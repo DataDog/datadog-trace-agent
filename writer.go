@@ -11,29 +11,6 @@ type Writer interface {
 	Start()
 }
 
-type StdoutWriter struct {
-	in chan Span
-}
-
-func NewStdoutWriter() *StdoutWriter {
-	return &StdoutWriter{}
-}
-
-func (w *StdoutWriter) Init(in chan Span) {
-	w.in = in
-}
-
-func (w *StdoutWriter) Start() {
-	go func() {
-		for s := range w.in {
-			log.Printf("TraceID: %d, SpanID: %d, ParentID: %d, Start: %s, Type: %s",
-				s.TraceID, s.SpanID, s.ParentID, s.FormatStart(), s.Type)
-		}
-	}()
-
-	log.Print("Writer started")
-}
-
 type EsWriter struct {
 	in chan Span
 	es *elastic.Client
@@ -51,12 +28,6 @@ func (w *EsWriter) Init(in chan Span) {
 	)
 	if err != nil {
 		log.Fatal(err)
-	}
-
-	// Create the index, just to be sure
-	_, err = client.CreateIndex("raclette").Do()
-	if err != nil {
-		// log.Fatal(err)
 	}
 
 	w.es = client

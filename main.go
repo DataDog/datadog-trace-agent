@@ -13,8 +13,7 @@ type RacletteAgent struct {
 func main() {
 
 	listener := NewHttpListener()
-	writer := NewStdoutWriter()
-	// writer := NewEsWriter()
+	writer := NewEsWriter()
 	channel := make(chan Span)
 
 	agent := RacletteAgent{

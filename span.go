@@ -20,7 +20,7 @@ type Span struct {
 	Type     string  `json:"type"`
 
 	// Arbitrary metadata
-	Meta map[string]string
+	Meta map[string]string `json:"meta"`
 }
 
 func (s *Span) Normalize() {
@@ -35,6 +35,13 @@ func (s *Span) Normalize() {
 	if s.TraceID == 0 {
 		s.TraceID = NewtID()
 		s.SpanID = NewsID()
+	}
+
+	// Set both end and duration for dev convenience (should be done by the backend)
+	if s.Duration == 0 && s.End != 0 {
+		s.Duration = s.End - s.Start
+	} else if s.Duration != 0 && s.End == 0 {
+		s.End = s.Start + s.Duration
 	}
 }
 

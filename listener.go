@@ -48,6 +48,8 @@ func (l *HttpListener) HandlePayload(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("OK\n"))
 
 	s.Normalize()
+	log.Printf("Span received. TraceID: %d, SpanID: %d, ParentID: %d, Start: %s, Type: %s",
+		s.TraceID, s.SpanID, s.ParentID, s.FormatStart(), s.Type)
 
 	l.out <- s
 }
