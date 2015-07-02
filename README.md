@@ -39,4 +39,8 @@ pip install -e ./
 ```
 # Send a trace manually
 curl "http://localhost:7777" -X POST -d '{"SpanID": 1234, "traceid": 46, "Type": "demo", "meta": {"client":"curl", "apache.version": "2.2.2"}}'
+
+# Send a trace with the example
+python python/example/custom_script.py
 ```
+
