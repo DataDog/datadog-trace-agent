@@ -26,7 +26,7 @@ func (l *HttpListener) Init(out chan Span) {
 
 func (l *HttpListener) Start() {
 	http.HandleFunc("/", l.HandlePayload)
-	log.Print("Listener ready to server")
+	log.Print("HTTP Listener running")
 	log.Fatal(http.ListenAndServe(":7777", nil))
 }
 

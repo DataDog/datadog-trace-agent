@@ -3,11 +3,19 @@
 #### The Agent
 
 ```
-# To use the ES writer, be sure ES runs on :9200 or :19200
+# Go dependencies
 go get github.com/olivere/elastic
+go get github.com/mattn/go-sqlite3
+
+# Build the collector
 go build
 
-# Create the ES index
+# Run it
+./raclette
+```
+
+```
+# If you want to use the ES writer, first create the ES index
 curl -XPOST localhost:9200/raclette -d '{
     "mappings" : {
         "span" : {
@@ -23,8 +31,8 @@ curl -XPOST localhost:9200/raclette -d '{
         }
     }
 }'
-
-./raclette
+# Then run with the proper option
+./raclette -writer=es
 ```
 
 #### The Python lib

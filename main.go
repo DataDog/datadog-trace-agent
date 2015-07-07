@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 )
 
@@ -12,8 +13,17 @@ type RacletteAgent struct {
 
 func main() {
 
+	var writerName = flag.String("writer", "sqlite", "Where to write the spans. Available: sqlite, es")
+	flag.Parse()
+
+	var writer Writer
+	if *writerName == "es" {
+		writer = NewEsWriter()
+	} else {
+		writer = NewSqliteWriter()
+	}
+
 	listener := NewHttpListener()
-	writer := NewEsWriter()
 	channel := make(chan Span)
 
 	agent := RacletteAgent{

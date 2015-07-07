@@ -1,3 +1,4 @@
 raclette
 python/raclette.egg-info
 sniffing/packetbeat_raclette*
+sqlite3.db
