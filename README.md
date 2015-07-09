@@ -35,6 +35,17 @@ curl -XPOST localhost:9200/raclette -d '{
 ./raclette -writer=es
 ```
 
+
+### The Agent UI
+
+Simple web UI to see traces and spans. Spans need to be written in the SQLite DB.
+
+```
+pip install flask
+
+python collector_web/server.py
+```
+
 #### The Python lib
 
 ```
@@ -46,9 +57,8 @@ pip install -e ./
 
 ```
 # Send a trace manually
-curl "http://localhost:7777" -X POST -d '{"SpanID": 1234, "traceid": 46, "Type": "demo", "meta": {"client":"curl", "apache.version": "2.2.2"}}'
+curl "http://localhost:7777" -X POST -d '{"span_id": 1234, "trace_id": 46, "type": "demo", "meta": {"client":"curl", "apache.version": "2.2.2"}}'
 
 # Send a trace with the example
 python python/example/custom_script.py
 ```
-
