@@ -32,7 +32,7 @@ curl -XPOST localhost:9200/raclette -d '{
     }
 }'
 # Then run with the proper option
-./raclette -writer=es
+./raclette -writers=es,sqlite
 ```
 
 

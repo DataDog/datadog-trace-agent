@@ -3,24 +3,36 @@ package main
 import (
 	"flag"
 	"log"
+	"strings"
 )
 
 type RacletteAgent struct {
-	Listener Listener
-	Writer   Writer
-	Spans    chan Span
+	Listener     Listener
+	Writers      []Writer
+	WritersChans []chan Span
+	Spans        chan Span
 }
 
 func main() {
 
-	var writerName = flag.String("writer", "sqlite", "Where to write the spans. Available: sqlite, es")
+	var writerNames = flag.String("writers", "sqlite", "comma-separated list of writers for spans. Available: sqlite, es")
 	flag.Parse()
 
-	var writer Writer
-	if *writerName == "es" {
-		writer = NewEsWriter()
-	} else {
-		writer = NewSqliteWriter()
+	var writers []Writer
+
+	for _, writerName := range strings.Split(*writerNames, ",") {
+		switch writerName {
+		case "es":
+			writers = append(writers, NewEsWriter())
+		case "sqlite":
+			writers = append(writers, NewSqliteWriter())
+		default:
+			log.Printf("Unknown writer %s, skipping ", writerName)
+		}
+	}
+
+	if len(writers) == 0 {
+		log.Fatal("You must specify at least one writer")
 	}
 
 	listener := NewHttpListener()
@@ -28,7 +40,7 @@ func main() {
 
 	agent := RacletteAgent{
 		Listener: listener,
-		Writer:   writer,
+		Writers:  writers,
 		Spans:    channel,
 	}
 
@@ -39,11 +51,24 @@ func main() {
 }
 
 func (a *RacletteAgent) Init() {
-	a.Writer.Init(a.Spans)
+	for _, writer := range a.Writers {
+		out := make(chan Span)
+		a.WritersChans = append(a.WritersChans, out)
+		writer.Init(out)
+	}
 	a.Listener.Init(a.Spans)
 }
 
 func (a *RacletteAgent) Start() {
-	a.Writer.Start()
+	for _, writer := range a.Writers {
+		writer.Start()
+	}
+	go func() {
+		for s := range a.Spans {
+			for _, c := range a.WritersChans {
+				c <- s
+			}
+		}
+	}()
 	a.Listener.Start()
 }

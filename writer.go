@@ -75,7 +75,10 @@ func (w *SqliteWriter) Init(in chan Span) {
 		json_meta TEXT
 	)`
 
-	db.Exec(schema)
+	_, err = db.Exec(schema)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	w.db = db
 }
