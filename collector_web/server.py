@@ -1,11 +1,24 @@
+from datetime import datetime as dt
 import os
 import json
 
-from flask import Flask, render_template
+from flask import Flask, render_template, send_from_directory
 import sqlite3
 
 app = Flask(__name__)
 
+
+def epoch_to_utc_dt(s):
+    return dt.utcfromtimestamp(float(s))
+
+@app.route('/js/<path:path>')
+def send_js(path):
+    app.logger.info(path)
+    return send_from_directory('js', path)
+
+@app.route('/css/<path:path>')
+def send_css(path):
+    return send_from_directory('css', path)
 
 @app.route("/")
 def trace_list():
@@ -18,6 +31,7 @@ def trace_list():
 
     traces = []
     for row in rows:
+        row['start_dt'] = epoch_to_utc_dt(row['start'])
         traces.append(row)
 
     return render_template("list.html", traces=traces)
@@ -63,4 +77,10 @@ def get_db():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(
+        debug=True,
+        static_files={
+             '/css': os.path.join(os.path.dirname(__file__), 'static/css'),
+             '/js': os.path.join(os.path.dirname(__file__), 'static/js')
+        }
+    )

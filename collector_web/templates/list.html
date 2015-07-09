@@ -1,7 +1,33 @@
 <!doctype html>
-<title>Traces</title>
-<ul>
-{% for trace in traces: %}
-  <li><a href="/{{ trace.trace_id }}">{{ trace.trace_id }}</a></li>
-{% endfor %}
-</ul>
+<html>
+<head>
+    <title>Traces</title>
+    <link rel="stylesheet" type="text/css" href="/css/sortable-theme-bootstrap.css">
+</head>
+<body>
+    <h3>{{ traces | length }} traces in our backend</h3>
+
+    <table class="sortable-theme-bootstrap" data-sortable>
+        <thead>
+        <tr>
+            <th>Timestamp</th>
+            <th>Duration</th>
+            <th>Type</th>
+            <th>Trace ID</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for trace in traces: %}
+        <tr>
+            <td>{{ trace.start_dt }}</td>
+            <td>{{ trace.duration }}</td>
+            <td>{{ trace.type }}</td>
+            <td><a href="/{{ trace.trace_id }}">{{ trace.trace_id }}</a></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+</table>
+
+    <script src="/js/sortable.js"></script>
+</body>
+</html>
