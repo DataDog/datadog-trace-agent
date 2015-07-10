@@ -40,7 +40,10 @@ func (w *EsWriter) Init(in chan Span) {
 func (w *EsWriter) Start() {
 	go func() {
 		for s := range w.in {
-			w.es.Index().Index("raclette").Type("span").BodyJson(s).Do()
+			_, err := w.es.Index().Index("raclette").Type("span").BodyJson(s).Do()
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 	}()
 

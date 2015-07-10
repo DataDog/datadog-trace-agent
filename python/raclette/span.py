@@ -77,7 +77,7 @@ class Span(object):
     def annotate(self, message, meta=None):
         annotation_span = self.create_child(span_type="annotation")
         annotation_span.meta = {
-            "message": message
+            "annotation.message": message
         }
         if meta:
             annotation_span.meta.update(meta)
@@ -90,8 +90,8 @@ def new_span(span_type=None):
 
 
 def new_trace_id():
-    return random.getrandbits(64)
+    return random.getrandbits(63)
 
 
 def new_span_id():
-    return random.getrandbits(32)
+    return random.getrandbits(31)
