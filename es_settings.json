@@ -1,0 +1,70 @@
+{
+  "mappings": {
+    "span": {
+      "properties": {
+        "trace_id": {
+          "type": "long"
+        },
+        "span_id": {
+          "type": "long",
+          "index": "no"
+        },
+        "parent_id": {
+          "type": "long",
+          "index": "no"
+        },
+        "type": {
+          "type": "string",
+          "index": "not_analyzed"
+        },
+        "label": {
+          "type": "string",
+          "index": "not_analyzed"
+        },
+        "start": {
+          "type": "double"
+        },
+        "end": {
+          "type": "double",
+          "index": "no"
+        },
+        "duration": {
+          "type": "double",
+          "index": "no"
+        },
+        "meta": {
+          "enabled": false,
+          "properties": {
+            "annotation.message": {
+              "type": "string",
+              "index": "no"
+            },
+            "http.url": {
+              "type": "string",
+              "index": "not_analyzed"
+            },
+            "http.response_code": {
+              "type": "short"
+            },
+            "sql.query": {
+              "type": "string",
+              "index": "no"
+            },
+            "sql.num_rows": {
+              "type": "integer",
+              "index": "no"
+            },
+            "net.bytes_in": {
+              "type": "integer",
+              "index": "no"
+            },
+            "net.bytes_out": {
+              "type": "integer",
+              "index": "no"
+            }
+          }
+        }
+      }
+    }
+  }
+}

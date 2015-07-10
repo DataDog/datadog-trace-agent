@@ -16,21 +16,8 @@ go build
 
 ```
 # If you want to use the ES writer, first create the ES index
-curl -XPOST localhost:9200/raclette -d '{
-    "mappings" : {
-        "span" : {
-            "properties" : {
-                "trace_id" : { "type" : "double" },
-                "span_id" : { "type" : "long" },
-                "parent_id" : { "type" : "long" },
-                "type" : { "type" : "string" },
-                "start" : { "type" : "float" },
-                "end" : { "type" : "float" },
-                "duration" : { "type" : "float" }
-            }
-        }
-    }
-}'
+curl -X PUT 'http://localhost:9200/raclette' -d @es_settings.json
+
 # Then run with the proper option
 ./raclette -writers=es,sqlite
 ```
