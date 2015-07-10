@@ -31,6 +31,15 @@ span.annotate(
 
 print "Back to work..."
 span.add_meta("animal.fox.say", "ding ding ding ding ding ding ding")
+
+http_call_span = span.create_child(span_type="http")
+http_call_span.duration = 0.1
+http_call_span.meta = {
+	"http.response_code": str(200),
+	"http.url": "google.com",
+	"http.response_size": str(4512),
+}
+
 time.sleep(.05)
 
 print "Boom, job is done! Report spans."
