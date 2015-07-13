@@ -65,7 +65,7 @@ def dict_factory(cursor, row):
     for idx, col in enumerate(cursor.description):
         d[col[0]] = row[idx]
         if col[0] == "json_meta":
-            d[col[0]] = json.loads(unicode(d[col[0]]))
+            d[col[0]] = json.loads(unicode(d[col[0]], errors='ignore'))
     return d
 
 
