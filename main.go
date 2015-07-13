@@ -3,7 +3,9 @@ package main
 import (
 	"flag"
 	"log"
+	"math/rand"
 	"strings"
+	"time"
 )
 
 type RacletteAgent struct {
@@ -17,6 +19,9 @@ func main() {
 
 	var writerNames = flag.String("writers", "sqlite", "comma-separated list of writers for spans. Available: sqlite, es")
 	flag.Parse()
+
+	// Seed rand
+	rand.Seed(time.Now().UTC().UnixNano())
 
 	var writers []Writer
 
