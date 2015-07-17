@@ -10,16 +10,18 @@ class Span(object):
     def __init__(
         self,
         trace_id=None, span_id=None, parent_id=None,
-        start=None, end=None, duration=None,
-        span_type=None, meta=None,
+        start=None, duration=None, sample_size=None,
+        span_type=None, service=None, resource=None, meta=None,
     ):
         self.trace_id = trace_id
         self.span_id = span_id
         self.parent_id = parent_id
         self.start = start
-        self.end = end
         self.duration = duration
+        self.sample_size = sample_size
         self.type = span_type
+        self.service = service
+        self.resource = resource
         self.meta = meta
 
         if self.trace_id is None:
@@ -28,6 +30,8 @@ class Span(object):
             self.span_id = new_span_id()
         if self.start is None:
             self.start = time.time()
+        if self.sample_size is None:
+            self.sample_size = 1
         if self.meta is None:
             self.meta = {}
 
@@ -47,12 +51,16 @@ class Span(object):
             json_span['parent_id'] = self.parent_id
         if self.start:
             json_span['start'] = self.start
-        if self.end:
-            json_span['end'] = self.end
         if self.duration:
             json_span['duration'] = self.duration
+        if self.sample_size:
+            json_span['sample_size'] = self.sample_size
         if self.type:
             json_span['type'] = self.type
+        if self.service:
+            json_span['service'] = self.service
+        if self.resource:
+            json_span['resource'] = self.resource
         if self.meta:
             json_span['meta'] = self.meta
 
@@ -60,29 +68,11 @@ class Span(object):
 
     def close(self):
         # Close the span when not done manually
-        if not self.end and not self.duration and not self.is_annotation():
-            self.end = time.time()
+        if not self.duration:
+            self.duration = time.time() - self.start
 
-    def is_annotation(self):
-        """Check if that span should have no duration"""
-        return self.type == "annotation"
-
-    def create_child(self, span_type=None):
-        child = Span(trace_id=self.trace_id, parent_id=self.span_id, start=time.time())
-        if span_type:
-            child.type = span_type
-
-        return child
-
-    def annotate(self, message, meta=None):
-        annotation_span = self.create_child(span_type="annotation")
-        annotation_span.meta = {
-            "annotation.message": message
-        }
-        if meta:
-            annotation_span.meta.update(meta)
-
-        return annotation_span
+    def create_child(self, **kwargs):
+        return Span(trace_id=self.trace_id, parent_id=self.span_id, start=time.time(), **kwargs)
 
 
 def new_span(span_type=None):

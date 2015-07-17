@@ -17,19 +17,19 @@
           "type": "string",
           "index": "not_analyzed"
         },
-        "label": {
+        "resource": {
           "type": "string",
           "index": "not_analyzed"
         },
         "start": {
           "type": "double"
         },
-        "end": {
+        "duration": {
           "type": "double",
           "index": "no"
         },
-        "duration": {
-          "type": "double",
+        "sample_size": {
+          "type": "long",
           "index": "no"
         },
         "meta": {

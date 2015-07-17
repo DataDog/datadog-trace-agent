@@ -72,9 +72,10 @@ func (w *SqliteWriter) Init(in chan Span) {
 		span_id INTEGER,
 		parent_id INTEGER,
 		start REAL,
-		end REAL,
 		duration REAL,
+		sample_size REAL,
 		type TEXT,
+		resource TEXT,
 		json_meta TEXT
 	)`
 
@@ -89,8 +90,8 @@ func (w *SqliteWriter) Init(in chan Span) {
 func (w *SqliteWriter) Start() {
 	go func() {
 		query, err := w.db.Prepare(
-			`INSERT INTO span(trace_id, span_id, parent_id, start, end, duration, type, json_meta)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO span(trace_id, span_id, parent_id, start, duration, sample_size, type, resource, json_meta)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		)
 		if err != nil {
 			log.Fatal(err)
@@ -103,9 +104,10 @@ func (w *SqliteWriter) Start() {
 				strconv.FormatUint(uint64(s.SpanID), 10),
 				strconv.FormatUint(uint64(s.ParentID), 10),
 				strconv.FormatFloat(s.Start, 'f', 6, 64),
-				strconv.FormatFloat(s.End, 'f', 6, 64),
 				strconv.FormatFloat(s.Duration, 'f', 6, 64),
+				strconv.FormatUint(uint64(s.SampleSize), 10),
 				s.Type,
+				s.Resource,
 				jsonMeta,
 			)
 			if err != nil {
