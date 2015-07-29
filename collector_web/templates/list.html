@@ -12,8 +12,9 @@
         <tr>
             <th>Timestamp</th>
             <th>Duration</th>
-            <th>Service</th>
             <th>Type</th>
+            <th>Service</th>
+            <th>Resource</th>
             <th>Trace ID</th>
         </tr>
         </thead>
@@ -22,8 +23,9 @@
         <tr>
             <td>{{ trace.start_dt }}</td>
             <td>{{ trace.duration }}</td>
-            <td>{{ trace.service }}</td>
             <td>{{ trace.type }}</td>
+            <td>{{ trace.service }}</td>
+            <td>{{ trace.resource }}</td>
             <td><a href="/{{ trace.trace_id }}">{{ trace.trace_id }}</a></td>
         </tr>
         {% endfor %}

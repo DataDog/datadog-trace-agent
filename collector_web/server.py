@@ -45,6 +45,9 @@ def trace_show(trace_id):
     cur.execute("SELECT * FROM span WHERE trace_id = ?", (trace_id, ))
     rows = cur.fetchall()
 
+    if not rows:
+        return 'TRACE NOT FOUND', 404
+
     parent = None
     children = []
     for row in rows:
@@ -53,10 +56,33 @@ def trace_show(trace_id):
         else:
             parent = row
 
+    WIDTH = 100
+    def get_span_title(span, start, width):
+        title = "{service} - {resource} ({duration}s)".format(**span)
+        fmt_str = ' ' * start + title
+        return fmt_str
+
+    sgraph = ""
+    # first level is fixed 100-wide
+    sgraph += get_span_title(parent, 0, WIDTH) + '\n'
+    sgraph += '=' * WIDTH + '\n'
+
+    time_unit = parent['duration'] / WIDTH
+    print "TIME UNIT %s" % time_unit
+
+    for c in sorted(children, key=lambda x: x['start']):
+        delay_units = int((c['start'] - parent['start']) / time_unit)
+        print c['start']
+        print parent['start']
+        print delay_units
+        sgraph += get_span_title(c, delay_units, WIDTH) + '\n'
+        sgraph += ' ' * delay_units + max(1, int(c['duration'] / time_unit)) * '=' + '\n'
+
     return render_template(
         "show.html",
         parent=json.dumps(parent, sort_keys=True, indent=4, separators=(',', ': ')),
         children=json.dumps(children, sort_keys=True, indent=4, separators=(',', ': ')),
+        graph=sgraph
     )
 
 

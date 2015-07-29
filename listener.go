@@ -42,6 +42,7 @@ func (l *HttpListener) HandleSpan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var s Span
+	//log.Printf("%s", body)
 	err = json.Unmarshal(body, &s)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
