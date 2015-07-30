@@ -1,17 +1,17 @@
-package main
+package model
 
 import (
 	"math/rand"
 	"time"
 )
 
-type tID uint64
-type sID uint32
+type TID uint64
+type SID uint32
 
 type Span struct {
-	TraceID  tID `json:"trace_id"`
-	SpanID   sID `json:"span_id"`
-	ParentID sID `json:"parent_id"`
+	TraceID  TID `json:"trace_id"`
+	SpanID   SID `json:"span_id"`
+	ParentID SID `json:"parent_id"`
 
 	Service  string `json:"service"`
 	Resource string `json:"resource"`
@@ -40,8 +40,8 @@ func (s *Span) Normalize() {
 
 	// Create a new Trace when there is no context for this span
 	if s.TraceID == 0 {
-		s.TraceID = NewtID()
-		s.SpanID = NewsID()
+		s.TraceID = NewTID()
+		s.SpanID = NewSID()
 	}
 }
 
@@ -57,10 +57,10 @@ func Now() float64 {
 	return float64(time.Now().UnixNano()) / 1e9
 }
 
-func NewtID() tID {
-	return tID(rand.Int63())
+func NewTID() TID {
+	return TID(rand.Int63())
 }
 
-func NewsID() sID {
-	return sID(rand.Uint32())
+func NewSID() SID {
+	return SID(rand.Uint32())
 }

@@ -6,23 +6,24 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/DataDog/raclette/model"
 	log "github.com/cihub/seelog"
 )
 
 type Listener interface {
-	Init(chan Span)
+	Init(chan model.Span)
 	Start() error
 }
 
 type HttpListener struct {
-	out chan Span
+	out chan model.Span
 }
 
 func NewHttpListener() *HttpListener {
 	return &HttpListener{}
 }
 
-func (l *HttpListener) Init(out chan Span) {
+func (l *HttpListener) Init(out chan model.Span) {
 	l.out = out
 }
 
@@ -41,7 +42,7 @@ func (l *HttpListener) HandleSpan(w http.ResponseWriter, r *http.Request) {
 		panic(fmt.Errorf("Error writing header: %s", err))
 	}
 
-	var s Span
+	var s model.Span
 	//log.Printf("%s", body)
 	err = json.Unmarshal(body, &s)
 	if err != nil {
@@ -66,7 +67,7 @@ func (l *HttpListener) HandleSpans(w http.ResponseWriter, r *http.Request) {
 		panic(fmt.Errorf("%s", err))
 	}
 
-	var spans []Span
+	var spans []model.Span
 	err = json.Unmarshal(body, &spans)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

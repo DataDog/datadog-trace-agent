@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/DataDog/raclette/model"
 	log "github.com/cihub/seelog"
 )
 
@@ -20,7 +21,7 @@ func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	listener := NewHttpListener()
-	spans := make(chan Span)
+	spans := make(chan model.Span)
 
 	writer := NewAPIWriter()
 	agent := RacletteAgent{
@@ -41,13 +42,13 @@ func main() {
 type RacletteAgent struct {
 	Listener     Listener
 	Writers      []Writer
-	WritersChans []chan Span
-	Spans        chan Span
+	WritersChans []chan model.Span
+	Spans        chan model.Span
 }
 
 func (a *RacletteAgent) Init() {
 	for _, writer := range a.Writers {
-		out := make(chan Span)
+		out := make(chan model.Span)
 		a.WritersChans = append(a.WritersChans, out)
 		writer.Init(out)
 	}
