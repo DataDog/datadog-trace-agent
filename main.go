@@ -31,6 +31,8 @@ func main() {
 			writers = append(writers, NewEsWriter())
 		case "sqlite":
 			writers = append(writers, NewSqliteWriter())
+		case "api":
+			writers = append(writers, NewAPIWriter())
 		default:
 			log.Printf("Unknown writer %s, skipping ", writerName)
 		}
