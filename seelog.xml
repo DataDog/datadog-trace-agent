@@ -1,0 +1,8 @@
+<seelog>
+    <outputs formatid="common">
+        <console/>
+    </outputs>
+    <formats>
+        <format id="common" format="%Date %Time %LEVEL (%File:%Line) - %Msg%n"/>
+    </formats>
+</seelog>

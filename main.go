@@ -1,60 +1,48 @@
 package main
 
 import (
-	"flag"
-	"log"
+	"fmt"
 	"math/rand"
-	"strings"
 	"time"
+
+	log "github.com/cihub/seelog"
 )
+
+func main() {
+
+	logger, err := log.LoggerFromConfigAsFile("./seelog.xml")
+	if err != nil {
+		panic(fmt.Sprintf("Error loading logging config: %v", err))
+	}
+	log.ReplaceLogger(logger)
+
+	// Seed rand
+	rand.Seed(time.Now().UTC().UnixNano())
+
+	listener := NewHttpListener()
+	spans := make(chan Span)
+
+	writer := NewAPIWriter()
+	agent := RacletteAgent{
+		Listener: listener,
+		Writers:  []Writer{writer},
+		Spans:    spans,
+	}
+
+	log.Info("Inititializing")
+	agent.Init()
+	log.Info("Starting")
+	err = agent.Start()
+	if err != nil {
+		panic(fmt.Errorf("Error starting agent: %s", err))
+	}
+}
 
 type RacletteAgent struct {
 	Listener     Listener
 	Writers      []Writer
 	WritersChans []chan Span
 	Spans        chan Span
-}
-
-func main() {
-
-	var writerNames = flag.String("writers", "sqlite", "comma-separated list of writers for spans. Available: sqlite, es")
-	flag.Parse()
-
-	// Seed rand
-	rand.Seed(time.Now().UTC().UnixNano())
-
-	var writers []Writer
-
-	for _, writerName := range strings.Split(*writerNames, ",") {
-		switch writerName {
-		case "es":
-			writers = append(writers, NewEsWriter())
-		case "sqlite":
-			writers = append(writers, NewSqliteWriter())
-		case "api":
-			writers = append(writers, NewAPIWriter())
-		default:
-			log.Printf("Unknown writer %s, skipping ", writerName)
-		}
-	}
-
-	if len(writers) == 0 {
-		log.Fatal("You must specify at least one writer")
-	}
-
-	listener := NewHttpListener()
-	channel := make(chan Span)
-
-	agent := RacletteAgent{
-		Listener: listener,
-		Writers:  writers,
-		Spans:    channel,
-	}
-
-	log.Print("Init")
-	agent.Init()
-	log.Print("Start")
-	agent.Start()
 }
 
 func (a *RacletteAgent) Init() {
@@ -66,7 +54,7 @@ func (a *RacletteAgent) Init() {
 	a.Listener.Init(a.Spans)
 }
 
-func (a *RacletteAgent) Start() {
+func (a *RacletteAgent) Start() error {
 	for _, writer := range a.Writers {
 		writer.Start()
 	}
@@ -77,5 +65,5 @@ func (a *RacletteAgent) Start() {
 			}
 		}
 	}()
-	a.Listener.Start()
+	return a.Listener.Start()
 }
