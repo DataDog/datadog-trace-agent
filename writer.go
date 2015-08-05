@@ -8,31 +8,31 @@ import (
 
 	log "github.com/cihub/seelog"
 
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/DataDog/raclette/model"
 )
 
 type Writer interface {
-	Init(chan Span)
+	Init(chan model.Span)
 	Start()
 }
 
 type CollectorPayload struct {
-	ApiKey string `json:"api_key"`
-	Spans  []Span `json:"spans"`
+	ApiKey string       `json:"api_key"`
+	Spans  []model.Span `json:"spans"`
 }
 
 type APIWriter struct {
-	in         chan Span
-	spanBuffer []Span
+	in         chan model.Span
+	spanBuffer []model.Span
 }
 
 func NewAPIWriter() *APIWriter {
 	return &APIWriter{}
 }
 
-func (w *APIWriter) Init(in chan Span) {
+func (w *APIWriter) Init(in chan model.Span) {
 	w.in = in
-	w.spanBuffer = []Span{}
+	w.spanBuffer = []model.Span{}
 }
 
 func (w *APIWriter) Start() {
@@ -60,7 +60,7 @@ func (w *APIWriter) Flush() {
 		log.Info("Nothing to flush")
 		return
 	}
-	w.spanBuffer = []Span{}
+	w.spanBuffer = []model.Span{}
 	log.Infof("Flush collector to the API, %d spans", len(spans))
 
 	payload := CollectorPayload{
