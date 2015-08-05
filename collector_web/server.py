@@ -32,6 +32,7 @@ def trace_list():
     traces = []
     for row in rows:
         row['start_dt'] = epoch_to_utc_dt(row['start'])
+        row['duration_micros'] = row['duration'] * 1e6
         traces.append(row)
 
     return render_template("list.html", traces=traces)
