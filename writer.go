@@ -11,30 +11,38 @@ import (
 	"github.com/DataDog/raclette/model"
 )
 
+// Writer is an interface of a routine consuming and persisting spans
+// somewhere
 type Writer interface {
 	Init(chan model.Span)
 	Start()
 }
 
+// CollectorPayload is the payload sent to the API of mothership
 type CollectorPayload struct {
-	ApiKey string       `json:"api_key"`
+	APIKey string       `json:"api_key"`
 	Spans  []model.Span `json:"spans"`
 }
 
+// APIWriter implements a Writer and writes to the Datadog API spans
 type APIWriter struct {
 	in         chan model.Span
 	spanBuffer []model.Span
 }
 
+// NewAPIWriter returns a new Writer
 func NewAPIWriter() *APIWriter {
 	return &APIWriter{}
 }
 
+// Init initalizes the span buffer and the input channel of spans
 func (w *APIWriter) Init(in chan model.Span) {
 	w.in = in
 	w.spanBuffer = []model.Span{}
 }
 
+// Start runs the writer by consuming spans in a buffer and periodically
+// flushing to the API
 func (w *APIWriter) Start() {
 	go func() {
 		for s := range w.in {
@@ -42,18 +50,19 @@ func (w *APIWriter) Start() {
 		}
 	}()
 
-	go w.PeriodicFlush()
+	go w.periodicFlush()
 
 	log.Info("APIWriter started")
 }
 
-func (w *APIWriter) PeriodicFlush() {
+func (w *APIWriter) periodicFlush() {
 	c := time.NewTicker(3 * time.Second).C
 	for _ = range c {
 		w.Flush()
 	}
 }
 
+// Flush the span buffer by writing to the API its contents
 func (w *APIWriter) Flush() {
 	spans := w.spanBuffer
 	if len(spans) == 0 {
@@ -64,7 +73,7 @@ func (w *APIWriter) Flush() {
 	log.Infof("Flush collector to the API, %d spans", len(spans))
 
 	payload := CollectorPayload{
-		ApiKey: "424242",
+		APIKey: "424242",
 		Spans:  spans,
 	}
 

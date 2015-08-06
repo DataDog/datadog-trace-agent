@@ -3,23 +3,14 @@
 #### The Agent
 
 ```
-# Go dependencies
-go get github.com/olivere/elastic
-go get github.com/mattn/go-sqlite3
-
-# Build the collector
-go build
+# Run verifications & build the binaries
+rake
 
 # Run it
 ./raclette
-```
 
-```
-# If you want to use the ES writer, first create the ES index
-curl -X PUT 'http://localhost:9200/raclette' -d @es_settings.json
-
-# Then run with the proper option
-./raclette -writers=es,sqlite
+# Run the trace generator
+./generator
 ```
 
 

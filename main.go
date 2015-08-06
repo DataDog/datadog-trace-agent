@@ -10,7 +10,6 @@ import (
 )
 
 func main() {
-
 	logger, err := log.LoggerFromConfigAsFile("./seelog.xml")
 	if err != nil {
 		panic(fmt.Sprintf("Error loading logging config: %v", err))
@@ -20,7 +19,7 @@ func main() {
 	// Seed rand
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	listener := NewHttpListener()
+	listener := NewHTTPListener()
 	spans := make(chan model.Span)
 
 	writer := NewAPIWriter()
@@ -37,34 +36,4 @@ func main() {
 	if err != nil {
 		panic(fmt.Errorf("Error starting agent: %s", err))
 	}
-}
-
-type RacletteAgent struct {
-	Listener     Listener
-	Writers      []Writer
-	WritersChans []chan model.Span
-	Spans        chan model.Span
-}
-
-func (a *RacletteAgent) Init() {
-	for _, writer := range a.Writers {
-		out := make(chan model.Span)
-		a.WritersChans = append(a.WritersChans, out)
-		writer.Init(out)
-	}
-	a.Listener.Init(a.Spans)
-}
-
-func (a *RacletteAgent) Start() error {
-	for _, writer := range a.Writers {
-		writer.Start()
-	}
-	go func() {
-		for s := range a.Spans {
-			for _, c := range a.WritersChans {
-				c <- s
-			}
-		}
-	}()
-	return a.Listener.Start()
 }

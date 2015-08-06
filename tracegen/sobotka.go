@@ -1,6 +1,10 @@
 package main
 
-func NewFakeDogpoundGet() Service {
+// this file implements some "fake" services that are used in dogweb
+// composing them will enable you to generate traces that look like the
+// ones from different applications of dogweb (web, sobotka, ...)
+
+func newFakeDogpoundGet() Service {
 	return Service{
 		Name: "dogpound.redis",
 		ResourceMaker: func() string {
@@ -12,7 +16,7 @@ func NewFakeDogpoundGet() Service {
 	}
 }
 
-func NewFakeDogpoundSet() Service {
+func newFakeDogpoundSet() Service {
 	return Service{
 		Name: "dogpound.redis",
 		ResourceMaker: func() string {
@@ -24,8 +28,8 @@ func NewFakeDogpoundSet() Service {
 	}
 }
 
-func NewFakeSobotkaNormalize() Service {
-	subs := []Service{NewFakeDogpoundGet(), NewFakeDogpoundSet(), NewFakeDogpoundSet()}
+func newFakeSobotkaNormalize() Service {
+	subs := []Service{newFakeDogpoundGet(), newFakeDogpoundSet(), newFakeDogpoundSet()}
 	return Service{
 		Name: "sobotka.transform",
 		ResourceMaker: func() string {
@@ -38,7 +42,7 @@ func NewFakeSobotkaNormalize() Service {
 	}
 }
 
-func NewFakeSobotkaTransform() Service {
+func newFakeSobotkaTransform() Service {
 	qs := []string{"agent_api", "metric_api"}
 	return Service{
 		Name: "sobotka.transform",
@@ -51,9 +55,9 @@ func NewFakeSobotkaTransform() Service {
 	}
 }
 
-func NewFakeSobotka() Service {
+func newFakeSobotka() Service {
 	qs := []string{"metric_api", "metrics", "check_runs"}
-	subs := []Service{NewFakeSobotkaTransform(), NewFakeSobotkaNormalize()}
+	subs := []Service{newFakeSobotkaTransform(), newFakeSobotkaNormalize()}
 	return Service{
 		Name: "sobotka.process",
 		ResourceMaker: func() string {

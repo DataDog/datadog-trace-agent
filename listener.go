@@ -10,32 +10,40 @@ import (
 	log "github.com/cihub/seelog"
 )
 
+// Listener is the common interface for an agent span collector
 type Listener interface {
 	Init(chan model.Span)
 	Start() error
 }
 
-type HttpListener struct {
+// HTTPListener is a collector that uses HTTP protocol and just holds
+// a chan where the spans received are sent one by one
+type HTTPListener struct {
 	out chan model.Span
 }
 
-func NewHttpListener() *HttpListener {
-	return &HttpListener{}
+// NewHTTPListener returns a poiter to a new HTTPListener
+func NewHTTPListener() *HTTPListener {
+	return &HTTPListener{}
 }
 
-func (l *HttpListener) Init(out chan model.Span) {
+// Init is needed before using the listener to set channels
+func (l *HTTPListener) Init(out chan model.Span) {
 	l.out = out
 }
 
-func (l *HttpListener) Start() error {
-	http.HandleFunc("/span", l.HandleSpan)
-	http.HandleFunc("/spans", l.HandleSpans)
+// Start actually starts the HTTP server and returns any error that could
+// have arosen
+func (l *HTTPListener) Start() error {
+	http.HandleFunc("/span", l.handleSpan)
+	http.HandleFunc("/spans", l.handleSpans)
 	addr := ":7777"
 	log.Infof("HTTP Listener starting on %s", addr)
 	return http.ListenAndServe(addr, nil)
 }
 
-func (l *HttpListener) HandleSpan(w http.ResponseWriter, r *http.Request) {
+// handleSpan handle a request with a single span
+func (l *HTTPListener) handleSpan(w http.ResponseWriter, r *http.Request) {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -60,7 +68,8 @@ func (l *HttpListener) HandleSpan(w http.ResponseWriter, r *http.Request) {
 	l.out <- s
 }
 
-func (l *HttpListener) HandleSpans(w http.ResponseWriter, r *http.Request) {
+// handleSpans handle a request with a list of several spans
+func (l *HTTPListener) handleSpans(w http.ResponseWriter, r *http.Request) {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

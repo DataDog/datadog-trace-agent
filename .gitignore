@@ -1,5 +1,10 @@
 raclette
+generator
+*.swp
 python/raclette.egg-info
 sniffing/packetbeat_raclette*
 db.sqlite3
 *.pyc
+venv/*
+stats/stats
+tracegen/tracegen
