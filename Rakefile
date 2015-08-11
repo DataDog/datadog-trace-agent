@@ -51,7 +51,7 @@ task :fmt do go_fmt("./") end
 
 # FIXME: add :test in the list
 desc "Raclette agent CI script (fmt, vet, etc)"
-task :ci => [:bootstrap, :fmt, :vet, :lint, :build]
+task :ci => [:restore, :fmt, :vet, :lint, :build]
 
 task :err do
   sh "errcheck github.com/DataDog/raclette"
