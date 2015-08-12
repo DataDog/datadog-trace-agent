@@ -4,46 +4,68 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
+	"sync"
 
 	"github.com/DataDog/raclette/model"
 	log "github.com/cihub/seelog"
 )
 
-// Listener is the common interface for an agent span collector
-type Listener interface {
+// Receiver is the common interface for an agent span collector, it receives spans from clients
+type Receiver interface {
 	Init(chan model.Span)
-	Start() error
+	Start()
 }
 
-// HTTPListener is a collector that uses HTTP protocol and just holds
+// HTTPReceiver is a collector that uses HTTP protocol and just holds
 // a chan where the spans received are sent one by one
-type HTTPListener struct {
-	out chan model.Span
+type HTTPReceiver struct {
+	out       chan model.Span
+	exit      chan bool
+	exitGroup *sync.WaitGroup
 }
 
-// NewHTTPListener returns a poiter to a new HTTPListener
-func NewHTTPListener() *HTTPListener {
-	return &HTTPListener{}
+// NewHTTPReceiver returns a pointer to a new HTTPReceiver
+func NewHTTPReceiver(exit chan bool, exitGroup *sync.WaitGroup) *HTTPReceiver {
+	return &HTTPReceiver{
+		exit:      exit,
+		exitGroup: exitGroup,
+	}
 }
 
 // Init is needed before using the listener to set channels
-func (l *HTTPListener) Init(out chan model.Span) {
+func (l *HTTPReceiver) Init(out chan model.Span) {
 	l.out = out
 }
 
 // Start actually starts the HTTP server and returns any error that could
 // have arosen
-func (l *HTTPListener) Start() error {
+func (l *HTTPReceiver) Start() {
 	http.HandleFunc("/span", l.handleSpan)
 	http.HandleFunc("/spans", l.handleSpans)
 	addr := ":7777"
 	log.Infof("HTTP Listener starting on %s", addr)
-	return http.ListenAndServe(addr, nil)
+
+	tcpL, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Error("Could not create TCP listener")
+		panic(err)
+	}
+
+	sl, err := NewStoppableListener(tcpL)
+	sl.Init(l.exit)
+	server := http.Server{}
+
+	l.exitGroup.Add(1)
+	defer l.exitGroup.Done()
+
+	// Will return when closed using exit channels
+	server.Serve(sl)
 }
 
 // handleSpan handle a request with a single span
-func (l *HTTPListener) handleSpan(w http.ResponseWriter, r *http.Request) {
+func (l *HTTPReceiver) handleSpan(w http.ResponseWriter, r *http.Request) {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -62,14 +84,14 @@ func (l *HTTPListener) handleSpan(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("OK\n"))
 
 	s.Normalize()
-	log.Infof("Span received. TraceID: %d, SpanID: %d, ParentID: %d, Start: %s, Service: %s, Type: %s",
-		s.TraceID, s.SpanID, s.ParentID, s.FormatStart(), s.Service, s.Type)
+	//	log.Infof("Span received. TraceID: %d, SpanID: %d, ParentID: %d, Start: %s, Service: %s, Type: %s",
+	//		s.TraceID, s.SpanID, s.ParentID, s.FormatStart(), s.Service, s.Type)
 
 	l.out <- s
 }
 
 // handleSpans handle a request with a list of several spans
-func (l *HTTPListener) handleSpans(w http.ResponseWriter, r *http.Request) {
+func (l *HTTPReceiver) handleSpans(w http.ResponseWriter, r *http.Request) {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -86,12 +108,12 @@ func (l *HTTPListener) handleSpans(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK\n"))
 
-	log.Infof("Set of spans received")
+	//	log.Infof("Set of spans received")
 
 	for _, s := range spans {
 		s.Normalize()
-		log.Infof("Span received. TraceID: %d, SpanID: %d, ParentID: %d, Start: %s, Service: %s, Type: %s",
-			s.TraceID, s.SpanID, s.ParentID, s.FormatStart(), s.Service, s.Type)
+		//		log.Infof("Span received. TraceID: %d, SpanID: %d, ParentID: %d, Start: %s, Service: %s, Type: %s",
+		//			s.TraceID, s.SpanID, s.ParentID, s.FormatStart(), s.Service, s.Type)
 
 		l.out <- s
 	}

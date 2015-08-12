@@ -16,9 +16,8 @@ task :restore => [:bootstrap] do
 end
 
 PACKAGES = %w(
-  .
+  ./agent
   ./model
-  ./stats
   ./tracegen
 )
 
@@ -26,8 +25,8 @@ task :default => [:ci]
 
 desc "Build Raclette agent"
 task :build do
-  go_build("github.com/DataDog/raclette")
-  go_build("github.com/DataDog/raclette/tracegen", :cmd=>"go build -a -o generator")
+  go_build("github.com/DataDog/raclette/agent", :cmd => "go build -a -o raclette")
+  go_build("github.com/DataDog/raclette/tracegen", :cmd => "go build -a -o generator")
 end
 
 desc "Install Raclette agent"
@@ -46,8 +45,13 @@ task :lint do
   end
 end
 
-task :vet do go_vet("./") end
-task :fmt do go_fmt("./") end
+task :vet do
+  PACKAGES.each { |pkg| go_vet(pkg) }
+end
+
+task :fmt do
+  PACKAGES.each { |pkg| go_fmt(pkg) }
+end
 
 # FIXME: add :test in the list
 desc "Raclette agent CI script (fmt, vet, etc)"
