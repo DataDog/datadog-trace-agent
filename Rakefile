@@ -38,6 +38,11 @@ end
 desc "Test Raclette agent"
 task :test do go_test("./raclette") end
 
+desc "Run Raclette agent"
+task :run do
+  sh "./raclette -config ./agent/trace-agent.ini -log_config ./seelog.xml"
+end
+
 task :lint do
   PACKAGES.each do |pkg|
     find_cmd = "find #{pkg} -name '*.go'"

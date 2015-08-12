@@ -27,11 +27,13 @@ func handleSignal(exit chan bool) {
 }
 
 var opts struct {
-	configFile string
+	configFile    string
+	logConfigFile string
 }
 
 func main() {
 	flag.StringVar(&opts.configFile, "config", "/etc/datadog/trace-agent.ini", "Trace agent ini config file.")
+	flag.StringVar(&opts.logConfigFile, "log_config", "/etc/datadog/trace-agent_seelog.xml", "Trace agent log config file.")
 	flag.Parse()
 
 	// Instantiate the config
@@ -41,7 +43,7 @@ func main() {
 	}
 
 	// Initialize logging
-	logger, err := log.LoggerFromConfigAsFile("./seelog.xml")
+	logger, err := log.LoggerFromConfigAsFile(opts.logConfigFile)
 	if err != nil {
 		panic(fmt.Sprintf("Error loading logging config: %v", err))
 	}
