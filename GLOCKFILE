@@ -2,5 +2,5 @@ cmd github.com/golang/lint/golint
 github.com/cihub/seelog c510775bb50d98213cfafca75a4bc5e3fddc8d8f
 github.com/dgryski/go-gk 201884a44051d8544b65e6b1c05ae71c0c45b9e0
 github.com/golang/lint f42f5c1c440621302702cb0741e9d2ca547ae80f
-github.com/mattn/go-sqlite3 b4142c444a8941d0d92b0b7103a24df9cd815e42
+github.com/vaughan0/go-ini a98ad7ee00ec53921f08832bc06ecf7fd600e6a1
 golang.org/x/tools a6d2a4254ebe0154bc44ff9b8473b8738f0d68e8
