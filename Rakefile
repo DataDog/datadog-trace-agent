@@ -30,7 +30,10 @@ task :build do
 end
 
 desc "Install Raclette agent"
-task :install do go_build("github.com/DataDog/raclette", :cmd=>"go install") end
+task :install do
+  go_build("github.com/DataDog/raclette/agent", :cmd=>"go install")
+  go_build("github.com/DataDog/raclette/tracegen", :cmd=>"go install")
+end
 
 desc "Test Raclette agent"
 task :test do go_test("./raclette") end
