@@ -3,6 +3,7 @@ package main
 import (
 	"sync"
 
+	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
 	log "github.com/cihub/seelog"
 )
@@ -13,6 +14,9 @@ type Agent struct {
 	Concentrator *Concentrator
 	SpanWriter   *SpanWriter
 	StatsWriter  *StatsWriter
+
+	// config
+	Config *config.File
 
 	// Used to synchronize on a clean exit
 	exit      chan bool
@@ -26,22 +30,24 @@ type Agent struct {
 }
 
 // NewAgent returns a new Agent object, ready to be initialized and started
-func NewAgent() *Agent {
+func NewAgent(conf *config.File) *Agent {
 	// FIXME: this should be read from config and not hardcoded
-	var concentratorBucketSize int32 = 5
-	concentratorStrategy := model.EXACT
-	concentratorGKEpsilon := 1e-3
-	APIEndpoint := "http://localhost:8012/api/v0.1"
+	endpoint := conf.GetDefault("trace.api", "endpoint", "http://localhost:8012/api/v0.1")
 
 	exit := make(chan bool)
 	var exitGroup sync.WaitGroup
 
 	r := NewHTTPReceiver(exit, &exitGroup)
-	c := NewConcentrator(concentratorBucketSize, concentratorStrategy, concentratorGKEpsilon, exit, &exitGroup)
-	spW := NewSpanWriter(APIEndpoint, exit, &exitGroup)
-	stW := NewStatsWriter(APIEndpoint, exit, &exitGroup)
+	c := NewConcentrator(
+		conf.GetIntDefault("trace.concentrator", "bucket_size", 5),
+		model.Strategy(conf.GetDefault("trace.concentrator", "strategy", string(model.EXACT))),
+		conf.GetFloat64Default("trace.concentrator", "gk_epsilon", 1e-3),
+		exit, &exitGroup)
+	spW := NewSpanWriter(endpoint, exit, &exitGroup)
+	stW := NewStatsWriter(endpoint, exit, &exitGroup)
 
 	return &Agent{
+		Config:       conf,
 		Receiver:     r,
 		Concentrator: c,
 		SpanWriter:   spW,

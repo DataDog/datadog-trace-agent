@@ -29,7 +29,7 @@ type Concentrator struct {
 	exitGroup *sync.WaitGroup
 
 	// configuration
-	bucketDuration int32
+	bucketDuration int
 	strategy       model.Strategy
 	gkEps          float64
 
@@ -39,7 +39,7 @@ type Concentrator struct {
 }
 
 // NewConcentrator yields a new Concentrator flushing at a bucketDuration secondspace
-func NewConcentrator(bucketDuration int32, strategy model.Strategy, gkEps float64, exit chan bool, exitGroup *sync.WaitGroup) *Concentrator {
+func NewConcentrator(bucketDuration int, strategy model.Strategy, gkEps float64, exit chan bool, exitGroup *sync.WaitGroup) *Concentrator {
 	return &Concentrator{
 		bucketDuration: bucketDuration,
 		strategy:       strategy,

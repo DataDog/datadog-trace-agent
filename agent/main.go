@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"math/rand"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/DataDog/raclette/config"
 	log "github.com/cihub/seelog"
 )
 
@@ -24,7 +26,20 @@ func handleSignal(exit chan bool) {
 	}
 }
 
+var opts struct {
+	configFile string
+}
+
 func main() {
+	flag.StringVar(&opts.configFile, "config", "/etc/datadog/trace-agent.ini", "Trace agent ini config file.")
+	flag.Parse()
+
+	// Instantiate the config
+	conf, err := config.New(opts.configFile)
+	if err != nil {
+		panic(err)
+	}
+
 	// Initialize logging
 	logger, err := log.LoggerFromConfigAsFile("./seelog.xml")
 	if err != nil {
@@ -35,7 +50,7 @@ func main() {
 	// Seed rand
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	agent := NewAgent()
+	agent := NewAgent(conf)
 
 	// Handle stops properly
 	defer agent.Join()
