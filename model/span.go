@@ -29,6 +29,8 @@ type Span struct {
 	Resource string `json:"resource"`
 	Type     string `json:"type"`
 
+	Error uint32 `json:"error"`
+
 	Start    float64 `json:"start"`
 	Duration float64 `json:"duration"`
 

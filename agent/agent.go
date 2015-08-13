@@ -12,8 +12,7 @@ import (
 type Agent struct {
 	Receiver     Receiver // Receiver is an interface
 	Concentrator *Concentrator
-	SpanWriter   *SpanWriter
-	StatsWriter  *StatsWriter
+	Writer       *Writer
 
 	// config
 	Config *config.File
@@ -25,13 +24,12 @@ type Agent struct {
 	// internal channels
 	spansFromReceiver     chan model.Span
 	spansToConcentrator   chan model.Span
-	spansToWriter         chan model.Span
+	spansFromConcentrator chan model.Span
 	statsFromConcentrator chan model.StatsBucket
 }
 
 // NewAgent returns a new Agent object, ready to be initialized and started
 func NewAgent(conf *config.File) *Agent {
-	// FIXME: this should be read from config and not hardcoded
 	endpoint := conf.GetDefault("trace.api", "endpoint", "http://localhost:8012/api/v0.1")
 
 	exit := make(chan bool)
@@ -40,18 +38,15 @@ func NewAgent(conf *config.File) *Agent {
 	r := NewHTTPReceiver(exit, &exitGroup)
 	c := NewConcentrator(
 		conf.GetIntDefault("trace.concentrator", "bucket_size", 5),
-		model.Strategy(conf.GetDefault("trace.concentrator", "strategy", string(model.EXACT))),
-		conf.GetFloat64Default("trace.concentrator", "gk_epsilon", 1e-3),
+		conf.GetFloat64Default("trace.concentrator", "quantile_precision", 0),
 		exit, &exitGroup)
-	spW := NewSpanWriter(endpoint, exit, &exitGroup)
-	stW := NewStatsWriter(endpoint, exit, &exitGroup)
+	w := NewWriter(endpoint, exit, &exitGroup)
 
 	return &Agent{
 		Config:       conf,
 		Receiver:     r,
 		Concentrator: c,
-		SpanWriter:   spW,
-		StatsWriter:  stW,
+		Writer:       w,
 		exit:         exit,
 		exitGroup:    &exitGroup,
 	}
@@ -66,13 +61,12 @@ func (a *Agent) Init() error {
 
 	// Concentrator initialization
 	a.spansToConcentrator = make(chan model.Span)
+	a.spansFromConcentrator = make(chan model.Span)
 	a.statsFromConcentrator = make(chan model.StatsBucket)
-	a.Concentrator.Init(a.spansToConcentrator, a.statsFromConcentrator)
+	a.Concentrator.Init(a.spansToConcentrator, a.statsFromConcentrator, a.spansFromConcentrator)
 
 	// Writer initialization
-	a.spansToWriter = make(chan model.Span)
-	a.SpanWriter.Init(a.spansToWriter)
-	a.StatsWriter.Init(a.statsFromConcentrator)
+	a.Writer.Init(a.spansFromConcentrator, a.statsFromConcentrator)
 
 	// FIXME: catch initialization errors
 	return nil
@@ -83,21 +77,19 @@ func (a *Agent) Start() error {
 	log.Info("Starting agent")
 
 	// Build the pipeline in the opposite way the data is processed
-	a.SpanWriter.Start()
-	a.StatsWriter.Start()
+	a.Writer.Start()
 
 	// sends stuff to the stats writer
 	a.Concentrator.Start()
 
 	// send stuff to the concentrator and span writer
+	// FIXME: might not be needed, keeping it for now in case we need to pipe the traces from the receiver elsewhere
 	go func() {
 		// should be closed by the listener when exiting
 		for s := range a.spansFromReceiver {
-			a.spansToWriter <- s
 			a.spansToConcentrator <- s
 		}
 		// when no more spans are to be read from the receiver, notify downstream readers
-		close(a.spansToWriter)
 		close(a.spansToConcentrator)
 	}()
 

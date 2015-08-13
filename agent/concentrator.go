@@ -21,8 +21,9 @@ import (
 //  * currentBucket, the index of openBucket we're currently writing to
 type Concentrator struct {
 	// work channels
-	incSpans chan model.Span
-	outStats chan model.StatsBucket
+	incSpans chan model.Span        // incoming spans to add to stats
+	outStats chan model.StatsBucket // outgoing stats buckets
+	outSpans chan model.Span        // filtered spans that needs to be written with that time bucket
 
 	// exit channels
 	exit      chan bool
@@ -30,8 +31,7 @@ type Concentrator struct {
 
 	// configuration
 	bucketDuration int
-	strategy       model.Strategy
-	gkEps          float64
+	eps            float64
 
 	// internal data structs
 	openBucket    [2]*model.StatsBucket
@@ -39,31 +39,34 @@ type Concentrator struct {
 }
 
 // NewConcentrator yields a new Concentrator flushing at a bucketDuration secondspace
-func NewConcentrator(bucketDuration int, strategy model.Strategy, gkEps float64, exit chan bool, exitGroup *sync.WaitGroup) *Concentrator {
+func NewConcentrator(bucketDuration int, eps float64, exit chan bool, exitGroup *sync.WaitGroup) *Concentrator {
 	return &Concentrator{
 		bucketDuration: bucketDuration,
-		strategy:       strategy,
-		gkEps:          gkEps,
+		eps:            eps,
 		exit:           exit,
 		exitGroup:      exitGroup,
 	}
 }
 
 // Init sets the channels for incoming spans and outgoing stats before starting
-func (c *Concentrator) Init(incSpans chan model.Span, outStats chan model.StatsBucket) {
+func (c *Concentrator) Init(incSpans chan model.Span, outStats chan model.StatsBucket, outSpans chan model.Span) {
 	c.incSpans = incSpans
 	c.outStats = outStats
+	c.outSpans = outSpans
 }
 
 // Start initializes the first structures and starts consuming stuff
 func (c *Concentrator) Start() {
 	// First bucket needs to be initialized manually now
-	c.openBucket[0] = model.NewStatsBucket(c.strategy, c.gkEps)
+	c.openBucket[0] = model.NewStatsBucket(c.eps)
 
 	go func() {
 		// should return when upstream span channel is closed
 		for s := range c.incSpans {
-			c.HandleNewSpan(&s)
+			keep := c.HandleNewSpan(&s)
+			if keep {
+				c.outSpans <- s
+			}
 		}
 	}()
 
@@ -73,17 +76,17 @@ func (c *Concentrator) Start() {
 }
 
 // HandleNewSpan adds to the current bucket the pointed span
-func (c *Concentrator) HandleNewSpan(s *model.Span) {
-	c.openBucket[c.currentBucket].HandleSpan(s)
+func (c *Concentrator) HandleNewSpan(s *model.Span) bool {
+	return c.openBucket[c.currentBucket].HandleSpan(s)
 }
 
 func (c *Concentrator) flush() {
 	nextBucket := (c.currentBucket + 1) % 2
-	c.openBucket[nextBucket] = model.NewStatsBucket(c.strategy, c.gkEps)
+	c.openBucket[nextBucket] = model.NewStatsBucket(c.eps)
 
 	//FIXME: use a mutex? too slow? don't care about potential traces written to previous bucket?
 	// Use it and close the previous one
-	c.openBucket[c.currentBucket].End = model.Now()
+	c.openBucket[c.currentBucket].Duration = model.Now() - c.openBucket[c.currentBucket].Start
 	c.currentBucket = nextBucket
 
 	// flush the other bucket before

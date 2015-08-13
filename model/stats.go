@@ -3,100 +3,127 @@ package model
 import (
 	"errors"
 	"fmt"
-
-	log "github.com/cihub/seelog"
-	"github.com/dgryski/go-gk"
+	"sort"
+	"strings"
 )
 
-// Strategy defines the streaming quantile algorithm we want
-type Strategy string
-
-// For now we just implement 2 strategies for streaming quantiles
-//  * EXACT just keeps every value in memory
-//  * GK uses the Greenwald-Khanna algorithm to compress the data and use a fixed amount of memory, with epsilon-precision
+// Hardcoded metric names for ease of reference
 const (
-	EXACT Strategy = "exact"
-	GK             = "gk"
+	HITS   string = "hits"
+	ERRORS        = "errors"
+	TIMES         = "times"
 )
 
-// QuantileSummary is the common interface for streaming quantiles
-type QuantileSummary interface {
-	Insert(float64)
-	Query(float64) float64
+// These represents the default stats we keep track of
+var DefaultMetrics = [3]string{HITS, ERRORS, TIMES}
+
+// Count represents one specific "metric" we track for a given tag set, it accumulates new values, optionally keeping track of the distribution
+type Count struct {
+	Name         string       `json:"name"`         // represents the entity we count, e.g. "hits", "errors", "time"
+	Tags         []Tag        `json:"tags"`         // list of dimensions for which we account this Count
+	Value        float64      `json:"value"`        // accumulated values
+	Distribution Distribution `json:"distribution"` // optional, represents distribution of values and refs of traces for the spectrum of values
 }
 
-// StatsBucket encloses stats for all traces between 2 time boundaries
-// stats are referenced by group in the StatsByGroup map
+func NewCount(m string, tags *[]Tag, eps float64) *Count {
+	// FIXME: how to handle tracking the distribution of other than DefaultMetrics?
+	var d Distribution
+	if m == TIMES {
+		d = NewDistribution(eps)
+	}
+	return &Count{
+		Name:         m,
+		Tags:         *tags,
+		Value:        0,
+		Distribution: d,
+	}
+}
+
+func (c *Count) Add(s *Span) bool {
+	switch c.Name {
+	case HITS:
+		c.Value++
+		return true
+	case ERRORS:
+		c.Value++
+		return true // always keep error traces? probably stupid if errors are not aggregated in some way
+	case TIMES:
+		c.Value += s.Duration
+		keep := c.Distribution.Insert(s.Duration, s.TraceID)
+		return keep
+	default:
+		panic(errors.New(fmt.Sprintf("Don't know how to handle a '%s' count", c.Name)))
+	}
+}
+
 type StatsBucket struct {
-	Strategy     Strategy               `json:"strategy"`
-	GkEps        float64                `json:"epsilon"`
-	Start        float64                `json:"start"`
-	End          float64                `json:"duration"`
-	StatsByGroup map[string]*StatsGroup `json:"by_group"` // FIXME: should we use something else than a string to designate a group?
+	Eps      float64           `json:"eps"`      // parameter used to guarantee epsilon-precision for the distribution
+	Start    float64           `json:"start"`    // timestamp representing the start of the bucket
+	Duration float64           `json:"duration"` // width of the time bucket
+	Counts   map[string]*Count `json:"count"`    // actual representation of the data that is tracked, keyed by (metric,tags) strings
+}
+
+func CountKey(m string, tags []Tag) string {
+	s := make([]string, len(tags))
+	for i, t := range tags {
+		s[i] = t.String()
+	}
+	sort.Strings(s)
+	return fmt.Sprintf("metric:%s|tags:%s", m, strings.Join(s, ","))
 }
 
 // NewStatsBucket opens a new bucket at this time and initializes it properly
-func NewStatsBucket(st Strategy, eps float64) *StatsBucket {
+func NewStatsBucket(eps float64) *StatsBucket {
+	m := make(map[string]*Count)
 	return &StatsBucket{
-		StatsByGroup: make(map[string]*StatsGroup),
-		Start:        Now(),
-		Strategy:     st,
-		GkEps:        eps,
+		Eps:    eps,
+		Start:  Now(),
+		Counts: m,
 	}
 }
 
 // HandleSpan adds the span to this bucket stats
-func (b *StatsBucket) HandleSpan(s *Span) {
-	// TODO: implement a real strategy for expanding groups, but for now we make just one per service and service/resource
-	byService := fmt.Sprintf("service:%s", s.Service)
-	b.handleGroupSpan(byService, s)
+func (b *StatsBucket) HandleSpan(s *Span) bool {
+	keep := false
 
-	byServiceResource := fmt.Sprintf("service:%s,resource:%s", s.Service, s.Resource)
-	b.handleGroupSpan(byServiceResource, s)
-}
+	// FIXME: clean and implement generic way of generating tag sets and metric names
 
-func (b *StatsBucket) handleGroupSpan(g string, s *Span) {
-	if sg, ok := b.StatsByGroup[g]; ok {
-		sg.AddSpan(s)
-	} else {
-		sg := NewStatsGroup(g, b.Strategy, b.GkEps)
-		sg.AddSpan(s)
-		b.StatsByGroup[g] = sg
+	// by service
+	sTag := Tag{Name: "service", Value: s.Service}
+	byS := []Tag{sTag}
+	if b.addInDimension(s, &byS) {
+		keep = true
 	}
-}
 
-// StatsGroup represents for a certain group (set of tags) all the values that were inserted (count, sum, quantiles)
-type StatsGroup struct {
-	Group     string  `json:"group"`
-	Count     uint64  `json:"count"`
-	TotalTime float64 `json:"total_time"`
-	Errors    uint64  `json:"errors"`
-	// FIXME: marshal summaries properly
-	Summary QuantileSummary `json:"summary"`
-}
-
-// NewStatsGroup initialize a new group with proper parameters
-func NewStatsGroup(g string, st Strategy, eps float64) *StatsGroup {
-	var summary QuantileSummary
-	switch st {
-	case EXACT:
-		summary = gk.NewExact()
-	case GK:
-		summary = gk.New(eps)
-	default:
-		log.Errorf("Summary strategy %s not implemented, panicking", st)
-		panic(errors.New("Unknown strategy"))
+	// by (service, resource)
+	rTag := Tag{Name: "resource", Value: s.Resource}
+	bySR := []Tag{sTag, rTag}
+	if b.addInDimension(s, &bySR) {
+		keep = true
 	}
-	return &StatsGroup{
-		Group:   g,
-		Summary: summary,
-	}
+
+	return keep
 }
 
-// AddSpan adds a span to the group by incrementing and inserting it in structures
-func (sg *StatsGroup) AddSpan(s *Span) {
-	sg.Count++
-	sg.TotalTime += s.Duration
-	// FIXME: increment errors somehow?
-	sg.Summary.Insert(s.Duration)
+func (b *StatsBucket) addInDimension(s *Span, tags *[]Tag) bool {
+	// FIXME: here add the ability to add more than the DefaultMetrics?
+	keep := false
+	for _, m := range DefaultMetrics {
+		if b.addToCount(m, s, tags) {
+			keep = true
+		}
+	}
+
+	return keep
+}
+
+func (b *StatsBucket) addToCount(metric string, s *Span, tags *[]Tag) bool {
+	ckey := CountKey(metric, *tags)
+
+	_, ok := b.Counts[ckey]
+	if !ok {
+		b.Counts[ckey] = NewCount(metric, tags, b.Eps)
+	}
+
+	return b.Counts[ckey].Add(s)
 }
