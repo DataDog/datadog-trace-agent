@@ -37,8 +37,8 @@ func NewDistribution(eps float64) Distribution {
 // TO ACHIEVE WHAT WE WANT WITH THE LEAST RESOURCES POSSIBLE.
 // []uint64 is used in place of a []float because it's an optimized map type supposed to be 100x faster (</quote>), see float_slice.go:FloatBitsSlice
 type ExactDistro struct {
-	summary map[uint64]int `json:"summary"` // counts of values, values represented on 64bits IEEE 754 rep
-	samples map[uint64]TID `json:"samples"` // a trace ID that represents a
+	summary map[uint64]int // counts of values, values represented on 64bits IEEE 754 rep
+	samples map[uint64]TID // a trace ID that represents a
 	n       int            // stream length
 	keys    FloatBitsSlice // cached sorted version of summary keys
 }
@@ -233,7 +233,7 @@ func (n *GKSkiplistNode) Println(offset int, alreadySeen *map[uintptr]bool) {
 		return
 	}
 	stroff := strings.Repeat(" ", offset)
-	fmt.Printf("%sENTRY {v: %f, g: %d, delta:%d, tids: %s}\n", stroff, n.value.V, n.value.G, n.value.Delta, n.value.Samples)
+	fmt.Printf("%sENTRY {v: %f, g: %d, delta:%d, tids: %v}\n", stroff, n.value.V, n.value.G, n.value.Delta, n.value.Samples)
 	fmt.Printf("%sPTR %p\n", stroff, n)
 	fmt.Printf("%sNEXT:\n", stroff)
 	(*alreadySeen)[uintptr(unsafe.Pointer(n))] = true
