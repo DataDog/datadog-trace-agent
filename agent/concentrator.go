@@ -103,15 +103,16 @@ func (c *Concentrator) bucketCloser() {
 	for {
 		select {
 		case <-c.exit:
-			log.Info("Concentrator received exit signal, flushing current bucket and exiting")
-			c.flush()
+			log.Info("Concentrator exiting")
+			// FIXME: don't flush, because downstream the writer is already shutting down
+			// c.flush()
 
 			// return cleanly and close writer chans
 			close(c.outSpans)
 			c.exitGroup.Done()
 			return
 		case <-ticker:
-			log.Info("Concentrator closing & flushing another stats bucket")
+			log.Info("Concentrator flushed a time bucket")
 			c.flush()
 		}
 	}
