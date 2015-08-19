@@ -13,11 +13,13 @@ import (
 
 // Writer implements a Writer and writes to the Datadog API spans
 type Writer struct {
-	inSpan     chan model.Span
-	spanBuffer []model.Span
-	endpoint   string
+	endpoint string
 
-	inStats chan model.StatsBucket
+	// All writen structs are buffered, in case sh** happens during transmissions
+	inSpan      chan model.Span
+	spanBuffer  []model.Span
+	inStats     chan model.StatsBucket
+	statsBuffer []model.StatsBucket
 
 	// exit channels
 	exit      chan bool
@@ -40,6 +42,7 @@ func (w *Writer) Init(inSpan chan model.Span, inStats chan model.StatsBucket) {
 
 	// NOTE: should this be unbounded?
 	w.spanBuffer = []model.Span{}
+	w.statsBuffer = []model.StatsBucket{}
 }
 
 // Start runs the writer by consuming spans in a buffer and periodically
@@ -64,34 +67,34 @@ func (w *Writer) flushStatsBucket() {
 		select {
 		case bucket := <-w.inStats:
 			log.Info("Received a stats bucket, flushing stats & bufferend spans")
-			w.Flush(&bucket)
+			w.statsBuffer = append(w.statsBuffer, bucket)
+			w.Flush()
 		case <-w.exit:
 			log.Info("Writer asked to exit. Flushing and exiting")
 			// FIXME, make sure w.inSpan is closed before to make sure we received all spans
-			w.Flush(nil)
+			w.Flush()
 			return
 		}
 	}
 }
 
 // Flush the span buffer by writing to the API its contents
-// FIXME: if we fail here, we must buffer the statsbucket to be able to replay them...
-func (w *Writer) Flush(b *model.StatsBucket) {
+func (w *Writer) Flush() {
 	spans := w.spanBuffer
+	stats := w.statsBuffer
 
 	w.spanBuffer = []model.Span{}
-	log.Infof("Writer flush to the API, %d spans", len(spans))
+	w.statsBuffer = []model.StatsBucket{}
+	log.Infof("Writer flush to the API, %d spans, %d stats buckets", len(spans), len(stats))
 
 	payload := model.SpanPayload{
 		// FIXME, this should go in a config file
 		APIKey: "424242",
 		Spans:  spans,
-	}
-	if b != nil {
-		payload.Stats = b
+		Stats:  stats,
 	}
 
-	url := w.endpoint + "/spans"
+	url := w.endpoint + "/collector"
 
 	jsonStr, err := json.Marshal(payload)
 	if err != nil {

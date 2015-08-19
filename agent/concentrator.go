@@ -106,7 +106,8 @@ func (c *Concentrator) bucketCloser() {
 			log.Info("Concentrator received exit signal, flushing current bucket and exiting")
 			c.flush()
 
-			// return cleanly
+			// return cleanly and close writer chans
+			close(c.outSpans)
 			c.exitGroup.Done()
 			return
 		case <-ticker:
