@@ -51,7 +51,7 @@ func (c *Count) Add(s *Span) bool {
 		return true // always keep error traces? probably stupid if errors are not aggregated in some way
 	case DURATION:
 		c.Value += int64(s.Duration * 1e9)
-		keep := c.Distribution.Insert(s.Duration, s.TraceID)
+		keep := c.Distribution.Insert(s.Duration, s.SpanID)
 		return keep
 	default:
 		panic(fmt.Errorf(fmt.Sprintf("Don't know how to handle a '%s' count", c.Name)))

@@ -14,9 +14,9 @@ import (
 // Distribution is the common interface to account for a distribution of values and representative traces of each slice of values
 type Distribution interface {
 	// Insert takes a value and a trace ID to insert it in our stats and returns a boolean to indicate if this trace should be kept (ie. NOT sampled out)
-	Insert(float64, TID) bool
+	Insert(float64, SID) bool
 	// Quantile takes a q/n-style float quantile query and returns the corresponding value in our distribution and IDs of representative traces
-	Quantile(float64) (float64, []TID)
+	Quantile(float64) (float64, []SID)
 }
 
 // NewDistribution generates a new distribution with a given epsilon
@@ -39,7 +39,7 @@ func NewDistribution(eps float64) Distribution {
 // []uint64 is used in place of a []float because it's an optimized map type supposed to be 100x faster (</quote>), see float_slice.go:FloatBitsSlice
 type ExactDistro struct {
 	summary map[uint64]int // counts of values, values represented on 64bits IEEE 754 rep
-	samples map[uint64]TID // a trace ID that represents a
+	samples map[uint64]SID // a trace ID that represents a
 	n       int            // stream length
 	keys    FloatBitsSlice // cached sorted version of summary keys
 }
@@ -48,12 +48,12 @@ type ExactDistro struct {
 func NewExactDistro() *ExactDistro {
 	return &ExactDistro{
 		summary: make(map[uint64]int),
-		samples: make(map[uint64]TID),
+		samples: make(map[uint64]SID),
 	}
 }
 
 // Insert adds a span to an exact distribution
-func (d *ExactDistro) Insert(v float64, t TID) bool {
+func (d *ExactDistro) Insert(v float64, t SID) bool {
 	d.n++
 
 	vbits := math.Float64bits(v)
@@ -73,7 +73,7 @@ func (d *ExactDistro) Insert(v float64, t TID) bool {
 }
 
 // Quantile returns the quantile representing a specific value
-func (d *ExactDistro) Quantile(q float64) (float64, []TID) {
+func (d *ExactDistro) Quantile(q float64) (float64, []SID) {
 	// re-create the cache
 	if d.keys == nil {
 		d.keys = make([]uint64, 0, len(d.summary))
@@ -92,7 +92,7 @@ func (d *ExactDistro) Quantile(q float64) (float64, []TID) {
 		total += d.summary[k]
 		p := float64(total) / float64(d.n)
 		if q <= p {
-			return math.Float64frombits(k), []TID{d.samples[k]}
+			return math.Float64frombits(k), []SID{d.samples[k]}
 		}
 	}
 
@@ -122,7 +122,7 @@ type GKEntry struct {
 	V       float64 `json:"v"`
 	G       int     `json:"g"`
 	Delta   int     `json:"delta"`
-	Samples []TID   `json:"samples"`
+	Samples []SID   `json:"samples"`
 }
 
 // NewGKDistro returns a new stream with accuracy epsilon (0 <= epsilon <= 1)
@@ -139,7 +139,7 @@ func (s *GKDistro) MarshalJSON() ([]byte, error) {
 }
 
 // Insert inserts an item into the quantile summary
-func (s *GKDistro) Insert(v float64, t TID) bool {
+func (s *GKDistro) Insert(v float64, t SID) bool {
 	e := GKEntry{
 		V:     v,
 		G:     1,
@@ -191,8 +191,8 @@ func (s *GKDistro) compress() {
 }
 
 // Quantile returns an epsilon estimate of the element at quantile 'q' (0 <= q <= 1)
-func (s *GKDistro) Quantile(q float64) (float64, []TID) {
-	var samples []TID
+func (s *GKDistro) Quantile(q float64) (float64, []SID) {
+	var samples []SID
 
 	// convert quantile to rank
 	r := int(q*float64(s.n) + 0.5)
