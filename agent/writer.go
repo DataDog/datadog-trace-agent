@@ -104,7 +104,16 @@ func (w *Writer) flushStatsBucket() {
 func (w *Writer) Flush() {
 	maxBuf := len(w.toWrite) - 1
 	flushed := 0
+
+	// FIXME: this is not ideal we might want to batch this into a single http call
 	for i := 0; i < maxBuf; i++ {
+		// decide to not flush if no spans & no stats
+		if len(w.toWrite[i].Spans) == 0 && len(w.toWrite[i].Stats.Counts) == 0 {
+			log.Debug("Nothing to flush")
+			flushed++
+			continue
+		}
+
 		log.Infof("Writer flush to the API, %d spans", len(w.toWrite[i].Spans))
 
 		payload := model.SpanPayload{
@@ -137,13 +146,13 @@ func (w *Writer) Flush() {
 		}
 		defer resp.Body.Close()
 		// if it succeeded remove from the slice
+		log.Info("Flushed one payload")
 		flushed++
 	}
 
 	if flushed != 0 {
 		w.bufLock.Lock()
 		w.toWrite = w.toWrite[flushed:]
-		log.Infof("Flushed successfully %d payloads", flushed)
 		w.bufLock.Unlock()
 	} else {
 		log.Warnf("Could not flush, still %d payloads to be flushed", maxBuf)

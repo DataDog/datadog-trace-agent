@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -9,26 +10,26 @@ import (
 
 // Hardcoded metric names for ease of reference
 const (
-	HITS   string = "hits"
-	ERRORS        = "errors"
-	TIMES         = "times"
+	HITS     string = "hits"
+	ERRORS          = "errors"
+	DURATION        = "duration"
 )
 
 // These represents the default stats we keep track of
-var DefaultMetrics = [3]string{HITS, ERRORS, TIMES}
+var DefaultMetrics = [3]string{HITS, ERRORS, DURATION}
 
 // Count represents one specific "metric" we track for a given tag set, it accumulates new values, optionally keeping track of the distribution
 type Count struct {
 	Name         string       `json:"name"`         // represents the entity we count, e.g. "hits", "errors", "time"
 	Tags         []Tag        `json:"tags"`         // list of dimensions for which we account this Count
-	Value        float64      `json:"value"`        // accumulated values
+	Value        int64        `json:"value"`        // accumulated values
 	Distribution Distribution `json:"distribution"` // optional, represents distribution of values and refs of traces for the spectrum of values
 }
 
 func NewCount(m string, tags *[]Tag, eps float64) *Count {
 	// FIXME: how to handle tracking the distribution of other than DefaultMetrics?
 	var d Distribution
-	if m == TIMES {
+	if m == DURATION {
 		d = NewDistribution(eps)
 	}
 	return &Count{
@@ -47,8 +48,8 @@ func (c *Count) Add(s *Span) bool {
 	case ERRORS:
 		c.Value++
 		return true // always keep error traces? probably stupid if errors are not aggregated in some way
-	case TIMES:
-		c.Value += s.Duration
+	case DURATION:
+		c.Value += int64(s.Duration * 1e9)
 		keep := c.Distribution.Insert(s.Duration, s.TraceID)
 		return keep
 	default:
@@ -57,10 +58,26 @@ func (c *Count) Add(s *Span) bool {
 }
 
 type StatsBucket struct {
-	Eps      float64           `json:"eps"`      // parameter used to guarantee epsilon-precision for the distribution
-	Start    float64           `json:"start"`    // timestamp representing the start of the bucket
-	Duration float64           `json:"duration"` // width of the time bucket
-	Counts   map[string]*Count `json:"count"`    // actual representation of the data that is tracked, keyed by (metric,tags) strings
+	Start    float64
+	Duration float64
+	Counts   map[string]*Count
+	//	Quantiles map[string]*Quantiles
+	Eps float64
+}
+
+func (sb *StatsBucket) MarshalJSON() ([]byte, error) {
+	// FIXME: add quantiles
+	flatCounts := make([]*Count, len(sb.Counts))
+	i := 0
+	for _, val := range sb.Counts {
+		flatCounts[i] = val
+		i++
+	}
+	return json.Marshal(map[string]interface{}{
+		"start":    sb.Start,
+		"duration": sb.Duration,
+		"counts":   flatCounts,
+	})
 }
 
 func CountKey(m string, tags []Tag) string {
