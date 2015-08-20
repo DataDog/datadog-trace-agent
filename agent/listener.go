@@ -14,7 +14,7 @@ type StoppableListener struct {
 	exit chan bool
 }
 
-// NewStoppableListener retruns a new wrapped listener, which is non-initialized
+// NewStoppableListener returns a new wrapped listener, which is non-initialized
 func NewStoppableListener(l net.Listener) (*StoppableListener, error) {
 	tcpL, ok := l.(*net.TCPListener)
 

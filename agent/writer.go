@@ -11,6 +11,7 @@ import (
 	"github.com/DataDog/raclette/model"
 )
 
+// WriterBuffer contains Spans and Stats to write to the API
 type WriterBuffer struct {
 	Spans []model.Span
 	Stats *model.StatsBucket

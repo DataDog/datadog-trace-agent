@@ -2,7 +2,6 @@ package model
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -26,6 +25,7 @@ type Count struct {
 	Distribution Distribution `json:"distribution"` // optional, represents distribution of values and refs of traces for the spectrum of values
 }
 
+// NewCount returns a new Count for a resource, with a given set of tags and an epsilon precision
 func NewCount(m string, tags *[]Tag, eps float64) *Count {
 	// FIXME: how to handle tracking the distribution of other than DefaultMetrics?
 	var d Distribution
@@ -40,6 +40,7 @@ func NewCount(m string, tags *[]Tag, eps float64) *Count {
 	}
 }
 
+// Add adds a Span to a Count
 func (c *Count) Add(s *Span) bool {
 	switch c.Name {
 	case HITS:
@@ -53,10 +54,11 @@ func (c *Count) Add(s *Span) bool {
 		keep := c.Distribution.Insert(s.Duration, s.TraceID)
 		return keep
 	default:
-		panic(errors.New(fmt.Sprintf("Don't know how to handle a '%s' count", c.Name)))
+		panic(fmt.Errorf(fmt.Sprintf("Don't know how to handle a '%s' count", c.Name)))
 	}
 }
 
+// StatsBucket is a time bucket to track statistic around multiple Counts
 type StatsBucket struct {
 	Start    float64
 	Duration float64
@@ -65,6 +67,7 @@ type StatsBucket struct {
 	Eps float64
 }
 
+// MarshalJSON returns a JSON representation
 func (sb *StatsBucket) MarshalJSON() ([]byte, error) {
 	// FIXME: add quantiles
 	flatCounts := make([]*Count, len(sb.Counts))
@@ -80,6 +83,7 @@ func (sb *StatsBucket) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// CountKey returns to name of the key counting a specific resource/tag
 func CountKey(m string, tags []Tag) string {
 	s := make([]string, len(tags))
 	for i, t := range tags {
@@ -100,7 +104,7 @@ func NewStatsBucket(eps float64) *StatsBucket {
 }
 
 // HandleSpan adds the span to this bucket stats
-func (b *StatsBucket) HandleSpan(s *Span) bool {
+func (sb *StatsBucket) HandleSpan(s *Span) bool {
 	keep := false
 
 	// FIXME: clean and implement generic way of generating tag sets and metric names
@@ -108,25 +112,25 @@ func (b *StatsBucket) HandleSpan(s *Span) bool {
 	// by service
 	sTag := Tag{Name: "service", Value: s.Service}
 	byS := []Tag{sTag}
-	if b.addInDimension(s, &byS) {
+	if sb.addInDimension(s, &byS) {
 		keep = true
 	}
 
 	// by (service, resource)
 	rTag := Tag{Name: "resource", Value: s.Resource}
 	bySR := []Tag{sTag, rTag}
-	if b.addInDimension(s, &bySR) {
+	if sb.addInDimension(s, &bySR) {
 		keep = true
 	}
 
 	return keep
 }
 
-func (b *StatsBucket) addInDimension(s *Span, tags *[]Tag) bool {
+func (sb *StatsBucket) addInDimension(s *Span, tags *[]Tag) bool {
 	// FIXME: here add the ability to add more than the DefaultMetrics?
 	keep := false
 	for _, m := range DefaultMetrics {
-		if b.addToCount(m, s, tags) {
+		if sb.addToCount(m, s, tags) {
 			keep = true
 		}
 	}
@@ -134,13 +138,13 @@ func (b *StatsBucket) addInDimension(s *Span, tags *[]Tag) bool {
 	return keep
 }
 
-func (b *StatsBucket) addToCount(metric string, s *Span, tags *[]Tag) bool {
+func (sb *StatsBucket) addToCount(metric string, s *Span, tags *[]Tag) bool {
 	ckey := CountKey(metric, *tags)
 
-	_, ok := b.Counts[ckey]
+	_, ok := sb.Counts[ckey]
 	if !ok {
-		b.Counts[ckey] = NewCount(metric, tags, b.Eps)
+		sb.Counts[ckey] = NewCount(metric, tags, sb.Eps)
 	}
 
-	return b.Counts[ckey].Add(s)
+	return sb.Counts[ckey].Add(s)
 }

@@ -18,11 +18,13 @@ func SplitTag(tag string) (group, value string) {
 	return split[0], split[1]
 }
 
+// NewTagFromString returns a new Tag from a raw string
 func NewTagFromString(raw string) Tag {
 	name, val := SplitTag(raw)
 	return Tag{name, val}
 }
 
+// NewTagsFromString returns a new []Tag from a raw string
 func NewTagsFromString(raw string) []Tag {
 	var tags []Tag
 	for _, t := range strings.Split(raw, ",") {
@@ -31,6 +33,7 @@ func NewTagsFromString(raw string) []Tag {
 	return tags
 }
 
+// String returns a string representation of a tag
 func (t Tag) String() string {
 	return t.Name + ":" + t.Value
 }

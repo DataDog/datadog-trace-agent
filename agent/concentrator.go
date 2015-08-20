@@ -38,7 +38,7 @@ type Concentrator struct {
 	currentBucket int32
 }
 
-// NewConcentrator yields a new Concentrator flushing at a bucketDuration secondspace
+// NewConcentrator returns a new Concentrator flushing at a bucketDuration secondspace
 func NewConcentrator(bucketDuration int, eps float64, exit chan bool, exitGroup *sync.WaitGroup) *Concentrator {
 	return &Concentrator{
 		bucketDuration: bucketDuration,

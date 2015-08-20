@@ -19,6 +19,7 @@ type Distribution interface {
 	Quantile(float64) (float64, []TID)
 }
 
+// NewDistribution generates a new distribution with a given epsilon
 func NewDistribution(eps float64) Distribution {
 	if eps == 0 {
 		return NewExactDistro()
@@ -43,6 +44,7 @@ type ExactDistro struct {
 	keys    FloatBitsSlice // cached sorted version of summary keys
 }
 
+// NewExactDistro returns a new empty exact distribution
 func NewExactDistro() *ExactDistro {
 	return &ExactDistro{
 		summary: make(map[uint64]int),
@@ -50,6 +52,7 @@ func NewExactDistro() *ExactDistro {
 	}
 }
 
+// Insert adds a span to an exact distribution
 func (d *ExactDistro) Insert(v float64, t TID) bool {
 	d.n++
 
@@ -69,6 +72,7 @@ func (d *ExactDistro) Insert(v float64, t TID) bool {
 	return true
 }
 
+// Quantile returns the quantile representing a specific value
 func (d *ExactDistro) Quantile(q float64) (float64, []TID) {
 	// re-create the cache
 	if d.keys == nil {
@@ -113,6 +117,7 @@ type GKDistro struct {
 	n       int
 }
 
+// GKEntry is an element of a GKDistro
 type GKEntry struct {
 	V       float64 `json:"v"`
 	G       int     `json:"g"`
@@ -120,7 +125,7 @@ type GKEntry struct {
 	Samples []TID   `json:"samples"`
 }
 
-// New returns a new stream with accuracy epsilon (0 <= epsilon <= 1)
+// NewGKDistro returns a new stream with accuracy epsilon (0 <= epsilon <= 1)
 func NewGKDistro(eps float64) *GKDistro {
 	return &GKDistro{
 		eps:     eps,
@@ -128,6 +133,7 @@ func NewGKDistro(eps float64) *GKDistro {
 	}
 }
 
+// MarshalJSON returns a JSON representation
 func (s *GKDistro) MarshalJSON() ([]byte, error) {
 	return s.summary.MarshalJSON()
 }
@@ -184,7 +190,7 @@ func (s *GKDistro) compress() {
 	}
 }
 
-// Query returns an epsilon estimate of the element at quantile 'q' (0 <= q <= 1)
+// Quantile returns an epsilon estimate of the element at quantile 'q' (0 <= q <= 1)
 func (s *GKDistro) Quantile(q float64) (float64, []TID) {
 	var samples []TID
 
@@ -216,18 +222,21 @@ func (s *GKDistro) Quantile(q float64) (float64, []TID) {
 
 const maxHeight = 31
 
+// GKSkiplist is a? (TODO LEO)
 type GKSkiplist struct {
 	height int
 	head   *GKSkiplistNode
 	rnd    *rand.Rand
 }
 
+// GKSkiplistNode is a? (TODO LEO)
 type GKSkiplistNode struct {
 	value GKEntry
 	next  []*GKSkiplistNode
 	prev  []*GKSkiplistNode
 }
 
+// Println prints deb8gug stuff? (TODO LEO)
 func (n *GKSkiplistNode) Println(offset int, alreadySeen *map[uintptr]bool) {
 	if _, ok := (*alreadySeen)[uintptr(unsafe.Pointer(n))]; ok {
 		return
@@ -253,6 +262,7 @@ func (n *GKSkiplistNode) Println(offset int, alreadySeen *map[uintptr]bool) {
 	}
 }
 
+// NewGKSkiplist returns a new empty GKSkiplist
 func NewGKSkiplist() *GKSkiplist {
 	return &GKSkiplist{
 		height: 0,
@@ -261,6 +271,7 @@ func NewGKSkiplist() *GKSkiplist {
 	}
 }
 
+// Insert adds a GKSkiplistNode into a GKSkiplist while doing stuff? (TODO LEO)
 func (s *GKSkiplist) Insert(e GKEntry) *GKSkiplistNode {
 	level := 0
 
@@ -302,6 +313,7 @@ func (s *GKSkiplist) Insert(e GKEntry) *GKSkiplistNode {
 	return node
 }
 
+// Remove removes a node from the GKSkiplist
 func (s *GKSkiplist) Remove(node *GKSkiplistNode) {
 
 	// remove n from each level of the Skiplist
@@ -321,6 +333,7 @@ func (s *GKSkiplist) Remove(node *GKSkiplistNode) {
 	}
 }
 
+// MarshalJSON returns a JSON representation
 func (s *GKSkiplist) MarshalJSON() ([]byte, error) {
 	// iterate over all available values and flatten the skiplist
 	// FIXME: probably here we could allocate up to X if we compress before?

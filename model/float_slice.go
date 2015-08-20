@@ -1,6 +1,6 @@
 package model
 
-// to sort IEEE Float64's as bits
+// FloatBitsSlice is used to sort IEEE Float64's as bits
 type FloatBitsSlice []uint64
 
 func (s FloatBitsSlice) Len() int { return len(s) }
