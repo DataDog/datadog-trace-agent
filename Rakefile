@@ -44,13 +44,12 @@ task :run do
 end
 
 task :lint do
+  total_output = ''
   PACKAGES.each do |pkg|
-    find_cmd = "find #{pkg} -name '*.go'"
-    # for the top level dir, only lint file at this level
-    find_cmd += ' -depth 1' if pkg == '.'
-
-    sh "#{find_cmd} | xargs golint"
+    total_output += `golint #{pkg}`.strip
   end
+  puts total_output
+  fail "We have some linting errors" if total_output.length > 0
 end
 
 task :vet do
