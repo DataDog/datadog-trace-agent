@@ -104,41 +104,28 @@ func NewStatsBucket(eps float64) *StatsBucket {
 }
 
 // HandleSpan adds the span to this bucket stats
-func (sb *StatsBucket) HandleSpan(s *Span) bool {
-	keep := false
-
+func (sb *StatsBucket) HandleSpan(s *Span) {
 	// FIXME: clean and implement generic way of generating tag sets and metric names
 
 	// by service
 	sTag := Tag{Name: "service", Value: s.Service}
 	byS := []Tag{sTag}
-	if sb.addInDimension(s, &byS) {
-		keep = true
-	}
+	sb.addInDimension(s, &byS)
 
 	// by (service, resource)
 	rTag := Tag{Name: "resource", Value: s.Resource}
 	bySR := []Tag{sTag, rTag}
-	if sb.addInDimension(s, &bySR) {
-		keep = true
-	}
-
-	return keep
+	sb.addInDimension(s, &bySR)
 }
 
-func (sb *StatsBucket) addInDimension(s *Span, tags *[]Tag) bool {
+func (sb *StatsBucket) addInDimension(s *Span, tags *[]Tag) {
 	// FIXME: here add the ability to add more than the DefaultMetrics?
-	keep := false
 	for _, m := range DefaultMetrics {
-		if sb.addToCount(m, s, tags) {
-			keep = true
-		}
+		sb.addToCount(m, s, tags)
 	}
-
-	return keep
 }
 
-func (sb *StatsBucket) addToCount(metric string, s *Span, tags *[]Tag) bool {
+func (sb *StatsBucket) addToCount(metric string, s *Span, tags *[]Tag) {
 	ckey := CountKey(metric, *tags)
 
 	_, ok := sb.Counts[ckey]
@@ -146,5 +133,5 @@ func (sb *StatsBucket) addToCount(metric string, s *Span, tags *[]Tag) bool {
 		sb.Counts[ckey] = NewCount(metric, tags, sb.Eps)
 	}
 
-	return sb.Counts[ckey].Add(s)
+	sb.Counts[ckey].Add(s)
 }

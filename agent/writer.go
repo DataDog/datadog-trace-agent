@@ -13,7 +13,8 @@ import (
 
 // WriterBuffer contains Spans and Stats to write to the API
 type WriterBuffer struct {
-	Spans []model.Span
+	Sampler *Sampler
+	// Spans   []model.Span
 	Stats *model.StatsBucket
 }
 
@@ -21,9 +22,13 @@ type WriterBuffer struct {
 type Writer struct {
 	endpoint string
 
-	// All writen structs are buffered, in case sh** happens during transmissions
+	// All written structs are buffered, in case sh** happens during transmissions
 	inSpan  chan model.Span
 	inStats chan model.StatsBucket
+
+	// Sampler configuration
+	// TODO: move the sampler into a real Agent worker?
+	minSpanByDistribution int
 
 	toWrite []WriterBuffer
 	bufLock sync.Mutex
@@ -34,11 +39,12 @@ type Writer struct {
 }
 
 // NewWriter returns a new Writer
-func NewWriter(endp string, exit chan bool, exitGroup *sync.WaitGroup) *Writer {
+func NewWriter(endp string, exit chan bool, exitGroup *sync.WaitGroup, minSpanByDistribution int) *Writer {
 	return &Writer{
-		endpoint:  endp,
-		exit:      exit,
-		exitGroup: exitGroup,
+		endpoint:              endp,
+		exit:                  exit,
+		exitGroup:             exitGroup,
+		minSpanByDistribution: minSpanByDistribution,
 	}
 }
 
@@ -53,7 +59,7 @@ func (w *Writer) Init(inSpan chan model.Span, inStats chan model.StatsBucket) {
 func (w *Writer) addNewBuffer() {
 	// Add a new buffer
 	// FIXME: Should these buffers be unbounded?
-	wb := WriterBuffer{}
+	wb := WriterBuffer{Sampler: NewSampler()}
 	w.bufLock.Lock()
 	w.toWrite = append(w.toWrite, wb)
 	w.bufLock.Unlock()
@@ -69,7 +75,7 @@ func (w *Writer) Start() {
 			// Always write to last element of span
 			// FIXME: mutex too slow?
 			w.bufLock.Lock()
-			w.toWrite[len(w.toWrite)-1].Spans = append(w.toWrite[len(w.toWrite)-1].Spans, s)
+			w.toWrite[len(w.toWrite)-1].Sampler.AddSpan(&s)
 			w.bufLock.Unlock()
 		}
 	}()
@@ -109,18 +115,19 @@ func (w *Writer) Flush() {
 	// FIXME: this is not ideal we might want to batch this into a single http call
 	for i := 0; i < maxBuf; i++ {
 		// decide to not flush if no spans & no stats
-		if len(w.toWrite[i].Spans) == 0 && len(w.toWrite[i].Stats.Counts) == 0 {
+		if w.toWrite[i].Sampler.IsEmpty() && len(w.toWrite[i].Stats.Counts) == 0 {
 			log.Debug("Nothing to flush")
 			flushed++
 			continue
 		}
 
-		log.Infof("Writer flush to the API, %d spans", len(w.toWrite[i].Spans))
+		spans := w.toWrite[i].Sampler.GetSamples(w.toWrite[i].Stats, w.minSpanByDistribution)
 
-		payload := model.SpanPayload{
-			// FIXME, this should go in a config file
-			APIKey: "424242",
-			Spans:  w.toWrite[i].Spans,
+		log.Infof("Writer flush to the API, %d spans", len(spans))
+
+		payload := model.Payload{
+			APIKey: "424242", // FIXME, this should go in a config file
+			Spans:  spans,
 			Stats:  w.toWrite[i].Stats,
 		}
 
