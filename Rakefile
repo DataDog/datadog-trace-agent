@@ -36,7 +36,7 @@ task :install do
 end
 
 desc "Test Raclette agent"
-task :test do go_test("./raclette") end
+task :test do go_test("./agent") end
 
 desc "Run Raclette agent"
 task :run do

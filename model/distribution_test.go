@@ -47,7 +47,7 @@ func NewDistributionWithTestData(eps float64) (Distribution, []bool) {
 	k := make([]bool, len(TestArray))
 
 	for i, v := range TestArray {
-		k[i] = d.Insert(v, TID(i))
+		k[i] = d.Insert(v, SID(i))
 	}
 
 	return d, k
@@ -78,11 +78,11 @@ func TestExactDistributionDropTraces(t *testing.T) {
 	assert := assert.New(t)
 
 	d := NewDistribution(0)
-	kept := d.Insert(42.42, TID(1))
+	kept := d.Insert(42.42, SID(1))
 	assert.True(kept)
 
 	// the ExactDistro drops subsequent same traces (DUMB)
-	kept = d.Insert(42.42, TID(2))
+	kept = d.Insert(42.42, SID(2))
 	assert.False(kept)
 }
 
@@ -98,12 +98,12 @@ func TestGKDistributionQuantile(t *testing.T) {
 
 	// For 100 elts and eps=0.01 the error on the rank is 0.01 * 100 = 1
 	// So we can have these results:
-	// *  404.9109332077119, (TID=24)
-	// *  422.0651987288255, (TID=43)
-	// *  432.5698909679998, (TID=63)
+	// *  404.9109332077119, (SID=24)
+	// *  422.0651987288255, (SID=43)
+	// *  432.5698909679998, (SID=63)
 	d, _ := NewDistributionWithTestData(0.01)
 
-	// FIXME: assert the returned sample TID
+	// FIXME: assert the returned sample SID
 	v, _ := d.Quantile(0.5)
 	acceptable := []float64{404.9109332077119, 422.0651987288255, 432.5698909679998}
 	assert.Contains(acceptable, v)
@@ -115,7 +115,7 @@ func TestGKDistributionInsertionHugeScale(t *testing.T) {
 
 	d := NewDistribution(0.001)
 	for i := 0; i < repet*len(TestArray); i++ {
-		d.Insert(TestArray[i%len(TestArray)], TID(i))
+		d.Insert(TestArray[i%len(TestArray)], SID(i))
 	}
 
 	/* to print the skiplist, DEBUG ONLY!
@@ -127,11 +127,11 @@ func TestGKDistributionInsertionHugeScale(t *testing.T) {
 	// FIXME: assert correctness of this, should return proper quantiles
 }
 
-func TestGKDistributionMarshall(t *testing.T) {
+func TestGKDistributionMarshal(t *testing.T) {
 	assert := assert.New(t)
 
 	d, _ := NewDistributionWithTestData(0.01)
 
 	// FIXME: test the real data in it
-	assert.NotPanics(func() { d.(*GKDistro).summary.Marshal() })
+	assert.NotPanics(func() { d.(*GKDistro).MarshalJSON() })
 }

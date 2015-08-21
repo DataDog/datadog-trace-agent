@@ -56,14 +56,14 @@ func TestCountTimes(t *testing.T) {
 	assert := assert.New(t)
 
 	tags := NewTagsFromString("version:34.42,resource:/dash/list,service:dogweb")
-	c := NewCount(TIMES, &tags, 0.01)
+	c := NewCount(DURATION, &tags, 0.01)
 
 	// Our fake span
 	s := Span{TraceID: NewTID(), SpanID: NewSID(), Start: Now(), Duration: 1.0}
 	c.Add(&s)
 
-	assert.Equal(TIMES, c.Name)
-	assert.Equal(1, c.Value)
+	assert.Equal(DURATION, c.Name)
+	assert.Equal(int(1e9), c.Value)
 	assert.Equal(
 		[]Tag{
 			Tag{Name: "version", Value: "34.42"},
