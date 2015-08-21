@@ -23,7 +23,7 @@ type Concentrator struct {
 	// work channels
 	incSpans chan model.Span        // incoming spans to add to stats
 	outStats chan model.StatsBucket // outgoing stats buckets
-	outSpans chan model.Span        // filtered spans that needs to be written with that time bucket
+	outSpans chan model.Span        // spans that potentially need to be written with that time bucket
 
 	// exit channels
 	exit      chan bool
@@ -63,10 +63,8 @@ func (c *Concentrator) Start() {
 	go func() {
 		// should return when upstream span channel is closed
 		for s := range c.incSpans {
-			keep := c.HandleNewSpan(&s)
-			if keep {
-				c.outSpans <- s
-			}
+			c.HandleNewSpan(&s)
+			c.outSpans <- s
 		}
 	}()
 
@@ -76,8 +74,8 @@ func (c *Concentrator) Start() {
 }
 
 // HandleNewSpan adds to the current bucket the pointed span
-func (c *Concentrator) HandleNewSpan(s *model.Span) bool {
-	return c.openBucket[c.currentBucket].HandleSpan(s)
+func (c *Concentrator) HandleNewSpan(s *model.Span) {
+	c.openBucket[c.currentBucket].HandleSpan(s)
 }
 
 func (c *Concentrator) flush() {

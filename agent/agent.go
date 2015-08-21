@@ -40,7 +40,8 @@ func NewAgent(conf *config.File) *Agent {
 		conf.GetIntDefault("trace.concentrator", "bucket_size", 5),
 		conf.GetFloat64Default("trace.concentrator", "quantile_precision", 0),
 		exit, &exitGroup)
-	w := NewWriter(endpoint, exit, &exitGroup)
+	w := NewWriter(endpoint, exit, &exitGroup,
+		conf.GetIntDefault("trace.sampler", "min_span_by_distribution", 5))
 
 	return &Agent{
 		Config:       conf,
