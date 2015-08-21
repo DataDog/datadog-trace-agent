@@ -141,9 +141,10 @@ func (s *GKDistro) MarshalJSON() ([]byte, error) {
 // Insert inserts an item into the quantile summary
 func (s *GKDistro) Insert(v float64, t SID) bool {
 	e := GKEntry{
-		V:     v,
-		G:     1,
-		Delta: 0,
+		V:       v,
+		G:       1,
+		Delta:   0,
+		Samples: []SID{t},
 	}
 
 	eptr := s.summary.Insert(e)
@@ -177,9 +178,11 @@ func (s *GKDistro) compress() {
 			missing += nt.G
 			nt.Delta += missing
 			nt.G = t.G
+			nt.Samples = append(nt.Samples, t.Samples...)
 			s.summary.Remove(elt)
 		} else if t.G+nt.G+missing+nt.Delta < epsN {
 			nt.G += t.G + missing
+			nt.Samples = append(nt.Samples, t.Samples...)
 			missing = 0
 			s.summary.Remove(elt)
 		} else {
@@ -192,7 +195,6 @@ func (s *GKDistro) compress() {
 
 // Quantile returns an epsilon estimate of the element at quantile 'q' (0 <= q <= 1)
 func (s *GKDistro) Quantile(q float64) (float64, []SID) {
-	var samples []SID
 
 	// convert quantile to rank
 	r := int(q*float64(s.n) + 0.5)
@@ -206,14 +208,14 @@ func (s *GKDistro) Quantile(q float64) (float64, []SID) {
 		n := elt.next[0]
 
 		if n == nil {
-			return t.V, samples
+			return t.V, t.Samples
 		}
 
 		if r+epsN < rmin+n.value.G+n.value.Delta {
 			if r+epsN < rmin+n.value.G {
-				return t.V, samples
+				return t.V, t.Samples
 			}
-			return n.value.V, samples
+			return n.value.V, n.value.Samples
 		}
 	}
 
@@ -345,6 +347,5 @@ func (s *GKSkiplist) MarshalJSON() ([]byte, error) {
 		curr = curr.next[0]
 	}
 
-	fmt.Println(entries)
 	return json.Marshal(entries)
 }
