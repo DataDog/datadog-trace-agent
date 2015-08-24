@@ -10,79 +10,72 @@ func TestCountHits(t *testing.T) {
 	assert := assert.New(t)
 
 	tags := NewTagsFromString("version:34.42,resource:/dash/list,service:dogweb")
-	c := NewCount(HITS, &tags, 0.01)
+	c := NewCount(HITS, &tags)
 
 	// Our fake span
-	s := Span{TraceID: NewTID(), SpanID: NewSID(), Start: Now(), Duration: 1.0}
+	s := Span{TraceID: RandomID(), SpanID: RandomID(), Start: Now(), Duration: 1.0}
 	c.Add(&s)
 
 	assert.Equal(HITS, c.Name)
 	assert.Equal(1, c.Value)
 	assert.Equal(
-		[]Tag{
+		TagSet{
 			Tag{Name: "version", Value: "34.42"},
 			Tag{Name: "resource", Value: "/dash/list"},
 			Tag{Name: "service", Value: "dogweb"},
 		},
-		c.Tags,
+		c.TagSet,
 	)
-	assert.Nil(c.Distribution)
 }
 
 func TestCountErrors(t *testing.T) {
 	assert := assert.New(t)
 
 	tags := NewTagsFromString("version:34.42,resource:/dash/list,service:dogweb")
-	c := NewCount(ERRORS, &tags, 0.01)
+	c := NewCount(ERRORS, &tags)
 
 	// Our fake span
-	s := Span{TraceID: NewTID(), SpanID: NewSID(), Start: Now(), Duration: 1.0}
+	s := Span{TraceID: RandomID(), SpanID: RandomID(), Start: Now(), Duration: 1.0}
 	c.Add(&s)
 
 	assert.Equal(ERRORS, c.Name)
 	assert.Equal(1, c.Value)
 	assert.Equal(
-		[]Tag{
+		TagSet{
 			Tag{Name: "version", Value: "34.42"},
 			Tag{Name: "resource", Value: "/dash/list"},
 			Tag{Name: "service", Value: "dogweb"},
 		},
-		c.Tags,
+		c.TagSet,
 	)
-	assert.Nil(c.Distribution)
 }
 
 func TestCountTimes(t *testing.T) {
 	assert := assert.New(t)
 
 	tags := NewTagsFromString("version:34.42,resource:/dash/list,service:dogweb")
-	c := NewCount(DURATION, &tags, 0.01)
+	c := NewCount(DURATION, &tags)
 
 	// Our fake span
-	s := Span{TraceID: NewTID(), SpanID: NewSID(), Start: Now(), Duration: 1.0}
+	s := Span{TraceID: RandomID(), SpanID: RandomID(), Start: Now(), Duration: 1e6}
 	c.Add(&s)
 
 	assert.Equal(DURATION, c.Name)
-	assert.Equal(int(1e9), c.Value)
+	assert.Equal(1000000, c.Value)
 	assert.Equal(
-		[]Tag{
+		TagSet{
 			Tag{Name: "version", Value: "34.42"},
 			Tag{Name: "resource", Value: "/dash/list"},
 			Tag{Name: "service", Value: "dogweb"},
 		},
-		c.Tags,
+		c.TagSet,
 	)
-	assert.NotNil(c.Distribution)
-	d, ok := c.Distribution.(*GKDistro)
-
-	assert.True(ok)
-	assert.Equal(1, d.n)
 }
 
 func TestCountBad(t *testing.T) {
 	assert := assert.New(t)
-	var tags []Tag
-	c := NewCount("raclette", &tags, 0.1)
-	s := Span{TraceID: NewTID(), SpanID: NewSID(), Start: Now(), Duration: 1.0}
+	var tags TagSet
+	c := NewCount("raclette", &tags)
+	s := Span{TraceID: RandomID(), SpanID: RandomID(), Start: Now(), Duration: 1e6}
 	assert.Panics(func() { c.Add(&s) })
 }

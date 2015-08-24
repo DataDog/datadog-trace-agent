@@ -3,7 +3,6 @@ package model
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"math/rand"
 	"sort"
 	"strings"
@@ -11,92 +10,90 @@ import (
 	"unsafe"
 )
 
-// Distribution is the common interface to account for a distribution of values and representative traces of each slice of values
-type Distribution interface {
-	// Insert takes a value and a trace ID to insert it in our stats and returns a boolean to indicate if this trace should be kept (ie. NOT sampled out)
-	Insert(float64, SID) bool
+// Summary represents
+type Summary interface {
+	// Insert takes a value and a trace ID to insert it in our stats
+	Insert(int64, uint64)
 	// Quantile takes a q/n-style float quantile query and returns the corresponding value in our distribution and IDs of representative traces
-	Quantile(float64) (float64, []SID)
+	Quantile(float64) (int64, []uint64)
 }
 
-// NewDistribution generates a new distribution with a given epsilon
-func NewDistribution(eps float64) Distribution {
+// NewSummary generates a new summary that answers to quantiles query with epsilon precision
+func NewSummary(eps float64) Summary {
 	if eps == 0 {
-		return NewExactDistro()
+		return NewExactSummary()
 	}
 
-	return NewGKDistro(eps)
+	return NewGKSummary(eps)
 }
 
 // FIXME: shamelessly copied from dgryski/go-gk, not verified, not really tested
 // Should reimplement everything from scratch from the paper
 
-// ExactDistro is an exact (map-based) quantile summary
-// WARNING!! IT IS NOT MADE TO BE USED ON PRODUCTION, IT WILL PROBABLY BLOW UP YOUR MEMORY
+// ExactSummary is an exact (map-based) quantile summary
+// WARNING: IT IS NOT MADE TO BE USED ON PRODUCTION, IT WILL PROBABLY BLOW UP YOUR MEMORY
 // BECAUSE WE KEEP EVERY SINGLE VALUE.
 // IT IS MADE TO BE A "TRUE" REFERENCE FOR QUANTILES, USEFUL TO TEST NEW APPROXIMATION ALGORITHMS
 // TO ACHIEVE WHAT WE WANT WITH THE LEAST RESOURCES POSSIBLE.
-// []uint64 is used in place of a []float because it's an optimized map type supposed to be 100x faster (</quote>), see float_slice.go:FloatBitsSlice
-type ExactDistro struct {
-	summary map[uint64]int // counts of values, values represented on 64bits IEEE 754 rep
-	samples map[uint64]SID // a trace ID that represents a
-	n       int            // stream length
-	keys    FloatBitsSlice // cached sorted version of summary keys
+// NOTE: []uint64 is used in place of a []float because it's an optimized map type supposed to be 100x faster (</quote>), see float_slice.go:FloatBitsSlice
+// there is a benchmark for that, but it's not really good ^
+type ExactSummary struct {
+	data    map[uint64]int      // counts of values, values represented on 64bits IEEE 754 rep
+	samples map[uint64][]uint64 // for each datum, sample trace IDs
+	n       int                 // stream length
+	sorted  FloatBitsSlice      // cached sorted version of summary keys
 }
 
-// NewExactDistro returns a new empty exact distribution
-func NewExactDistro() *ExactDistro {
-	return &ExactDistro{
-		summary: make(map[uint64]int),
-		samples: make(map[uint64]SID),
+// NewExactSummary returns a new empty exact distribution
+func NewExactSummary() *ExactSummary {
+	return &ExactSummary{
+		data:    make(map[uint64]int),
+		samples: make(map[uint64][]uint64),
 	}
 }
 
-// Insert adds a span to an exact distribution
-func (d *ExactDistro) Insert(v float64, t SID) bool {
-	d.n++
+// Insert adds a value/trace ID tuple in its data structs
+func (s *ExactSummary) Insert(v int64, t uint64) {
+	s.n++
 
-	vbits := math.Float64bits(v)
-	d.summary[vbits]++
+	uv := uint64(v)
+	s.data[uv]++
 
 	// clear out the cache of sorted keys
-	d.keys = nil
+	s.sorted = nil
 
-	if _, ok := d.samples[vbits]; ok {
-		// FIXME, dumb but ?
-		// Already here, so decide to drop this trace
-		return false
+	if _, ok := s.samples[uv]; !ok {
+		s.samples[uv] = []uint64{}
 	}
 
-	d.samples[vbits] = t
-	return true
+	s.samples[uv] = append(s.samples[uv], t)
 }
 
 // Quantile returns the quantile representing a specific value
-func (d *ExactDistro) Quantile(q float64) (float64, []SID) {
+func (s *ExactSummary) Quantile(q float64) (int64, []uint64) {
 	// re-create the cache
-	if d.keys == nil {
-		d.keys = make([]uint64, 0, len(d.summary))
+	if s.sorted == nil {
+		s.sorted = make([]uint64, 0, len(s.data))
 
-		for k := range d.summary {
-			d.keys = append(d.keys, k)
+		for k := range s.data {
+			s.sorted = append(s.sorted, k)
 		}
 
-		sort.Sort(d.keys)
+		sort.Sort(s.sorted)
 	}
 
 	// TODO(dgryski): create prefix sum array and then binsearch to find quantile.
 	total := 0
 
-	for _, k := range d.keys {
-		total += d.summary[k]
-		p := float64(total) / float64(d.n)
+	for _, k := range s.sorted {
+		total += s.data[k]
+		p := float64(total) / float64(s.n)
 		if q <= p {
-			return math.Float64frombits(k), []SID{d.samples[k]}
+			return int64(k), s.samples[k]
 		}
 	}
 
-	panic("ExactDistro.Quantile(), end reached")
+	panic("ExactSummary.Quantile(), end reached")
 }
 
 /*
@@ -110,65 +107,62 @@ summary faster.  Querying is still O(n).
 
 */
 
-// GKDistro is a quantile summary
-type GKDistro struct {
-	summary *GKSkiplist
-	eps     float64
-	n       int
+// GKSummary see above
+type GKSummary struct {
+	data *GKSkiplist
+	eps  float64
+	n    int
 }
 
-// GKEntry is an element of a GKDistro
+// GKEntry is an element of the skiplist
 type GKEntry struct {
-	V       float64 `json:"v"`
-	G       int     `json:"g"`
-	Delta   int     `json:"delta"`
-	Samples []SID   `json:"samples"`
+	V       int64    `json:"v"`
+	G       int      `json:"g"`
+	Delta   int      `json:"delta"`
+	Samples []uint64 `json:"samples"`
 }
 
-// NewGKDistro returns a new stream with accuracy epsilon (0 <= epsilon <= 1)
-func NewGKDistro(eps float64) *GKDistro {
-	return &GKDistro{
-		eps:     eps,
-		summary: NewGKSkiplist(),
+// NewGKSummary returns a new approx-summary with accuracy epsilon (0 <= epsilon <= 1)
+func NewGKSummary(eps float64) *GKSummary {
+	return &GKSummary{
+		eps:  eps,
+		data: NewGKSkiplist(),
 	}
 }
 
-// MarshalJSON returns a JSON representation
-func (s *GKDistro) MarshalJSON() ([]byte, error) {
-	return s.summary.MarshalJSON()
+// MarshalJSON returns a JSON representation of the summary, only marshals the data
+func (s *GKSummary) MarshalJSON() ([]byte, error) {
+	return s.data.MarshalJSON()
 }
 
 // Insert inserts an item into the quantile summary
-func (s *GKDistro) Insert(v float64, t SID) bool {
+func (s *GKSummary) Insert(v int64, t uint64) {
 	e := GKEntry{
 		V:       v,
 		G:       1,
 		Delta:   0,
-		Samples: []SID{t},
+		Samples: []uint64{t},
 	}
 
-	eptr := s.summary.Insert(e)
+	eptr := s.data.Insert(e)
 
 	s.n++
 
-	if eptr.prev[0] != s.summary.head && eptr.next[0] != nil {
+	if eptr.prev[0] != s.data.head && eptr.next[0] != nil {
 		eptr.value.Delta = int(2 * s.eps * float64(s.n))
 	}
 
 	if s.n%int(1.0/float64(2.0*s.eps)) == 0 {
 		s.compress()
 	}
-
-	// FIXME: choose if it needs to be sampled out?
-	return true
 }
 
-func (s *GKDistro) compress() {
+func (s *GKSummary) compress() {
 	var missing int
 
 	epsN := int(2 * s.eps * float64(s.n))
 
-	for elt := s.summary.head.next[0]; elt != nil && elt.next[0] != nil; {
+	for elt := s.data.head.next[0]; elt != nil && elt.next[0] != nil; {
 		next := elt.next[0]
 		t := elt.value
 		nt := &next.value
@@ -179,12 +173,12 @@ func (s *GKDistro) compress() {
 			nt.Delta += missing
 			nt.G = t.G
 			nt.Samples = append(nt.Samples, t.Samples...)
-			s.summary.Remove(elt)
+			s.data.Remove(elt)
 		} else if t.G+nt.G+missing+nt.Delta < epsN {
 			nt.G += t.G + missing
 			nt.Samples = append(nt.Samples, t.Samples...)
 			missing = 0
-			s.summary.Remove(elt)
+			s.data.Remove(elt)
 		} else {
 			nt.G += missing
 			missing = 0
@@ -194,7 +188,7 @@ func (s *GKDistro) compress() {
 }
 
 // Quantile returns an epsilon estimate of the element at quantile 'q' (0 <= q <= 1)
-func (s *GKDistro) Quantile(q float64) (float64, []SID) {
+func (s *GKSummary) Quantile(q float64) (int64, []uint64) {
 
 	// convert quantile to rank
 	r := int(q*float64(s.n) + 0.5)
@@ -202,7 +196,7 @@ func (s *GKDistro) Quantile(q float64) (float64, []SID) {
 	var rmin int
 	epsN := int(s.eps * float64(s.n))
 
-	for elt := s.summary.head.next[0]; elt != nil; elt = elt.next[0] {
+	for elt := s.data.head.next[0]; elt != nil; elt = elt.next[0] {
 		t := elt.value
 		rmin += t.G
 		n := elt.next[0]
@@ -244,7 +238,7 @@ func (n *GKSkiplistNode) Println(offset int, alreadySeen *map[uintptr]bool) {
 		return
 	}
 	stroff := strings.Repeat(" ", offset)
-	fmt.Printf("%sENTRY {v: %f, g: %d, delta:%d, tids: %v}\n", stroff, n.value.V, n.value.G, n.value.Delta, n.value.Samples)
+	fmt.Printf("%sENTRY {v: %d, g: %d, delta:%d, tids: %v}\n", stroff, n.value.V, n.value.G, n.value.Delta, n.value.Samples)
 	fmt.Printf("%sPTR %p\n", stroff, n)
 	fmt.Printf("%sNEXT:\n", stroff)
 	(*alreadySeen)[uintptr(unsafe.Pointer(n))] = true

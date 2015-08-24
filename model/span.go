@@ -1,83 +1,82 @@
 package model
 
 import (
+	"errors"
+	"fmt"
 	"math/rand"
-	"time"
 )
 
-// TID is a placeholder type for a Trace ID
-type TID uint64
-
-// SID is a placeholder type for a Span ID
-type SID uint32
-
 // Span is the common struct we use to represent a dapper-like span
-//	* TraceID is an ID that all spans in the same trace share
-//	* SpanID is a unique ID given to any span
-//  * ParentID is the span ID of the parent span if any, otherwise zeroed
-//	* Service represents the application name for which the span is originating
-//	* Start is a float UNIX timestamp for the span starting time
-//	* Duration is a float number of seconds for the length of the span
-//  * SampleSize represents how many spans this span actually stands for, or is zeroed
-//	* Meta is a flattened arbitrary metadata map
 type Span struct {
-	TraceID  TID `json:"trace_id"`
-	SpanID   SID `json:"span_id"`
-	ParentID SID `json:"parent_id"`
+	// Mandatory
+	TraceID  uint64 `json:"trace_id"` // ID that all spans in the same trace share
+	SpanID   uint64 `json:"span_id"`  // unique ID given to any span
+	Service  string `json:"service"`  // the name of the high-level application generating this span
+	Resource string `json:"resource"` // the natural key of what we measure
+	Error    int32  `json:"error"`    // error status of the span, 0 == OK
+	Start    int64  `json:"start"`    // nanosecond epoch of span start
+	Duration int64  `json:"duration"` // in nanoseconds
 
-	Service  string `json:"service"`
-	Resource string `json:"resource"`
-	Type     string `json:"type"`
+	// Optional
+	Type     string            `json:"type"`      // protocol associated with the span
+	ParentID uint64            `json:"parent_id"` // span ID of the span in which this one was created
+	Meta     map[string]string `json:"meta"`      // arbitrary tags/metadata
+	Metrics  map[string]int64  `json:"metrics"`   // arbitrary metrics
+}
 
-	Error uint32 `json:"error"`
-
-	Start    float64 `json:"start"`
-	Duration float64 `json:"duration"`
-
-	SampleSize uint32 `json:"sample_size"`
-
-	Meta map[string]string `json:"meta"`
+// String formats a Span struct to be displayed as a string
+func (s Span) String() string {
+	return fmt.Sprintf(
+		"Span[t_id=%d,s_id=%d,p_id=%d,s=%s,r=%s,e=%d,st=%d,d=%d,t=%s,meta=%v,metrics=%v]",
+		s.TraceID,
+		s.SpanID,
+		s.ParentID,
+		s.Service,
+		s.Resource,
+		s.Error,
+		s.Start,
+		s.Duration,
+		s.Type,
+		s.Meta,
+		s.Metrics,
+	)
 }
 
 // Normalize makes sure a Span is properly initialized and encloses the minimum required info
-func (s *Span) Normalize() {
+func (s *Span) Normalize() error {
+	// Mandatory data
+	// Int63() generates a non-negative pseudo-random 63-bit integer
+	if s.TraceID == 0 {
+		s.TraceID = RandomID()
+	}
+	if s.SpanID == 0 {
+		s.SpanID = RandomID()
+	}
+	if len(s.Service) == 0 {
+		return errors.New("span.normalize: `service` must be set in span")
+	}
+	if len(s.Resource) == 0 {
+		return errors.New("span.normalize: `resource` must be set in span")
+	}
+	// an Error - if not set - is 0 which is equivalent to a success status
 	if s.Start == 0 {
+		// NOTE[leo] this is probably ok, but we might want to be stricter and error?
 		s.Start = Now()
 	}
-	if s.SampleSize == 0 {
-		s.SampleSize = 1
-	}
+	// a Duration can be zero if it's an annotation...
+
+	// Optional data
+	// TODO[leo] Should we try to guess the type?
 	if s.Meta == nil {
 		s.Meta = map[string]string{}
 	}
-
-	// Create a new Trace when there is no context for this span
-	if s.TraceID == 0 {
-		s.TraceID = NewTID()
-		s.SpanID = NewSID()
+	if s.Metrics == nil {
+		s.Metrics = map[string]int64{}
 	}
+	return nil
 }
 
-// FormatStart returns a nice string of the span start time
-func (s *Span) FormatStart() string {
-	secs := int64(s.Start)
-	nsecs := int64((s.Start - float64(secs)) * 1e9)
-	date := time.Unix(secs, nsecs)
-
-	return date.Format(time.StampMilli)
-}
-
-// Now returns the current timestamp in our span-compliant format
-func Now() float64 {
-	return float64(time.Now().UnixNano()) / 1e9
-}
-
-// NewTID returns a new randomly generated TID
-func NewTID() TID {
-	return TID(rand.Int63())
-}
-
-// NewSID returns a new randomly generated SID
-func NewSID() SID {
-	return SID(rand.Uint32())
+// RandomID generates a random uint64 that we use for IDs
+func RandomID() uint64 {
+	return uint64(rand.Int63())
 }

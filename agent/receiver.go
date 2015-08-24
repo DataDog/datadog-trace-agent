@@ -108,13 +108,14 @@ func (l *HTTPReceiver) handleSpans(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK\n"))
 
-	//	log.Infof("Set of spans received")
-
 	for _, s := range spans {
-		s.Normalize()
-		//		log.Infof("Span received. TraceID: %d, SpanID: %d, ParentID: %d, Start: %s, Service: %s, Type: %s",
-		//			s.TraceID, s.SpanID, s.ParentID, s.FormatStart(), s.Service, s.Type)
+		err := s.Normalize()
+		if err != nil {
+			log.Errorf("Dropped a span, could not normalize span: %v", s)
+			continue
+		}
 
+		log.Debugf("Received a span %v", s)
 		l.out <- s
 	}
 }

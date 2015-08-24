@@ -8,15 +8,15 @@ import (
 
 // Sampler chooses wich spans to write to the API
 type Sampler struct {
-	TraceIDBySpanID map[model.SID]model.TID
-	SpansByTraceID  map[model.TID][]model.Span
+	TraceIDBySpanID map[uint64]uint64
+	SpansByTraceID  map[uint64][]model.Span
 }
 
 // NewSampler creates a new empty sampler
 func NewSampler() *Sampler {
 	return &Sampler{
-		TraceIDBySpanID: map[model.SID]model.TID{},
-		SpansByTraceID:  map[model.TID][]model.Span{},
+		TraceIDBySpanID: map[uint64]uint64{},
+		SpansByTraceID:  map[uint64][]model.Span{},
 	}
 }
 
@@ -47,22 +47,19 @@ func (s *Sampler) GetSamples(sb *model.StatsBucket, minSpanByDistribution int) [
 	}
 
 	// Look at the stats to find representative spans
-	spanIDs := []model.SID{}
-	for _, c := range sb.Counts {
-		d := c.Distribution
-		if d != nil {
-			for _, q := range quantiles {
-				_, sIDs := d.Quantile(q)
+	spanIDs := []uint64{}
+	for _, d := range sb.Distributions {
+		for _, q := range quantiles {
+			_, sIDs := d.Summary.Quantile(q)
 
-				if len(sIDs) > 0 { // TODO: not sure this condition is required
-					spanIDs = append(spanIDs, sIDs[0])
-				}
+			if len(sIDs) > 0 { // TODO: not sure this condition is required
+				spanIDs = append(spanIDs, sIDs[0])
 			}
 		}
 	}
 
 	// Then find the trace IDs thanks to a spanID -> traceID map
-	traceIDSet := map[model.TID]bool{}
+	traceIDSet := map[uint64]interface{}{}
 	for _, spanID := range spanIDs {
 		traceIDSet[s.TraceIDBySpanID[spanID]] = true
 	}

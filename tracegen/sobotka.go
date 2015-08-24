@@ -10,7 +10,7 @@ func newFakeDogpoundGet() Service {
 		ResourceMaker: func() string {
 			return "mget"
 		},
-		DurationMaker: func() float64 {
+		DurationMaker: func() int64 {
 			return GaussianDuration(0.001, 0.01, 0, 0)
 		},
 	}
@@ -22,7 +22,7 @@ func newFakeDogpoundSet() Service {
 		ResourceMaker: func() string {
 			return "mset"
 		},
-		DurationMaker: func() float64 {
+		DurationMaker: func() int64 {
 			return GaussianDuration(0.00001, 0.01, 0, 0)
 		},
 	}
@@ -35,8 +35,8 @@ func newFakeSobotkaNormalize() Service {
 		ResourceMaker: func() string {
 			return "normalize"
 		},
-		DurationMaker: func() float64 {
-			return GaussianDuration(0.03, 0.1, 0.01, 0)
+		DurationMaker: func() int64 {
+			return GaussianDuration(0.03, 0.1, 1e7, 0)
 		},
 		SubServices: subs,
 	}
@@ -49,7 +49,7 @@ func newFakeSobotkaTransform() Service {
 		ResourceMaker: func() string {
 			return ChooseRandomString(qs)
 		},
-		DurationMaker: func() float64 {
+		DurationMaker: func() int64 {
 			return GaussianDuration(0.05, 0.01, 0, 0)
 		},
 	}
@@ -63,8 +63,8 @@ func newFakeSobotka() Service {
 		ResourceMaker: func() string {
 			return ChooseRandomString(qs)
 		},
-		DurationMaker: func() float64 {
-			return GaussianDuration(0.30, 0.1, 0.1, 0)
+		DurationMaker: func() int64 {
+			return GaussianDuration(0.30, 0.1, 1e8, 0)
 		},
 		SubServices: subs,
 	}

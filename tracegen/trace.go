@@ -1,7 +1,7 @@
 package main
 
 import (
-	"math"
+	"math/rand"
 
 	"github.com/DataDog/raclette/model"
 )
@@ -14,10 +14,10 @@ import (
 // * traces is a pointer to a slice of Spans where the trace we generate will be appended
 // * minTs/maxTs are float64 timestamps, if != 0 they will be used as time boundaries for generated traces
 //   this is something useful when you want to generatet "nested" traces
-func generateTrace(s Service, traceID model.TID, parentID model.SID, traces *[]model.Span, minTs float64, maxTs float64) float64 {
+func generateTrace(s Service, traceID uint64, parentID uint64, traces *[]model.Span, minTs int64, maxTs int64) int64 {
 	t := model.Span{
 		TraceID:  traceID,
-		SpanID:   model.NewSID(),
+		SpanID:   uint64(rand.Int63()),
 		ParentID: parentID,
 		Service:  s.Name,
 		Resource: s.ResourceMaker(),
@@ -26,7 +26,9 @@ func generateTrace(s Service, traceID model.TID, parentID model.SID, traces *[]m
 	}
 	t.Normalize()
 
-	t.Start = math.Max(minTs, t.Start)
+	if t.Start < minTs {
+		t.Start = minTs
+	}
 	if maxTs != 0 && t.Start+t.Duration > maxTs {
 		t.Duration = maxTs - t.Start
 	}
@@ -57,7 +59,9 @@ func generateTrace(s Service, traceID model.TID, parentID model.SID, traces *[]m
 		//        -----------
 		//			   s2
 		genTs := generateTrace(subs, t.TraceID, t.SpanID, traces, maxGeneratedTs, maxTs)
-		maxGeneratedTs = math.Max(maxGeneratedTs, genTs)
+		if genTs > maxGeneratedTs {
+			maxGeneratedTs = genTs
+		}
 	}
 
 	return maxGeneratedTs
