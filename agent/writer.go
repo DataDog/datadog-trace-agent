@@ -71,7 +71,6 @@ func (w *Writer) Start() {
 	// will shutdown as the input channel is closed
 	go func() {
 		for s := range w.inSpan {
-			log.Debugf("Received a span, TID=%d, SID=%d, service=%s, resource=%s", s.TraceID, s.SpanID, s.Service, s.Resource)
 			// Always write to last element of span
 			// FIXME: mutex too slow?
 			w.bufLock.Lock()
