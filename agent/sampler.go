@@ -9,14 +9,14 @@ import (
 // Sampler chooses wich spans to write to the API
 type Sampler struct {
 	TraceIDBySpanID map[model.SID]model.TID
-	SpansByTraceID  map[model.TID][]*model.Span
+	SpansByTraceID  map[model.TID][]model.Span
 }
 
 // NewSampler creates a new empty sampler
 func NewSampler() *Sampler {
 	return &Sampler{
 		TraceIDBySpanID: map[model.SID]model.TID{},
-		SpansByTraceID:  map[model.TID][]*model.Span{},
+		SpansByTraceID:  map[model.TID][]model.Span{},
 	}
 }
 
@@ -26,18 +26,20 @@ func (s *Sampler) IsEmpty() bool {
 }
 
 // AddSpan adds a span to the sampler internal momory
-func (s *Sampler) AddSpan(span *model.Span) {
+func (s *Sampler) AddSpan(span model.Span) {
 	s.TraceIDBySpanID[span.SpanID] = span.TraceID
+
 	spans, ok := s.SpansByTraceID[span.TraceID]
 	if !ok {
-		s.SpansByTraceID[span.TraceID] = []*model.Span{span}
+		spans = []model.Span{span}
 	} else {
-		s.SpansByTraceID[span.TraceID] = append(spans, span)
+		spans = append(spans, span)
 	}
+	s.SpansByTraceID[span.TraceID] = spans
 }
 
 // GetSamples returns a list of representative spans to write
-func (s *Sampler) GetSamples(sb *model.StatsBucket, minSpanByDistribution int) []*model.Span {
+func (s *Sampler) GetSamples(sb *model.StatsBucket, minSpanByDistribution int) []model.Span {
 	qn := float64(1) / float64(minSpanByDistribution-1)
 	quantiles := make([]float64, minSpanByDistribution)
 	for i := 0; i < minSpanByDistribution; i++ {
@@ -60,13 +62,13 @@ func (s *Sampler) GetSamples(sb *model.StatsBucket, minSpanByDistribution int) [
 	}
 
 	// Then find the trace IDs thanks to a spanID -> traceID map
-	traceIDSet := map[model.TID]interface{}{}
+	traceIDSet := map[model.TID]bool{}
 	for _, spanID := range spanIDs {
-		traceIDSet[s.TraceIDBySpanID[spanID]] = nil
+		traceIDSet[s.TraceIDBySpanID[spanID]] = true
 	}
 
 	// Then get the traces (ie. set of spans) thanks to a traceID -> []spanID map
-	spans := []*model.Span{}
+	spans := []model.Span{}
 	for traceID := range traceIDSet {
 		spans = append(spans, s.SpansByTraceID[traceID]...)
 	}

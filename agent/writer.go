@@ -75,7 +75,7 @@ func (w *Writer) Start() {
 			// Always write to last element of span
 			// FIXME: mutex too slow?
 			w.bufLock.Lock()
-			w.toWrite[len(w.toWrite)-1].Sampler.AddSpan(&s)
+			w.toWrite[len(w.toWrite)-1].Sampler.AddSpan(s)
 			w.bufLock.Unlock()
 		}
 	}()
@@ -127,7 +127,7 @@ func (w *Writer) Flush() {
 
 		payload := model.Payload{
 			APIKey: "424242", // FIXME, this should go in a config file
-			Spans:  spans,
+			Spans:  &spans,
 			Stats:  w.toWrite[i].Stats,
 		}
 
