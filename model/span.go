@@ -52,10 +52,10 @@ func (s *Span) Normalize() error {
 	if s.SpanID == 0 {
 		s.SpanID = RandomID()
 	}
-	if len(s.Service) == 0 {
+	if s.Service == "" {
 		return errors.New("span.normalize: `service` must be set in span")
 	}
-	if len(s.Resource) == 0 {
+	if s.Resource == "" {
 		return errors.New("span.normalize: `resource` must be set in span")
 	}
 	// an Error - if not set - is 0 which is equivalent to a success status
@@ -65,14 +65,7 @@ func (s *Span) Normalize() error {
 	}
 	// a Duration can be zero if it's an annotation...
 
-	// Optional data
-	// TODO[leo] Should we try to guess the type?
-	if s.Meta == nil {
-		s.Meta = map[string]string{}
-	}
-	if s.Metrics == nil {
-		s.Metrics = map[string]int64{}
-	}
+	// Optional data, Meta & Metrics can be nil
 	return nil
 }
 

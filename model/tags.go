@@ -45,8 +45,8 @@ func (t Tag) String() string {
 	return t.Name + ":" + t.Value
 }
 
-// GetTagKey returns a unique key from the string given and the tagset, useful to index stuff on tagsets
-func (s TagSet) GetTagKey(m string) string {
+// TagKey returns a unique key from the string given and the tagset, useful to index stuff on tagsets
+func (s TagSet) TagKey(m string) string {
 	tagStrings := make([]string, len(s))
 	for i, t := range s {
 		tagStrings[i] = t.String()

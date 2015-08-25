@@ -46,8 +46,8 @@ func (s *Sampler) GetSamples(sb *model.StatsBucket, minSpanByDistribution int) [
 		quantiles[i] = float64(i) * qn
 	}
 
+	spanIDs := make([]uint64, len(sb.Distributions)*minSpanByDistribution)
 	// Look at the stats to find representative spans
-	spanIDs := []uint64{}
 	for _, d := range sb.Distributions {
 		for _, q := range quantiles {
 			_, sIDs := d.Summary.Quantile(q)
@@ -59,9 +59,10 @@ func (s *Sampler) GetSamples(sb *model.StatsBucket, minSpanByDistribution int) [
 	}
 
 	// Then find the trace IDs thanks to a spanID -> traceID map
-	traceIDSet := map[uint64]interface{}{}
+	traceIDSet := make(map[uint64]struct{})
+	var empty struct{}
 	for _, spanID := range spanIDs {
-		traceIDSet[s.TraceIDBySpanID[spanID]] = true
+		traceIDSet[s.TraceIDBySpanID[spanID]] = empty
 	}
 
 	// Then get the traces (ie. set of spans) thanks to a traceID -> []spanID map

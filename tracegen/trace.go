@@ -1,10 +1,6 @@
 package main
 
-import (
-	"math/rand"
-
-	"github.com/DataDog/raclette/model"
-)
+import "github.com/DataDog/raclette/model"
 
 // generateTrace generate a trace for the given Service
 // You can also pass some more parameters if you want to generate a trace
@@ -17,7 +13,7 @@ import (
 func generateTrace(s Service, traceID uint64, parentID uint64, traces *[]model.Span, minTs int64, maxTs int64) int64 {
 	t := model.Span{
 		TraceID:  traceID,
-		SpanID:   uint64(rand.Int63()),
+		SpanID:   model.RandomID(),
 		ParentID: parentID,
 		Service:  s.Name,
 		Resource: s.ResourceMaker(),
