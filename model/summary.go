@@ -1,7 +1,7 @@
 package model
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sort"
@@ -19,12 +19,12 @@ type Summary interface {
 }
 
 // NewSummary generates a new summary that answers to quantiles query with epsilon precision
-func NewSummary(eps float64) Summary {
-	if eps == 0 {
+func NewSummary(epsilon float64) Summary {
+	if epsilon == 0 {
 		return NewExactSummary()
 	}
 
-	return NewGKSummary(eps)
+	return NewGKSummary(epsilon)
 }
 
 // FIXME: shamelessly copied from dgryski/go-gk, not verified, not really tested
@@ -109,9 +109,10 @@ summary faster.  Querying is still O(n).
 
 // GKSummary see above
 type GKSummary struct {
-	data *GKSkiplist
-	eps  float64
-	n    int
+	data        *GKSkiplist
+	EncodedData []GKEntry `json:"data"`
+	Epsilon     float64   `json:"epsilon"`
+	N           int       `json:"n"`
 }
 
 // GKEntry is an element of the skiplist
@@ -123,16 +124,40 @@ type GKEntry struct {
 }
 
 // NewGKSummary returns a new approx-summary with accuracy epsilon (0 <= epsilon <= 1)
-func NewGKSummary(eps float64) *GKSummary {
+func NewGKSummary(epsilon float64) *GKSummary {
 	return &GKSummary{
-		eps:  eps,
-		data: NewGKSkiplist(),
+		Epsilon: epsilon,
+		data:    NewGKSkiplist(),
 	}
 }
 
-// MarshalJSON returns a JSON representation of the summary, only marshals the data
-func (s *GKSummary) MarshalJSON() ([]byte, error) {
-	return s.data.MarshalJSON()
+// Encode prepares a flat version of the skiplist for various encoders (json/gob)
+func (s *GKSummary) Encode() {
+	if s.data == nil {
+		panic(errors.New("Cannot encode non-initialized Summary"))
+	}
+
+	// TODO[leo] preallocate, not sure: 1/ 2*epsilon?
+	s.EncodedData = make([]GKEntry, 0)
+	curr := s.data.head
+	for curr != nil {
+		s.EncodedData = append(s.EncodedData, curr.value)
+		curr = curr.next[0]
+	}
+}
+
+// Decode is used to restore the original skiplist from the EncodedData
+func (s *GKSummary) Decode() {
+	if s.EncodedData == nil {
+		panic(errors.New("Nothing to decode"))
+	}
+	if s.data != nil {
+		panic(errors.New("Cannot decode in already used struct"))
+	}
+
+	for _, e := range s.EncodedData {
+		s.data.Insert(e)
+	}
 }
 
 // Insert inserts an item into the quantile summary
@@ -146,13 +171,13 @@ func (s *GKSummary) Insert(v int64, t uint64) {
 
 	eptr := s.data.Insert(e)
 
-	s.n++
+	s.N++
 
 	if eptr.prev[0] != s.data.head && eptr.next[0] != nil {
-		eptr.value.Delta = int(2 * s.eps * float64(s.n))
+		eptr.value.Delta = int(2 * s.Epsilon * float64(s.N))
 	}
 
-	if s.n%int(1.0/float64(2.0*s.eps)) == 0 {
+	if s.N%int(1.0/float64(2.0*s.Epsilon)) == 0 {
 		s.compress()
 	}
 }
@@ -160,7 +185,7 @@ func (s *GKSummary) Insert(v int64, t uint64) {
 func (s *GKSummary) compress() {
 	var missing int
 
-	epsN := int(2 * s.eps * float64(s.n))
+	epsN := int(2 * s.Epsilon * float64(s.N))
 
 	for elt := s.data.head.next[0]; elt != nil && elt.next[0] != nil; {
 		next := elt.next[0]
@@ -191,10 +216,10 @@ func (s *GKSummary) compress() {
 func (s *GKSummary) Quantile(q float64) (int64, []uint64) {
 
 	// convert quantile to rank
-	r := int(q*float64(s.n) + 0.5)
+	r := int(q*float64(s.N) + 0.5)
 
 	var rmin int
-	epsN := int(s.eps * float64(s.n))
+	epsN := int(s.Epsilon * float64(s.N))
 
 	for elt := s.data.head.next[0]; elt != nil; elt = elt.next[0] {
 		t := elt.value
@@ -327,19 +352,4 @@ func (s *GKSkiplist) Remove(node *GKSkiplistNode) {
 		node.next[i] = nil
 		node.prev[i] = nil
 	}
-}
-
-// MarshalJSON returns a JSON representation
-func (s *GKSkiplist) MarshalJSON() ([]byte, error) {
-	// iterate over all available values and flatten the skiplist
-	// FIXME: probably here we could allocate up to X if we compress before?
-	var entries []GKEntry
-
-	curr := s.head
-	for curr != nil {
-		entries = append(entries, curr.value)
-		curr = curr.next[0]
-	}
-
-	return json.Marshal(entries)
 }

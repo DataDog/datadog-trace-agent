@@ -137,6 +137,16 @@ func (sb *StatsBucket) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// Encode prepares a bucket for encoding
+func (sb *StatsBucket) Encode() {
+	for _, d := range sb.Distributions {
+		gkd, ok := d.Summary.(*GKSummary)
+		if ok {
+			gkd.Encode()
+		}
+	}
+}
+
 // HandleSpan adds the span to this bucket stats
 func (sb *StatsBucket) HandleSpan(s *Span) {
 	// by service

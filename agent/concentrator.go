@@ -90,6 +90,8 @@ func (c *Concentrator) flush() {
 	// flush the other bucket before
 	bucketToSend := (c.currentBucket + 1) % 2
 	if c.openBucket[bucketToSend] != nil {
+		// prepare for serialization
+		c.openBucket[bucketToSend].Encode()
 		c.outStats <- *c.openBucket[bucketToSend]
 	}
 }
