@@ -14,14 +14,14 @@ import (
 )
 
 // Concentrator is getting a stream of raw traces and producing some time-bucketed normalized statistics from them.
-//  * incSpans, channel from which we consume spans and create stats
+//  * inSpans, channel from which we consume spans and create stats
 //  * outStats, channel where we return our computed stats
 //	* bucketDuration, designates the length of a time bucket
 //	* openBucket, array of stats buckets we keep in memory (fixed size and iterating over)
 //  * currentBucket, the index of openBucket we're currently writing to
 type Concentrator struct {
 	// work channels
-	incSpans chan model.Span        // incoming spans to add to stats
+	inSpans  chan model.Span        // incoming spans to add to stats
 	outStats chan model.StatsBucket // outgoing stats buckets
 	outSpans chan model.Span        // spans that potentially need to be written with that time bucket
 
@@ -49,8 +49,8 @@ func NewConcentrator(bucketDuration int, eps float64, exit chan bool, exitGroup 
 }
 
 // Init sets the channels for incoming spans and outgoing stats before starting
-func (c *Concentrator) Init(incSpans chan model.Span, outStats chan model.StatsBucket, outSpans chan model.Span) {
-	c.incSpans = incSpans
+func (c *Concentrator) Init(inSpans chan model.Span, outStats chan model.StatsBucket, outSpans chan model.Span) {
+	c.inSpans = inSpans
 	c.outStats = outStats
 	c.outSpans = outSpans
 }
@@ -62,7 +62,7 @@ func (c *Concentrator) Start() {
 
 	go func() {
 		// should return when upstream span channel is closed
-		for s := range c.incSpans {
+		for s := range c.inSpans {
 			c.HandleNewSpan(&s)
 			c.outSpans <- s
 		}
