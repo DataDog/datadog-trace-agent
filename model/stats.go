@@ -193,7 +193,7 @@ func (sb StatsBucket) addToCount(m string, s Span, tgs TagSet) {
 		sb.Counts[ckey] = NewCount(m, tgs)
 	}
 
-	sb.Counts[ckey].Add(s)
+	sb.Counts[ckey] = sb.Counts[ckey].Add(s)
 }
 
 func (sb StatsBucket) addToDistribution(m string, s Span, tgs TagSet) {
