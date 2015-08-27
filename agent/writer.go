@@ -13,9 +13,9 @@ import (
 
 // WriterBuffer contains Spans and Stats to write to the API
 type WriterBuffer struct {
-	Sampler *Sampler
+	Sampler Sampler
+	Stats   model.StatsBucket
 	// Spans   []model.Span
-	Stats model.StatsBucket
 }
 
 // Writer implements a Writer and writes to the Datadog API spans

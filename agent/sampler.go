@@ -13,20 +13,20 @@ type Sampler struct {
 }
 
 // NewSampler creates a new empty sampler
-func NewSampler() *Sampler {
-	return &Sampler{
+func NewSampler() Sampler {
+	return Sampler{
 		TraceIDBySpanID: map[uint64]uint64{},
 		SpansByTraceID:  map[uint64][]model.Span{},
 	}
 }
 
 // IsEmpty tells if the sampler contains no span
-func (s *Sampler) IsEmpty() bool {
+func (s Sampler) IsEmpty() bool {
 	return len(s.TraceIDBySpanID) == 0
 }
 
 // AddSpan adds a span to the sampler internal momory
-func (s *Sampler) AddSpan(span model.Span) {
+func (s Sampler) AddSpan(span model.Span) {
 	s.TraceIDBySpanID[span.SpanID] = span.TraceID
 
 	spans, ok := s.SpansByTraceID[span.TraceID]
@@ -40,7 +40,6 @@ func (s *Sampler) AddSpan(span model.Span) {
 
 // GetSamples returns a list of representative spans to write
 func (s *Sampler) GetSamples(sb model.StatsBucket, quantiles []float64) []model.Span {
-
 	spanIDs := make([]uint64, len(sb.Distributions)*len(quantiles))
 	// Look at the stats to find representative spans
 	for _, d := range sb.Distributions {
