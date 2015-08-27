@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	log "github.com/cihub/seelog"
 )
 
 // Hardcoded metric names for ease of reference
@@ -49,15 +51,23 @@ func NewCount(m string, tgs TagSet) Count {
 	return c
 }
 
-// Add adds a Span to a Count, panics if cannot add values
-func (c Count) Add(s Span) (newc Count) {
-	newc.Key = c.Key
-	newc.Name = c.Name
-	newc.TagSet = c.TagSet
+// Add adds a Span to a Count, returns an error if it cannot add values
+func (c Count) Add(s Span) (Count, error) {
+	newc := Count{
+		Key:    c.Key,
+		Name:   c.Name,
+		TagSet: c.TagSet,
+	}
 
 	switch c.Name {
-	case HITS, ERRORS:
+	case HITS:
 		newc.Value = c.Value + 1
+	case ERRORS:
+		if s.Error != 0 {
+			newc.Value = c.Value + 1
+		} else {
+			return c, nil
+		}
 	case DURATION:
 		newc.Value = c.Value + s.Duration
 	default:
@@ -65,14 +75,14 @@ func (c Count) Add(s Span) (newc Count) {
 		if s.Metrics != nil {
 			val, ok := s.Metrics[c.Name]
 			if !ok {
-				panic(fmt.Errorf("Count %s was not initialized", c.Name))
+				return c, fmt.Errorf("Count %s was not initialized", c.Name)
 			}
 			newc.Value = c.Value + val
 		} else {
-			panic(fmt.Errorf("Not adding span metrics %v to count %s, not compatible", s.Metrics, c.Name))
+			return c, fmt.Errorf("Not adding span metrics %v to count %s, not compatible", s.Metrics, c.Name)
 		}
 	}
-	return newc
+	return newc, nil
 }
 
 // NewDistribution returns a new Distribution for a metric and a given tag set
@@ -193,7 +203,11 @@ func (sb StatsBucket) addToCount(m string, s Span, tgs TagSet) {
 		sb.Counts[ckey] = NewCount(m, tgs)
 	}
 
-	sb.Counts[ckey] = sb.Counts[ckey].Add(s)
+	var err error
+	sb.Counts[ckey], err = sb.Counts[ckey].Add(s)
+	if err != nil {
+		log.Infof("Not adding span %d to count %s/%s, %s", s.SpanID, m, ckey, err)
+	}
 }
 
 func (sb StatsBucket) addToDistribution(m string, s Span, tgs TagSet) {
