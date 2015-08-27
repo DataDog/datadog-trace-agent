@@ -34,7 +34,7 @@ type Concentrator struct {
 	eps            float64
 
 	// internal data structs
-	openBucket    [2]*model.StatsBucket
+	openBucket    [2]model.StatsBucket
 	currentBucket int32
 }
 
@@ -63,7 +63,7 @@ func (c *Concentrator) Start() {
 	go func() {
 		// should return when upstream span channel is closed
 		for s := range c.inSpans {
-			c.HandleNewSpan(&s)
+			c.HandleNewSpan(s)
 			c.outSpans <- s
 		}
 	}()
@@ -74,7 +74,7 @@ func (c *Concentrator) Start() {
 }
 
 // HandleNewSpan adds to the current bucket the pointed span
-func (c *Concentrator) HandleNewSpan(s *model.Span) {
+func (c *Concentrator) HandleNewSpan(s model.Span) {
 	c.openBucket[c.currentBucket].HandleSpan(s)
 }
 
@@ -89,10 +89,10 @@ func (c *Concentrator) flush() {
 
 	// flush the other bucket before
 	bucketToSend := (c.currentBucket + 1) % 2
-	if c.openBucket[bucketToSend] != nil {
+	if c.openBucket[bucketToSend].Start != 0 {
 		// prepare for serialization
 		c.openBucket[bucketToSend].Encode()
-		c.outStats <- *c.openBucket[bucketToSend]
+		c.outStats <- c.openBucket[bucketToSend]
 	}
 }
 

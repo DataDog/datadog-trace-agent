@@ -77,7 +77,7 @@ func TestGKSummaryInsertion(t *testing.T) {
 	assert := assert.New(t)
 
 	d := NewSummaryWithTestData(0.01)
-	assert.Equal(100, d.(*GKSummary).n)
+	assert.Equal(100, d.(*GKSummary).N)
 }
 
 func TestGKSummaryQuantile(t *testing.T) {
@@ -110,7 +110,7 @@ func TestGKSummaryInsertionHugeScale(t *testing.T) {
 	d.(*GKSummary).summary.head.Println(0, &seen)
 	*/
 
-	assert.Equal(repet*len(TestArray), d.(*GKSummary).n)
+	assert.Equal(repet*len(TestArray), d.(*GKSummary).N)
 	// FIXME: assert correctness of this, should return proper quantiles
 }
 
@@ -120,5 +120,5 @@ func TestGKSummaryMarshal(t *testing.T) {
 	d := NewSummaryWithTestData(0.01)
 
 	// FIXME: test the real data in it
-	assert.NotPanics(func() { d.(*GKSummary).MarshalJSON() })
+	assert.NotPanics(func() { d.(*GKSummary).Encode() })
 }

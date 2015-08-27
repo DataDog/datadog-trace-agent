@@ -15,7 +15,7 @@ import (
 type WriterBuffer struct {
 	Sampler *Sampler
 	// Spans   []model.Span
-	Stats *model.StatsBucket
+	Stats model.StatsBucket
 }
 
 // Writer implements a Writer and writes to the Datadog API spans
@@ -92,7 +92,7 @@ func (w *Writer) flushStatsBucket() {
 			log.Info("Received a stats bucket, flushing stats & bufferend spans")
 			// closing this buffer
 			w.bufLock.Lock()
-			w.toWrite[len(w.toWrite)-1].Stats = &bucket
+			w.toWrite[len(w.toWrite)-1].Stats = bucket
 			w.bufLock.Unlock()
 			w.addNewBuffer()
 			w.Flush()
@@ -126,7 +126,7 @@ func (w *Writer) Flush() {
 
 		payload := model.Payload{
 			APIKey: "424242", // FIXME, this should go in a config file
-			Spans:  &spans,
+			Spans:  spans,
 			Stats:  w.toWrite[i].Stats,
 		}
 

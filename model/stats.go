@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
 )
 
 // Hardcoded metric names for ease of reference
@@ -21,6 +23,7 @@ var DefaultDistributions = [...]string{DURATION}
 
 // Count represents one specific "metric" we track for a given tagset
 type Count struct {
+	Key    string `json:"key"`
 	Name   string `json:"name"`   // represents the entity we count, e.g. "hits", "errors", "time"
 	TagSet TagSet `json:"tagset"` // set of tags for which we account this Distribution
 	Value  int64  `json:"value"`  // accumulated values
@@ -28,27 +31,35 @@ type Count struct {
 
 // Distribution represents a true image of the spectrum of values, allowing arbitrary quantile queries
 type Distribution struct {
+	Key     string  `json:"key"`
 	Name    string  `json:"name"`    // represents the entity we count, e.g. "hits", "errors", "time"
 	TagSet  TagSet  `json:"tagset"`  // set of tags for which we account this Distribution
 	Summary Summary `json:"summary"` // actual representation of data
 }
 
 // NewCount returns a new Count for a metric and a given tag set
-func NewCount(m string, tgs TagSet) *Count {
-	return &Count{
-		Name:   m,
-		TagSet: tgs,
-		Value:  0,
+func NewCount(m string, tgs TagSet) Count {
+	c := Count{Name: m, TagSet: tgs, Value: 0}
+	tagStrings := make([]string, len(c.TagSet))
+	for i, t := range c.TagSet {
+		tagStrings[i] = fmt.Sprintf("%s:%s", t.Name, t.Value)
 	}
+	sort.Strings(tagStrings)
+	c.Key = fmt.Sprintf("Count(name=%s,tags=%s)", c.Name, strings.Join(tagStrings, ","))
+	return c
 }
 
 // Add adds a Span to a Count, panics if cannot add values
-func (c *Count) Add(s *Span) {
+func (c Count) Add(s Span) (newc Count) {
+	newc.Key = c.Key
+	newc.Name = c.Name
+	newc.TagSet = c.TagSet
+
 	switch c.Name {
 	case HITS, ERRORS:
-		c.Value++
+		newc.Value = c.Value + 1
 	case DURATION:
-		c.Value += s.Duration
+		newc.Value = c.Value + s.Duration
 	default:
 		// arbitrary metrics implementation
 		if s.Metrics != nil {
@@ -56,16 +67,17 @@ func (c *Count) Add(s *Span) {
 			if !ok {
 				panic(fmt.Errorf("Count %s was not initialized", c.Name))
 			}
-			c.Value += val
+			newc.Value = c.Value + val
 		} else {
 			panic(fmt.Errorf("Not adding span metrics %v to count %s, not compatible", s.Metrics, c.Name))
 		}
 	}
+	return newc
 }
 
 // NewDistribution returns a new Distribution for a metric and a given tag set
-func NewDistribution(m string, tgs TagSet, epsilon float64) *Distribution {
-	return &Distribution{
+func NewDistribution(m string, tgs TagSet, epsilon float64) Distribution {
+	return Distribution{
 		Name:    m,
 		TagSet:  tgs,
 		Summary: NewSummary(epsilon),
@@ -73,7 +85,7 @@ func NewDistribution(m string, tgs TagSet, epsilon float64) *Distribution {
 }
 
 // Add inserts the proper values in a given distribution from a span
-func (d *Distribution) Add(s *Span) {
+func (d Distribution) Add(s Span) {
 	if d.Name == DURATION {
 		d.Summary.Insert(s.Duration, s.SpanID)
 	} else {
@@ -92,17 +104,17 @@ type StatsBucket struct {
 	Epsilon  float64 // epsilon used to rebuild GK distributions if needed
 
 	// stats indexed by keys
-	Counts        map[string]*Count        // All the true counts we keep
-	Distributions map[string]*Distribution // All the true distribution we keep to answer quantile queries
+	Counts        map[string]Count        // All the true counts we keep
+	Distributions map[string]Distribution // All the true distribution we keep to answer quantile queries
 }
 
 // NewStatsBucket opens a new bucket at this time and initializes it properly
-func NewStatsBucket(epsilon float64) *StatsBucket {
-	counts := make(map[string]*Count)
-	distros := make(map[string]*Distribution)
+func NewStatsBucket(epsilon float64) StatsBucket {
+	counts := make(map[string]Count)
+	distros := make(map[string]Distribution)
 
 	// The only non-initialized value is the Duration which should be set by whoever closes that bucket
-	return &StatsBucket{
+	return StatsBucket{
 		Start:         Now(),
 		Epsilon:       epsilon,
 		Counts:        counts,
@@ -111,18 +123,18 @@ func NewStatsBucket(epsilon float64) *StatsBucket {
 }
 
 // MarshalJSON returns a JSON representation of a bucket, flattening stats
-func (sb *StatsBucket) MarshalJSON() ([]byte, error) {
+func (sb StatsBucket) MarshalJSON() ([]byte, error) {
 	if sb.Duration == 0 {
 		panic(errors.New("Trying to marshal a bucket that has not been closed"))
 	}
 
-	flatCounts := make([]*Count, len(sb.Counts))
+	flatCounts := make([]Count, len(sb.Counts))
 	i := 0
 	for _, val := range sb.Counts {
 		flatCounts[i] = val
 		i++
 	}
-	flatDistros := make([]*Distribution, len(sb.Distributions))
+	flatDistros := make([]Distribution, len(sb.Distributions))
 	i = 0
 	for _, val := range sb.Distributions {
 		flatDistros[i] = val
@@ -138,7 +150,7 @@ func (sb *StatsBucket) MarshalJSON() ([]byte, error) {
 }
 
 // Encode prepares a bucket for encoding
-func (sb *StatsBucket) Encode() {
+func (sb StatsBucket) Encode() {
 	for _, d := range sb.Distributions {
 		gkd, ok := d.Summary.(*GKSummary)
 		if ok {
@@ -148,7 +160,7 @@ func (sb *StatsBucket) Encode() {
 }
 
 // HandleSpan adds the span to this bucket stats
-func (sb *StatsBucket) HandleSpan(s *Span) {
+func (sb *StatsBucket) HandleSpan(s Span) {
 	// by service
 	sTag := Tag{Name: "service", Value: s.Service}
 	byS := TagSet{sTag}
@@ -162,7 +174,7 @@ func (sb *StatsBucket) HandleSpan(s *Span) {
 	// TODO by (service) or (service, resource) union preset tags in the config (from s.Metadata)
 }
 
-func (sb *StatsBucket) addToTagSet(s *Span, tgs TagSet) {
+func (sb StatsBucket) addToTagSet(s Span, tgs TagSet) {
 	for _, m := range DefaultCounts {
 		sb.addToCount(m, s, tgs)
 	}
@@ -174,7 +186,7 @@ func (sb *StatsBucket) addToTagSet(s *Span, tgs TagSet) {
 	}
 }
 
-func (sb *StatsBucket) addToCount(m string, s *Span, tgs TagSet) {
+func (sb StatsBucket) addToCount(m string, s Span, tgs TagSet) {
 	ckey := tgs.TagKey(m)
 
 	if _, ok := sb.Counts[ckey]; !ok {
@@ -184,7 +196,7 @@ func (sb *StatsBucket) addToCount(m string, s *Span, tgs TagSet) {
 	sb.Counts[ckey].Add(s)
 }
 
-func (sb *StatsBucket) addToDistribution(m string, s *Span, tgs TagSet) {
+func (sb StatsBucket) addToDistribution(m string, s Span, tgs TagSet) {
 	ckey := tgs.TagKey(m)
 
 	if _, ok := sb.Distributions[ckey]; !ok {
