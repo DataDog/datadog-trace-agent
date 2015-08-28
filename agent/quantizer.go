@@ -67,7 +67,8 @@ func (q *Quantizer) Quantize(span model.Span) model.Span {
 	if span.Type == sqlType {
 		return q.QuantizeSQL(span)
 	}
-	log.Debug("No quantization for this span")
+	log.Debugf("No quantization for this span, Type: %s", span.Type)
+
 	return span
 }
 
