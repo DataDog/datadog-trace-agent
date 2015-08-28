@@ -11,6 +11,7 @@ import (
 // Agent struct holds all the sub-routines structs and some channels to stream data in those
 type Agent struct {
 	Receiver     Receiver // Receiver is an interface
+	Quantizer    *Quantizer
 	Concentrator *Concentrator
 	Writer       *Writer
 
@@ -23,7 +24,7 @@ type Agent struct {
 
 	// internal channels
 	spansFromReceiver     chan model.Span
-	spansToConcentrator   chan model.Span
+	spansFromQuantizer    chan model.Span
 	spansFromConcentrator chan model.Span
 	statsFromConcentrator chan model.StatsBucket
 }
@@ -36,6 +37,7 @@ func NewAgent(conf *config.File) *Agent {
 	var exitGroup sync.WaitGroup
 
 	r := NewHTTPReceiver(exit, &exitGroup)
+	q := NewQuantizer()
 	c := NewConcentrator(
 		conf.GetIntDefault("trace.concentrator", "bucket_size", 5),
 		conf.GetFloat64Default("trace.concentrator", "quantile_precision", 0),
@@ -46,6 +48,7 @@ func NewAgent(conf *config.File) *Agent {
 	return &Agent{
 		Config:       conf,
 		Receiver:     r,
+		Quantizer:    q,
 		Concentrator: c,
 		Writer:       w,
 		exit:         exit,
@@ -60,11 +63,14 @@ func (a *Agent) Init() error {
 	a.spansFromReceiver = make(chan model.Span)
 	a.Receiver.Init(a.spansFromReceiver)
 
+	// Quantizer initialization
+	a.spansFromQuantizer = make(chan model.Span)
+	a.Quantizer.Init(a.spansFromReceiver, a.spansFromQuantizer, a.exit, a.exitGroup)
+
 	// Concentrator initialization
-	a.spansToConcentrator = make(chan model.Span)
 	a.spansFromConcentrator = make(chan model.Span)
 	a.statsFromConcentrator = make(chan model.StatsBucket)
-	a.Concentrator.Init(a.spansToConcentrator, a.statsFromConcentrator, a.spansFromConcentrator)
+	a.Concentrator.Init(a.spansFromQuantizer, a.statsFromConcentrator, a.spansFromConcentrator)
 
 	// Writer initialization
 	a.Writer.Init(a.spansFromConcentrator, a.statsFromConcentrator)
@@ -83,16 +89,8 @@ func (a *Agent) Start() error {
 	// sends stuff to the stats writer
 	a.Concentrator.Start()
 
-	// send stuff to the concentrator and span writer
-	// FIXME: might not be needed, keeping it for now in case we need to pipe the traces from the receiver elsewhere
-	go func() {
-		// should be closed by the listener when exiting
-		for s := range a.spansFromReceiver {
-			a.spansToConcentrator <- s
-		}
-		// when no more spans are to be read from the receiver, notify downstream readers
-		close(a.spansToConcentrator)
-	}()
+	// sends stuff to our main spansFromQuantizer pipe
+	a.Quantizer.Start()
 
 	// sends stuff to our main spansFromReceiver pipe
 	a.Receiver.Start()
