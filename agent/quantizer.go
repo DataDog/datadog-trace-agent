@@ -19,8 +19,8 @@ type Quantizer struct {
 }
 
 const (
-	SQLType                = "sql"
-	SQLVariableReplacement = "?"
+	sqlType                = "sql"
+	sqlVariableReplacement = "?"
 )
 
 var sqlCommentName = regexp.MustCompile("^-- ([^\n]*)")
@@ -64,12 +64,11 @@ func (q *Quantizer) Start() {
 
 // Quantize generates meaningul resource for a span, depending on its type
 func (q *Quantizer) Quantize(span model.Span) model.Span {
-	if span.Type == SQLType {
+	if span.Type == sqlType {
 		return q.QuantizeSQL(span)
-	} else {
-		log.Debug("No quantization for this span")
-		return span
 	}
+	log.Debug("No quantization for this span")
+	return span
 }
 
 // QuantizeSQL generates resource for SQL spans
@@ -89,11 +88,11 @@ func (q *Quantizer) QuantizeSQL(span model.Span) model.Span {
 	} else {
 		log.Infof("Quantize SQL command with generic parsing, SpanID: %d", span.SpanID)
 		// Remove variables
-		resource = sqlVariablesRegexp.ReplaceAllString(resource, SQLVariableReplacement)
-		resource = sqlalchemyVariablesRegexp.ReplaceAllString(resource, SQLVariableReplacement)
+		resource = sqlVariablesRegexp.ReplaceAllString(resource, sqlVariableReplacement)
+		resource = sqlalchemyVariablesRegexp.ReplaceAllString(resource, sqlVariableReplacement)
 
 		// Deal with list of variables of arbitrary size
-		resource = sqlListVariables.ReplaceAllString(resource, SQLVariableReplacement)
+		resource = sqlListVariables.ReplaceAllString(resource, sqlVariableReplacement)
 	}
 
 	span.Resource = resource
