@@ -2,6 +2,7 @@ package main
 
 import (
 	"sync"
+	"time"
 
 	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
@@ -37,11 +38,12 @@ func NewAgent(conf *config.File) *Agent {
 
 	r := NewHTTPReceiver(exit, &exitGroup)
 	c := NewConcentrator(
-		conf.GetIntDefault("trace.concentrator", "bucket_size", 5),
+		time.Second*5, // FIXME replace with duration parse `5s`
 		conf.GetFloat64Default("trace.concentrator", "quantile_precision", 0),
 		exit, &exitGroup)
-	w := NewWriter(endpoint, exit, &exitGroup,
-		conf.GetIntDefault("trace.sampler", "min_span_by_distribution", 5))
+
+	quantiles := []float64{0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 1}
+	w := NewWriter(endpoint, exit, &exitGroup, quantiles)
 
 	return &Agent{
 		Config:       conf,

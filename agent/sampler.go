@@ -39,14 +39,9 @@ func (s *Sampler) AddSpan(span model.Span) {
 }
 
 // GetSamples returns a list of representative spans to write
-func (s *Sampler) GetSamples(sb model.StatsBucket, minSpanByDistribution int) []model.Span {
-	qn := float64(1) / float64(minSpanByDistribution-1)
-	quantiles := make([]float64, minSpanByDistribution)
-	for i := 0; i < minSpanByDistribution; i++ {
-		quantiles[i] = float64(i) * qn
-	}
+func (s *Sampler) GetSamples(sb model.StatsBucket, quantiles []float64) []model.Span {
 
-	spanIDs := make([]uint64, len(sb.Distributions)*minSpanByDistribution)
+	spanIDs := make([]uint64, len(sb.Distributions)*len(quantiles))
 	// Look at the stats to find representative spans
 	for _, d := range sb.Distributions {
 		for _, q := range quantiles {
