@@ -28,7 +28,7 @@ type Writer struct {
 
 	// Sampler configuration
 	// TODO: move the sampler into a real Agent worker?
-	minSpanByDistribution int
+	quantiles []float64
 
 	toWrite []WriterBuffer
 	bufLock sync.Mutex
@@ -39,12 +39,12 @@ type Writer struct {
 }
 
 // NewWriter returns a new Writer
-func NewWriter(endp string, exit chan bool, exitGroup *sync.WaitGroup, minSpanByDistribution int) *Writer {
+func NewWriter(endp string, exit chan bool, exitGroup *sync.WaitGroup, quantiles []float64) *Writer {
 	return &Writer{
-		endpoint:              endp,
-		exit:                  exit,
-		exitGroup:             exitGroup,
-		minSpanByDistribution: minSpanByDistribution,
+		endpoint:  endp,
+		exit:      exit,
+		exitGroup: exitGroup,
+		quantiles: quantiles,
 	}
 }
 
@@ -120,7 +120,7 @@ func (w *Writer) Flush() {
 			continue
 		}
 
-		spans := w.toWrite[i].Sampler.GetSamples(w.toWrite[i].Stats, w.minSpanByDistribution)
+		spans := w.toWrite[i].Sampler.GetSamples(w.toWrite[i].Stats, w.quantiles)
 
 		log.Infof("Writer flush to the API, %d spans", len(spans))
 

@@ -13,12 +13,7 @@ import (
 	"github.com/DataDog/raclette/model"
 )
 
-// Concentrator is getting a stream of raw traces and producing some time-bucketed normalized statistics from them.
-//  * inSpans, channel from which we consume spans and create stats
-//  * outStats, channel where we return our computed stats
-//	* bucketDuration, designates the length of a time bucket
-//	* openBucket, array of stats buckets we keep in memory (fixed size and iterating over)
-//  * currentBucket, the index of openBucket we're currently writing to
+// Concentrator produces time bucketed statistics from a stream of raw traces.
 type Concentrator struct {
 	// work channels
 	inSpans  chan model.Span        // incoming spans to add to stats
@@ -29,22 +24,23 @@ type Concentrator struct {
 	exit      chan bool
 	exitGroup *sync.WaitGroup
 
-	// configuration
-	bucketDuration int
-	eps            float64
+	bucket time.Duration // the duration of our stats windows
+	eps    float64       // quantile precision between 0 and 1
 
 	// internal data structs
 	openBucket    [2]model.StatsBucket
 	currentBucket int32
 }
 
-// NewConcentrator returns a new Concentrator flushing at a bucketDuration secondspace
-func NewConcentrator(bucketDuration int, eps float64, exit chan bool, exitGroup *sync.WaitGroup) *Concentrator {
+// NewConcentrator returns that collects stats for every bucket.
+func NewConcentrator(bucket time.Duration, eps float64, exit chan bool, exitGroup *sync.WaitGroup) *Concentrator {
+
+	log.Infof("Starting new concentrator bucket:%s eps:%s", bucket, eps)
 	return &Concentrator{
-		bucketDuration: bucketDuration,
-		eps:            eps,
-		exit:           exit,
-		exitGroup:      exitGroup,
+		bucket:    bucket,
+		eps:       eps,
+		exit:      exit,
+		exitGroup: exitGroup,
 	}
 }
 
@@ -68,7 +64,7 @@ func (c *Concentrator) Start() {
 		}
 	}()
 
-	go c.bucketCloser()
+	go c.closeBuckets()
 
 	log.Info("Concentrator started")
 }
@@ -96,10 +92,10 @@ func (c *Concentrator) flush() {
 	}
 }
 
-func (c *Concentrator) bucketCloser() {
+func (c *Concentrator) closeBuckets() {
 	// block on the closer, to flush cleanly last bucket
 	c.exitGroup.Add(1)
-	ticker := time.Tick(time.Duration(c.bucketDuration) * time.Second)
+	ticker := time.Tick(c.bucket)
 	for {
 		select {
 		case <-c.exit:
