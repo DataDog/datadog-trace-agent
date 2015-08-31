@@ -69,7 +69,7 @@ func TestSampler(t *testing.T) {
 
 	// Add one fake distribution for choosing
 	stats.Distributions["whatever"] = faked
-	chosen := sampler.GetSamples(stats, 4)
+	chosen := sampler.GetSamples(stats, []float64{0, 0.5, 1})
 
 	shouldChoose := []int{0, 1, 2, 3, 4, 5, 8}
 	chosenSID := make([]int, len(chosen))
