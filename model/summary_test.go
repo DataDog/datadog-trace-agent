@@ -68,7 +68,7 @@ func TestExactSummaryQuantile(t *testing.T) {
 	d := NewSummaryWithTestData(0)
 
 	v, spans := d.Quantile(0.5)
-	assert.Equal(7192619690997925, v)
+	assert.Equal(7192619690997925, int(v))
 	assert.Equal(1, len(spans))
 	assert.Equal(36, int(spans[0]))
 }

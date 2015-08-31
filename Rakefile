@@ -62,7 +62,7 @@ end
 
 # FIXME: add :test in the list
 desc "Raclette agent CI script (fmt, vet, etc)"
-task :ci => [:restore, :fmt, :vet, :lint, :build]
+task :ci => [:restore, :fmt, :vet, :lint, :test, :build]
 
 task :err do
   sh "errcheck github.com/DataDog/raclette"

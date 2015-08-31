@@ -48,13 +48,13 @@ func TestCounts(t *testing.T) {
 	for _, c := range testCounts {
 		switch c.Name {
 		case HITS:
-			assert.Equal(4, c.Value)
+			assert.Equal(4, int(c.Value))
 		case ERRORS:
-			assert.Equal(1, c.Value)
+			assert.Equal(1, int(c.Value))
 		case DURATION:
-			assert.Equal(50, c.Value)
+			assert.Equal(50, int(c.Value))
 		case "custom_size":
-			assert.Equal(13, c.Value)
+			assert.Equal(13, int(c.Value))
 		default:
 			t.Fatalf("Was not supposed to handle count %v", c)
 		}
