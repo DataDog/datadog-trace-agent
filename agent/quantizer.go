@@ -54,8 +54,8 @@ func (q *Quantizer) Start() {
 	go func() {
 		<-q.exit
 		log.Info("Quantizer exiting")
-		q.exitGroup.Done()
 		close(q.in)
+		q.exitGroup.Done()
 		return
 	}()
 
@@ -76,18 +76,18 @@ func (q *Quantizer) Quantize(span model.Span) model.Span {
 func (q *Quantizer) QuantizeSQL(span model.Span) model.Span {
 	query, ok := span.Meta["query"]
 	if !ok {
-		log.Infof("`query` meta is missing in a SQL span, can't quantize it, SpanID: %d", span.SpanID)
+		log.Debugf("`query` meta is missing in a SQL span, can't quantize it, SpanID: %d", span.SpanID)
 		return span
 	}
 
 	resource := strings.TrimSpace(query)
 
 	if strings.HasPrefix(resource, "--") {
-		log.Infof("Quantize SQL command based on its comment, SpanID: %d", span.SpanID)
+		log.Debugf("Quantize SQL command based on its comment, SpanID: %d", span.SpanID)
 		resource = sqlCommentName.FindStringSubmatch(resource)[1]
 		resource = strings.TrimSpace(resource)
 	} else {
-		log.Infof("Quantize SQL command with generic parsing, SpanID: %d", span.SpanID)
+		log.Debugf("Quantize SQL command with generic parsing, SpanID: %d", span.SpanID)
 		// Remove variables
 		resource = sqlVariablesRegexp.ReplaceAllString(resource, sqlVariableReplacement)
 		resource = sqlalchemyVariablesRegexp.ReplaceAllString(resource, sqlVariableReplacement)
