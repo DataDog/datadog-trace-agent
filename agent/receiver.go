@@ -27,11 +27,13 @@ type HTTPReceiver struct {
 }
 
 // NewHTTPReceiver returns a pointer to a new HTTPReceiver
-func NewHTTPReceiver(exit chan bool, exitGroup *sync.WaitGroup) *HTTPReceiver {
-	return &HTTPReceiver{
+func NewHTTPReceiver(exit chan bool, exitGroup *sync.WaitGroup) (*HTTPReceiver, chan model.Span) {
+	r := HTTPReceiver{
+		out:       make(chan model.Span),
 		exit:      exit,
 		exitGroup: exitGroup,
 	}
+	return &r, r.out
 }
 
 // Init is needed before using the listener to set channels

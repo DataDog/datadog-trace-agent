@@ -37,15 +37,15 @@ func NewAgent(conf *config.File) *Agent {
 	exit := make(chan bool)
 	var exitGroup sync.WaitGroup
 
-	r := NewHTTPReceiver(exit, &exitGroup)
-	q := NewQuantizer()
-	c := NewConcentrator(
+	r, cSpansFromReceiver := NewHTTPReceiver(exit, &exitGroup)
+	q, cSpansFromQuantizer := NewQuantizer(cSpansFromReceiver, exit, &exitGroup)
+	c, cSpansFromConcentrator, cStatsFromConcentrator := NewConcentrator(
 		time.Second*5, // FIXME replace with duration parse `5s`
-		conf.GetFloat64Default("trace.concentrator", "quantile_precision", 0),
+		cSpansFromQuantizer,
 		exit, &exitGroup)
 
 	quantiles := []float64{0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 1}
-	w := NewWriter(endpoint, exit, &exitGroup, quantiles)
+	w := NewWriter(endpoint, quantiles, cSpansFromConcentrator, cStatsFromConcentrator, exit, &exitGroup)
 
 	return &Agent{
 		Config:       conf,
@@ -56,29 +56,6 @@ func NewAgent(conf *config.File) *Agent {
 		exit:         exit,
 		exitGroup:    &exitGroup,
 	}
-}
-
-// Init needs to be called to initialize channels
-func (a *Agent) Init() error {
-	log.Info("Initializing agent")
-	// Listener initialization
-	a.spansFromReceiver = make(chan model.Span)
-	a.Receiver.Init(a.spansFromReceiver)
-
-	// Quantizer initialization
-	a.spansFromQuantizer = make(chan model.Span)
-	a.Quantizer.Init(a.spansFromReceiver, a.spansFromQuantizer, a.exit, a.exitGroup)
-
-	// Concentrator initialization
-	a.spansFromConcentrator = make(chan model.Span)
-	a.statsFromConcentrator = make(chan model.StatsBucket)
-	a.Concentrator.Init(a.spansFromQuantizer, a.statsFromConcentrator, a.spansFromConcentrator)
-
-	// Writer initialization
-	a.Writer.Init(a.spansFromConcentrator, a.statsFromConcentrator)
-
-	// FIXME: catch initialization errors
-	return nil
 }
 
 // Start starts routers routines and individual pieces forever

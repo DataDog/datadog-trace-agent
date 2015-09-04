@@ -30,16 +30,14 @@ var sqlListRegexp = regexp.MustCompile("('[^']+')|([0-9]+)")
 var sqlListVariables = regexp.MustCompile("\\?[\\? ,]+\\?")
 
 // NewQuantizer creates a new Quantizer
-func NewQuantizer() *Quantizer {
-	return &Quantizer{}
-}
-
-// Init initializes the Quantizer with input/output
-func (q *Quantizer) Init(in chan model.Span, out chan model.Span, exit chan bool, exitGroup *sync.WaitGroup) {
-	q.in = in
-	q.out = out
-	q.exit = exit
-	q.exitGroup = exitGroup
+func NewQuantizer(inSpans chan model.Span, exit chan bool, exitGroup *sync.WaitGroup) (*Quantizer, chan model.Span) {
+	q := Quantizer{
+		in:        inSpans,
+		out:       make(chan model.Span),
+		exit:      exit,
+		exitGroup: exitGroup,
+	}
+	return &q, q.out
 }
 
 // Start runs the Quantizer by quantizing spans from the channel
