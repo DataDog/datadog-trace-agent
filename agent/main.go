@@ -14,7 +14,7 @@ import (
 )
 
 // dumb handler that closes a channel to exit cleanly from routines
-func handleSignal(exit chan bool) {
+func handleSignal(exit chan struct{}) {
 	sigChan := make(chan os.Signal, 10)
 	signal.Notify(sigChan)
 	for signal := range sigChan {

@@ -14,7 +14,6 @@ import (
 
 // Receiver is the common interface for an agent span collector, it receives spans from clients
 type Receiver interface {
-	Init(chan model.Span)
 	Start()
 }
 
@@ -22,23 +21,18 @@ type Receiver interface {
 // a chan where the spans received are sent one by one
 type HTTPReceiver struct {
 	out       chan model.Span
-	exit      chan bool
+	exit      chan struct{}
 	exitGroup *sync.WaitGroup
 }
 
 // NewHTTPReceiver returns a pointer to a new HTTPReceiver
-func NewHTTPReceiver(exit chan bool, exitGroup *sync.WaitGroup) (*HTTPReceiver, chan model.Span) {
+func NewHTTPReceiver(exit chan struct{}, exitGroup *sync.WaitGroup) (*HTTPReceiver, chan model.Span) {
 	r := HTTPReceiver{
 		out:       make(chan model.Span),
 		exit:      exit,
 		exitGroup: exitGroup,
 	}
 	return &r, r.out
-}
-
-// Init is needed before using the listener to set channels
-func (l *HTTPReceiver) Init(out chan model.Span) {
-	l.out = out
 }
 
 // Start actually starts the HTTP server and returns any error that could
@@ -56,7 +50,6 @@ func (l *HTTPReceiver) Start() {
 	}
 
 	sl, err := NewStoppableListener(tcpL)
-	sl.Init(l.exit)
 	server := http.Server{}
 
 	l.exitGroup.Add(1)

@@ -11,7 +11,7 @@ import (
 
 func NewTestQuantizer() (*Quantizer, chan model.Span) {
 	inSpans := make(chan model.Span)
-	exit := make(chan bool)
+	exit := make(chan struct{})
 	var exitGroup sync.WaitGroup
 	return NewQuantizer(inSpans, exit, &exitGroup)
 }

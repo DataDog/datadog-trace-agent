@@ -14,7 +14,7 @@ import (
 type Quantizer struct {
 	in        chan model.Span
 	out       chan model.Span
-	exit      chan bool
+	exit      chan struct{}
 	exitGroup *sync.WaitGroup
 }
 
@@ -30,7 +30,7 @@ var sqlListRegexp = regexp.MustCompile("('[^']+')|([0-9]+)")
 var sqlListVariables = regexp.MustCompile("\\?[\\? ,]+\\?")
 
 // NewQuantizer creates a new Quantizer
-func NewQuantizer(inSpans chan model.Span, exit chan bool, exitGroup *sync.WaitGroup) (*Quantizer, chan model.Span) {
+func NewQuantizer(inSpans chan model.Span, exit chan struct{}, exitGroup *sync.WaitGroup) (*Quantizer, chan model.Span) {
 	q := Quantizer{
 		in:        inSpans,
 		out:       make(chan model.Span),

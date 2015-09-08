@@ -12,7 +12,7 @@ import (
 )
 
 func NewTestConcentrator(inSpans chan model.Span) (*Concentrator, chan model.Span, chan model.StatsBucket) {
-	exit := make(chan bool)
+	exit := make(chan struct{})
 	var exitGroup sync.WaitGroup
 
 	return NewConcentrator(
@@ -43,11 +43,11 @@ func TestConcentratorExitsGracefully(t *testing.T) {
 
 	// And now try to stop it in a given time, by closing the exit channel
 	timer := time.NewTimer(100 * time.Millisecond).C
-	receivedExit := make(chan bool, 1)
+	receivedExit := make(chan struct{}, 1)
 	go func() {
 		close(c.exit)
 		c.exitGroup.Wait()
-		receivedExit <- true
+		close(receivedExit)
 	}()
 	for {
 		select {
