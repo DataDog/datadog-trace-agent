@@ -27,12 +27,12 @@ type Concentrator struct {
 	oldestSpanCutoff int64                       // maximum time we wait before discarding straggling spans
 
 	// exit channels used for synchronisation and sending stop signals
-	exit      chan bool
+	exit      chan struct{}
 	exitGroup *sync.WaitGroup
 }
 
 // NewConcentrator initializes a new concentrator ready to be started and aggregate stats
-func NewConcentrator(bucketSize time.Duration, inSpans chan model.Span, exit chan bool, exitGroup *sync.WaitGroup) (*Concentrator, chan model.Span, chan model.StatsBucket) {
+func NewConcentrator(bucketSize time.Duration, inSpans chan model.Span, exit chan struct{}, exitGroup *sync.WaitGroup) (*Concentrator, chan model.Span, chan model.StatsBucket) {
 	c := Concentrator{
 		inSpans:          inSpans,
 		outSpans:         make(chan model.Span),

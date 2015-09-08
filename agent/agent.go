@@ -20,7 +20,7 @@ type Agent struct {
 	Config *config.File
 
 	// Used to synchronize on a clean exit
-	exit      chan bool
+	exit      chan struct{}
 	exitGroup *sync.WaitGroup
 
 	// internal channels
@@ -34,18 +34,15 @@ type Agent struct {
 func NewAgent(conf *config.File) *Agent {
 	endpoint := conf.GetDefault("trace.api", "endpoint", "http://localhost:8012/api/v0.1")
 
-	exit := make(chan bool)
+	exit := make(chan struct{})
 	var exitGroup sync.WaitGroup
 
-	r, cSpansFromReceiver := NewHTTPReceiver(exit, &exitGroup)
-	q, cSpansFromQuantizer := NewQuantizer(cSpansFromReceiver, exit, &exitGroup)
-	c, cSpansFromConcentrator, cStatsFromConcentrator := NewConcentrator(
-		time.Second*5, // FIXME replace with duration parse `5s`
-		cSpansFromQuantizer,
-		exit, &exitGroup)
+	r, rawSpans := NewHTTPReceiver(exit, &exitGroup)
+	q, quantizedSpans := NewQuantizer(rawSpans, exit, &exitGroup)
+	c, concentratedSpans, concentratedStats := NewConcentrator(time.Second*5, quantizedSpans, exit, &exitGroup)
 
 	quantiles := []float64{0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 1}
-	w := NewWriter(endpoint, quantiles, cSpansFromConcentrator, cStatsFromConcentrator, exit, &exitGroup)
+	w := NewWriter(endpoint, quantiles, concentratedSpans, concentratedStats, exit, &exitGroup)
 
 	return &Agent{
 		Config:       conf,

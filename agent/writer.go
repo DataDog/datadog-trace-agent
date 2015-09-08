@@ -34,13 +34,13 @@ type Writer struct {
 	bufLock sync.Mutex
 
 	// exit channels
-	exit      chan bool
+	exit      chan struct{}
 	exitGroup *sync.WaitGroup
 }
 
 // NewWriter returns a new Writer
-func NewWriter(endp string, quantiles []float64, inSpans chan model.Span, inStats chan model.StatsBucket, exit chan bool, exitGroup *sync.WaitGroup) *Writer {
-	return &Writer{
+func NewWriter(endp string, quantiles []float64, inSpans chan model.Span, inStats chan model.StatsBucket, exit chan struct{}, exitGroup *sync.WaitGroup) *Writer {
+	w := Writer{
 		endpoint:  endp,
 		inSpan:    inSpans,
 		inStats:   inStats,
@@ -48,14 +48,9 @@ func NewWriter(endp string, quantiles []float64, inSpans chan model.Span, inStat
 		exitGroup: exitGroup,
 		quantiles: quantiles,
 	}
-}
-
-// Init initalizes the span buffer and the input channel of spans
-func (w *Writer) Init(inSpan chan model.Span, inStats chan model.StatsBucket) {
-	w.inSpan = inSpan
-	w.inStats = inStats
-
 	w.addNewBuffer()
+
+	return &w
 }
 
 func (w *Writer) addNewBuffer() {
@@ -74,7 +69,6 @@ func (w *Writer) Start() {
 	go func() {
 		for s := range w.inSpan {
 			// Always write to last element of span
-			// FIXME: mutex too slow?
 			w.bufLock.Lock()
 			w.toWrite[len(w.toWrite)-1].Sampler.AddSpan(s)
 			w.bufLock.Unlock()
