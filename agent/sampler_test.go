@@ -9,8 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const EPSILON float64 = 1e-2
-
 func newTestSpan(tid, sid uint64) model.Span {
 	return model.Span{TraceID: tid, SpanID: sid}
 }
@@ -58,7 +56,7 @@ func TestSampler(t *testing.T) {
 	}
 
 	// Now prepare distributions
-	stats := model.NewStatsBucket(EPSILON)
+	stats := model.NewStatsBucket(0)
 	tgs := model.NewTagsFromString("service:dogweb,resource:dash.list")
 	faked := model.NewDistribution(model.DURATION, tgs, 0)
 	fakes := NewFakeSummary()

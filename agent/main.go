@@ -58,11 +58,5 @@ func main() {
 	defer agent.Join()
 	go handleSignal(agent.exit)
 
-	err = agent.Init()
-	if err != nil {
-		log.Error("Error when initializing agent")
-		panic(err)
-	}
-
 	agent.Start()
 }

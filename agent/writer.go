@@ -39,9 +39,11 @@ type Writer struct {
 }
 
 // NewWriter returns a new Writer
-func NewWriter(endp string, exit chan bool, exitGroup *sync.WaitGroup, quantiles []float64) *Writer {
+func NewWriter(endp string, quantiles []float64, inSpans chan model.Span, inStats chan model.StatsBucket, exit chan bool, exitGroup *sync.WaitGroup) *Writer {
 	return &Writer{
 		endpoint:  endp,
+		inSpan:    inSpans,
+		inStats:   inStats,
 		exit:      exit,
 		exitGroup: exitGroup,
 		quantiles: quantiles,

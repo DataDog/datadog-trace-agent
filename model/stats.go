@@ -17,6 +17,8 @@ const (
 	DURATION        = "duration"
 )
 
+var epsilon = 1e-2
+
 // These represents the default stats we keep track of, Counts
 var DefaultCounts = [...]string{HITS, ERRORS, DURATION}
 
@@ -118,14 +120,14 @@ type StatsBucket struct {
 	Distributions map[string]Distribution // All the true distribution we keep to answer quantile queries
 }
 
-// NewStatsBucket opens a new bucket at this time and initializes it properly
-func NewStatsBucket(epsilon float64) StatsBucket {
+// NewStatsBucket opens a new bucket for time ts and initializes it properly
+func NewStatsBucket(ts int64) StatsBucket {
 	counts := make(map[string]Count)
 	distros := make(map[string]Distribution)
 
 	// The only non-initialized value is the Duration which should be set by whoever closes that bucket
 	return StatsBucket{
-		Start:         Now(),
+		Start:         ts,
 		Epsilon:       epsilon,
 		Counts:        counts,
 		Distributions: distros,

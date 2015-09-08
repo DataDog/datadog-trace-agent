@@ -1,6 +1,7 @@
 package main
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -8,7 +9,12 @@ import (
 	"github.com/DataDog/raclette/model"
 )
 
-var quantizer = NewQuantizer()
+func NewTestQuantizer() (*Quantizer, chan model.Span) {
+	inSpans := make(chan model.Span)
+	exit := make(chan bool)
+	var exitGroup sync.WaitGroup
+	return NewQuantizer(inSpans, exit, &exitGroup)
+}
 
 func SQLSpan(query string) model.Span {
 	return model.Span{
@@ -27,6 +33,8 @@ type sqlTestCase struct {
 
 func TestSQLQuantizer(t *testing.T) {
 	assert := assert.New(t)
+
+	quantizer, _ := NewTestQuantizer()
 
 	queryToExpected := []sqlTestCase{
 		{"select * from users where id = 42",
