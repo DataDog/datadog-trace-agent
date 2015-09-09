@@ -3,11 +3,8 @@ package quantile
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"math/rand"
-	"strings"
 	"time"
-	"unsafe"
 )
 
 /*
@@ -25,18 +22,19 @@ summary faster.  Querying is still O(n).
 
 const epsilon float64 = 0.01
 
+// Summary is a way to represent an approximation of the distribution of values
 type Summary struct {
-	data        *Skiplist
-	EncodedData []Entry `json:"data"`
-	N           int     `json:"n"`
+	data        *Skiplist // where the real data is stored
+	EncodedData []Entry   `json:"data"` // flattened data user for ser/deser purposes
+	N           int       `json:"n"`    // number of unique points that have been added to this summary
 }
 
-// Entry is an element of the skiplist
+// Entry is an element of the skiplist, see GK paper for description
 type Entry struct {
 	V       int64    `json:"v"`
 	G       int      `json:"g"`
 	Delta   int      `json:"delta"`
-	Samples []uint64 `json:"samples"`
+	Samples []uint64 `json:"samples"` // Span IDs of traces representing this part of the spectrum
 }
 
 // NewSummary returns a new approx-summary with accuracy epsilon (0 <= epsilon <= 1)
@@ -46,7 +44,7 @@ func NewSummary() *Summary {
 	}
 }
 
-// Encode prepares a flat version of the skiplist for various encoders (json/gob)
+// MarshalJSON is used to send the data over to the API
 func (s Summary) MarshalJSON() ([]byte, error) {
 	if s.data == nil {
 		panic(errors.New("Cannot marshal non-initialized Summary"))
@@ -66,9 +64,11 @@ func (s Summary) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// Avoid infinite recursion when unmarshalling
 type summary Summary
 
-// Decode is used to restore the original skiplist from the EncodedData
+// UnmarshalJSON is used to recreate a Summary structure from a JSON payload
+// It reinserts points artificially (TODO: see if this is OK?)
 func (s *Summary) UnmarshalJSON(b []byte) error {
 	ss := summary{}
 	err := json.Unmarshal(b, &ss)
@@ -85,7 +85,7 @@ func (s *Summary) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// Insert inserts an item into the quantile summary
+// Insert inserts a new value v in the summary paired with t (the ID of the span it was reported from)
 func (s *Summary) Insert(v int64, t uint64) {
 	e := Entry{
 		V:       v,
@@ -168,44 +168,18 @@ func (s *Summary) Quantile(q float64) (int64, []uint64) {
 
 const maxHeight = 31
 
-// Skiplist is a? (TODO LEO)
+// Skiplist is a pseudo-random data structure used to store nodes and find quickly what we want
 type Skiplist struct {
 	height int
 	head   *SkiplistNode
 	rnd    *rand.Rand
 }
 
-// SkiplistNode is a? (TODO LEO)
+// SkiplistNode is holding the actual value and pointers to the neighbor nodes
 type SkiplistNode struct {
 	value Entry
 	next  []*SkiplistNode
 	prev  []*SkiplistNode
-}
-
-// Println prints deb8gug stuff? (TODO LEO)
-func (n *SkiplistNode) Println(offset int, alreadySeen *map[uintptr]bool) {
-	if _, ok := (*alreadySeen)[uintptr(unsafe.Pointer(n))]; ok {
-		return
-	}
-	stroff := strings.Repeat(" ", offset)
-	fmt.Printf("%sENTRY {v: %d, g: %d, delta:%d, tids: %v}\n", stroff, n.value.V, n.value.G, n.value.Delta, n.value.Samples)
-	fmt.Printf("%sPTR %p\n", stroff, n)
-	fmt.Printf("%sNEXT:\n", stroff)
-	(*alreadySeen)[uintptr(unsafe.Pointer(n))] = true
-
-	for _, nptr := range n.next {
-		if nptr != nil {
-			nptr.Println(offset+1, alreadySeen)
-		}
-	}
-
-	fmt.Printf("%sPREV:\n", stroff)
-
-	for _, nptr := range n.prev {
-		if nptr != nil {
-			nptr.Println(offset+1, alreadySeen)
-		}
-	}
 }
 
 // NewSkiplist returns a new empty Skiplist
@@ -217,7 +191,7 @@ func NewSkiplist() *Skiplist {
 	}
 }
 
-// Insert adds a SkiplistNode into a Skiplist while doing stuff? (TODO LEO)
+// Insert adds a new Entry to the Skiplist and yields a pointer to the node where the data was inserted
 func (s *Skiplist) Insert(e Entry) *SkiplistNode {
 	level := 0
 
