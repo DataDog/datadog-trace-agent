@@ -1,6 +1,8 @@
-package model
+package quantile
 
 import (
+	"encoding/json"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,63 +26,30 @@ In [10]: np.percentile(TestArray, 99.9, interpolation='lower')
 Out[10]: 47092556792851724
 */
 
-func TestNewSummary(t *testing.T) {
-	assert := assert.New(t)
-	d := NewSummary(0)
-
-	_, isExact := d.(*ExactSummary)
-	assert.True(isExact)
-	_, isGK := d.(*GKSummary)
-	assert.False(isGK)
-
-	d = NewSummary(0.01)
-
-	_, isExact = d.(*ExactSummary)
-	assert.False(isExact)
-	_, isGK = d.(*GKSummary)
-	assert.True(isGK)
-}
-
 // NewSummaryWithTestData returns the Summary
-func NewSummaryWithTestData(eps float64) Summary {
-	d := NewSummary(eps)
+func NewSummaryWithTestData() Summary {
+	s := NewSummary()
 
 	for i, v := range TestArray {
-		d.Insert(v, uint64(i))
+		s.Insert(v, uint64(i))
 	}
 
-	return d
+	return s
 }
 
-func TestExactSummaryInsertion(t *testing.T) {
+func TestSummaryInsertion(t *testing.T) {
 	assert := assert.New(t)
 
-	d := NewSummaryWithTestData(0)
-
-	// struct should have seen as many samples so far
-	assert.Equal(100, d.(*ExactSummary).n)
-	assert.Equal(100, len(d.(*ExactSummary).data))
+	s := NewSummaryWithTestData()
+	assert.Equal(100, s.N)
 }
 
-func TestExactSummaryQuantile(t *testing.T) {
-	assert := assert.New(t)
-
-	d := NewSummaryWithTestData(0)
-
-	v, spans := d.Quantile(0.5)
-	assert.Equal(7192619690997925, int(v))
-	assert.Equal(1, len(spans))
-	assert.Equal(36, int(spans[0]))
+type Quantile struct {
+	Value   int64
+	Samples []uint64
 }
 
-func TestGKSummaryInsertion(t *testing.T) {
-	assert := assert.New(t)
-
-	d := NewSummaryWithTestData(0.01)
-	assert.Equal(100, d.(*GKSummary).N)
-}
-
-func TestGKSummaryQuantile(t *testing.T) {
+func TestSummaryQuantile(t *testing.T) {
 	assert := assert.New(t)
 
 	// For 100 elts and eps=0.01 the error on the rank is 0.01 * 100 = 1
@@ -88,37 +57,71 @@ func TestGKSummaryQuantile(t *testing.T) {
 	// *  7157789354354156, (SID=72)
 	// *  7192619690997925, (SID=36)
 	// *  7620414993900439, (SID=53)
-	d := NewSummaryWithTestData(0.01)
+	s := NewSummaryWithTestData()
 
-	// FIXME: assert the returned sample SID
-	v, _ := d.Quantile(0.5)
-	acceptable := []int64{7157789354354156, 7192619690997925, 7620414993900439}
-	assert.Contains(acceptable, v)
-}
-
-func TestGKSummaryInsertionHugeScale(t *testing.T) {
-	assert := assert.New(t)
-	repet := 10
-
-	d := NewSummary(0.001)
-	for i := 0; i < repet*len(TestArray); i++ {
-		d.Insert(TestArray[i%len(TestArray)], uint64(i))
+	v, samples := s.Quantile(0.5)
+	// our sample array only yields a sample per value
+	assert.Equal(1, len(samples))
+	acceptable := []Quantile{
+		Quantile{Value: 7157789354354156, Samples: []uint64{72}},
+		Quantile{Value: 7192619690997925, Samples: []uint64{36}},
+		Quantile{Value: 7620414993900439, Samples: []uint64{53}},
+	}
+	foundCorrectQuantile := false
+	for _, q := range acceptable {
+		foundCorrectQuantile = q.Value == v && q.Samples[0] == samples[0]
+		if foundCorrectQuantile {
+			break
+		}
 	}
 
-	/* to print the skiplist, DEBUG ONLY!
-	seen := make(map[uintptr]bool)
-	d.(*GKSummary).summary.head.Println(0, &seen)
-	*/
-
-	assert.Equal(repet*len(TestArray), d.(*GKSummary).N)
-	// FIXME: assert correctness of this, should return proper quantiles
+	assert.True(foundCorrectQuantile, "Quantile %d (samples=%v) not found", v, samples)
 }
 
-func TestGKSummaryMarshal(t *testing.T) {
+func BenchmarkSummaryInsertion(b *testing.B) {
+	s := NewSummary()
+	for n := 0; n < b.N; n++ {
+		val := rand.Int63()
+		s.Insert(val, uint64(n))
+	}
+}
+
+func TestSummaryMarshal(t *testing.T) {
 	assert := assert.New(t)
 
-	d := NewSummaryWithTestData(0.01)
+	s := NewSummaryWithTestData()
 
-	// FIXME: test the real data in it
-	assert.NotPanics(func() { d.(*GKSummary).Encode() })
+	b, err := json.Marshal(s)
+	assert.Nil(err)
+
+	// Now test contents
+	ss := Summary{}
+	err = json.Unmarshal(b, &ss)
+
+	assert.Equal(s.N, ss.N)
+	v1, samp1 := s.Quantile(0.5)
+	v2, samp2 := ss.Quantile(0.5)
+
+	assert.Equal(v1, v2)
+	assert.Equal(1, len(samp1))
+	assert.Equal(1, len(samp2))
+
+	// Verify samples are correct
+	samp1Correct := false
+	for i, val := range TestArray {
+		if val == v1 && samp1[0] == uint64(i) {
+			samp1Correct = true
+			break
+		}
+	}
+	assert.True(samp1Correct, "1: sample %v incorrect for quantile %d", samp1, v1)
+
+	samp2Correct := false
+	for i, val := range TestArray {
+		if val == v2 && samp2[0] == uint64(i) {
+			samp2Correct = true
+			break
+		}
+	}
+	assert.True(samp2Correct, "2: sample %v incorrect for quantile %d", samp2, v2)
 }

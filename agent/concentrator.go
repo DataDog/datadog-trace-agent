@@ -97,7 +97,6 @@ func (c *Concentrator) flush() {
 		// flush & expire old buckets that cannot be hit anymore
 		if bucket < now-c.oldestSpanCutoff && bucket != lastBucket {
 			log.Infof("Concentrator flushed time bucket %d", bucket)
-			stats.Encode()
 			c.outStats <- stats
 			delete(c.buckets, bucket)
 		}

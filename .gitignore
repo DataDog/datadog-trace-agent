@@ -10,3 +10,5 @@ stats/stats
 tracegen/tracegen
 agent/agent
 coverage.out
+prof*
+*test
