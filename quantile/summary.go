@@ -166,6 +166,23 @@ func (s *Summary) Quantile(q float64) (int64, []uint64) {
 	panic("not reached")
 }
 
+// Merge takes a summary and merge the values inside the current pointed object
+func (s *Summary) Merge(s2 *Summary) {
+	if s2.N == 0 {
+		return
+	}
+
+	s.N += s2.N
+	// Iterate on s2 elements and insert/merge them
+	curElt := s2.data.head
+	for curElt != nil {
+		s.data.Insert(curElt.value)
+		curElt = curElt.next[0]
+	}
+	// Force compression
+	s.compress()
+}
+
 const maxHeight = 31
 
 // Skiplist is a pseudo-random data structure used to store nodes and find quickly what we want

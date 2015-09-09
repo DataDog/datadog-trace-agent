@@ -125,3 +125,22 @@ func TestSummaryMarshal(t *testing.T) {
 	}
 	assert.True(samp2Correct, "2: sample %v incorrect for quantile %d", samp2, v2)
 }
+
+func TestSummaryMerge(t *testing.T) {
+	assert := assert.New(t)
+
+	s := NewSummaryWithTestData()
+	s2 := NewSummary()
+	samples := []int64{32987, 987, 9879, 879, 87938327, 9823, 25585683826277574}
+
+	for i, v := range samples {
+		s2.Insert(v, uint64(42000+i))
+	}
+
+	assert.Equal(len(TestArray), s.N)
+	s.Merge(s2)
+	assert.Equal(len(TestArray)+len(samples), s.N)
+
+	s.Quantile(0.9)
+	// FIXME[leo] assert results of merged quantiles
+}
