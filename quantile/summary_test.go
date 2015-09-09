@@ -2,6 +2,7 @@ package quantile
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"testing"
 
@@ -143,4 +144,17 @@ func TestSummaryMerge(t *testing.T) {
 
 	s.Quantile(0.9)
 	// FIXME[leo] assert results of merged quantiles
+}
+
+func TestSummaryGob(t *testing.T) {
+	assert := assert.New(t)
+
+	s := NewSummaryWithTestData()
+	bytes, err := s.GobEncode()
+	assert.Nil(err)
+	ss := NewSummary()
+	ss.GobDecode(bytes)
+
+	assert.Equal(s.N, ss.N)
+	fmt.Printf("%v\n%v\n", s.EncodedData, ss.EncodedData)
 }

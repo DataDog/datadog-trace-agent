@@ -12,8 +12,10 @@ type Tag struct {
 	Value string `json:"value"`
 }
 
-// TagSet is an ordered and unique combination of tags
-type TagSet []Tag
+// String returns a string representation of a tag
+func (t Tag) String() string {
+	return t.Name + ":" + t.Value
+}
 
 // SplitTag splits the tag into group and value. If it doesn't have a seperator
 // the empty string will be used for the group.
@@ -31,6 +33,9 @@ func NewTagFromString(raw string) Tag {
 	return Tag{name, val}
 }
 
+// TagSet is an ordered and unique combination of tags
+type TagSet []Tag
+
 // NewTagsFromString returns a new TagSet from a raw string
 func NewTagsFromString(raw string) TagSet {
 	var tags TagSet
@@ -38,11 +43,6 @@ func NewTagsFromString(raw string) TagSet {
 		tags = append(tags, NewTagFromString(t))
 	}
 	return tags
-}
-
-// String returns a string representation of a tag
-func (t Tag) String() string {
-	return t.Name + ":" + t.Value
 }
 
 // TagKey returns a unique key from the string given and the tagset, useful to index stuff on tagsets
@@ -53,4 +53,60 @@ func (s TagSet) TagKey(m string) string {
 	}
 	sort.Strings(tagStrings)
 	return fmt.Sprintf("%s|%s", m, strings.Join(tagStrings, ","))
+}
+
+func (t TagSet) Len() int           { return len(t) }
+func (t TagSet) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
+func (t TagSet) Less(i, j int) bool { return t[i].Name < t[j].Name && t[i].Value < t[j].Value }
+
+// Key returns a string representing a new set of tags.
+func (t TagSet) Key() string {
+	s := make([]string, len(t))
+	for i, t := range t {
+		s[i] = t.String()
+	}
+	sort.Strings(s)
+	return strings.Join(s, ",")
+}
+
+// Get the tag with the particular name
+func (t TagSet) Get(name string) Tag {
+	for _, tag := range t {
+		if tag.Name == name {
+			return tag
+		}
+	}
+	return Tag{}
+}
+
+// Match returns a new tag set with only the tags matching the given groups.
+func (t TagSet) Match(groups []string) TagSet {
+	if len(groups) == 0 {
+		return nil
+	}
+	var match []Tag
+	for _, g := range groups {
+		tag := t.Get(g)
+		if tag.Value == "" {
+			continue
+		}
+		match = append(match, tag)
+	}
+	ts := TagSet(match)
+	sort.Sort(ts)
+	return ts
+}
+
+// HasExactly returns true if we have tags only for the given groups.
+func (t TagSet) HasExactly(groups []string) bool {
+	if len(groups) != len(t) {
+		return false
+	}
+	// FIXME quadratic
+	for _, g := range groups {
+		if t.Get(g).Name == "" {
+			return false
+		}
+	}
+	return true
 }

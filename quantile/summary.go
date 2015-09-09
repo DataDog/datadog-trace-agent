@@ -1,6 +1,8 @@
 package quantile
 
 import (
+	"bytes"
+	"encoding/gob"
 	"encoding/json"
 	"errors"
 	"math/rand"
@@ -20,7 +22,7 @@ summary faster.  Querying is still O(n).
 
 */
 
-const epsilon float64 = 0.01
+const EPSILON float64 = 0.01
 
 // Summary is a way to represent an approximation of the distribution of values
 type Summary struct {
@@ -37,7 +39,7 @@ type Entry struct {
 	Samples []uint64 `json:"samples"` // Span IDs of traces representing this part of the spectrum
 }
 
-// NewSummary returns a new approx-summary with accuracy epsilon (0 <= epsilon <= 1)
+// NewSummary returns a new approx-summary with accuracy EPSILON
 func NewSummary() *Summary {
 	return &Summary{
 		data: NewSkiplist(),
@@ -50,7 +52,7 @@ func (s Summary) MarshalJSON() ([]byte, error) {
 		panic(errors.New("Cannot marshal non-initialized Summary"))
 	}
 
-	// TODO[leo] preallocate, not sure: 1/ 2*epsilon?
+	// TODO[leo] preallocate, not sure: 1/ 2*EPSILON?
 	s.EncodedData = make([]Entry, 0)
 	curr := s.data.head
 	for curr != nil {
@@ -65,6 +67,8 @@ func (s Summary) MarshalJSON() ([]byte, error) {
 }
 
 // Avoid infinite recursion when unmarshalling
+// When unmarshalling bytes in a Summary{} struct, it will call UnmarshalJSON recursively because Summary{} implements the unmarshaller interface
+// using the private type summary here, tricks the unmarshaller into running the regular JSON unmarshalling.
 type summary Summary
 
 // UnmarshalJSON is used to recreate a Summary structure from a JSON payload
@@ -77,6 +81,39 @@ func (s *Summary) UnmarshalJSON(b []byte) error {
 	}
 	*s = Summary(ss)
 
+	s.data = NewSkiplist()
+	for _, e := range s.EncodedData {
+		s.data.Insert(e)
+	}
+
+	return nil
+}
+
+func (s *Summary) GobEncode() ([]byte, error) {
+	// TODO[leo] preallocate, not sure: 1/ 2*EPSILON?
+	s.EncodedData = make([]Entry, 0)
+	curr := s.data.head
+	for curr != nil {
+		s.EncodedData = append(s.EncodedData, curr.value)
+		curr = curr.next[0]
+	}
+	ss := summary(*s)
+
+	var buf bytes.Buffer
+	encoder := gob.NewEncoder(&buf)
+	err := encoder.Encode(ss)
+	return buf.Bytes(), err
+}
+
+func (s *Summary) GobDecode(data []byte) error {
+	ss := summary{}
+	buf := bytes.NewBuffer(data)
+	decoder := gob.NewDecoder(buf)
+	if err := decoder.Decode(&ss); err != nil {
+		return err
+	}
+
+	*s = Summary(ss)
 	s.data = NewSkiplist()
 	for _, e := range s.EncodedData {
 		s.data.Insert(e)
@@ -99,10 +136,10 @@ func (s *Summary) Insert(v int64, t uint64) {
 	s.N++
 
 	if eptr.prev[0] != s.data.head && eptr.next[0] != nil {
-		eptr.value.Delta = int(2 * epsilon * float64(s.N))
+		eptr.value.Delta = int(2 * EPSILON * float64(s.N))
 	}
 
-	if s.N%int(1.0/float64(2.0*epsilon)) == 0 {
+	if s.N%int(1.0/float64(2.0*EPSILON)) == 0 {
 		s.compress()
 	}
 }
@@ -110,7 +147,7 @@ func (s *Summary) Insert(v int64, t uint64) {
 func (s *Summary) compress() {
 	var missing int
 
-	epsN := int(2 * epsilon * float64(s.N))
+	epsN := int(2 * EPSILON * float64(s.N))
 
 	for elt := s.data.head.next[0]; elt != nil && elt.next[0] != nil; {
 		next := elt.next[0]
@@ -137,14 +174,14 @@ func (s *Summary) compress() {
 	}
 }
 
-// Quantile returns an epsilon estimate of the element at quantile 'q' (0 <= q <= 1)
+// Quantile returns an EPSILON estimate of the element at quantile 'q' (0 <= q <= 1)
 func (s *Summary) Quantile(q float64) (int64, []uint64) {
 
 	// convert quantile to rank
 	r := int(q*float64(s.N) + 0.5)
 
 	var rmin int
-	epsN := int(epsilon * float64(s.N))
+	epsN := int(EPSILON * float64(s.N))
 
 	for elt := s.data.head.next[0]; elt != nil; elt = elt.next[0] {
 		t := elt.value
@@ -168,7 +205,7 @@ func (s *Summary) Quantile(q float64) (int64, []uint64) {
 
 // Merge takes a summary and merge the values inside the current pointed object
 func (s *Summary) Merge(s2 *Summary) {
-	if s2.N == 0 {
+	if s2.N == 0 || s2.data == nil {
 		return
 	}
 

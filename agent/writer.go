@@ -126,7 +126,7 @@ func (w *Writer) Flush() {
 
 		log.Infof("Writer flush to the API, %d spans", len(spans))
 
-		payload := model.Payload{
+		payload := model.AgentPayload{
 			APIKey: "424242", // FIXME, this should go in a config file
 			Spans:  spans,
 			Stats:  w.toWrite[i].Stats,
@@ -139,6 +139,7 @@ func (w *Writer) Flush() {
 			log.Errorf("Error marshalling: %s", err)
 			break
 		}
+		log.Infof("PAYLOAD %s", jsonStr)
 
 		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
 		if err != nil {
