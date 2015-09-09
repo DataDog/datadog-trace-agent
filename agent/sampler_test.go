@@ -32,7 +32,7 @@ func TestSampler(t *testing.T) {
 	}
 
 	// Now prepare distributions
-	stats := model.NewStatsBucket(0)
+	stats := model.NewStatsBucket(0, 1)
 	tgs := model.NewTagsFromString("service:dogweb,resource:dash.list")
 	d := model.NewDistribution(model.DURATION, tgs)
 	for _, span := range testSpans {

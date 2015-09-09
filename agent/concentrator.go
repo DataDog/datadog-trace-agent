@@ -80,7 +80,7 @@ func (c *Concentrator) HandleNewSpan(s model.Span) error {
 
 	b, ok := c.buckets[bucket]
 	if !ok {
-		b = model.NewStatsBucket(bucket)
+		b = model.NewStatsBucket(bucket, c.bucketSize.Nanoseconds())
 		c.buckets[bucket] = b
 	}
 

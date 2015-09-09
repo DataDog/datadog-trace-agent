@@ -102,8 +102,7 @@ func TestWriterBufferFlush(t *testing.T) {
 	// sending a stats bucket should trigger a flush for that buffer
 	lastFlush := w.lastFlush
 
-	stats := model.NewStatsBucket(model.Now())
-	stats.Duration = 100000
+	stats := model.NewStatsBucket(model.Now(), 100000)
 	w.inStats <- stats
 
 	// wait for a flush

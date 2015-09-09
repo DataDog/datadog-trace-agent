@@ -119,13 +119,14 @@ type StatsBucket struct {
 }
 
 // NewStatsBucket opens a new bucket for time ts and initializes it properly
-func NewStatsBucket(ts int64) StatsBucket {
+func NewStatsBucket(ts, d int64) StatsBucket {
 	counts := make(map[string]Count)
 	distros := make(map[string]Distribution)
 
 	// The only non-initialized value is the Duration which should be set by whoever closes that bucket
 	return StatsBucket{
 		Start:         ts,
+		Duration:      d,
 		Counts:        counts,
 		Distributions: distros,
 	}
