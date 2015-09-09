@@ -27,7 +27,7 @@ Out[10]: 47092556792851724
 */
 
 // NewSummaryWithTestData returns the Summary
-func NewSummaryWithTestData() Summary {
+func NewSummaryWithTestData() *Summary {
 	s := NewSummary()
 
 	for i, v := range TestArray {

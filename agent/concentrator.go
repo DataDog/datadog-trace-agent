@@ -11,7 +11,7 @@ import (
 )
 
 // Discard spans that are older than this value in the concentrator (nanoseconds)
-var OldestSpanCutoff int64 = time.Duration(5 * time.Second).Nanoseconds()
+var OldestSpanCutoff = time.Duration(5 * time.Second).Nanoseconds()
 
 // Concentrator produces time bucketed statistics from a stream of raw traces.
 // https://en.wikipedia.org/wiki/Knelson_concentrator

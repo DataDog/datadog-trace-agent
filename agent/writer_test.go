@@ -72,10 +72,10 @@ func TestWriterBufferFlush(t *testing.T) {
 	assert := assert.New(t)
 
 	// Create a fake API for the writer
-	fakeApi := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	fakeAPI := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 	}))
-	defer fakeApi.Close()
+	defer fakeAPI.Close()
 
 	w := NewTestWriter()
 	w.Start()
@@ -125,12 +125,12 @@ func TestWriterBufferFlush(t *testing.T) {
 	assert.Equal(2, len(w.toWrite), "Did not see failed flush in time")
 
 	// now start our HTTPServer and send stuff to it
-	fakeApi.Start()
+	fakeAPI.Start()
 	// point our writer to it
 	// We have to stop the writer so that we don't get a race when we change w.endpoint
 	close(w.exit)
 	w.exitGroup.Wait()
-	w.endpoint = fakeApi.URL + "/api/v0.1"
+	w.endpoint = fakeAPI.URL + "/api/v0.1"
 	w.Start()
 
 	// Reflush, manually!

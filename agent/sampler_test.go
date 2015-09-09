@@ -44,17 +44,17 @@ func TestSampler(t *testing.T) {
 	assert.Equal(len(testSpans), d.Summary.N)
 
 	q1, samp1 := d.Summary.Quantile(0.5)
-	assert.Equal(197884, q1)
+	assert.Equal(int64(197884), q1)
 	assert.Equal(1, len(samp1))
 	assert.Equal(uint64(8), samp1[0])
 
 	q2, samp2 := d.Summary.Quantile(0.90)
-	assert.Equal(769540, q2)
+	assert.Equal(int64(769540), q2)
 	assert.Equal(1, len(samp2))
 	assert.Equal(uint64(2), samp2[0])
 
 	q3, samp3 := d.Summary.Quantile(0.99)
-	assert.Equal(992312, q3)
+	assert.Equal(int64(992312), q3)
 	assert.Equal(1, len(samp3))
 	assert.Equal(uint64(1), samp3[0])
 
