@@ -28,6 +28,7 @@ var sqlVariablesRegexp = regexp.MustCompile("('[^']+')|([0-9]+)")
 var sqlalchemyVariablesRegexp = regexp.MustCompile("%\\(.+?\\)s")
 var sqlListRegexp = regexp.MustCompile("('[^']+')|([0-9]+)")
 var sqlListVariables = regexp.MustCompile("\\?[\\? ,]+\\?")
+var nonUniformSpacesRegexp = regexp.MustCompile("\\s+")
 
 // NewQuantizer creates a new Quantizer
 func NewQuantizer(inSpans chan model.Span, exit chan struct{}, exitGroup *sync.WaitGroup) (*Quantizer, chan model.Span) {
@@ -70,6 +71,10 @@ func (q *Quantizer) Quantize(span model.Span) model.Span {
 	return span
 }
 
+func normalizeSpaces(text string) string {
+	return nonUniformSpacesRegexp.ReplaceAllString(text, " ")
+}
+
 // QuantizeSQL generates resource for SQL spans
 func (q *Quantizer) QuantizeSQL(span model.Span) model.Span {
 	query, ok := span.Meta["query"]
@@ -86,6 +91,9 @@ func (q *Quantizer) QuantizeSQL(span model.Span) model.Span {
 		resource = strings.TrimSpace(resource)
 	} else {
 		log.Debugf("Quantize SQL command with generic parsing, SpanID: %d", span.SpanID)
+
+		resource = normalizeSpaces(resource)
+
 		// Remove variables
 		resource = sqlVariablesRegexp.ReplaceAllString(resource, sqlVariableReplacement)
 		resource = sqlalchemyVariablesRegexp.ReplaceAllString(resource, sqlVariableReplacement)

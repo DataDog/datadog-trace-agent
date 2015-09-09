@@ -40,6 +40,9 @@ func TestSQLQuantizer(t *testing.T) {
 		{"select * from users where id = 42",
 			"select * from users where id = ?"},
 
+		{"select * \n   from users \n    where\n       id = 214325346",
+			"select * from users where id = ?"},
+
 		{"UPDATE user_dash_pref SET json_prefs = %(json_prefs)s, modified = '2015-08-27 22:10:32.492912' WHERE user_id = %(user_id)s AND url = %(url)s",
 			"UPDATE user_dash_pref SET json_prefs = ?, modified = ? WHERE user_id = ? AND url = ?"},
 
@@ -52,7 +55,7 @@ func TestSQLQuantizer(t *testing.T) {
 		{"SELECT org_id,metric_key FROM metrics_metadata WHERE org_id = %(org_id)s AND metric_key = ANY(array[75])",
 			"SELECT org_id,metric_key FROM metrics_metadata WHERE org_id = ? AND metric_key = ANY(array[?])"},
 
-		{"SELECT org_id,metric_key FROM metrics_metadata WHERE org_id = %(org_id)s AND metric_key = ANY(array[21, 25, 32])",
+		{"SELECT org_id,metric_key   FROM metrics_metadata   WHERE org_id = %(org_id)s AND metric_key = ANY(array[21, 25, 32])",
 			"SELECT org_id,metric_key FROM metrics_metadata WHERE org_id = ? AND metric_key = ANY(array[?])"},
 	}
 
