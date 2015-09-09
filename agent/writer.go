@@ -64,6 +64,8 @@ func (w *Writer) addNewBuffer() {
 // Start runs the writer by consuming spans in a buffer and periodically
 // flushing to the API
 func (w *Writer) Start() {
+	w.exitGroup.Add(1)
+
 	// will shutdown as the input channel is closed
 	go func() {
 		for s := range w.inSpans {
@@ -97,6 +99,7 @@ func (w *Writer) flushStatsBucket() {
 			// FIXME? don't flush the traces we received because we didn't get the stats associated
 			// w.addNewBuffer()
 			// w.Flush()
+			w.exitGroup.Done()
 			return
 		}
 	}

@@ -49,6 +49,8 @@ func NewConcentrator(bucketSize time.Duration, inSpans chan model.Span, exit cha
 
 // Start initializes the first structures and starts consuming stuff
 func (c *Concentrator) Start() {
+	c.exitGroup.Add(1)
+
 	go func() {
 		// should return when upstream span channel is closed
 		for s := range c.inSpans {
@@ -105,7 +107,6 @@ func (c *Concentrator) flush() {
 
 func (c *Concentrator) closeBuckets() {
 	// block on the closer, to flush cleanly last bucket
-	c.exitGroup.Add(1)
 	ticker := time.Tick(c.bucketSize)
 	for {
 		select {

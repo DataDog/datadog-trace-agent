@@ -94,8 +94,11 @@ func TestWriterBufferFlush(t *testing.T) {
 		w.inSpans <- span
 	}
 
-	// these spans should have been buffered in the sampler
-	assert.False(w.toWrite[0].Sampler.IsEmpty())
+	// these spans should have been buffered in the sampler, toWrite is dangerously accessed by other routines
+	w.bufLock.Lock()
+	samplerEmpty := w.toWrite[0].Sampler.IsEmpty()
+	w.bufLock.Unlock()
+	assert.False(samplerEmpty, "Sampler is empty, spans got lost?")
 	// sending a stats bucket should trigger a flush for that buffer
 	lastFlush := w.lastFlush
 
@@ -108,8 +111,13 @@ func TestWriterBufferFlush(t *testing.T) {
 	ticker := time.NewTicker(10 * time.Millisecond).C
 	loop := 0
 	maxFlushWait := 10
+	bufLen := 0
 	for range ticker {
-		if len(w.toWrite) > 1 || loop >= maxFlushWait {
+		// toWrite is dangerously written to by other routines
+		w.bufLock.Lock()
+		bufLen = len(w.toWrite)
+		w.bufLock.Unlock()
+		if bufLen > 1 || loop >= maxFlushWait {
 			break
 		}
 		loop++
@@ -119,7 +127,11 @@ func TestWriterBufferFlush(t *testing.T) {
 	// now start our HTTPServer and send stuff to it
 	fakeApi.Start()
 	// point our writer to it
+	// We have to stop the writer so that we don't get a race when we change w.endpoint
+	close(w.exit)
+	w.exitGroup.Wait()
 	w.endpoint = fakeApi.URL + "/api/v0.1"
+	w.Start()
 
 	// Reflush, manually!
 	w.Flush()
