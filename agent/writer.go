@@ -23,7 +23,7 @@ type Writer struct {
 	endpoint string
 
 	// All written structs are buffered, in case sh** happens during transmissions
-	inSpan  chan model.Span
+	inSpans chan model.Span
 	inStats chan model.StatsBucket
 
 	// Sampler configuration
@@ -42,7 +42,7 @@ type Writer struct {
 func NewWriter(endp string, quantiles []float64, inSpans chan model.Span, inStats chan model.StatsBucket, exit chan struct{}, exitGroup *sync.WaitGroup) *Writer {
 	w := Writer{
 		endpoint:  endp,
-		inSpan:    inSpans,
+		inSpans:   inSpans,
 		inStats:   inStats,
 		exit:      exit,
 		exitGroup: exitGroup,
@@ -67,7 +67,7 @@ func (w *Writer) addNewBuffer() {
 func (w *Writer) Start() {
 	// will shutdown as the input channel is closed
 	go func() {
-		for s := range w.inSpan {
+		for s := range w.inSpans {
 			// Always write to last element of span
 			w.bufLock.Lock()
 			w.toWrite[len(w.toWrite)-1].Sampler.AddSpan(s)
@@ -85,7 +85,7 @@ func (w *Writer) flushStatsBucket() {
 	for {
 		select {
 		case bucket := <-w.inStats:
-			log.Info("Received a stats bucket, flushing stats & bufferend spans")
+			log.Info("Received a stats bucket, flushing stats & buffered spans")
 			// closing this buffer
 			w.bufLock.Lock()
 			w.toWrite[len(w.toWrite)-1].Stats = bucket
