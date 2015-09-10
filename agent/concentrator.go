@@ -11,7 +11,7 @@ import (
 )
 
 // Discard spans that are older than this value in the concentrator (nanoseconds)
-var OldestSpanCutoff int64 = time.Duration(5 * time.Second).Nanoseconds()
+var OldestSpanCutoff = time.Duration(5 * time.Second).Nanoseconds()
 
 // Concentrator produces time bucketed statistics from a stream of raw traces.
 // https://en.wikipedia.org/wiki/Knelson_concentrator
@@ -49,6 +49,8 @@ func NewConcentrator(bucketSize time.Duration, inSpans chan model.Span, exit cha
 
 // Start initializes the first structures and starts consuming stuff
 func (c *Concentrator) Start() {
+	c.exitGroup.Add(1)
+
 	go func() {
 		// should return when upstream span channel is closed
 		for s := range c.inSpans {
@@ -78,7 +80,7 @@ func (c *Concentrator) HandleNewSpan(s model.Span) error {
 
 	b, ok := c.buckets[bucket]
 	if !ok {
-		b = model.NewStatsBucket(bucket)
+		b = model.NewStatsBucket(bucket, c.bucketSize.Nanoseconds())
 		c.buckets[bucket] = b
 	}
 
@@ -97,7 +99,6 @@ func (c *Concentrator) flush() {
 		// flush & expire old buckets that cannot be hit anymore
 		if bucket < now-c.oldestSpanCutoff && bucket != lastBucket {
 			log.Infof("Concentrator flushed time bucket %d", bucket)
-			stats.Encode()
 			c.outStats <- stats
 			delete(c.buckets, bucket)
 		}
@@ -106,7 +107,6 @@ func (c *Concentrator) flush() {
 
 func (c *Concentrator) closeBuckets() {
 	// block on the closer, to flush cleanly last bucket
-	c.exitGroup.Add(1)
 	ticker := time.Tick(c.bucketSize)
 	for {
 		select {

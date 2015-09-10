@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/DataDog/raclette/quantile"
 	log "github.com/cihub/seelog"
 )
 
@@ -16,8 +17,6 @@ const (
 	ERRORS          = "errors"
 	DURATION        = "duration"
 )
-
-var epsilon = 1e-2
 
 // These represents the default stats we keep track of, Counts
 var DefaultCounts = [...]string{HITS, ERRORS, DURATION}
@@ -35,10 +34,10 @@ type Count struct {
 
 // Distribution represents a true image of the spectrum of values, allowing arbitrary quantile queries
 type Distribution struct {
-	Key     string  `json:"key"`
-	Name    string  `json:"name"`    // represents the entity we count, e.g. "hits", "errors", "time"
-	TagSet  TagSet  `json:"tagset"`  // set of tags for which we account this Distribution
-	Summary Summary `json:"summary"` // actual representation of data
+	Key     string            `json:"key"`
+	Name    string            `json:"name"`    // represents the entity we count, e.g. "hits", "errors", "time"
+	TagSet  TagSet            `json:"tagset"`  // set of tags for which we account this Distribution
+	Summary *quantile.Summary `json:"summary"` // actual representation of data
 }
 
 // NewCount returns a new Count for a metric and a given tag set
@@ -88,11 +87,11 @@ func (c Count) Add(s Span) (Count, error) {
 }
 
 // NewDistribution returns a new Distribution for a metric and a given tag set
-func NewDistribution(m string, tgs TagSet, epsilon float64) Distribution {
+func NewDistribution(m string, tgs TagSet) Distribution {
 	return Distribution{
 		Name:    m,
 		TagSet:  tgs,
-		Summary: NewSummary(epsilon),
+		Summary: quantile.NewSummary(),
 	}
 }
 
@@ -111,9 +110,8 @@ func (d Distribution) Add(s Span) {
 
 // StatsBucket is a time bucket to track statistic around multiple Counts
 type StatsBucket struct {
-	Start    int64   // timestamp of start in our format
-	Duration int64   // duration of a bucket in nanoseconds
-	Epsilon  float64 // epsilon used to rebuild GK distributions if needed
+	Start    int64 // timestamp of start in our format
+	Duration int64 // duration of a bucket in nanoseconds
 
 	// stats indexed by keys
 	Counts        map[string]Count        // All the true counts we keep
@@ -121,14 +119,14 @@ type StatsBucket struct {
 }
 
 // NewStatsBucket opens a new bucket for time ts and initializes it properly
-func NewStatsBucket(ts int64) StatsBucket {
+func NewStatsBucket(ts, d int64) StatsBucket {
 	counts := make(map[string]Count)
 	distros := make(map[string]Distribution)
 
 	// The only non-initialized value is the Duration which should be set by whoever closes that bucket
 	return StatsBucket{
 		Start:         ts,
-		Epsilon:       epsilon,
+		Duration:      d,
 		Counts:        counts,
 		Distributions: distros,
 	}
@@ -155,20 +153,9 @@ func (sb StatsBucket) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
 		"start":         sb.Start,
 		"duration":      sb.Duration,
-		"epsilon":       sb.Epsilon,
 		"counts":        flatCounts,
 		"distributions": flatDistros,
 	})
-}
-
-// Encode prepares a bucket for encoding
-func (sb StatsBucket) Encode() {
-	for _, d := range sb.Distributions {
-		gkd, ok := d.Summary.(*GKSummary)
-		if ok {
-			gkd.Encode()
-		}
-	}
 }
 
 // HandleSpan adds the span to this bucket stats
@@ -216,7 +203,7 @@ func (sb StatsBucket) addToDistribution(m string, s Span, tgs TagSet) {
 	ckey := tgs.TagKey(m)
 
 	if _, ok := sb.Distributions[ckey]; !ok {
-		sb.Distributions[ckey] = NewDistribution(m, tgs, sb.Epsilon)
+		sb.Distributions[ckey] = NewDistribution(m, tgs)
 	}
 
 	sb.Distributions[ckey].Add(s)

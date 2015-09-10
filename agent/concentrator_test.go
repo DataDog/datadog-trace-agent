@@ -11,9 +11,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func NewTestConcentrator(inSpans chan model.Span) (*Concentrator, chan model.Span, chan model.StatsBucket) {
+func NewTestConcentrator() (*Concentrator, chan model.Span, chan model.StatsBucket) {
 	exit := make(chan struct{})
 	var exitGroup sync.WaitGroup
+
+	inSpans := make(chan model.Span)
 
 	return NewConcentrator(
 		time.Second,
@@ -37,8 +39,7 @@ func WaitForSpanOnChan(c *Concentrator, channel chan model.Span, timeout time.Du
 
 func TestConcentratorExitsGracefully(t *testing.T) {
 	// Start a concentrator
-	inSpans := make(chan model.Span)
-	c, _, _ := NewTestConcentrator(inSpans)
+	c, _, _ := NewTestConcentrator()
 	c.Start()
 
 	// And now try to stop it in a given time, by closing the exit channel
@@ -62,13 +63,12 @@ func TestConcentratorExitsGracefully(t *testing.T) {
 func TestConcentratorRejectsLateSpan(t *testing.T) {
 	assert := assert.New(t)
 
-	inSpans := make(chan model.Span)
-	c, outSpans, _ := NewTestConcentrator(inSpans)
+	c, outSpans, _ := NewTestConcentrator()
 
 	c.Start()
 
 	s := model.Span{}
-	inSpans <- s
+	c.inSpans <- s
 
 	// span with s.Start = 0 should be filtered out by concentrator
 	_, err := WaitForSpanOnChan(c, outSpans, 100*time.Millisecond)
@@ -78,13 +78,12 @@ func TestConcentratorRejectsLateSpan(t *testing.T) {
 func TestSpanPassesThroughConcentrator(t *testing.T) {
 	assert := assert.New(t)
 
-	inSpans := make(chan model.Span)
-	c, outSpans, _ := NewTestConcentrator(inSpans)
+	c, outSpans, _ := NewTestConcentrator()
 
 	c.Start()
 
 	s := model.Span{SpanID: 42, Start: model.Now()}
-	inSpans <- s
+	c.inSpans <- s
 
 	// span with s.Start = 0 should be filtered out by concentrator
 	receivedSpan, err := WaitForSpanOnChan(c, outSpans, 100*time.Millisecond)
@@ -103,8 +102,7 @@ func getTsInBucket(ref int64, bucketSize time.Duration, offset int64) int64 {
 func TestConcentratorStatsCounts(t *testing.T) {
 	assert := assert.New(t)
 
-	inSpans := make(chan model.Span)
-	c, outSpans, outStats := NewTestConcentrator(inSpans)
+	c, outSpans, outStats := NewTestConcentrator()
 	// we want this faster
 	c.oldestSpanCutoff = time.Second.Nanoseconds()
 
@@ -148,7 +146,7 @@ func TestConcentratorStatsCounts(t *testing.T) {
 
 	// insert the spans!
 	for _, span := range testSpans {
-		inSpans <- span
+		c.inSpans <- span
 	}
 
 	<-waitForStats

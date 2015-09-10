@@ -1,36 +1,12 @@
 package main
 
 import (
-	"math/rand"
 	"sort"
 	"testing"
 
 	"github.com/DataDog/raclette/model"
 	"github.com/stretchr/testify/assert"
 )
-
-func newTestSpan(tid, sid uint64) model.Span {
-	return model.Span{TraceID: tid, SpanID: sid}
-}
-
-// Will insert nothing and return a given array of ids and random value for Quantile()
-type FakeSummary struct {
-	FakeQuantiles map[float64][]uint64
-}
-
-func NewFakeSummary() *FakeSummary {
-	return &FakeSummary{FakeQuantiles: make(map[float64][]uint64)}
-}
-func (s *FakeSummary) FakeQuantile(q float64, sids []uint64) { s.FakeQuantiles[q] = sids }
-func (s *FakeSummary) Insert(v int64, t uint64)              {}
-func (s *FakeSummary) Quantile(q float64) (int64, []uint64) {
-	quantile := rand.Int63()
-	vals, ok := s.FakeQuantiles[q]
-	if !ok {
-		return quantile, []uint64{}
-	}
-	return quantile, vals
-}
 
 func TestSampler(t *testing.T) {
 	assert := assert.New(t)
@@ -40,36 +16,53 @@ func TestSampler(t *testing.T) {
 
 	// Add some spans to our sampler
 	testSpans := []model.Span{
-		newTestSpan(0, 0),
-		newTestSpan(0, 1),
-		newTestSpan(0, 2),
-		newTestSpan(1, 3),
-		newTestSpan(0, 4),
-		newTestSpan(2, 5),
-		newTestSpan(3, 6),
-		newTestSpan(3, 7),
-		newTestSpan(1, 8),
-		newTestSpan(4, 9),
+		model.Span{TraceID: 0, SpanID: 0, Duration: 573496},
+		model.Span{TraceID: 0, SpanID: 1, Duration: 992312},
+		model.Span{TraceID: 0, SpanID: 2, Duration: 769540},
+		model.Span{TraceID: 1, SpanID: 3, Duration: 26965},
+		model.Span{TraceID: 0, SpanID: 4, Duration: 513323},
+		model.Span{TraceID: 2, SpanID: 5, Duration: 34347},
+		model.Span{TraceID: 3, SpanID: 6, Duration: 498798},
+		model.Span{TraceID: 3, SpanID: 7, Duration: 19207},
+		model.Span{TraceID: 1, SpanID: 8, Duration: 197884},
+		model.Span{TraceID: 4, SpanID: 9, Duration: 151384},
 	}
 	for _, s := range testSpans {
 		sampler.AddSpan(s)
 	}
 
 	// Now prepare distributions
-	stats := model.NewStatsBucket(0)
+	stats := model.NewStatsBucket(0, 1)
 	tgs := model.NewTagsFromString("service:dogweb,resource:dash.list")
-	faked := model.NewDistribution(model.DURATION, tgs, 0)
-	fakes := NewFakeSummary()
-	faked.Summary = fakes
-	fakes.FakeQuantile(0, []uint64{5})
-	fakes.FakeQuantile(0.5, []uint64{2})
-	fakes.FakeQuantile(1, []uint64{3, 8}) // supposed to pick only the first one
+	d := model.NewDistribution(model.DURATION, tgs)
+	for _, span := range testSpans {
+		d.Add(span)
+	}
+
+	// not too good as we also test the quantile package
+	// but if these asserts pass we're sure we're correctly testing the sampler
+	assert.Equal(len(testSpans), d.Summary.N)
+
+	q1, samp1 := d.Summary.Quantile(0.5)
+	assert.Equal(int64(197884), q1)
+	assert.Equal(1, len(samp1))
+	assert.Equal(uint64(8), samp1[0])
+
+	q2, samp2 := d.Summary.Quantile(0.90)
+	assert.Equal(int64(769540), q2)
+	assert.Equal(1, len(samp2))
+	assert.Equal(uint64(2), samp2[0])
+
+	q3, samp3 := d.Summary.Quantile(0.99)
+	assert.Equal(int64(992312), q3)
+	assert.Equal(1, len(samp3))
+	assert.Equal(uint64(1), samp3[0])
 
 	// Add one fake distribution for choosing
-	stats.Distributions["whatever"] = faked
-	chosen := sampler.GetSamples(stats, []float64{0, 0.5, 1})
+	stats.Distributions["whatever"] = d
+	chosen := sampler.GetSamples(stats, []float64{0.5, 0.90, 0.99})
 
-	shouldChoose := []int{0, 1, 2, 3, 4, 5, 8}
+	shouldChoose := []int{0, 1, 2, 3, 4, 8}
 	chosenSID := make([]int, len(chosen))
 	for i, s := range chosen {
 		chosenSID[i] = int(s.SpanID)

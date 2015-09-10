@@ -23,15 +23,16 @@ type Writer struct {
 	endpoint string
 
 	// All written structs are buffered, in case sh** happens during transmissions
-	inSpan  chan model.Span
+	inSpans chan model.Span
 	inStats chan model.StatsBucket
 
 	// Sampler configuration
 	// TODO: move the sampler into a real Agent worker?
 	quantiles []float64
 
-	toWrite []WriterBuffer
-	bufLock sync.Mutex
+	lastFlush int64          // last successful flush, for logging/monitoring purposes
+	toWrite   []WriterBuffer // buffers to write to the API and currently written to from upstream
+	bufLock   sync.Mutex     // mutex on data above
 
 	// exit channels
 	exit      chan struct{}
@@ -42,7 +43,7 @@ type Writer struct {
 func NewWriter(endp string, quantiles []float64, inSpans chan model.Span, inStats chan model.StatsBucket, exit chan struct{}, exitGroup *sync.WaitGroup) *Writer {
 	w := Writer{
 		endpoint:  endp,
-		inSpan:    inSpans,
+		inSpans:   inSpans,
 		inStats:   inStats,
 		exit:      exit,
 		exitGroup: exitGroup,
@@ -57,17 +58,17 @@ func (w *Writer) addNewBuffer() {
 	// Add a new buffer
 	// FIXME: Should these buffers be unbounded?
 	wb := WriterBuffer{Sampler: NewSampler()}
-	w.bufLock.Lock()
 	w.toWrite = append(w.toWrite, wb)
-	w.bufLock.Unlock()
 }
 
 // Start runs the writer by consuming spans in a buffer and periodically
 // flushing to the API
 func (w *Writer) Start() {
+	w.exitGroup.Add(1)
+
 	// will shutdown as the input channel is closed
 	go func() {
-		for s := range w.inSpan {
+		for s := range w.inSpans {
 			// Always write to last element of span
 			w.bufLock.Lock()
 			w.toWrite[len(w.toWrite)-1].Sampler.AddSpan(s)
@@ -85,18 +86,20 @@ func (w *Writer) flushStatsBucket() {
 	for {
 		select {
 		case bucket := <-w.inStats:
-			log.Info("Received a stats bucket, flushing stats & bufferend spans")
+			log.Info("Received a stats bucket, flushing stats & buffered spans")
 			// closing this buffer
 			w.bufLock.Lock()
 			w.toWrite[len(w.toWrite)-1].Stats = bucket
-			w.bufLock.Unlock()
 			w.addNewBuffer()
+			w.bufLock.Unlock()
+
 			w.Flush()
 		case <-w.exit:
 			log.Info("Writer exiting")
 			// FIXME? don't flush the traces we received because we didn't get the stats associated
 			// w.addNewBuffer()
 			// w.Flush()
+			w.exitGroup.Done()
 			return
 		}
 	}
@@ -104,6 +107,7 @@ func (w *Writer) flushStatsBucket() {
 
 // Flush the span buffer by writing to the API its contents
 func (w *Writer) Flush() {
+	// Do not flush the buffer we just added
 	maxBuf := len(w.toWrite) - 1
 	flushed := 0
 
@@ -156,6 +160,7 @@ func (w *Writer) Flush() {
 	if flushed != 0 {
 		w.bufLock.Lock()
 		w.toWrite = w.toWrite[flushed:]
+		w.lastFlush = model.Now()
 		w.bufLock.Unlock()
 	} else {
 		log.Warnf("Could not flush, still %d payloads to be flushed", maxBuf)
