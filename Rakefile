@@ -44,12 +44,16 @@ task :run do
 end
 
 task :lint do
-  total_output = ''
+  error = false
   PACKAGES.each do |pkg|
-    total_output += `golint #{pkg}`.strip
+    puts "golint #{pkg}"
+    output = `golint #{pkg}`.strip
+    if output.length > 0
+      puts output
+      error = true
+    end
   end
-  puts total_output
-  fail "We have some linting errors" if total_output.length > 0
+  fail "We have some linting errors" if error
 end
 
 task :vet do
