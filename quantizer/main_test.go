@@ -45,6 +45,9 @@ func TestCompactAllSpaces(t *testing.T) {
 
 		{"aa \n  \n bb\ncc 		 dd\n",
 			"aa bb cc dd"},
+
+		{"¡™£¢∞§¶ \n •ªº–≠œ∑´®†¥¨ˆøπ  “‘«åß∂ƒ©˙∆˚¬…æΩ≈ç√	∫˜µ≤≥÷",
+			"¡™£¢∞§¶ •ªº–≠œ∑´®†¥¨ˆøπ “‘«åß∂ƒ©˙∆˚¬…æΩ≈ç√ ∫˜µ≤≥÷"},
 	}
 
 	for _, testCase := range resultsToExpect {
