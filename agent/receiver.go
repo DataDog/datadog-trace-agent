@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -64,7 +63,8 @@ func (l *HTTPReceiver) handleSpan(w http.ResponseWriter, r *http.Request) {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		panic(fmt.Errorf("Error writing header: %s", err))
+		log.Error(err)
+		return
 	}
 
 	var s model.Span
@@ -72,7 +72,8 @@ func (l *HTTPReceiver) handleSpan(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(body, &s)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		panic(fmt.Errorf("%s", err))
+		log.Error(err)
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -90,14 +91,16 @@ func (l *HTTPReceiver) handleSpans(w http.ResponseWriter, r *http.Request) {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		panic(fmt.Errorf("%s", err))
+		log.Error(err)
+		return
 	}
 
 	var spans []model.Span
 	err = json.Unmarshal(body, &spans)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		panic(fmt.Errorf("%s", err))
+		log.Error(err)
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
