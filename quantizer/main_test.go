@@ -1,0 +1,68 @@
+package quantizer
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+type compactSpacesTestCase struct {
+	before string
+	after  string
+}
+
+func TestCompactWhitespaces(t *testing.T) {
+	assert := assert.New(t)
+
+	resultsToExpect := []compactSpacesTestCase{
+		{"aa",
+			"aa"},
+
+		{"aa bb",
+			"aa bb"},
+
+		{"aa    bb  cc  dd ",
+			"aa bb cc dd"},
+	}
+
+	for _, testCase := range resultsToExpect {
+		assert.Equal(testCase.after, compactWhitespaces(testCase.before))
+	}
+}
+
+func TestCompactAllSpaces(t *testing.T) {
+	assert := assert.New(t)
+
+	resultsToExpect := []compactSpacesTestCase{
+		{"aa",
+			"aa"},
+
+		{"aa bb \n   ",
+			"aa bb"},
+
+		{"aa 	bb	cc\n ",
+			"aa bb cc"},
+
+		{"aa \n  \n bb\ncc 		 dd\n",
+			"aa bb cc dd"},
+	}
+
+	for _, testCase := range resultsToExpect {
+		assert.Equal(testCase.after, compactAllSpacesWithRegexp(testCase.before))
+	}
+	for _, testCase := range resultsToExpect {
+		assert.Equal(testCase.after, compactAllSpacesWithoutRegexp(testCase.before))
+	}
+}
+
+func BenchmarkCompactAllSpacesWithRegexp(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		compactAllSpacesWithRegexp("SELECT org_id,metric_key \n		FROM metrics_metadata \n		WHERE org_id = %(org_id)s 	AND 	metric_key = ANY(array[21, 25, 32])")
+	}
+}
+
+func BenchmarkCompactAllSpacesWithoutRegexp(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		compactAllSpacesWithoutRegexp("SELECT org_id,metric_key \n		FROM metrics_metadata \n		WHERE org_id = %(org_id)s 	AND 	metric_key = ANY(array[21, 25, 32])")
+	}
+}

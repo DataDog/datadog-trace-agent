@@ -1,20 +1,12 @@
-package main
+package quantizer
 
 import (
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/DataDog/raclette/model"
 )
-
-func NewTestQuantizer() (*Quantizer, chan model.Span) {
-	inSpans := make(chan model.Span)
-	exit := make(chan struct{})
-	var exitGroup sync.WaitGroup
-	return NewQuantizer(inSpans, exit, &exitGroup)
-}
 
 func SQLSpan(query string) model.Span {
 	return model.Span{
@@ -33,8 +25,6 @@ type sqlTestCase struct {
 
 func TestSQLQuantizer(t *testing.T) {
 	assert := assert.New(t)
-
-	quantizer, _ := NewTestQuantizer()
 
 	queryToExpected := []sqlTestCase{
 		{"select * from users where id = 42",
@@ -60,7 +50,6 @@ func TestSQLQuantizer(t *testing.T) {
 	}
 
 	for _, testCase := range queryToExpected {
-		assert.Equal(testCase.expectedResource, quantizer.Quantize(SQLSpan(testCase.query)).Resource)
+		assert.Equal(testCase.expectedResource, Quantize(SQLSpan(testCase.query)).Resource)
 	}
-
 }
