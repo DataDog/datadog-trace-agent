@@ -55,9 +55,6 @@ func (s *Span) Normalize() error {
 	if s.Service == "" {
 		return errors.New("span.normalize: `service` must be set in span")
 	}
-	if s.Resource == "" {
-		return errors.New("span.normalize: `resource` must be set in span")
-	}
 	// an Error - if not set - is 0 which is equivalent to a success status
 	if s.Start == 0 {
 		// NOTE[leo] this is probably ok, but we might want to be stricter and error?
