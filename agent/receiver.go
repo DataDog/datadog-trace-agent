@@ -92,7 +92,7 @@ func (l *HTTPReceiver) handleSpans(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Error(err)
-		Statsd.Count("trace_agent.receiver.error", 1, nil, 1)
+		Statsd.Count("trace_agent.receiver.error", 1, []string{"error:read-io"}, 1)
 		return
 	}
 
@@ -101,7 +101,7 @@ func (l *HTTPReceiver) handleSpans(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Error(err)
-		Statsd.Count("trace_agent.receiver.error", 1, nil, 1)
+		Statsd.Count("trace_agent.receiver.error", 1, []string{"error:unmarshal-json"}, 1)
 		return
 	}
 
@@ -113,6 +113,7 @@ func (l *HTTPReceiver) handleSpans(w http.ResponseWriter, r *http.Request) {
 	for _, s := range spans {
 		err := s.Normalize()
 		if err != nil {
+			Statsd.Count("trace_agent.receiver.error", 1, []string{"error:normalize"}, 1)
 			log.Errorf("Dropped a span, could not normalize span: %v", s)
 			continue
 		}
