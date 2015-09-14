@@ -49,6 +49,12 @@ func main() {
 	}
 	log.ReplaceLogger(logger)
 
+	// Initialize dogstatsd client
+	err = ConfigureStatsd(conf, "dogstatsd")
+	if err != nil {
+		panic(fmt.Sprintf("Error configuring dogstatsd: %v", err))
+	}
+
 	// Seed rand
 	rand.Seed(time.Now().UTC().UnixNano())
 

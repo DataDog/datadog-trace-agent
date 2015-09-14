@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+
 	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/raclette/model"
@@ -40,6 +42,7 @@ func (s Sampler) AddSpan(span model.Span) {
 
 // GetSamples returns a list of representative spans to write
 func (s *Sampler) GetSamples(sb model.StatsBucket, quantiles []float64) []model.Span {
+	startTime := time.Now()
 	spanIDs := make([]uint64, len(sb.Distributions)*len(quantiles))
 	// Look at the stats to find representative spans
 	for _, d := range sb.Distributions {
@@ -54,9 +57,17 @@ func (s *Sampler) GetSamples(sb model.StatsBucket, quantiles []float64) []model.
 
 	// Then find the trace IDs thanks to a spanID -> traceID map
 	traceIDSet := make(map[uint64]struct{})
-	var empty struct{}
+	var token struct{}
 	for _, spanID := range spanIDs {
-		traceIDSet[s.TraceIDBySpanID[spanID]] = empty
+		// spanIDs is pre-allocated, so it may contain zeros
+		if spanID != 0 {
+			traceID, ok := s.TraceIDBySpanID[spanID]
+			if !ok {
+				log.Errorf("SpanID reported by Quantiles not available in Sampler, SpanID=%d", spanID)
+			} else {
+				traceIDSet[traceID] = token
+			}
+		}
 	}
 
 	// Then get the traces (ie. set of spans) thanks to a traceID -> []spanID map
@@ -65,8 +76,16 @@ func (s *Sampler) GetSamples(sb model.StatsBucket, quantiles []float64) []model.
 		spans = append(spans, s.SpansByTraceID[traceID]...)
 	}
 
-	log.Infof("Sampled %d traces out of %d, %d spans out of %d",
-		len(traceIDSet), len(s.SpansByTraceID), len(spans), len(s.TraceIDBySpanID))
+	Statsd.Count("trace_agent.sampler.trace.total", int64(len(s.SpansByTraceID)), nil, 1)
+	Statsd.Count("trace_agent.sampler.trace.kept", int64(len(traceIDSet)), nil, 1)
+	Statsd.Count("trace_agent.sampler.span.total", int64(len(s.TraceIDBySpanID)), nil, 1)
+	Statsd.Count("trace_agent.sampler.span.kept", int64(len(spans)), nil, 1)
+
+	execTime := time.Since(startTime)
+	log.Infof("Sampled %d traces out of %d, %d spans out of %d, in %s",
+		len(traceIDSet), len(s.SpansByTraceID), len(spans), len(s.TraceIDBySpanID), execTime)
+
+	Statsd.Gauge("trace_agent.sampler.sample_duration", execTime.Seconds(), nil, 1)
 
 	return spans
 }

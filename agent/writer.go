@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"sync"
+	"time"
 
 	log "github.com/cihub/seelog"
 
@@ -15,7 +16,6 @@ import (
 type WriterBuffer struct {
 	Sampler Sampler
 	Stats   model.StatsBucket
-	// Spans   []model.Span
 }
 
 // Writer implements a Writer and writes to the Datadog API spans
@@ -81,7 +81,8 @@ func (w *Writer) Start() {
 	log.Info("Writer started")
 }
 
-// We rely on the concentrator ticker to flush periodically traces "aligning" on the buckets (it's not perfect, but we don't really care, traces of this stats bucket may arrive in the next flush)
+// We rely on the concentrator ticker to flush periodically traces "aligning" on the buckets
+// (it's not perfect, but we don't really care, traces of this stats bucket may arrive in the next flush)
 func (w *Writer) flushStatsBucket() {
 	for {
 		select {
@@ -113,6 +114,7 @@ func (w *Writer) Flush() {
 
 	// FIXME: this is not ideal we might want to batch this into a single http call
 	for i := 0; i < maxBuf; i++ {
+		startFlush := time.Now()
 		// decide to not flush if no spans & no stats
 		if w.toWrite[i].Sampler.IsEmpty() && len(w.toWrite[i].Stats.Counts) == 0 {
 			log.Debug("Nothing to flush")
@@ -153,7 +155,10 @@ func (w *Writer) Flush() {
 		}
 		defer resp.Body.Close()
 		// if it succeeded remove from the slice
-		log.Info("Flushed one payload")
+		flushTime := time.Since(startFlush)
+		log.Infof("Flushed one payload to the API in %s, size %d", flushTime, len(jsonStr))
+		Statsd.Gauge("trace_agent.writer.flush_duration", flushTime.Seconds(), nil, 1)
+		Statsd.Count("trace_agent.writer.payload_bytes", int64(len(jsonStr)), nil, 1)
 		flushed++
 	}
 

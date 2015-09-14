@@ -10,27 +10,21 @@ import (
 
 // StoppableListener wraps a regular TCPListener with an exit channel so we can exit cleanly from the Serve() loop of our HTTP server
 type StoppableListener struct {
+	exit chan struct{}
 	*net.TCPListener
-	exit chan bool
 }
 
 // NewStoppableListener returns a new wrapped listener, which is non-initialized
-func NewStoppableListener(l net.Listener) (*StoppableListener, error) {
+func NewStoppableListener(l net.Listener, exit chan struct{}) (*StoppableListener, error) {
 	tcpL, ok := l.(*net.TCPListener)
 
 	if !ok {
 		return nil, errors.New("Cannot wrap listener")
 	}
 
-	retval := &StoppableListener{}
-	retval.TCPListener = tcpL
+	sl := &StoppableListener{exit: exit, TCPListener: tcpL}
 
-	return retval, nil
-}
-
-// Init sets the exit channel, must be called before using it
-func (sl *StoppableListener) Init(exit chan bool) {
-	sl.exit = exit
+	return sl, nil
 }
 
 // Accept reimplements the regular Accept but adds a check on the exit channel and returns if needed
