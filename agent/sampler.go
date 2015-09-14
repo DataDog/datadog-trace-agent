@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+
 	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/raclette/model"
@@ -40,6 +42,7 @@ func (s Sampler) AddSpan(span model.Span) {
 
 // GetSamples returns a list of representative spans to write
 func (s *Sampler) GetSamples(sb model.StatsBucket, quantiles []float64) []model.Span {
+	startTime := time.Now()
 	spanIDs := make([]uint64, len(sb.Distributions)*len(quantiles))
 	// Look at the stats to find representative spans
 	for _, d := range sb.Distributions {
@@ -78,8 +81,11 @@ func (s *Sampler) GetSamples(sb model.StatsBucket, quantiles []float64) []model.
 	Statsd.Count("trace_agent.sampler.span.total", int64(len(s.TraceIDBySpanID)), nil, 1)
 	Statsd.Count("trace_agent.sampler.span.kept", int64(len(spans)), nil, 1)
 
-	log.Infof("Sampled %d traces out of %d, %d spans out of %d",
-		len(traceIDSet), len(s.SpansByTraceID), len(spans), len(s.TraceIDBySpanID))
+	execTime := time.Since(startTime)
+	log.Infof("Sampled %d traces out of %d, %d spans out of %d, in %s",
+		len(traceIDSet), len(s.SpansByTraceID), len(spans), len(s.TraceIDBySpanID), execTime)
+
+	Statsd.Gauge("trace_agent.sampler.sample_duration", execTime.Seconds(), nil, 1)
 
 	return spans
 }
