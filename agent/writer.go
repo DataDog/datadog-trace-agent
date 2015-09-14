@@ -15,7 +15,6 @@ import (
 type WriterBuffer struct {
 	Sampler Sampler
 	Stats   model.StatsBucket
-	// Spans   []model.Span
 }
 
 // Writer implements a Writer and writes to the Datadog API spans
@@ -81,7 +80,8 @@ func (w *Writer) Start() {
 	log.Info("Writer started")
 }
 
-// We rely on the concentrator ticker to flush periodically traces "aligning" on the buckets (it's not perfect, but we don't really care, traces of this stats bucket may arrive in the next flush)
+// We rely on the concentrator ticker to flush periodically traces "aligning" on the buckets
+// (it's not perfect, but we don't really care, traces of this stats bucket may arrive in the next flush)
 func (w *Writer) flushStatsBucket() {
 	for {
 		select {

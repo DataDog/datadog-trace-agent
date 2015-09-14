@@ -65,6 +65,11 @@ func (s *Sampler) GetSamples(sb model.StatsBucket, quantiles []float64) []model.
 		spans = append(spans, s.SpansByTraceID[traceID]...)
 	}
 
+	Statsd.Count("trace_agent.sampler.trace.total", int64(len(s.SpansByTraceID)), nil, 1)
+	Statsd.Count("trace_agent.sampler.trace.kept", int64(len(traceIDSet)), nil, 1)
+	Statsd.Count("trace_agent.sampler.span.total", int64(len(s.TraceIDBySpanID)), nil, 1)
+	Statsd.Count("trace_agent.sampler.span.kept", int64(len(spans)), nil, 1)
+
 	log.Infof("Sampled %d traces out of %d, %d spans out of %d",
 		len(traceIDSet), len(s.SpansByTraceID), len(spans), len(s.TraceIDBySpanID))
 

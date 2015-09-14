@@ -86,10 +86,13 @@ func (l *HTTPReceiver) handleSpan(w http.ResponseWriter, r *http.Request) {
 
 // handleSpans handle a request with a list of several spans
 func (l *HTTPReceiver) handleSpans(w http.ResponseWriter, r *http.Request) {
+	Statsd.Count("trace_agent.receiver.payload", 1, nil, 1)
+
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Error(err)
+		Statsd.Count("trace_agent.receiver.error", 1, nil, 1)
 		return
 	}
 
@@ -98,8 +101,11 @@ func (l *HTTPReceiver) handleSpans(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Error(err)
+		Statsd.Count("trace_agent.receiver.error", 1, nil, 1)
 		return
 	}
+
+	Statsd.Count("trace_agent.receiver.span", int64(len(spans)), nil, 1)
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK\n"))
