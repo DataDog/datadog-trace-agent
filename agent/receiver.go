@@ -48,7 +48,7 @@ func (l *HTTPReceiver) Start() {
 		panic(err)
 	}
 
-	sl, err := NewStoppableListener(tcpL)
+	sl, err := NewStoppableListener(tcpL, l.exit)
 	server := http.Server{}
 
 	l.exitGroup.Add(1)
@@ -80,8 +80,6 @@ func (l *HTTPReceiver) handleSpan(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("OK\n"))
 
 	s.Normalize()
-	//	log.Infof("Span received. TraceID: %d, SpanID: %d, ParentID: %d, Start: %s, Service: %s, Type: %s",
-	//		s.TraceID, s.SpanID, s.ParentID, s.FormatStart(), s.Service, s.Type)
 
 	l.out <- s
 }
