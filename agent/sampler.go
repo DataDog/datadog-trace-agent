@@ -54,9 +54,17 @@ func (s *Sampler) GetSamples(sb model.StatsBucket, quantiles []float64) []model.
 
 	// Then find the trace IDs thanks to a spanID -> traceID map
 	traceIDSet := make(map[uint64]struct{})
-	var empty struct{}
+	var token struct{}
 	for _, spanID := range spanIDs {
-		traceIDSet[s.TraceIDBySpanID[spanID]] = empty
+		// spanIDs is pre-allocated, so it may contain zeros
+		if spanID != 0 {
+			traceID, ok := s.TraceIDBySpanID[spanID]
+			if !ok {
+				log.Errorf("SpanID reported by Quantiles not available in Sampler, SpanID=%d", spanID)
+			} else {
+				traceIDSet[traceID] = token
+			}
+		}
 	}
 
 	// Then get the traces (ie. set of spans) thanks to a traceID -> []spanID map
