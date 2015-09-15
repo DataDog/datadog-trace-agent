@@ -34,11 +34,11 @@ func Quantize(span model.Span) model.Span {
 // compactAllSpaces transforms any sequence of space-like characters (including line breaks) into a single standard space
 // Also right trims spaces.
 func compactAllSpaces(text string) string {
-	return compactAllSpacesWithRegexp(text)
+	return compactAllSpacesWithoutRegexp(text)
 }
 
 func compactAllSpacesWithRegexp(text string) string {
-	return strings.TrimRight(nonUniformSpacesRegexp.ReplaceAllString(text, " "), " ")
+	return strings.Trim(nonUniformSpacesRegexp.ReplaceAllString(text, " "), " ")
 }
 
 func isGenericSpace(char uint8) bool {
@@ -58,6 +58,7 @@ func compactAllSpacesWithoutRegexp(t string) string {
 	//     - look for the end of the whitespace sequence (cursor `j`)
 	//     - resume the iteration at the end of the whitespace sequence
 	//  - At the end, append the remains to the result
+	//  - Trim spaces
 
 	n := len(t)
 	r := make([]byte, n)
@@ -84,13 +85,17 @@ func compactAllSpacesWithoutRegexp(t string) string {
 	}
 	copy(r[nr:], t[nr+offset:n])
 
-	// Rtrim
-	if isWhitespace(r[n-offset-1]) {
-		return string(r[0 : n-offset-1])
-	} else {
-		return string(r[0 : n-offset])
+	// Trim
+	rStart := 0
+	rEnd := n - offset
+	if isWhitespace(r[rEnd-1]) {
+		rEnd -= 1
+	}
+	if isWhitespace(r[rStart]) {
+		rStart += 1
 	}
 
+	return string(r[rStart:rEnd])
 }
 
 // compactWhitespaces is same as compactAllSpaces, except it only apply to standard spaces
@@ -120,10 +125,15 @@ func compactWhitespaces(t string) string {
 	}
 	copy(r[nr:], t[nr+offset:n])
 
-	// Rtrim
-	if isWhitespace(r[n-offset-1]) {
-		return string(r[0 : n-offset-1])
-	} else {
-		return string(r[0 : n-offset])
+	// Trim
+	rStart := 0
+	rEnd := n - offset
+	if isWhitespace(r[rEnd-1]) {
+		rEnd -= 1
 	}
+	if isWhitespace(r[rStart]) {
+		rStart += 1
+	}
+
+	return string(r[rStart:rEnd])
 }

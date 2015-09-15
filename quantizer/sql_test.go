@@ -30,7 +30,7 @@ func TestSQLQuantizer(t *testing.T) {
 		{"select * from users where id = 42",
 			"select * from users where id = ?"},
 
-		{"select * \n   from users \n    where\n       id = 214325346",
+		{"-- get user \n--\n select * \n   from users \n    where\n       id = 214325346",
 			"select * from users where id = ?"},
 
 		{"UPDATE user_dash_pref SET json_prefs = %(json_prefs)s, modified = '2015-08-27 22:10:32.492912' WHERE user_id = %(user_id)s AND url = %(url)s",

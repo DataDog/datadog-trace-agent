@@ -18,7 +18,7 @@ func TestCompactWhitespaces(t *testing.T) {
 		{"aa",
 			"aa"},
 
-		{"aa bb",
+		{" aa bb",
 			"aa bb"},
 
 		{"aa    bb  cc  dd ",
@@ -40,13 +40,13 @@ func TestCompactAllSpaces(t *testing.T) {
 		{"aa bb \n   ",
 			"aa bb"},
 
-		{"aa 	bb	cc\n ",
+		{"	aa 	bb	cc\n ",
 			"aa bb cc"},
 
 		{"aa \n  \n bb\ncc 		 dd\n",
 			"aa bb cc dd"},
 
-		{"¡™£¢∞§¶ \n •ªº–≠œ∑´®†¥¨ˆøπ  “‘«åß∂ƒ©˙∆˚¬…æΩ≈ç√	∫˜µ≤≥÷",
+		{"\n ¡™£¢∞§¶ \n •ªº–≠œ∑´®†¥¨ˆøπ  “‘«åß∂ƒ©˙∆˚¬…æΩ≈ç√	∫˜µ≤≥÷",
 			"¡™£¢∞§¶ •ªº–≠œ∑´®†¥¨ˆøπ “‘«åß∂ƒ©˙∆˚¬…æΩ≈ç√ ∫˜µ≤≥÷"},
 	}
 

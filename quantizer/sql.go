@@ -11,11 +11,10 @@ import (
 
 const sqlVariableReplacement = "?"
 
-var sqlCommentName = regexp.MustCompile("^-- ([^\n]*)")
 var sqlVariablesRegexp = regexp.MustCompile("('[^']+')|([0-9]+)")
 var sqlalchemyVariablesRegexp = regexp.MustCompile("%\\(.+?\\)s")
-var sqlListRegexp = regexp.MustCompile("('[^']+')|([0-9]+)")
-var sqlListVariables = regexp.MustCompile("\\?[\\? ,]+\\?")
+var sqlListVariablesRegexp = regexp.MustCompile("\\?[\\? ,]+\\?")
+var sqlCommentsRegexp = regexp.MustCompile("--[^\n]*")
 
 // QuantizeSQL generates resource for SQL spans
 func QuantizeSQL(span model.Span) model.Span {
@@ -29,14 +28,18 @@ func QuantizeSQL(span model.Span) model.Span {
 
 	log.Debugf("Quantize SQL command, generate resource from the query, SpanID: %d", span.SpanID)
 
-	resource = compactAllSpaces(resource)
-
 	// Remove variables
 	resource = sqlVariablesRegexp.ReplaceAllString(resource, sqlVariableReplacement)
 	resource = sqlalchemyVariablesRegexp.ReplaceAllString(resource, sqlVariableReplacement)
 
 	// Deal with list of variables of arbitrary size
-	resource = sqlListVariables.ReplaceAllString(resource, sqlVariableReplacement)
+	resource = sqlListVariablesRegexp.ReplaceAllString(resource, sqlVariableReplacement)
+
+	// Remove comments
+	resource = sqlCommentsRegexp.ReplaceAllString(resource, "")
+
+	// Uniform spacing
+	resource = compactAllSpaces(resource)
 
 	span.Resource = resource
 
