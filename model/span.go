@@ -27,6 +27,17 @@ type Span struct {
 // String formats a Span struct to be displayed as a string
 func (s Span) String() string {
 	return fmt.Sprintf(
+		"Span[t_id=%d,s_id=%d,p_id=%d,s=%s]",
+		s.TraceID,
+		s.SpanID,
+		s.ParentID,
+		s.Service,
+	)
+}
+
+// FullString formats a Span struct as a string with its full content
+func (s Span) FullString() string {
+	return fmt.Sprintf(
 		"Span[t_id=%d,s_id=%d,p_id=%d,s=%s,r=%s,e=%d,st=%d,d=%d,t=%s,meta=%v,metrics=%v]",
 		s.TraceID,
 		s.SpanID,
