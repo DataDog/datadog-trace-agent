@@ -27,22 +27,16 @@ func QuantizeSQL(span model.Span) model.Span {
 
 	resource := strings.TrimSpace(query)
 
-	if strings.HasPrefix(resource, "--") {
-		log.Debugf("Quantize SQL command based on its comment, SpanID: %d", span.SpanID)
-		resource = sqlCommentName.FindStringSubmatch(resource)[1]
-		resource = strings.TrimSpace(resource)
-	} else {
-		log.Debugf("Quantize SQL command with generic parsing, SpanID: %d", span.SpanID)
+	log.Debugf("Quantize SQL command, generate resource from the query, SpanID: %d", span.SpanID)
 
-		resource = compactAllSpaces(resource)
+	resource = compactAllSpaces(resource)
 
-		// Remove variables
-		resource = sqlVariablesRegexp.ReplaceAllString(resource, sqlVariableReplacement)
-		resource = sqlalchemyVariablesRegexp.ReplaceAllString(resource, sqlVariableReplacement)
+	// Remove variables
+	resource = sqlVariablesRegexp.ReplaceAllString(resource, sqlVariableReplacement)
+	resource = sqlalchemyVariablesRegexp.ReplaceAllString(resource, sqlVariableReplacement)
 
-		// Deal with list of variables of arbitrary size
-		resource = sqlListVariables.ReplaceAllString(resource, sqlVariableReplacement)
-	}
+	// Deal with list of variables of arbitrary size
+	resource = sqlListVariables.ReplaceAllString(resource, sqlVariableReplacement)
 
 	span.Resource = resource
 

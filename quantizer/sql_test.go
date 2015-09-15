@@ -36,9 +36,6 @@ func TestSQLQuantizer(t *testing.T) {
 		{"UPDATE user_dash_pref SET json_prefs = %(json_prefs)s, modified = '2015-08-27 22:10:32.492912' WHERE user_id = %(user_id)s AND url = %(url)s",
 			"UPDATE user_dash_pref SET json_prefs = ?, modified = ? WHERE user_id = ? AND url = ?"},
 
-		{"-- get_incidents \n-- select aggregate_event_id from incident i left join dduser u on i.ack_user_id = u.id where aggregate_event_id = any(%(event_ids)s)",
-			"get_incidents"},
-
 		{"SELECT DISTINCT host.id AS host_id FROM host JOIN host_alias ON host_alias.host_id = host.id WHERE host.org_id = %(org_id_1)s AND host.name NOT IN (%(name_1)s) AND host.name IN (%(name_2)s, %(name_3)s, %(name_4)s, %(name_5)s)",
 			"SELECT DISTINCT host.id AS host_id FROM host JOIN host_alias ON host_alias.host_id = host.id WHERE host.org_id = ? AND host.name NOT IN (?) AND host.name IN (?)"},
 
