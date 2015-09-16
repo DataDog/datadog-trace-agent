@@ -46,10 +46,10 @@ func NewTagsFromString(raw string) TagSet {
 }
 
 // TagKey returns a unique key from the string given and the tagset, useful to index stuff on tagsets
-func (s TagSet) TagKey(m string) string {
-	tagStrings := make([]string, len(s))
-	for i, t := range s {
-		tagStrings[i] = t.String()
+func (t TagSet) TagKey(m string) string {
+	tagStrings := make([]string, len(t))
+	for i, tag := range t {
+		tagStrings[i] = tag.String()
 	}
 	sort.Strings(tagStrings)
 	return fmt.Sprintf("%s|%s", m, strings.Join(tagStrings, ","))

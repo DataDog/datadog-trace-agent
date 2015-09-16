@@ -22,6 +22,7 @@ summary faster.  Querying is still O(n).
 
 */
 
+// EPSILON is the precision of the rank returned by our quantile queries
 const EPSILON float64 = 0.01
 
 // Summary is a way to represent an approximation of the distribution of values
@@ -89,6 +90,7 @@ func (s *Summary) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// GobEncode is used by the Kafka payload now, it flattens our skiplist
 func (s *Summary) GobEncode() ([]byte, error) {
 	// TODO[leo] preallocate, not sure: 1/ 2*EPSILON?
 	s.EncodedData = make([]Entry, 0)
@@ -105,6 +107,7 @@ func (s *Summary) GobEncode() ([]byte, error) {
 	return buf.Bytes(), err
 }
 
+// GobDecode recreates a skiplist, TODO[leo] is the skiplist recreated as is?
 func (s *Summary) GobDecode(data []byte) error {
 	ss := summary{}
 	buf := bytes.NewBuffer(data)

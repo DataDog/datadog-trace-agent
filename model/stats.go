@@ -76,6 +76,7 @@ func (c Count) Add(s Span) (Count, error) {
 	return newc, nil
 }
 
+// Merge is used when 2 Counts represent the same thing and adds Values
 func (c Count) Merge(c2 Count) Count {
 	if c.Key != c2.Key {
 		panic(errors.New("Trying to merge counts not representing the same thing"))
@@ -112,6 +113,7 @@ func (d Distribution) Add(s Span) {
 	}
 }
 
+// Merge is used when 2 Distributions represent the same thing and it merges the 2 underlying summaries
 func (d Distribution) Merge(d2 Distribution) {
 	d.Summary.Merge(d2.Summary)
 }
