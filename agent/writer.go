@@ -139,7 +139,6 @@ func (w *Writer) Flush() {
 			log.Errorf("Error marshalling: %s", err)
 			break
 		}
-		log.Infof("PAYLOAD %s", jsonStr)
 
 		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
 		if err != nil {
