@@ -1,11 +1,8 @@
 package model
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
-	"strings"
 
 	"github.com/DataDog/raclette/quantile"
 	log "github.com/cihub/seelog"
@@ -42,14 +39,7 @@ type Distribution struct {
 
 // NewCount returns a new Count for a metric and a given tag set
 func NewCount(m string, tgs TagSet) Count {
-	c := Count{Name: m, TagSet: tgs, Value: 0}
-	tagStrings := make([]string, len(c.TagSet))
-	for i, t := range c.TagSet {
-		tagStrings[i] = fmt.Sprintf("%s:%s", t.Name, t.Value)
-	}
-	sort.Strings(tagStrings)
-	c.Key = fmt.Sprintf("Count(name=%s,tags=%s)", c.Name, strings.Join(tagStrings, ","))
-	return c
+	return Count{Key: tgs.TagKey(m), Name: m, TagSet: tgs, Value: 0}
 }
 
 // Add adds a Span to a Count, returns an error if it cannot add values
@@ -86,9 +76,24 @@ func (c Count) Add(s Span) (Count, error) {
 	return newc, nil
 }
 
+// Merge is used when 2 Counts represent the same thing and adds Values
+func (c Count) Merge(c2 Count) Count {
+	if c.Key != c2.Key {
+		panic(errors.New("Trying to merge counts not representing the same thing"))
+	}
+
+	return Count{
+		Key:    c.Key,
+		Name:   c.Name,
+		TagSet: c.TagSet,
+		Value:  c.Value + c2.Value,
+	}
+}
+
 // NewDistribution returns a new Distribution for a metric and a given tag set
 func NewDistribution(m string, tgs TagSet) Distribution {
 	return Distribution{
+		Key:     tgs.TagKey(m),
 		Name:    m,
 		TagSet:  tgs,
 		Summary: quantile.NewSummary(),
@@ -106,6 +111,11 @@ func (d Distribution) Add(s Span) {
 		}
 		d.Summary.Insert(val, s.SpanID)
 	}
+}
+
+// Merge is used when 2 Distributions represent the same thing and it merges the 2 underlying summaries
+func (d Distribution) Merge(d2 Distribution) {
+	d.Summary.Merge(d2.Summary)
 }
 
 // StatsBucket is a time bucket to track statistic around multiple Counts
@@ -130,32 +140,6 @@ func NewStatsBucket(ts, d int64) StatsBucket {
 		Counts:        counts,
 		Distributions: distros,
 	}
-}
-
-// MarshalJSON returns a JSON representation of a bucket, flattening stats
-func (sb StatsBucket) MarshalJSON() ([]byte, error) {
-	if sb.Duration == 0 {
-		panic(errors.New("Trying to marshal a bucket that has not been closed"))
-	}
-
-	flatCounts := make([]Count, len(sb.Counts))
-	i := 0
-	for _, val := range sb.Counts {
-		flatCounts[i] = val
-		i++
-	}
-	flatDistros := make([]Distribution, len(sb.Distributions))
-	i = 0
-	for _, val := range sb.Distributions {
-		flatDistros[i] = val
-		i++
-	}
-	return json.Marshal(map[string]interface{}{
-		"start":         sb.Start,
-		"duration":      sb.Duration,
-		"counts":        flatCounts,
-		"distributions": flatDistros,
-	})
 }
 
 // HandleSpan adds the span to this bucket stats

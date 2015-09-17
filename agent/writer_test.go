@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -73,6 +75,8 @@ func TestWriterBufferFlush(t *testing.T) {
 
 	// Create a fake API for the writer
 	fakeAPI := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := ioutil.ReadAll(r.Body)
+		fmt.Println(string(b))
 		w.WriteHeader(200)
 	}))
 	defer fakeAPI.Close()

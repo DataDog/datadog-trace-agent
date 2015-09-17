@@ -126,7 +126,7 @@ func (w *Writer) Flush() {
 
 		log.Infof("Writer flush to the API, %d spans", len(spans))
 
-		payload := model.Payload{
+		payload := model.AgentPayload{
 			APIKey: "424242", // FIXME, this should go in a config file
 			Spans:  spans,
 			Stats:  w.toWrite[i].Stats,

@@ -18,6 +18,7 @@ end
 PACKAGES = %w(
   ./agent
   ./model
+  ./quantile
   ./tracegen
 )
 
