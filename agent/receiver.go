@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/DataDog/raclette/model"
 	log "github.com/cihub/seelog"
@@ -49,7 +50,9 @@ func (l *HTTPReceiver) Start() {
 	}
 
 	sl, err := NewStoppableListener(tcpL, l.exit)
-	server := http.Server{}
+	// some clients might use keep-alive and keep open their connections too long
+	// avoid leaks
+	server := http.Server{ReadTimeout: 5 * time.Second}
 
 	l.exitGroup.Add(1)
 	defer l.exitGroup.Done()
