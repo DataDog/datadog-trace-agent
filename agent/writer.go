@@ -84,7 +84,7 @@ func (w *Writer) Flush() {
 			continue
 		}
 
-		payload := b.getPayload()
+		payload := b.buildPayload()
 		log.Infof("Bucket %d being flushed to the API (%d spans)", b.Stats.Start, len(payload.Spans))
 
 		url := w.endpoint + "/collector"
