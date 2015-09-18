@@ -13,18 +13,48 @@ import (
 // Discard spans that are older than this value in the concentrator (nanoseconds)
 var OldestSpanCutoff = time.Duration(5 * time.Second).Nanoseconds()
 
+// ConcentratorBucket is what the concentrator produces: bucketed spans/summary stats
+type ConcentratorBucket struct {
+	Sampler Sampler
+	Stats   model.StatsBucket
+}
+
+func newBucket(ts, d int64) ConcentratorBucket {
+	return ConcentratorBucket{
+		Stats:   model.NewStatsBucket(ts, d),
+		Sampler: NewSampler(),
+	}
+}
+
+func (cb ConcentratorBucket) handleSpan(s model.Span) {
+	cb.Stats.HandleSpan(s)
+	cb.Sampler.AddSpan(s)
+}
+
+func (cb ConcentratorBucket) isEmpty() bool {
+	return cb.Sampler.IsEmpty() && cb.Stats.IsEmpty()
+}
+
+func (cb ConcentratorBucket) getPayload() model.AgentPayload {
+	return model.AgentPayload{
+		APIKey: "234234234", // FIXME[leo]: get from config
+		Spans:  cb.Sampler.GetSamples(cb.Stats),
+		Stats:  cb.Stats,
+	}
+}
+
 // Concentrator produces time bucketed statistics from a stream of raw traces.
 // https://en.wikipedia.org/wiki/Knelson_concentrator
 // Gets an imperial shitton of traces, and outputs pre-computed data structures
 // allowing to find the gold (stats) amongst the traces.
+// It also takes care of inserting the spans in a sampler.
 type Concentrator struct {
-	inSpans          chan model.Span             // incoming spans to process
-	outSpans         chan model.Span             // pass-thru channel for spans after having been concentrated
-	outStats         chan model.StatsBucket      // outgoing stats buckets
-	bucketSize       time.Duration               // the size of our pre-aggregation per bucket
-	buckets          map[int64]model.StatsBucket // buckets use to aggregate stats per timestamp
-	lock             sync.Mutex                  // lock to read/write buckets
-	oldestSpanCutoff int64                       // maximum time we wait before discarding straggling spans
+	inSpans          chan model.Span              // incoming spans to process
+	outBuckets       chan ConcentratorBucket      // outgoing buckets
+	bucketSize       time.Duration                // the size of our pre-aggregation per bucket
+	buckets          map[int64]ConcentratorBucket // buckets use to aggregate stats per timestamp
+	lock             sync.Mutex                   // lock to read/write buckets
+	oldestSpanCutoff int64                        // maximum time we wait before discarding straggling spans
 
 	// exit channels used for synchronisation and sending stop signals
 	exit      chan struct{}
@@ -32,19 +62,18 @@ type Concentrator struct {
 }
 
 // NewConcentrator initializes a new concentrator ready to be started and aggregate stats
-func NewConcentrator(bucketSize time.Duration, inSpans chan model.Span, exit chan struct{}, exitGroup *sync.WaitGroup) (*Concentrator, chan model.Span, chan model.StatsBucket) {
+func NewConcentrator(bucketSize time.Duration, inSpans chan model.Span, exit chan struct{}, exitGroup *sync.WaitGroup) (*Concentrator, chan ConcentratorBucket) {
 	c := Concentrator{
 		inSpans:          inSpans,
-		outSpans:         make(chan model.Span),
-		outStats:         make(chan model.StatsBucket),
+		outBuckets:       make(chan ConcentratorBucket),
 		bucketSize:       bucketSize,
-		buckets:          make(map[int64]model.StatsBucket),
+		buckets:          make(map[int64]ConcentratorBucket),
 		exit:             exit,
 		oldestSpanCutoff: OldestSpanCutoff, // set by default, useful to override to have faster tests
 		exitGroup:        exitGroup,
 	}
 
-	return &c, c.outSpans, c.outStats
+	return &c, c.outBuckets
 }
 
 // Start initializes the first structures and starts consuming stuff
@@ -55,9 +84,7 @@ func (c *Concentrator) Start() {
 		// should return when upstream span channel is closed
 		for s := range c.inSpans {
 			err := c.HandleNewSpan(s)
-			if err == nil {
-				c.outSpans <- s
-			} else {
+			if err != nil {
 				log.Debugf("Span rejected by concentrator. Reason: %v", err)
 			}
 		}
@@ -73,18 +100,21 @@ func (c *Concentrator) HandleNewSpan(s model.Span) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	bucket := s.Start - s.Start%c.bucketSize.Nanoseconds()
-	if model.Now()-bucket > OldestSpanCutoff {
+	bucketTs := s.Start - s.Start%c.bucketSize.Nanoseconds()
+
+	// TODO[leo]: figure out what's the best strategy here
+	if model.Now()-bucketTs > OldestSpanCutoff {
+		Statsd.Count("trace_agent.concentrator.late_span", int64(1), nil, 1)
 		return errors.New("Late span rejected")
 	}
 
-	b, ok := c.buckets[bucket]
+	b, ok := c.buckets[bucketTs]
 	if !ok {
-		b = model.NewStatsBucket(bucket, c.bucketSize.Nanoseconds())
-		c.buckets[bucket] = b
+		b = newBucket(bucketTs, c.bucketSize.Nanoseconds())
+		c.buckets[bucketTs] = b
 	}
 
-	b.HandleSpan(s)
+	b.handleSpan(s)
 	return nil
 }
 
@@ -93,14 +123,14 @@ func (c *Concentrator) flush() {
 	defer c.lock.Unlock()
 
 	now := model.Now()
-	lastBucket := now - now%c.bucketSize.Nanoseconds()
+	lastBucketTs := now - now%c.bucketSize.Nanoseconds()
 
-	for bucket, stats := range c.buckets {
+	for ts, bucket := range c.buckets {
 		// flush & expire old buckets that cannot be hit anymore
-		if bucket < now-c.oldestSpanCutoff && bucket != lastBucket {
-			log.Infof("Concentrator flushed time bucket %d", bucket)
-			c.outStats <- stats
-			delete(c.buckets, bucket)
+		if ts < now-c.oldestSpanCutoff && ts != lastBucketTs {
+			log.Infof("Concentrator flushed bucket %d", ts)
+			c.outBuckets <- bucket
+			delete(c.buckets, ts)
 		}
 	}
 }
@@ -116,7 +146,7 @@ func (c *Concentrator) closeBuckets() {
 			// c.flush()
 
 			// return cleanly and close writer chans
-			close(c.outSpans)
+			close(c.outBuckets)
 			c.exitGroup.Done()
 			return
 		case <-ticker:

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/DataDog/raclette/config"
-	"github.com/DataDog/raclette/model"
 	log "github.com/cihub/seelog"
 )
 
@@ -22,12 +21,6 @@ type Agent struct {
 	// Used to synchronize on a clean exit
 	exit      chan struct{}
 	exitGroup *sync.WaitGroup
-
-	// internal channels
-	spansFromReceiver     chan model.Span
-	spansFromQuantizer    chan model.Span
-	spansFromConcentrator chan model.Span
-	statsFromConcentrator chan model.StatsBucket
 }
 
 // NewAgent returns a new Agent object, ready to be initialized and started
@@ -39,10 +32,9 @@ func NewAgent(conf *config.File) *Agent {
 
 	r, rawSpans := NewHTTPReceiver(exit, &exitGroup)
 	q, quantizedSpans := NewQuantizer(rawSpans, exit, &exitGroup)
-	c, concentratedSpans, concentratedStats := NewConcentrator(time.Second*5, quantizedSpans, exit, &exitGroup)
+	c, concentratedBuckets := NewConcentrator(time.Second*5, quantizedSpans, exit, &exitGroup)
 
-	quantiles := []float64{0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 1}
-	w := NewWriter(endpoint, quantiles, concentratedSpans, concentratedStats, exit, &exitGroup)
+	w := NewWriter(endpoint, concentratedBuckets, exit, &exitGroup)
 
 	return &Agent{
 		Config:       conf,
@@ -61,14 +53,8 @@ func (a *Agent) Start() error {
 
 	// Build the pipeline in the opposite way the data is processed
 	a.Writer.Start()
-
-	// sends stuff to the stats writer
 	a.Concentrator.Start()
-
-	// sends stuff to our main spansFromQuantizer pipe
 	a.Quantizer.Start()
-
-	// sends stuff to our main spansFromReceiver pipe
 	a.Receiver.Start()
 
 	// FIXME: catch start errors
