@@ -2,12 +2,17 @@ package main
 
 import (
 	"errors"
+	"expvar"
 	"sync"
 	"time"
 
 	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/raclette/model"
+)
+
+var (
+	eLateSpans = expvar.NewInt("LateSpans")
 )
 
 // Discard spans that are older than this value in the concentrator (nanoseconds)
@@ -104,7 +109,7 @@ func (c *Concentrator) HandleNewSpan(s model.Span) error {
 
 	// TODO[leo]: figure out what's the best strategy here
 	if model.Now()-bucketTs > OldestSpanCutoff {
-		Statsd.Count("trace_agent.concentrator.late_span", int64(1), nil, 1)
+		eLateSpans.Add(1)
 		return errors.New("Late span rejected")
 	}
 
