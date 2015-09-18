@@ -192,3 +192,8 @@ func (sb StatsBucket) addToDistribution(m string, s Span, tgs TagSet) {
 
 	sb.Distributions[ckey].Add(s)
 }
+
+// IsEmpty just says if this stats bucket has no information (in which case it's useless)
+func (sb StatsBucket) IsEmpty() bool {
+	return len(sb.Counts) == 0 && len(sb.Distributions) == 0
+}

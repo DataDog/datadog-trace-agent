@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"math/rand"
 	"sync"
 	"testing"
@@ -11,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func NewTestConcentrator() (*Concentrator, chan model.Span, chan model.StatsBucket) {
+func NewTestConcentrator() (*Concentrator, chan ConcentratorBucket) {
 	exit := make(chan struct{})
 	var exitGroup sync.WaitGroup
 
@@ -25,21 +24,9 @@ func NewTestConcentrator() (*Concentrator, chan model.Span, chan model.StatsBuck
 	)
 }
 
-func WaitForSpanOnChan(c *Concentrator, channel chan model.Span, timeout time.Duration) (model.Span, error) {
-	timeBomb := time.NewTimer(timeout).C
-	for {
-		select {
-		case <-timeBomb:
-			return model.Span{}, errors.New("Did not receive span in time")
-		case processed := <-c.outSpans:
-			return processed, nil
-		}
-	}
-}
-
 func TestConcentratorExitsGracefully(t *testing.T) {
 	// Start a concentrator
-	c, _, _ := NewTestConcentrator()
+	c, _ := NewTestConcentrator()
 	c.Start()
 
 	// And now try to stop it in a given time, by closing the exit channel
@@ -60,37 +47,6 @@ func TestConcentratorExitsGracefully(t *testing.T) {
 	}
 }
 
-func TestConcentratorRejectsLateSpan(t *testing.T) {
-	assert := assert.New(t)
-
-	c, outSpans, _ := NewTestConcentrator()
-
-	c.Start()
-
-	s := model.Span{}
-	c.inSpans <- s
-
-	// span with s.Start = 0 should be filtered out by concentrator
-	_, err := WaitForSpanOnChan(c, outSpans, 100*time.Millisecond)
-	assert.NotNil(err)
-}
-
-func TestSpanPassesThroughConcentrator(t *testing.T) {
-	assert := assert.New(t)
-
-	c, outSpans, _ := NewTestConcentrator()
-
-	c.Start()
-
-	s := model.Span{SpanID: 42, Start: model.Now()}
-	c.inSpans <- s
-
-	// span with s.Start = 0 should be filtered out by concentrator
-	receivedSpan, err := WaitForSpanOnChan(c, outSpans, 100*time.Millisecond)
-	assert.Nil(err)
-	assert.Equal(s.SpanID, receivedSpan.SpanID)
-}
-
 // getTsInBucket(now(), 1s, 3) get you a nanosecond timestamp, 3 buckets later from now (buckets aligned on 1s)
 func getTsInBucket(ref int64, bucketSize time.Duration, offset int64) int64 {
 	// align it on bucket
@@ -102,7 +58,7 @@ func getTsInBucket(ref int64, bucketSize time.Duration, offset int64) int64 {
 func TestConcentratorStatsCounts(t *testing.T) {
 	assert := assert.New(t)
 
-	c, outSpans, outStats := NewTestConcentrator()
+	c, outBuckets := NewTestConcentrator()
 	// we want this faster
 	c.oldestSpanCutoff = time.Second.Nanoseconds()
 
@@ -124,22 +80,20 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	}
 
 	c.Start()
-	receivedStats := make([]model.StatsBucket, 0, 2)
-	receivedSpans := make([]model.Span, 0, len(testSpans))
+	// we should expect 2 buckets!
+	receivedBuckets := make([]ConcentratorBucket, 0, 2)
 
 	// we have to wait at least for the 2 buckets to be "flushable", ie. now - c.oldestSpanCutoff is older than their ts
 	maxWaitFlushTimer := time.NewTimer(time.Duration(c.oldestSpanCutoff)*time.Nanosecond + 2*c.bucketSize).C
-	waitForStats := make(chan bool)
+	waitingForBucket := make(chan struct{})
 	go func() {
 		for {
 			select {
 			case <-maxWaitFlushTimer:
-				waitForStats <- true
+				close(waitingForBucket)
 				break
-			case stats := <-outStats:
-				receivedStats = append(receivedStats, stats)
-			case span := <-outSpans:
-				receivedSpans = append(receivedSpans, span)
+			case bucket := <-outBuckets:
+				receivedBuckets = append(receivedBuckets, bucket)
 			}
 		}
 	}()
@@ -149,15 +103,15 @@ func TestConcentratorStatsCounts(t *testing.T) {
 		c.inSpans <- span
 	}
 
-	<-waitForStats
-	assert.Equal(testSpans, receivedSpans)
-	if !assert.Equal(2, len(receivedStats)) {
+	<-waitingForBucket
+	// FIXME[leo]: assert something in the sampler?
+	if !assert.Equal(2, len(receivedBuckets)) {
 		// Don't bother continuing
 		t.FailNow()
 	}
 	// inspect our 2 stats buckets
-	assert.Equal(now-now%c.bucketSize.Nanoseconds(), receivedStats[0].Start)
-	assert.Equal(now-now%c.bucketSize.Nanoseconds()+c.bucketSize.Nanoseconds(), receivedStats[1].Start)
+	assert.Equal(now-now%c.bucketSize.Nanoseconds(), receivedBuckets[0].Stats.Start)
+	assert.Equal(now-now%c.bucketSize.Nanoseconds()+c.bucketSize.Nanoseconds(), receivedBuckets[1].Stats.Start)
 
 	expectedCountValByKey := map[string]int64{
 		"hits|service:service1":                          4,
@@ -177,11 +131,12 @@ func TestConcentratorStatsCounts(t *testing.T) {
 		"duration|resource:resourcefoo,service:service2": 30,
 	}
 
+	// FIXME[leo]: assert distributions!
 	// verify we got all counts
-	assert.Equal(len(expectedCountValByKey), len(receivedStats[0].Counts), "GOT %v", receivedStats[0].Counts)
+	assert.Equal(len(expectedCountValByKey), len(receivedBuckets[0].Stats.Counts), "GOT %v", receivedBuckets[0].Stats.Counts)
 	// verify values
 	for key, val := range expectedCountValByKey {
-		count, ok := receivedStats[0].Counts[key]
+		count, ok := receivedBuckets[0].Stats.Counts[key]
 		assert.True(ok, "%s was expected from concentrator", key)
 		assert.Equal(val, count.Value, "Wrong value for count %s", key)
 	}
@@ -206,10 +161,10 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	}
 
 	// verify we got all counts
-	assert.Equal(len(expectedCountValByKey), len(receivedStats[1].Counts), "GOT %v", receivedStats[1].Counts)
+	assert.Equal(len(expectedCountValByKey), len(receivedBuckets[1].Stats.Counts), "GOT %v", receivedBuckets[1].Stats.Counts)
 	// verify values
 	for key, val := range expectedCountValByKey {
-		count, ok := receivedStats[1].Counts[key]
+		count, ok := receivedBuckets[1].Stats.Counts[key]
 		assert.True(ok, "%s was expected from concentrator", key)
 		assert.Equal(val, count.Value, "Wrong value for count %s", key)
 	}

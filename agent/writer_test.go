@@ -17,34 +17,14 @@ func NewTestWriter() *Writer {
 	exit := make(chan struct{})
 	var exitGroup sync.WaitGroup
 
-	quantiles := []float64{0.42, 0.99}
-	inSpans := make(chan model.Span)
-	inStats := make(chan model.StatsBucket)
+	inBuckets := make(chan ConcentratorBucket)
 
 	return NewWriter(
 		"http://localhost:8080",
-		quantiles,
-		inSpans,
-		inStats,
+		inBuckets,
 		exit,
 		&exitGroup,
 	)
-}
-
-// Very high-level stupid testing
-
-func TestWriterCanHandleSpans(t *testing.T) {
-	w := NewTestWriter()
-	w.Start()
-
-	w.inSpans <- model.Span{}
-}
-
-func TestWriterCanHandleStats(t *testing.T) {
-	w := NewTestWriter()
-	w.Start()
-
-	w.inStats <- model.StatsBucket{}
 }
 
 func TestWriterExitsGracefully(t *testing.T) {
@@ -69,14 +49,32 @@ func TestWriterExitsGracefully(t *testing.T) {
 	}
 }
 
+func getTestConcentratorBucket() ConcentratorBucket {
+	now := model.Now()
+	bucketSize := time.Duration(5 * time.Second).Nanoseconds()
+	cb := newBucket(now, bucketSize)
+
+	testSpans := []model.Span{
+		model.Span{TraceID: 0, SpanID: 1},
+		model.Span{TraceID: 1, SpanID: 2},
+	}
+	for _, s := range testSpans {
+		cb.handleSpan(s)
+	}
+
+	return cb
+}
+
 // Testing the real logic of the writer
 func TestWriterBufferFlush(t *testing.T) {
 	assert := assert.New(t)
 
 	// Create a fake API for the writer
+	receivedData := false
 	fakeAPI := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := ioutil.ReadAll(r.Body)
 		fmt.Println(string(b))
+		receivedData = true
 		w.WriteHeader(200)
 	}))
 	defer fakeAPI.Close()
@@ -84,48 +82,26 @@ func TestWriterBufferFlush(t *testing.T) {
 	w := NewTestWriter()
 	w.Start()
 
-	// should be ready to handle spans with one buffer
-	assert.Equal(1, len(w.toWrite))
-	assert.True(w.toWrite[0].Sampler.IsEmpty())
+	// light the fire by sending a bucket
+	w.inBuckets <- getTestConcentratorBucket()
 
-	// add some spans, don't test the sampler logic, already done in its file
-	testSpans := []model.Span{
-		model.Span{TraceID: 0, SpanID: 1},
-		model.Span{TraceID: 1, SpanID: 2},
-	}
-
-	for _, span := range testSpans {
-		w.inSpans <- span
-	}
-
-	// these spans should have been buffered in the sampler, toWrite is dangerously accessed by other routines
-	w.bufLock.Lock()
-	samplerEmpty := w.toWrite[0].Sampler.IsEmpty()
-	w.bufLock.Unlock()
-	assert.False(samplerEmpty, "Sampler is empty, spans got lost?")
-	// sending a stats bucket should trigger a flush for that buffer
-	lastFlush := w.lastFlush
-
-	stats := model.NewStatsBucket(model.Now(), 100000)
-	w.inStats <- stats
-
-	// wait for a flush
-	// although, HTTP endpoint is down so we have 2 buffers now waiting
+	// the bucket should be added to our queue pretty fast
+	// HTTP endpoint is down so the bucket should stay in the queue
 	ticker := time.NewTicker(10 * time.Millisecond).C
 	loop := 0
 	maxFlushWait := 10
-	bufLen := 0
+	buckets := 0
 	for range ticker {
 		// toWrite is dangerously written to by other routines
-		w.bufLock.Lock()
-		bufLen = len(w.toWrite)
-		w.bufLock.Unlock()
-		if bufLen > 1 || loop >= maxFlushWait {
+		w.mu.Lock()
+		buckets = len(w.bucketsToWrite)
+		w.mu.Unlock()
+		if buckets > 1 || loop >= maxFlushWait {
 			break
 		}
 		loop++
 	}
-	assert.Equal(2, len(w.toWrite), "Did not see failed flush in time")
+	assert.Equal(1, buckets, "New bucket was not added to the flush queue, broken pipes?")
 
 	// now start our HTTPServer and send stuff to it
 	fakeAPI.Start()
@@ -136,9 +112,8 @@ func TestWriterBufferFlush(t *testing.T) {
 	w.endpoint = fakeAPI.URL + "/api/v0.1"
 	w.Start()
 
-	// Reflush, manually!
+	// Reflush, manually! synchronous
 	w.Flush()
 	// verify that we flushed!!
-	assert.True(lastFlush < w.lastFlush)
-	// FIXME test the data that has been flushed to the API
+	assert.True(receivedData)
 }
