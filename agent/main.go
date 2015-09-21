@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"math/rand"
+	_ "net/http/pprof" // register debugger
 	"os"
 	"os/signal"
 	"syscall"
