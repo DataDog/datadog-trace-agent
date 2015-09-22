@@ -58,7 +58,6 @@ func main() {
 					continue
 				}
 				go func() {
-					//log.Printf("Batch of %d traces\n", batchSize)
 					// avg depth level ~ 20
 					var traces []model.Span
 					for i := 0; i < batchSize; i++ {
@@ -67,16 +66,16 @@ func main() {
 					}
 
 					body, err := json.Marshal(traces)
-					//log.Println(string(body))
-					if err != nil {
-						panic(err)
-					}
-					resp, err := http.Post("http://localhost:7777/spans", "application/json", bytes.NewBuffer(body))
 					if err != nil {
 						panic(err)
 					}
 
-					log.Println(resp.Status)
+					resp, err := http.Post("http://localhost:7777/spans", "application/json", bytes.NewBuffer(body))
+					if err != nil {
+						log.Println("error submitting: ", err)
+					} else {
+						log.Println(resp.Status)
+					}
 				}()
 				assigned += batchSize
 			}
