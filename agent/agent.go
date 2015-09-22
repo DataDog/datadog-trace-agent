@@ -25,7 +25,6 @@ type Agent struct {
 
 // NewAgent returns a new Agent object, ready to be initialized and started
 func NewAgent(conf *config.File) *Agent {
-	endpoint := conf.GetDefault("trace.api", "endpoint", "http://localhost:8012/api/v0.1")
 
 	exit := make(chan struct{})
 	var exitGroup sync.WaitGroup
@@ -33,6 +32,15 @@ func NewAgent(conf *config.File) *Agent {
 	r, rawSpans := NewHTTPReceiver(exit, &exitGroup)
 	q, quantizedSpans := NewQuantizer(rawSpans, exit, &exitGroup)
 	c, concentratedBuckets := NewConcentrator(time.Second*5, quantizedSpans, exit, &exitGroup)
+
+	var endpoint BucketEndpoint
+	if conf.GetBool("trace.api", "enabled", true) {
+		url := conf.GetDefault("trace.api", "endpoint", "http://localhost:8012/api/v0.1")
+		endpoint = NewAPIEndpoint(url)
+	} else {
+		log.Info("using null endpoint")
+		endpoint = NullEndpoint{}
+	}
 
 	w := NewWriter(endpoint, concentratedBuckets, exit, &exitGroup)
 
@@ -67,7 +75,4 @@ func (a *Agent) Join() {
 	log.Info("Agent stopping, waiting for all running routines to finish")
 	a.exitGroup.Wait()
 	log.Info("DONE. Exiting now, over and out.")
-
-	// Display any messages left in buffers
-	log.Flush()
 }

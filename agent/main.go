@@ -49,6 +49,7 @@ func main() {
 		panic(fmt.Sprintf("Error loading logging config: %v", err))
 	}
 	log.ReplaceLogger(logger)
+	defer log.Flush()
 
 	// Initialize dogstatsd client
 	err = ConfigureStatsd(conf, "dogstatsd")
