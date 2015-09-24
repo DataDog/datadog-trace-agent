@@ -15,6 +15,9 @@ var (
 	eLateSpans = expvar.NewInt("LateSpans")
 )
 
+// By default the finest grain we aggregate to
+var DefaultAggregators = []string{"service", "resource"}
+
 // Discard spans that are older than this value in the concentrator (nanoseconds)
 var OldestSpanCutoff = time.Duration(5 * time.Second).Nanoseconds()
 
@@ -31,8 +34,8 @@ func newBucket(ts, d int64) ConcentratorBucket {
 	}
 }
 
-func (cb ConcentratorBucket) handleSpan(s model.Span) {
-	cb.Stats.HandleSpan(s)
+func (cb ConcentratorBucket) handleSpan(s model.Span, aggr []string) {
+	cb.Stats.HandleSpan(s, aggr)
 	cb.Sampler.AddSpan(s)
 }
 
@@ -54,12 +57,15 @@ func (cb ConcentratorBucket) buildPayload() model.AgentPayload {
 // allowing to find the gold (stats) amongst the traces.
 // It also takes care of inserting the spans in a sampler.
 type Concentrator struct {
-	inSpans          chan model.Span              // incoming spans to process
-	outBuckets       chan ConcentratorBucket      // outgoing buckets
-	bucketSize       time.Duration                // the size of our pre-aggregation per bucket
-	buckets          map[int64]ConcentratorBucket // buckets use to aggregate stats per timestamp
-	lock             sync.Mutex                   // lock to read/write buckets
-	oldestSpanCutoff int64                        // maximum time we wait before discarding straggling spans
+	inSpans    chan model.Span              // incoming spans to process
+	outBuckets chan ConcentratorBucket      // outgoing buckets
+	bucketSize time.Duration                // the size of our pre-aggregation per bucket
+	buckets    map[int64]ConcentratorBucket // buckets use to aggregate stats per timestamp
+	lock       sync.Mutex                   // lock to read/write buckets
+
+	// config
+	aggregators      []string // we'll always aggregate (if possible) to this finest grain
+	oldestSpanCutoff int64    // maximum time we wait before discarding straggling spans
 
 	// exit channels used for synchronisation and sending stop signals
 	exit      chan struct{}
@@ -67,7 +73,9 @@ type Concentrator struct {
 }
 
 // NewConcentrator initializes a new concentrator ready to be started and aggregate stats
-func NewConcentrator(bucketSize time.Duration, inSpans chan model.Span, exit chan struct{}, exitGroup *sync.WaitGroup) (*Concentrator, chan ConcentratorBucket) {
+func NewConcentrator(
+	bucketSize time.Duration, inSpans chan model.Span, extraAggregators []string,
+	exit chan struct{}, exitGroup *sync.WaitGroup) (*Concentrator, chan ConcentratorBucket) {
 	c := Concentrator{
 		inSpans:          inSpans,
 		outBuckets:       make(chan ConcentratorBucket),
@@ -75,6 +83,7 @@ func NewConcentrator(bucketSize time.Duration, inSpans chan model.Span, exit cha
 		buckets:          make(map[int64]ConcentratorBucket),
 		exit:             exit,
 		oldestSpanCutoff: OldestSpanCutoff, // set by default, useful to override to have faster tests
+		aggregators:      append(DefaultAggregators, extraAggregators...),
 		exitGroup:        exitGroup,
 	}
 
@@ -119,7 +128,7 @@ func (c *Concentrator) HandleNewSpan(s model.Span) error {
 		c.buckets[bucketTs] = b
 	}
 
-	b.handleSpan(s)
+	b.handleSpan(s, c.aggregators)
 	return nil
 }
 

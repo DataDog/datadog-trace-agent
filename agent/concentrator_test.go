@@ -19,6 +19,7 @@ func NewTestConcentrator() (*Concentrator, chan ConcentratorBucket) {
 	return NewConcentrator(
 		time.Second,
 		inSpans,
+		[]string{},
 		exit,
 		&exitGroup,
 	)
@@ -114,12 +115,6 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	assert.Equal(now-now%c.bucketSize.Nanoseconds()+c.bucketSize.Nanoseconds(), receivedBuckets[1].Stats.Start)
 
 	expectedCountValByKey := map[string]int64{
-		"hits|service:service1":                          4,
-		"hits|service:service2":                          1,
-		"errors|service:service1":                        3,
-		"errors|service:service2":                        0,
-		"duration|service:service1":                      106,
-		"duration|service:service2":                      30,
 		"hits|resource:resource1,service:service1":       2,
 		"hits|resource:resource2,service:service1":       2,
 		"hits|resource:resourcefoo,service:service2":     1,
@@ -143,12 +138,6 @@ func TestConcentratorStatsCounts(t *testing.T) {
 
 	// same for second bucket
 	expectedCountValByKey = map[string]int64{
-		"hits|service:service1":                          4,
-		"hits|service:service2":                          1,
-		"errors|service:service1":                        3,
-		"errors|service:service2":                        0,
-		"duration|service:service1":                      106,
-		"duration|service:service2":                      30,
 		"hits|resource:resource1,service:service1":       2,
 		"hits|resource:resource2,service:service1":       2,
 		"hits|resource:resourcefoo,service:service2":     1,
@@ -169,3 +158,5 @@ func TestConcentratorStatsCounts(t *testing.T) {
 		assert.Equal(val, count.Value, "Wrong value for count %s", key)
 	}
 }
+
+// TODO[leo] test extra aggregators here?
