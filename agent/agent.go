@@ -32,7 +32,10 @@ func NewAgent(conf *config.File) *Agent {
 	r, rawSpans := NewHTTPReceiver(exit, &exitGroup)
 	q, quantizedSpans := NewQuantizer(rawSpans, exit, &exitGroup)
 
-	extraAggr, _ := conf.GetStrArray("trace.concentrator", "extra_aggregators", ",")
+	extraAggr, err := conf.GetStrArray("trace.concentrator", "extra_aggregators", ",")
+	if err != nil {
+		log.Info("No aggregator configuration, using defaults")
+	}
 	c, concentratedBuckets := NewConcentrator(time.Second*5, quantizedSpans, extraAggr, exit, &exitGroup)
 
 	var endpoint BucketEndpoint
