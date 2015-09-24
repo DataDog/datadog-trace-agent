@@ -31,7 +31,9 @@ func NewAgent(conf *config.File) *Agent {
 
 	r, rawSpans := NewHTTPReceiver(exit, &exitGroup)
 	q, quantizedSpans := NewQuantizer(rawSpans, exit, &exitGroup)
-	c, concentratedBuckets := NewConcentrator(time.Second*5, quantizedSpans, exit, &exitGroup)
+
+	extraAggr, _ := conf.GetStrArray("trace.concentrator", "extra_aggregators", ",")
+	c, concentratedBuckets := NewConcentrator(time.Second*5, quantizedSpans, extraAggr, exit, &exitGroup)
 
 	var endpoint BucketEndpoint
 	if conf.GetBool("trace.api", "enabled", true) {

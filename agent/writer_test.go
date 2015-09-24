@@ -59,7 +59,7 @@ func getTestConcentratorBucket() ConcentratorBucket {
 		model.Span{TraceID: 1, SpanID: 2},
 	}
 	for _, s := range testSpans {
-		cb.handleSpan(s)
+		cb.handleSpan(s, DefaultAggregators)
 	}
 
 	return cb

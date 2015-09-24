@@ -142,19 +142,26 @@ func NewStatsBucket(ts, d int64) StatsBucket {
 	}
 }
 
-// HandleSpan adds the span to this bucket stats
-func (sb *StatsBucket) HandleSpan(s Span) {
-	// by service
-	sTag := Tag{Name: "service", Value: s.Service}
-	byS := TagSet{sTag}
-	sb.addToTagSet(s, byS)
+// HandleSpan adds the span to this bucket stats, aggregated with the finest grain matching given aggregators
+func (sb *StatsBucket) HandleSpan(s Span, aggregators []string) {
+	finestGrain := TagSet{}
 
-	// by (service, resource)
-	rTag := Tag{Name: "resource", Value: s.Resource}
-	bySR := TagSet{sTag, rTag}
-	sb.addToTagSet(s, bySR)
+	for _, agg := range aggregators {
+		switch agg {
+		case "service":
+			finestGrain = append(finestGrain, Tag{Name: "service", Value: s.Service})
+		case "resource":
+			finestGrain = append(finestGrain, Tag{Name: "resource", Value: s.Resource})
+		// custom aggregators asked by people
+		default:
+			val, ok := s.Meta[agg]
+			if ok {
+				finestGrain = append(finestGrain, Tag{Name: agg, Value: val})
+			}
+		}
+	}
 
-	// TODO by (service) or (service, resource) union preset tags in the config (from s.Metadata)
+	sb.addToTagSet(s, finestGrain)
 }
 
 func (sb StatsBucket) addToTagSet(s Span, tgs TagSet) {
