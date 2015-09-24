@@ -20,7 +20,7 @@ func NewTestWriter() *Writer {
 	inBuckets := make(chan ConcentratorBucket)
 
 	return NewWriter(
-		"http://localhost:8080",
+		NewAPIEndpoint("http://localhost:8080"),
 		inBuckets,
 		exit,
 		&exitGroup,
@@ -109,7 +109,7 @@ func TestWriterBufferFlush(t *testing.T) {
 	// We have to stop the writer so that we don't get a race when we change w.endpoint
 	close(w.exit)
 	w.exitGroup.Wait()
-	w.endpoint = fakeAPI.URL + "/api/v0.1"
+	w.endpoint = NewAPIEndpoint(fakeAPI.URL + "/api/v0.1")
 	w.Start()
 
 	// Reflush, manually! synchronous
