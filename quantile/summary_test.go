@@ -158,3 +158,19 @@ func TestSummaryGob(t *testing.T) {
 	assert.Equal(s.N, ss.N)
 	fmt.Printf("%v\n%v\n", s.EncodedData, ss.EncodedData)
 }
+
+func TestSummaryBySlices(t *testing.T) {
+	s := NewSummary()
+
+	for i := 0; i < 10000; i++ {
+		s.Insert(int64(i), uint64(i))
+		if i%1000 == 0 {
+			fmt.Println(i)
+		}
+	}
+
+	slices := s.BySlices()
+	b, _ := json.Marshal(slices)
+	fmt.Println(string(b))
+	// FIXME: assert the data, it's not a test!
+}
