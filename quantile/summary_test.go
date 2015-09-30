@@ -164,9 +164,6 @@ func TestSummaryBySlices(t *testing.T) {
 
 	for i := 0; i < 10000; i++ {
 		s.Insert(int64(i), uint64(i))
-		if i%1000 == 0 {
-			fmt.Println(i)
-		}
 	}
 
 	slices := s.BySlices()
