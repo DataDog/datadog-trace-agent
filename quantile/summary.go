@@ -206,6 +206,41 @@ func (s *Summary) Quantile(q float64) (int64, []uint64) {
 	panic("not reached")
 }
 
+// SummarySlice reprensents how many values are in a [Start, End] range
+type SummarySlice struct {
+	Start  int64
+	End    int64
+	Weight int
+}
+
+// BySlices returns a slice of Summary slices that represents weighted ranges of
+// values
+// e.g.    [0, 1]  : 3
+//		   [1, 23] : 12 ...
+// The number of intervals is related to the precision kept in the internal
+// data structure to ensure epsilon*s.N precision on quantiles, but it's bounded.
+// The weights are not exact, they're only upper bounds (see GK paper).
+func (s *Summary) BySlices() []SummarySlice {
+	var slices []SummarySlice
+
+	last := s.data.head
+	cur := last.next[0]
+
+	for cur != nil {
+		ss := SummarySlice{
+			Start:  last.value.V,
+			End:    cur.value.V,
+			Weight: cur.value.G + cur.value.Delta - 1, // see GK paper section 2.1
+		}
+		slices = append(slices, ss)
+
+		last = cur
+		cur = cur.next[0]
+	}
+
+	return slices
+}
+
 // Merge takes a summary and merge the values inside the current pointed object
 func (s *Summary) Merge(s2 *Summary) {
 	if s2.N == 0 || s2.data == nil {
