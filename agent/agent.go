@@ -40,8 +40,12 @@ func NewAgent(conf *config.File) *Agent {
 
 	var endpoint BucketEndpoint
 	if conf.GetBool("trace.api", "enabled", true) {
+		apiKey, err := conf.Get("trace.api", "api_key")
+		if err != nil {
+			panic(err)
+		}
 		url := conf.GetDefault("trace.api", "endpoint", "http://localhost:8012/api/v0.1")
-		endpoint = NewAPIEndpoint(url)
+		endpoint = NewAPIEndpoint(url, apiKey)
 	} else {
 		log.Info("using null endpoint")
 		endpoint = NullEndpoint{}

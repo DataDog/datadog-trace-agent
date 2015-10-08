@@ -111,14 +111,15 @@ type BucketEndpoint interface {
 
 // APIEndpoint is the api we write to.
 type APIEndpoint struct {
+	apiKey       string
 	url          string
 	collectorURL string
 }
 
-// NewAPIEndpoint creates an endpoint writing to the given url.
-func NewAPIEndpoint(url string) APIEndpoint {
+// NewAPIEndpoint creates an endpoint writing to the given url and apiKey.
+func NewAPIEndpoint(url string, apiKey string) APIEndpoint {
 	collectorURL := url + "/collector"
-	return APIEndpoint{url: url, collectorURL: collectorURL}
+	return APIEndpoint{api_key: apiKey, url: url, collectorURL: collectorURL}
 }
 
 // Write writes the bucket to the api.
@@ -136,6 +137,10 @@ func (a APIEndpoint) Write(b ConcentratorBucket) error {
 	if err != nil {
 		return err
 	}
+
+	query_params := req.URL.Query()
+	query_params.Add("api_key", a.apiKey)
+	req.URL.RawQuery = query_params.Encode()
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
