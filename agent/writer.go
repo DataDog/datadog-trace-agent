@@ -119,7 +119,7 @@ type APIEndpoint struct {
 // NewAPIEndpoint creates an endpoint writing to the given url and apiKey.
 func NewAPIEndpoint(url string, apiKey string) APIEndpoint {
 	collectorURL := url + "/collector"
-	return APIEndpoint{api_key: apiKey, url: url, collectorURL: collectorURL}
+	return APIEndpoint{apiKey: apiKey, url: url, collectorURL: collectorURL}
 }
 
 // Write writes the bucket to the api.
