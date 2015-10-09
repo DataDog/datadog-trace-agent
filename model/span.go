@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+
+	log "github.com/cihub/seelog"
 )
 
 // Span is the common struct we use to represent a dapper-like span
@@ -81,7 +83,7 @@ func (s *Span) Normalize() error {
 	// in case of eny errors on getting hostname just push it as an empty string
 	if err != nil {
 		// we should say something about this happening
-		log.Info(err)
+		log.Errorf("Unable to read hostname: %s", err)
 		hostname = ""
 	}
 	s.HostName = hostname
