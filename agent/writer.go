@@ -138,9 +138,9 @@ func (a APIEndpoint) Write(b ConcentratorBucket) error {
 		return err
 	}
 
-	query_params := req.URL.Query()
-	query_params.Add("api_key", a.apiKey)
-	req.URL.RawQuery = query_params.Encode()
+	queryParams := req.URL.Query()
+	queryParams.Add("api_key", a.apiKey)
+	req.URL.RawQuery = queryParams.Encode()
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}

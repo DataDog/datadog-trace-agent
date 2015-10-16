@@ -17,11 +17,11 @@ func NewTestWriter() *Writer {
 	exit := make(chan struct{})
 	var exitGroup sync.WaitGroup
 
-	fakeApiKey := "9d6e1075bb75e28ea6e720a4561f6b6d"
+	fakeAPIKey := "9d6e1075bb75e28ea6e720a4561f6b6d"
 	inBuckets := make(chan ConcentratorBucket)
 
 	return NewWriter(
-		NewAPIEndpoint("http://localhost:8080", fakeApiKey),
+		NewAPIEndpoint("http://localhost:8080", fakeAPIKey),
 		inBuckets,
 		exit,
 		&exitGroup,
@@ -110,8 +110,8 @@ func TestWriterBufferFlush(t *testing.T) {
 	// We have to stop the writer so that we don't get a race when we change w.endpoint
 	close(w.exit)
 	w.exitGroup.Wait()
-	fakeApiKey := "9d6e1075bb75e28ea6e720a4561f6b6d"
-	w.endpoint = NewAPIEndpoint(fakeAPI.URL+"/api/v0.1", fakeApiKey)
+	fakeAPIKey := "9d6e1075bb75e28ea6e720a4561f6b6d"
+	w.endpoint = NewAPIEndpoint(fakeAPI.URL+"/api/v0.1", fakeAPIKey)
 	w.Start()
 
 	// Reflush, manually! synchronous
