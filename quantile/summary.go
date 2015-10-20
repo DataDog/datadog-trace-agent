@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"math/rand"
-	"time"
 )
 
 /*
@@ -264,7 +263,6 @@ const maxHeight = 31
 type Skiplist struct {
 	height int
 	head   *SkiplistNode
-	rnd    *rand.Rand
 }
 
 // SkiplistNode is holding the actual value and pointers to the neighbor nodes
@@ -279,7 +277,6 @@ func NewSkiplist() *Skiplist {
 	return &Skiplist{
 		height: 0,
 		head:   &SkiplistNode{next: make([]*SkiplistNode, maxHeight)},
-		rnd:    rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
@@ -287,7 +284,7 @@ func NewSkiplist() *Skiplist {
 func (s *Skiplist) Insert(e Entry) *SkiplistNode {
 	level := 0
 
-	n := s.rnd.Int31()
+	n := rand.Int31()
 	for n&1 == 1 {
 		level++
 		n >>= 1
