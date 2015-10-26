@@ -207,9 +207,10 @@ func (s *Summary) Quantile(q float64) (int64, []uint64) {
 
 // SummarySlice reprensents how many values are in a [Start, End] range
 type SummarySlice struct {
-	Start  int64
-	End    int64
-	Weight int
+	Start   int64
+	End     int64
+	Weight  int
+	Samples []uint64
 }
 
 // BySlices returns a slice of Summary slices that represents weighted ranges of
@@ -227,9 +228,10 @@ func (s *Summary) BySlices() []SummarySlice {
 
 	for cur != nil {
 		ss := SummarySlice{
-			Start:  last.value.V,
-			End:    cur.value.V,
-			Weight: cur.value.G + cur.value.Delta - 1, // see GK paper section 2.1
+			Start:   last.value.V,
+			End:     cur.value.V,
+			Weight:  cur.value.G + cur.value.Delta - 1, // see GK paper section 2.1
+			Samples: cur.value.Samples,
 		}
 		slices = append(slices, ss)
 
