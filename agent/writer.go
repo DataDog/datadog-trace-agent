@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -12,7 +14,7 @@ import (
 
 // Writer implements a Writer and writes to the Datadog API bucketed stats & spans
 type Writer struct {
-	endpoint       BucketEndpoint
+	endpoint       BucketEndpoint          // config, where we're writing the data
 	inBuckets      chan ConcentratorBucket // data input, buckets of concentrated spans/stats
 	bucketsToWrite []ConcentratorBucket    // buffers to write to the API and currently written to from upstream
 	mu             sync.Mutex              // mutex on data above
@@ -111,6 +113,7 @@ type BucketEndpoint interface {
 
 // APIEndpoint is the api we write to.
 type APIEndpoint struct {
+	hostname     string
 	apiKey       string
 	url          string
 	collectorURL string
@@ -118,15 +121,21 @@ type APIEndpoint struct {
 
 // NewAPIEndpoint creates an endpoint writing to the given url and apiKey.
 func NewAPIEndpoint(url string, apiKey string) APIEndpoint {
+	// FIXME[leo]: allow overriding it from config?
+	hostname, err := os.Hostname()
+	if err != nil {
+		panic(fmt.Errorf("Could not get hostname: %v", err))
+	}
+
 	collectorURL := url + "/collector"
-	return APIEndpoint{apiKey: apiKey, url: url, collectorURL: collectorURL}
+	return APIEndpoint{hostname: hostname, apiKey: apiKey, url: url, collectorURL: collectorURL}
 }
 
 // Write writes the bucket to the api.
 func (a APIEndpoint) Write(b ConcentratorBucket) error {
 	startFlush := time.Now()
 	payload := b.buildPayload()
-	log.Infof("Bucket %d being flushed to the API (%d spans)", b.Stats.Start, len(payload.Spans))
+	payload.HostName = a.hostname
 
 	jsonStr, err := json.Marshal(payload)
 	if err != nil {
