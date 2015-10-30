@@ -4,9 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"os"
-
-	log "github.com/cihub/seelog"
 )
 
 // Span is the common struct we use to represent a dapper-like span
@@ -14,7 +11,6 @@ type Span struct {
 	// Mandatory
 	Duration int64  `json:"duration"` // in nanoseconds
 	Error    int32  `json:"error"`    // error status of the span, 0 == OK
-	HostName string `json:"hostname"` // name of the host which has generated this span
 	Resource string `json:"resource"` // the natural key of what we measure
 	Service  string `json:"service"`  // the name of the high-level application generating this span
 	SpanID   uint64 `json:"span_id"`  // unique ID given to any span
@@ -42,7 +38,7 @@ func (s Span) String() string {
 // FullString formats a Span struct as a string with its full content
 func (s Span) FullString() string {
 	return fmt.Sprintf(
-		"Span[t_id=%d,s_id=%d,p_id=%d,s=%s,r=%s,e=%d,st=%d,d=%d,t=%s,meta=%v,metrics=%v,hostname=%s]",
+		"Span[t_id=%d,s_id=%d,p_id=%d,s=%s,r=%s,e=%d,st=%d,d=%d,t=%s,meta=%v,metrics=%v]",
 		s.TraceID,
 		s.SpanID,
 		s.ParentID,
@@ -54,7 +50,6 @@ func (s Span) FullString() string {
 		s.Type,
 		s.Meta,
 		s.Metrics,
-		s.HostName,
 	)
 }
 
@@ -77,16 +72,6 @@ func (s *Span) Normalize() error {
 		s.Start = Now()
 	}
 	// a Duration can be zero if it's an annotation...
-
-	// FIXME: allow reading the hardcoded host name in the agent config
-	hostname, err := os.Hostname()
-	// in case of eny errors on getting hostname just push it as an empty string
-	if err != nil {
-		// we should say something about this happening
-		log.Errorf("Unable to read hostname: %s", err)
-		hostname = ""
-	}
-	s.HostName = hostname
 
 	// Optional data, Meta & Metrics can be nil
 	return nil

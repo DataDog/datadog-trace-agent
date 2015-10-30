@@ -45,9 +45,8 @@ func (cb ConcentratorBucket) isEmpty() bool {
 
 func (cb ConcentratorBucket) buildPayload() model.AgentPayload {
 	return model.AgentPayload{
-		APIKey: "234234234", // FIXME[leo]: get from config
-		Spans:  cb.Sampler.GetSamples(cb.Stats),
-		Stats:  cb.Stats,
+		Spans: cb.Sampler.GetSamples(cb.Stats),
+		Stats: cb.Stats,
 	}
 }
 
