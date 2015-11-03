@@ -19,7 +19,7 @@ var (
 var DefaultAggregators = []string{"service", "resource"}
 
 // Discard spans that are older than this value in the concentrator (nanoseconds)
-var OldestSpanCutoff = time.Duration(5 * time.Second).Nanoseconds()
+var OldestSpanCutoff = time.Duration(10 * time.Second).Nanoseconds()
 
 // ConcentratorBucket is what the concentrator produces: bucketed spans/summary stats
 type ConcentratorBucket struct {
@@ -27,10 +27,10 @@ type ConcentratorBucket struct {
 	Stats   model.StatsBucket
 }
 
-func newBucket(ts, d int64) ConcentratorBucket {
+func newBucket(ts, d int64, quantiles []float64) ConcentratorBucket {
 	return ConcentratorBucket{
 		Stats:   model.NewStatsBucket(ts, d),
-		Sampler: NewSampler(),
+		Sampler: NewSampler(quantiles),
 	}
 }
 
@@ -65,6 +65,7 @@ type Concentrator struct {
 	// config
 	aggregators      []string // we'll always aggregate (if possible) to this finest grain
 	oldestSpanCutoff int64    // maximum time we wait before discarding straggling spans
+	quantiles        []float64
 
 	// exit channels used for synchronisation and sending stop signals
 	exit      chan struct{}
@@ -74,7 +75,11 @@ type Concentrator struct {
 // NewConcentrator initializes a new concentrator ready to be started and aggregate stats
 func NewConcentrator(
 	bucketSize time.Duration, inSpans chan model.Span, extraAggregators []string,
-	exit chan struct{}, exitGroup *sync.WaitGroup) (*Concentrator, chan ConcentratorBucket) {
+	exit chan struct{}, exitGroup *sync.WaitGroup, quantiles []float64) (*Concentrator, chan ConcentratorBucket) {
+
+	// update OldestSpanCutoff with the proper bucketSize
+	OldestSpanCutoff = bucketSize.Nanoseconds()
+
 	c := Concentrator{
 		inSpans:          inSpans,
 		outBuckets:       make(chan ConcentratorBucket),
@@ -82,6 +87,7 @@ func NewConcentrator(
 		buckets:          make(map[int64]ConcentratorBucket),
 		exit:             exit,
 		oldestSpanCutoff: OldestSpanCutoff, // set by default, useful to override to have faster tests
+		quantiles:        quantiles,
 		aggregators:      append(DefaultAggregators, extraAggregators...),
 		exitGroup:        exitGroup,
 	}
@@ -123,7 +129,7 @@ func (c *Concentrator) HandleNewSpan(s model.Span) error {
 
 	b, ok := c.buckets[bucketTs]
 	if !ok {
-		b = newBucket(bucketTs, c.bucketSize.Nanoseconds())
+		b = newBucket(bucketTs, c.bucketSize.Nanoseconds(), c.quantiles)
 		c.buckets[bucketTs] = b
 	}
 
