@@ -25,7 +25,7 @@ type Agent struct {
 }
 
 func GetQuantilesFromConfig(conf *config.File) []float64 {
-	confQuantiles, err := conf.GetStrArray("trace.concentrator", "percenties", ",")
+	confQuantiles, err := conf.GetStrArray("trace.concentrator", "quantiles", ",")
 
 	// return default range if no configuration available
 	if err != nil {
