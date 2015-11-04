@@ -10,6 +10,8 @@ import (
 	"time"
 
 	log "github.com/cihub/seelog"
+
+	"github.com/DataDog/raclette/config"
 )
 
 // Writer implements a Writer and writes to the Datadog API bucketed stats & spans
@@ -25,9 +27,17 @@ type Writer struct {
 }
 
 // NewWriter returns a new Writer
-func NewWriter(ep BucketEndpoint, in chan ConcentratorBucket, exit chan struct{}, exitGroup *sync.WaitGroup) *Writer {
+func NewWriter(in chan ConcentratorBucket, conf *config.AgentConfig, exit chan struct{}, exitGroup *sync.WaitGroup) *Writer {
+	var endpoint BucketEndpoint
+	if conf.APIEnabled {
+		endpoint = NewAPIEndpoint(conf.APIEndpoint, conf.APIKey)
+	} else {
+		log.Info("using null endpoint")
+		endpoint = NullEndpoint{}
+	}
+
 	w := Writer{
-		endpoint:  ep,
+		endpoint:  endpoint,
 		inBuckets: in,
 		exit:      exit,
 		exitGroup: exitGroup,

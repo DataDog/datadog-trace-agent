@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -14,12 +15,14 @@ func NewTestConcentrator() (*Concentrator, chan ConcentratorBucket) {
 	exit := make(chan struct{})
 	var exitGroup sync.WaitGroup
 
+	conf := config.NewDefaultAgentConfig()
+	conf.BucketInterval = time.Duration(1) * time.Second
+
 	inSpans := make(chan model.Span)
 
 	return NewConcentrator(
-		time.Second,
 		inSpans,
-		[]string{},
+		conf,
 		exit,
 		&exitGroup,
 	)
@@ -49,11 +52,11 @@ func TestConcentratorExitsGracefully(t *testing.T) {
 }
 
 // getTsInBucket(now(), 1s, 3) get you a nanosecond timestamp, 3 buckets later from now (buckets aligned on 1s)
-func getTsInBucket(ref int64, bucketSize time.Duration, offset int64) int64 {
+func getTsInBucket(ref int64, bucketInterval time.Duration, offset int64) int64 {
 	// align it on bucket
-	ref = ref - ref%bucketSize.Nanoseconds()
+	ref = ref - ref%bucketInterval.Nanoseconds()
 
-	return ref + offset*bucketSize.Nanoseconds() + rand.Int63n(bucketSize.Nanoseconds())
+	return ref + offset*bucketInterval.Nanoseconds() + rand.Int63n(bucketInterval.Nanoseconds())
 }
 
 func TestConcentratorStatsCounts(t *testing.T) {
@@ -61,31 +64,33 @@ func TestConcentratorStatsCounts(t *testing.T) {
 
 	c, outBuckets := NewTestConcentrator()
 	// we want this faster
-	c.oldestSpanCutoff = time.Second.Nanoseconds()
+	c.conf.OldestSpanCutoff = time.Second.Nanoseconds()
 
 	now := model.Now()
 
+	bucketInterval := c.conf.BucketInterval
+
 	testSpans := []model.Span{
 		// first bucket
-		model.Span{SpanID: 1, Duration: 24, Start: getTsInBucket(now, c.bucketSize, 0), Service: "service1", Resource: "resource1"},
-		model.Span{SpanID: 2, Duration: 12, Start: getTsInBucket(now, c.bucketSize, 0), Service: "service1", Resource: "resource1", Error: 2},
-		model.Span{SpanID: 3, Duration: 40, Start: getTsInBucket(now, c.bucketSize, 0), Service: "service1", Resource: "resource2", Error: 2},
-		model.Span{SpanID: 4, Duration: 30, Start: getTsInBucket(now, c.bucketSize, 0), Service: "service1", Resource: "resource2", Error: 2},
-		model.Span{SpanID: 5, Duration: 30, Start: getTsInBucket(now, c.bucketSize, 0), Service: "service2", Resource: "resourcefoo"},
+		model.Span{SpanID: 1, Duration: 24, Start: getTsInBucket(now, bucketInterval, 0), Service: "service1", Resource: "resource1"},
+		model.Span{SpanID: 2, Duration: 12, Start: getTsInBucket(now, bucketInterval, 0), Service: "service1", Resource: "resource1", Error: 2},
+		model.Span{SpanID: 3, Duration: 40, Start: getTsInBucket(now, bucketInterval, 0), Service: "service1", Resource: "resource2", Error: 2},
+		model.Span{SpanID: 4, Duration: 30, Start: getTsInBucket(now, bucketInterval, 0), Service: "service1", Resource: "resource2", Error: 2},
+		model.Span{SpanID: 5, Duration: 30, Start: getTsInBucket(now, bucketInterval, 0), Service: "service2", Resource: "resourcefoo"},
 		// second bucket
-		model.Span{SpanID: 6, Duration: 24, Start: getTsInBucket(now, c.bucketSize, 1), Service: "service1", Resource: "resource2"},
-		model.Span{SpanID: 7, Duration: 12, Start: getTsInBucket(now, c.bucketSize, 1), Service: "service1", Resource: "resource1", Error: 2},
-		model.Span{SpanID: 8, Duration: 40, Start: getTsInBucket(now, c.bucketSize, 1), Service: "service1", Resource: "resource1", Error: 2},
-		model.Span{SpanID: 9, Duration: 30, Start: getTsInBucket(now, c.bucketSize, 1), Service: "service1", Resource: "resource2", Error: 2},
-		model.Span{SpanID: 10, Duration: 30, Start: getTsInBucket(now, c.bucketSize, 1), Service: "service2", Resource: "resourcefoo"},
+		model.Span{SpanID: 6, Duration: 24, Start: getTsInBucket(now, bucketInterval, 1), Service: "service1", Resource: "resource2"},
+		model.Span{SpanID: 7, Duration: 12, Start: getTsInBucket(now, bucketInterval, 1), Service: "service1", Resource: "resource1", Error: 2},
+		model.Span{SpanID: 8, Duration: 40, Start: getTsInBucket(now, bucketInterval, 1), Service: "service1", Resource: "resource1", Error: 2},
+		model.Span{SpanID: 9, Duration: 30, Start: getTsInBucket(now, bucketInterval, 1), Service: "service1", Resource: "resource2", Error: 2},
+		model.Span{SpanID: 10, Duration: 30, Start: getTsInBucket(now, bucketInterval, 1), Service: "service2", Resource: "resourcefoo"},
 	}
 
 	c.Start()
 	// we should expect 2 buckets!
 	receivedBuckets := make([]ConcentratorBucket, 0, 2)
 
-	// we have to wait at least for the 2 buckets to be "flushable", ie. now - c.oldestSpanCutoff is older than their ts
-	maxWaitFlushTimer := time.NewTimer(time.Duration(c.oldestSpanCutoff)*time.Nanosecond + 2*c.bucketSize).C
+	// we have to wait at least for the 2 buckets to be "flushable", ie. now - c.conf.OldestSpanCutoff is older than their ts
+	maxWaitFlushTimer := time.NewTimer(time.Duration(c.conf.OldestSpanCutoff)*time.Nanosecond + 2*bucketInterval).C
 	waitingForBucket := make(chan struct{})
 	go func() {
 		for {
@@ -111,8 +116,8 @@ func TestConcentratorStatsCounts(t *testing.T) {
 		t.FailNow()
 	}
 	// inspect our 2 stats buckets
-	assert.Equal(now-now%c.bucketSize.Nanoseconds(), receivedBuckets[0].Stats.Start)
-	assert.Equal(now-now%c.bucketSize.Nanoseconds()+c.bucketSize.Nanoseconds(), receivedBuckets[1].Stats.Start)
+	assert.Equal(now-now%bucketInterval.Nanoseconds(), receivedBuckets[0].Stats.Start)
+	assert.Equal(now-now%bucketInterval.Nanoseconds()+bucketInterval.Nanoseconds(), receivedBuckets[1].Stats.Start)
 
 	expectedCountValByKey := map[string]int64{
 		"hits|resource:resource1,service:service1":       2,

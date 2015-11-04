@@ -2,7 +2,6 @@ package main
 
 import (
 	"sync"
-	"time"
 
 	"github.com/DataDog/raclette/config"
 	log "github.com/cihub/seelog"
@@ -16,7 +15,7 @@ type Agent struct {
 	Writer       *Writer
 
 	// config
-	Config *config.File
+	Config *config.AgentConfig
 
 	// Used to synchronize on a clean exit
 	exit      chan struct{}
@@ -24,34 +23,15 @@ type Agent struct {
 }
 
 // NewAgent returns a new Agent object, ready to be initialized and started
-func NewAgent(conf *config.File) *Agent {
+func NewAgent(conf *config.AgentConfig) *Agent {
 
 	exit := make(chan struct{})
 	var exitGroup sync.WaitGroup
 
 	r, rawSpans := NewHTTPReceiver(exit, &exitGroup)
 	q, quantizedSpans := NewQuantizer(rawSpans, exit, &exitGroup)
-
-	extraAggr, err := conf.GetStrArray("trace.concentrator", "extra_aggregators", ",")
-	if err != nil {
-		log.Info("No aggregator configuration, using defaults")
-	}
-	c, concentratedBuckets := NewConcentrator(time.Second*5, quantizedSpans, extraAggr, exit, &exitGroup)
-
-	var endpoint BucketEndpoint
-	if conf.GetBool("trace.api", "enabled", true) {
-		apiKey, err := conf.Get("trace.api", "api_key")
-		if err != nil {
-			panic(err)
-		}
-		url := conf.GetDefault("trace.api", "endpoint", "http://localhost:8012/api/v0.1")
-		endpoint = NewAPIEndpoint(url, apiKey)
-	} else {
-		log.Info("using null endpoint")
-		endpoint = NullEndpoint{}
-	}
-
-	w := NewWriter(endpoint, concentratedBuckets, exit, &exitGroup)
+	c, concentratedBuckets := NewConcentrator(quantizedSpans, conf, exit, &exitGroup)
+	w := NewWriter(concentratedBuckets, conf, exit, &exitGroup)
 
 	return &Agent{
 		Config:       conf,

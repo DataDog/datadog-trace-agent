@@ -8,6 +8,7 @@ import (
 
 	log "github.com/cihub/seelog"
 
+	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
 )
 
@@ -17,9 +18,6 @@ var (
 
 // By default the finest grain we aggregate to
 var DefaultAggregators = []string{"service", "resource"}
-
-// Discard spans that are older than this value in the concentrator (nanoseconds)
-var OldestSpanCutoff = time.Duration(5 * time.Second).Nanoseconds()
 
 // ConcentratorBucket is what the concentrator produces: bucketed spans/summary stats
 type ConcentratorBucket struct {
@@ -56,15 +54,13 @@ func (cb ConcentratorBucket) buildPayload() model.AgentPayload {
 // allowing to find the gold (stats) amongst the traces.
 // It also takes care of inserting the spans in a sampler.
 type Concentrator struct {
-	inSpans    chan model.Span              // incoming spans to process
-	outBuckets chan ConcentratorBucket      // outgoing buckets
-	bucketSize time.Duration                // the size of our pre-aggregation per bucket
-	buckets    map[int64]ConcentratorBucket // buckets use to aggregate stats per timestamp
-	lock       sync.Mutex                   // lock to read/write buckets
+	inSpans     chan model.Span              // incoming spans to process
+	outBuckets  chan ConcentratorBucket      // outgoing buckets
+	buckets     map[int64]ConcentratorBucket // buckets use to aggregate stats per timestamp
+	aggregators []string                     // we'll always aggregate (if possible) to this finest grain
+	lock        sync.Mutex                   // lock to read/write buckets
 
-	// config
-	aggregators      []string // we'll always aggregate (if possible) to this finest grain
-	oldestSpanCutoff int64    // maximum time we wait before discarding straggling spans
+	conf *config.AgentConfig
 
 	// exit channels used for synchronisation and sending stop signals
 	exit      chan struct{}
@@ -73,17 +69,16 @@ type Concentrator struct {
 
 // NewConcentrator initializes a new concentrator ready to be started and aggregate stats
 func NewConcentrator(
-	bucketSize time.Duration, inSpans chan model.Span, extraAggregators []string,
-	exit chan struct{}, exitGroup *sync.WaitGroup) (*Concentrator, chan ConcentratorBucket) {
+	inSpans chan model.Span, conf *config.AgentConfig, exit chan struct{}, exitGroup *sync.WaitGroup,
+) (*Concentrator, chan ConcentratorBucket) {
 	c := Concentrator{
-		inSpans:          inSpans,
-		outBuckets:       make(chan ConcentratorBucket),
-		bucketSize:       bucketSize,
-		buckets:          make(map[int64]ConcentratorBucket),
-		exit:             exit,
-		oldestSpanCutoff: OldestSpanCutoff, // set by default, useful to override to have faster tests
-		aggregators:      append(DefaultAggregators, extraAggregators...),
-		exitGroup:        exitGroup,
+		inSpans:     inSpans,
+		outBuckets:  make(chan ConcentratorBucket),
+		buckets:     make(map[int64]ConcentratorBucket),
+		aggregators: append(DefaultAggregators, conf.ExtraAggregators...),
+		conf:        conf,
+		exit:        exit,
+		exitGroup:   exitGroup,
 	}
 
 	return &c, c.outBuckets
@@ -113,17 +108,17 @@ func (c *Concentrator) HandleNewSpan(s model.Span) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	bucketTs := s.Start - s.Start%c.bucketSize.Nanoseconds()
+	bucketTs := s.Start - s.Start%c.conf.BucketInterval.Nanoseconds()
 
 	// TODO[leo]: figure out what's the best strategy here
-	if model.Now()-bucketTs > OldestSpanCutoff {
+	if model.Now()-bucketTs > c.conf.OldestSpanCutoff {
 		eLateSpans.Add(1)
 		return errors.New("Late span rejected")
 	}
 
 	b, ok := c.buckets[bucketTs]
 	if !ok {
-		b = newBucket(bucketTs, c.bucketSize.Nanoseconds())
+		b = newBucket(bucketTs, c.conf.BucketInterval.Nanoseconds())
 		c.buckets[bucketTs] = b
 	}
 
@@ -136,11 +131,11 @@ func (c *Concentrator) flush() {
 	defer c.lock.Unlock()
 
 	now := model.Now()
-	lastBucketTs := now - now%c.bucketSize.Nanoseconds()
+	lastBucketTs := now - now%c.conf.BucketInterval.Nanoseconds()
 
 	for ts, bucket := range c.buckets {
 		// flush & expire old buckets that cannot be hit anymore
-		if ts < now-c.oldestSpanCutoff && ts != lastBucketTs {
+		if ts < now-c.conf.OldestSpanCutoff && ts != lastBucketTs {
 			log.Infof("Concentrator flushed bucket %d", ts)
 			c.outBuckets <- bucket
 			delete(c.buckets, ts)
@@ -150,7 +145,7 @@ func (c *Concentrator) flush() {
 
 func (c *Concentrator) closeBuckets() {
 	// block on the closer, to flush cleanly last bucket
-	ticker := time.Tick(c.bucketSize)
+	ticker := time.Tick(c.conf.BucketInterval)
 	for {
 		select {
 		case <-c.exit:

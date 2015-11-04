@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -17,12 +18,14 @@ func NewTestWriter() *Writer {
 	exit := make(chan struct{})
 	var exitGroup sync.WaitGroup
 
-	fakeAPIKey := "9d6e1075bb75e28ea6e720a4561f6b6d"
+	conf := config.NewDefaultAgentConfig()
+	conf.APIKey = "9d6e1075bb75e28ea6e720a4561f6b6d"
+	conf.APIEndpoint = "http://localhost:8080"
 	inBuckets := make(chan ConcentratorBucket)
 
 	return NewWriter(
-		NewAPIEndpoint("http://localhost:8080", fakeAPIKey),
 		inBuckets,
+		conf,
 		exit,
 		&exitGroup,
 	)
