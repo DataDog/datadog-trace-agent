@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/DataDog/raclette/config"
+	"github.com/DataDog/raclette/model"
 	log "github.com/cihub/seelog"
 )
 
@@ -12,6 +13,7 @@ type Agent struct {
 	Receiver     Receiver // Receiver is an interface
 	Quantizer    *Quantizer
 	Concentrator *Concentrator
+	Sampler      *Sampler
 	Writer       *Writer
 
 	// config
@@ -28,16 +30,21 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 	exit := make(chan struct{})
 	var exitGroup sync.WaitGroup
 
-	r, rawSpans := NewHTTPReceiver(exit, &exitGroup)
-	q, quantizedSpans := NewQuantizer(rawSpans, exit, &exitGroup)
-	c, concentratedBuckets := NewConcentrator(quantizedSpans, conf, exit, &exitGroup)
-	w := NewWriter(concentratedBuckets, conf, exit, &exitGroup)
+	r := NewHTTPReceiver(exit, &exitGroup)
+	q := NewQuantizer(r.out, exit, &exitGroup)
+
+	spansToConcentrator, spansToSampler := spanTPipe(q.out)
+
+	c := NewConcentrator(spansToConcentrator, conf, exit, &exitGroup)
+	s := NewSampler(spansToSampler, c.out, exit, &exitGroup)
+	w := NewWriter(s.out, conf, exit, &exitGroup)
 
 	return &Agent{
 		Config:       conf,
 		Receiver:     r,
 		Quantizer:    q,
 		Concentrator: c,
+		Sampler:      s,
 		Writer:       w,
 		exit:         exit,
 		exitGroup:    &exitGroup,
@@ -50,6 +57,7 @@ func (a *Agent) Start() error {
 
 	// Build the pipeline in the opposite way the data is processed
 	a.Writer.Start()
+	a.Sampler.Start()
 	a.Concentrator.Start()
 	a.Quantizer.Start()
 	a.Receiver.Start()
@@ -64,4 +72,19 @@ func (a *Agent) Join() {
 	log.Info("Agent stopping, waiting for all running routines to finish")
 	a.exitGroup.Wait()
 	log.Info("DONE. Exiting now, over and out.")
+}
+
+// Distribute spans from the quantizer to the concentrator and the sampler
+func spanTPipe(in chan model.Span) (chan model.Span, chan model.Span) {
+	out1 := make(chan model.Span)
+	out2 := make(chan model.Span)
+
+	go func() {
+		for s := range in {
+			out1 <- s
+			out2 <- s
+		}
+	}()
+
+	return out1, out2
 }

@@ -26,13 +26,12 @@ type HTTPReceiver struct {
 }
 
 // NewHTTPReceiver returns a pointer to a new HTTPReceiver
-func NewHTTPReceiver(exit chan struct{}, exitGroup *sync.WaitGroup) (*HTTPReceiver, chan model.Span) {
-	r := HTTPReceiver{
+func NewHTTPReceiver(exit chan struct{}, exitGroup *sync.WaitGroup) *HTTPReceiver {
+	return &HTTPReceiver{
 		out:       make(chan model.Span),
 		exit:      exit,
 		exitGroup: exitGroup,
 	}
-	return &r, r.out
 }
 
 // Start actually starts the HTTP server and returns any error that could

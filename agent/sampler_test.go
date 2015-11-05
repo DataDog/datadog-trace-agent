@@ -2,6 +2,7 @@ package main
 
 import (
 	"sort"
+	"sync"
 	"testing"
 
 	"github.com/DataDog/raclette/model"
@@ -11,8 +12,9 @@ import (
 func TestSampler(t *testing.T) {
 	assert := assert.New(t)
 
-	sampler := NewSampler()
-	assert.True(sampler.IsEmpty())
+	exit := make(chan struct{})
+	var exitGroup sync.WaitGroup
+	sampler := NewSampler(make(chan model.Span), make(chan model.StatsBucket), exit, &exitGroup)
 
 	type sampleResult struct {
 		quantile float64
@@ -78,7 +80,7 @@ func TestSampler(t *testing.T) {
 
 	// Add one fake distribution for choosing
 	stats.Distributions["whatever"] = d
-	chosen := sampler.GetSamples(stats)
+	chosen := sampler.GetSamples(sampler.TraceIDBySpanID, sampler.SpansByTraceID, stats)
 
 	// step1: chosen spans by distributions: 18, 12, 11
 	chosenSID := make([]int, len(chosen))

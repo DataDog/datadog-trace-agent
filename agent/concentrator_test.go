@@ -11,17 +11,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func NewTestConcentrator() (*Concentrator, chan ConcentratorBucket) {
+func NewTestConcentrator() *Concentrator {
 	exit := make(chan struct{})
 	var exitGroup sync.WaitGroup
 
 	conf := config.NewDefaultAgentConfig()
 	conf.BucketInterval = time.Duration(1) * time.Second
 
-	inSpans := make(chan model.Span)
+	in := make(chan model.Span)
 
 	return NewConcentrator(
-		inSpans,
+		in,
 		conf,
 		exit,
 		&exitGroup,
@@ -30,7 +30,7 @@ func NewTestConcentrator() (*Concentrator, chan ConcentratorBucket) {
 
 func TestConcentratorExitsGracefully(t *testing.T) {
 	// Start a concentrator
-	c, _ := NewTestConcentrator()
+	c := NewTestConcentrator()
 	c.Start()
 
 	// And now try to stop it in a given time, by closing the exit channel
@@ -62,7 +62,7 @@ func getTsInBucket(ref int64, bucketInterval time.Duration, offset int64) int64 
 func TestConcentratorStatsCounts(t *testing.T) {
 	assert := assert.New(t)
 
-	c, outBuckets := NewTestConcentrator()
+	c := NewTestConcentrator()
 	// we want this faster
 	c.conf.OldestSpanCutoff = time.Second.Nanoseconds()
 
@@ -87,7 +87,7 @@ func TestConcentratorStatsCounts(t *testing.T) {
 
 	c.Start()
 	// we should expect 2 buckets!
-	receivedBuckets := make([]ConcentratorBucket, 0, 2)
+	receivedBuckets := make([]model.StatsBucket, 0, 2)
 
 	// we have to wait at least for the 2 buckets to be "flushable", ie. now - c.conf.OldestSpanCutoff is older than their ts
 	maxWaitFlushTimer := time.NewTimer(time.Duration(c.conf.OldestSpanCutoff)*time.Nanosecond + 2*bucketInterval).C
@@ -98,7 +98,7 @@ func TestConcentratorStatsCounts(t *testing.T) {
 			case <-maxWaitFlushTimer:
 				close(waitingForBucket)
 				break
-			case bucket := <-outBuckets:
+			case bucket := <-c.out:
 				receivedBuckets = append(receivedBuckets, bucket)
 			}
 		}
@@ -106,7 +106,7 @@ func TestConcentratorStatsCounts(t *testing.T) {
 
 	// insert the spans!
 	for _, span := range testSpans {
-		c.inSpans <- span
+		c.in <- span
 	}
 
 	<-waitingForBucket
@@ -116,8 +116,8 @@ func TestConcentratorStatsCounts(t *testing.T) {
 		t.FailNow()
 	}
 	// inspect our 2 stats buckets
-	assert.Equal(now-now%bucketInterval.Nanoseconds(), receivedBuckets[0].Stats.Start)
-	assert.Equal(now-now%bucketInterval.Nanoseconds()+bucketInterval.Nanoseconds(), receivedBuckets[1].Stats.Start)
+	assert.Equal(now-now%bucketInterval.Nanoseconds(), receivedBuckets[0].Start)
+	assert.Equal(now-now%bucketInterval.Nanoseconds()+bucketInterval.Nanoseconds(), receivedBuckets[1].Start)
 
 	expectedCountValByKey := map[string]int64{
 		"hits|resource:resource1,service:service1":       2,
@@ -133,10 +133,10 @@ func TestConcentratorStatsCounts(t *testing.T) {
 
 	// FIXME[leo]: assert distributions!
 	// verify we got all counts
-	assert.Equal(len(expectedCountValByKey), len(receivedBuckets[0].Stats.Counts), "GOT %v", receivedBuckets[0].Stats.Counts)
+	assert.Equal(len(expectedCountValByKey), len(receivedBuckets[0].Counts), "GOT %v", receivedBuckets[0].Counts)
 	// verify values
 	for key, val := range expectedCountValByKey {
-		count, ok := receivedBuckets[0].Stats.Counts[key]
+		count, ok := receivedBuckets[0].Counts[key]
 		assert.True(ok, "%s was expected from concentrator", key)
 		assert.Equal(val, count.Value, "Wrong value for count %s", key)
 	}
@@ -155,10 +155,10 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	}
 
 	// verify we got all counts
-	assert.Equal(len(expectedCountValByKey), len(receivedBuckets[1].Stats.Counts), "GOT %v", receivedBuckets[1].Stats.Counts)
+	assert.Equal(len(expectedCountValByKey), len(receivedBuckets[1].Counts), "GOT %v", receivedBuckets[1].Counts)
 	// verify values
 	for key, val := range expectedCountValByKey {
-		count, ok := receivedBuckets[1].Stats.Counts[key]
+		count, ok := receivedBuckets[1].Counts[key]
 		assert.True(ok, "%s was expected from concentrator", key)
 		assert.Equal(val, count.Value, "Wrong value for count %s", key)
 	}

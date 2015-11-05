@@ -18,14 +18,13 @@ type Quantizer struct {
 }
 
 // NewQuantizer creates a new Quantizer
-func NewQuantizer(inSpans chan model.Span, exit chan struct{}, exitGroup *sync.WaitGroup) (*Quantizer, chan model.Span) {
-	q := Quantizer{
+func NewQuantizer(inSpans chan model.Span, exit chan struct{}, exitGroup *sync.WaitGroup) *Quantizer {
+	return &Quantizer{
 		in:        inSpans,
 		out:       make(chan model.Span),
 		exit:      exit,
 		exitGroup: exitGroup,
 	}
-	return &q, q.out
 }
 
 // Start runs the Quantizer by quantizing spans from the channel

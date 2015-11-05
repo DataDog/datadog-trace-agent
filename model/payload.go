@@ -6,3 +6,7 @@ type AgentPayload struct {
 	Spans    []Span      `json:"spans"`
 	Stats    StatsBucket `json:"stats"`
 }
+
+func (p *AgentPayload) IsEmpty() bool {
+	return len(p.Spans) == 0 && p.Stats.IsEmpty()
+}

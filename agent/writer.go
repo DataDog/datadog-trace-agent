@@ -12,14 +12,15 @@ import (
 	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/raclette/config"
+	"github.com/DataDog/raclette/model"
 )
 
 // Writer implements a Writer and writes to the Datadog API bucketed stats & spans
 type Writer struct {
-	endpoint       BucketEndpoint          // config, where we're writing the data
-	inBuckets      chan ConcentratorBucket // data input, buckets of concentrated spans/stats
-	bucketsToWrite []ConcentratorBucket    // buffers to write to the API and currently written to from upstream
-	mu             sync.Mutex              // mutex on data above
+	endpoint        BucketEndpoint          // config, where we're writing the data
+	in              chan model.AgentPayload // data input, payloads of concentrated spans/stats
+	payloadsToWrite []model.AgentPayload    // buffers to write to the API and currently written to from upstream
+	mu              sync.Mutex              // mutex on data above
 
 	// exit channels
 	exit      chan struct{}
@@ -27,7 +28,7 @@ type Writer struct {
 }
 
 // NewWriter returns a new Writer
-func NewWriter(in chan ConcentratorBucket, conf *config.AgentConfig, exit chan struct{}, exitGroup *sync.WaitGroup) *Writer {
+func NewWriter(in chan model.AgentPayload, conf *config.AgentConfig, exit chan struct{}, exitGroup *sync.WaitGroup) *Writer {
 	var endpoint BucketEndpoint
 	if conf.APIEnabled {
 		endpoint = NewAPIEndpoint(conf.APIEndpoint, conf.APIKey)
@@ -38,7 +39,7 @@ func NewWriter(in chan ConcentratorBucket, conf *config.AgentConfig, exit chan s
 
 	w := Writer{
 		endpoint:  endpoint,
-		inBuckets: in,
+		in:        in,
 		exit:      exit,
 		exitGroup: exitGroup,
 	}
@@ -60,10 +61,10 @@ func (w *Writer) Start() {
 func (w *Writer) run() {
 	for {
 		select {
-		case bucket := <-w.inBuckets:
-			log.Info("Received a bucket from concentrator, initiating a flush")
+		case payload := <-w.in:
+			log.Info("Received a bucket from sampler, initiating a flush")
 			w.mu.Lock()
-			w.bucketsToWrite = append(w.bucketsToWrite, bucket)
+			w.payloadsToWrite = append(w.payloadsToWrite, payload)
 			w.mu.Unlock()
 			w.Flush()
 		case <-w.exit:
@@ -83,22 +84,22 @@ func (w *Writer) Flush() {
 
 	// number of successfully flushed buckets
 	flushed := 0
-	total := len(w.bucketsToWrite)
+	total := len(w.payloadsToWrite)
 	if total == 0 {
 		return
 	}
 
 	// FIXME: this is not ideal we might want to batch this into a single http call
-	for _, b := range w.bucketsToWrite {
+	for _, p := range w.payloadsToWrite {
 
 		// decide to not flush if no spans & no stats
-		if b.isEmpty() {
-			log.Debugf("Bucket %d sampler & stats are empty", b.Stats.Start)
+		if p.IsEmpty() {
+			log.Debugf("Bucket %d sampler & stats are empty", p.Stats.Start)
 			flushed++
 			continue
 		}
 
-		err := w.endpoint.Write(b)
+		err := w.endpoint.Write(p)
 		if err != nil {
 			log.Errorf("Error writing bucket: %s", err)
 			break
@@ -107,18 +108,18 @@ func (w *Writer) Flush() {
 	}
 
 	if flushed == total {
-		// all buckets were properly flushed.
-		w.bucketsToWrite = nil
+		// all payloads were properly flushed.
+		w.payloadsToWrite = nil
 	} else if 0 < flushed {
-		w.bucketsToWrite = w.bucketsToWrite[flushed:]
+		w.payloadsToWrite = w.payloadsToWrite[flushed:]
 	}
 
-	log.Infof("Flushed %d/%d buckets", flushed, total)
+	log.Infof("Flushed %d/%d payloads", flushed, total)
 }
 
-// BucketEndpoint is a place where we can write buckets.
+// BucketEndpoint is a place where we can write payloads.
 type BucketEndpoint interface {
-	Write(b ConcentratorBucket) error
+	Write(b model.AgentPayload) error
 }
 
 // APIEndpoint is the api we write to.
@@ -142,9 +143,8 @@ func NewAPIEndpoint(url string, apiKey string) APIEndpoint {
 }
 
 // Write writes the bucket to the api.
-func (a APIEndpoint) Write(b ConcentratorBucket) error {
+func (a APIEndpoint) Write(payload model.AgentPayload) error {
 	startFlush := time.Now()
-	payload := b.buildPayload()
 	payload.HostName = a.hostname
 
 	jsonStr, err := json.Marshal(payload)
@@ -170,7 +170,7 @@ func (a APIEndpoint) Write(b ConcentratorBucket) error {
 	defer resp.Body.Close()
 
 	flushTime := time.Since(startFlush)
-	log.Infof("Bucket %d, flushed to the API (time=%s, size=%d)", b.Stats.Start, flushTime, len(jsonStr))
+	log.Infof("Bucket %d, flushed to the API (time=%s, size=%d)", payload.Stats.Start, flushTime, len(jsonStr))
 	Statsd.Gauge("trace_agent.writer.flush_duration", flushTime.Seconds(), nil, 1)
 	Statsd.Count("trace_agent.writer.payload_bytes", int64(len(jsonStr)), nil, 1)
 
@@ -181,7 +181,7 @@ func (a APIEndpoint) Write(b ConcentratorBucket) error {
 type NullEndpoint struct{}
 
 // Write drops the bucket on the floor.
-func (ne NullEndpoint) Write(b ConcentratorBucket) error {
+func (ne NullEndpoint) Write(p model.AgentPayload) error {
 	log.Debug("Null endpoint is dropping bucket")
 	return nil
 }
