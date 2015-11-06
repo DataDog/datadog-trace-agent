@@ -24,7 +24,7 @@ type Agent struct {
 	exitGroup *sync.WaitGroup
 }
 
-func GetQuantilesFromConfig(conf *config.File) ([]float64, error) {
+func getQuantilesFromConfig(conf *config.File) ([]float64, error) {
 	confQuantiles, err := conf.GetStrArray("trace.concentrator", "quantiles", ",")
 
 	if err != nil {
@@ -58,7 +58,7 @@ func NewAgent(conf *config.File) *Agent {
 	}
 
 	bucketSize := conf.GetIntDefault("trace.concentrator", "bucket_size_seconds", 10)
-	bucketQuantiles, err := GetQuantilesFromConfig(conf)
+	bucketQuantiles, err := getQuantilesFromConfig(conf)
 
 	// fail if quantiles configuration missing
 	if err != nil {
