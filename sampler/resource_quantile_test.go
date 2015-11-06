@@ -1,8 +1,7 @@
-package main
+package sampler
 
 import (
 	"sort"
-	"sync"
 	"testing"
 
 	"github.com/DataDog/raclette/model"
@@ -12,9 +11,7 @@ import (
 func TestSampler(t *testing.T) {
 	assert := assert.New(t)
 
-	exit := make(chan struct{})
-	var exitGroup sync.WaitGroup
-	sampler := NewSampler(make(chan model.Span), make(chan model.StatsBucket), exit, &exitGroup)
+	sampler := NewResourceQuantileSampler()
 
 	type sampleResult struct {
 		quantile float64
