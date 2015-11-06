@@ -6,23 +6,24 @@ import (
 
 	log "github.com/cihub/seelog"
 
+	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
 )
-
-var DefaultQuantiles = [...]float64{0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 1}
 
 // Sampler chooses wich spans to write to the API
 type ResourceQuantileSampler struct {
 	TraceIDBySpanID map[uint64]uint64
 	SpansByTraceID  map[uint64][]model.Span
+	conf            *config.AgentConfig
 	mu              sync.Mutex
 }
 
 // NewResourceQuantileSampler creates a ResourceQuantileSampler
-func NewResourceQuantileSampler() *ResourceQuantileSampler {
+func NewResourceQuantileSampler(conf *config.AgentConfig) *ResourceQuantileSampler {
 	return &ResourceQuantileSampler{
 		TraceIDBySpanID: map[uint64]uint64{},
 		SpansByTraceID:  map[uint64][]model.Span{},
+		conf:            conf,
 	}
 }
 
@@ -61,11 +62,11 @@ func (s *ResourceQuantileSampler) GetSamples(
 	traceIDBySpanID map[uint64]uint64, spansByTraceID map[uint64][]model.Span, sb model.StatsBucket,
 ) []model.Span {
 	startTime := time.Now()
-	spanIDs := make([]uint64, len(sb.Distributions)*len(DefaultQuantiles))
+	spanIDs := make([]uint64, len(sb.Distributions)*len(s.conf.SamplerQuantiles))
 
 	// Look at the stats to find representative spans
 	for _, d := range sb.Distributions {
-		for _, q := range DefaultQuantiles {
+		for _, q := range s.conf.SamplerQuantiles {
 			_, sIDs := d.Summary.Quantile(q)
 
 			if len(sIDs) > 0 { // TODO: not sure this condition is required

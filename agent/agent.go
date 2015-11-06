@@ -36,7 +36,7 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 	spansToConcentrator, spansToSampler := spanTPipe(q.out)
 
 	c := NewConcentrator(spansToConcentrator, conf, exit, &exitGroup)
-	s := NewSampler(spansToSampler, c.out, exit, &exitGroup)
+	s := NewSampler(spansToSampler, c.out, conf, exit, &exitGroup)
 	w := NewWriter(s.out, conf, exit, &exitGroup)
 
 	return &Agent{

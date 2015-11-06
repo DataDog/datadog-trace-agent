@@ -5,6 +5,7 @@ import (
 
 	log "github.com/cihub/seelog"
 
+	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
 	"github.com/DataDog/raclette/sampler"
 )
@@ -14,6 +15,8 @@ type Sampler struct {
 	inSpans chan model.Span
 	inStats chan model.StatsBucket  // Trigger the flush of the sampler when stats are received
 	out     chan model.AgentPayload // Output the stats + samples
+
+	conf *config.AgentConfig
 
 	se SamplerEngine
 
@@ -29,17 +32,21 @@ type SamplerEngine interface {
 }
 
 // NewSampler creates a new empty sampler
-func NewSampler(inSpans chan model.Span, inStats chan model.StatsBucket, exit chan struct{}, exitGroup *sync.WaitGroup) *Sampler {
+func NewSampler(
+	inSpans chan model.Span, inStats chan model.StatsBucket, conf *config.AgentConfig, exit chan struct{}, exitGroup *sync.WaitGroup,
+) *Sampler {
 
 	return &Sampler{
 		inSpans: inSpans,
 		inStats: inStats,
 		out:     make(chan model.AgentPayload),
 
+		conf: conf,
+
 		exit:      exit,
 		exitGroup: exitGroup,
 
-		se: sampler.NewResourceQuantileSampler(),
+		se: sampler.NewResourceQuantileSampler(conf),
 	}
 }
 

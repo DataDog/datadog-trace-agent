@@ -4,6 +4,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -11,7 +12,9 @@ import (
 func TestSampler(t *testing.T) {
 	assert := assert.New(t)
 
-	sampler := NewResourceQuantileSampler()
+	conf := config.NewDefaultAgentConfig()
+	conf.SamplerQuantiles = []float64{0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 1}
+	sampler := NewResourceQuantileSampler(conf)
 
 	type sampleResult struct {
 		quantile float64

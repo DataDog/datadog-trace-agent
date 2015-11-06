@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strconv"
 	"time"
 
 	log "github.com/cihub/seelog"
@@ -18,6 +19,8 @@ type AgentConfig struct {
 	OldestSpanCutoff int64         // maximum time we wait before discarding straggling spans
 
 	ExtraAggregators []string
+
+	SamplerQuantiles []float64
 }
 
 // NewDefaultAgentConfig returns a configuration with the default values
@@ -31,6 +34,8 @@ func NewDefaultAgentConfig() *AgentConfig {
 		OldestSpanCutoff: time.Duration(5 * time.Second).Nanoseconds(),
 
 		ExtraAggregators: []string{},
+
+		SamplerQuantiles: []float64{0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 1},
 	}
 }
 
@@ -58,6 +63,18 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 		c.ExtraAggregators = v
 	} else {
 		log.Info("No aggregator configuration, using defaults")
+	}
+
+	if v, e := conf.GetStrArray("trace.concentrator", "quantiles", ","); e == nil {
+		quantiles := make([]float64, len(v))
+		for index, q := range v {
+			value, err := strconv.ParseFloat(q, 64)
+			if err != nil {
+				return nil, err
+			}
+			quantiles[index] = value
+		}
+		c.SamplerQuantiles = quantiles
 	}
 
 	return c, nil
