@@ -8,20 +8,19 @@ import (
 	"github.com/DataDog/raclette/model"
 )
 
-// FIXME[leo]: do not hardcode it maybe?
-var DefaultQuantiles = [...]float64{0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 1}
-
 // Sampler chooses wich spans to write to the API
 type Sampler struct {
-	TraceIDBySpanID map[uint64]uint64
-	SpansByTraceID  map[uint64][]model.Span
+	TraceIDBySpanID  map[uint64]uint64
+	SpansByTraceID   map[uint64][]model.Span
+	SamplerQuantiles []float64
 }
 
 // NewSampler creates a new empty sampler
-func NewSampler() Sampler {
+func NewSampler(quantiles []float64) Sampler {
 	return Sampler{
-		TraceIDBySpanID: map[uint64]uint64{},
-		SpansByTraceID:  map[uint64][]model.Span{},
+		TraceIDBySpanID:  map[uint64]uint64{},
+		SpansByTraceID:   map[uint64][]model.Span{},
+		SamplerQuantiles: quantiles,
 	}
 }
 
@@ -46,11 +45,11 @@ func (s Sampler) AddSpan(span model.Span) {
 // GetSamples returns a list of representative spans to write
 func (s *Sampler) GetSamples(sb model.StatsBucket) []model.Span {
 	startTime := time.Now()
-	spanIDs := make([]uint64, len(sb.Distributions)*len(DefaultQuantiles))
+	spanIDs := make([]uint64, len(sb.Distributions)*len(s.SamplerQuantiles))
 
 	// Look at the stats to find representative spans
 	for _, d := range sb.Distributions {
-		for _, q := range DefaultQuantiles {
+		for _, q := range s.SamplerQuantiles {
 			_, sIDs := d.Summary.Quantile(q)
 
 			if len(sIDs) > 0 { // TODO: not sure this condition is required
