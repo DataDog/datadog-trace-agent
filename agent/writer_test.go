@@ -53,7 +53,7 @@ func TestWriterExitsGracefully(t *testing.T) {
 func getTestConcentratorBucket() ConcentratorBucket {
 	now := model.Now()
 	bucketSize := time.Duration(5 * time.Second).Nanoseconds()
-	cb := newBucket(now, bucketSize)
+	cb := newBucket(now, bucketSize, []float64{0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 1})
 
 	testSpans := []model.Span{
 		model.Span{TraceID: 0, SpanID: 1},

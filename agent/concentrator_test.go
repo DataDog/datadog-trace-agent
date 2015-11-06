@@ -22,6 +22,7 @@ func NewTestConcentrator() (*Concentrator, chan ConcentratorBucket) {
 		[]string{},
 		exit,
 		&exitGroup,
+		[]float64{0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 1},
 	)
 }
 

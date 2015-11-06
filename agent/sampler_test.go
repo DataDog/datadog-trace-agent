@@ -11,7 +11,7 @@ import (
 func TestSampler(t *testing.T) {
 	assert := assert.New(t)
 
-	sampler := NewSampler()
+	sampler := NewSampler([]float64{0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 1})
 	assert.True(sampler.IsEmpty())
 
 	type sampleResult struct {
