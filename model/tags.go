@@ -110,3 +110,45 @@ func (t TagSet) HasExactly(groups []string) bool {
 	}
 	return true
 }
+
+// MatchFilters returns a tag set of the tags that match certain filters.
+// A filter is defined as : "KEY:VAL" where:
+//  * KEY is a non-empty string
+//  * VALUE is a string (can be empty)
+// A tag {Name:k, Value:v} from the input tag set will match if:
+//  * KEY==k and VALUE is non-empty and v==VALUE
+//  * KEY==k and VALUE is empty (don't care about v)
+func (t TagSet) MatchFilters(filters []string) TagSet {
+	// FIXME: ugly ?
+	filterMap := make(map[string]map[string]struct{})
+
+	for _, f := range filters {
+		s := strings.SplitN(f, ":", 2)
+		m, ok := filterMap[s[0]]
+		if !ok {
+			m = make(map[string]struct{})
+			filterMap[s[0]] = m
+		}
+
+		if s[1] != "" {
+			filterMap[s[0]][s[1]] = struct{}{}
+		}
+	}
+
+	matchedFilters := TagSet{}
+
+	for _, tag := range t {
+		vals, ok := filterMap[tag.Name]
+		if ok {
+			if len(vals) == 0 {
+				matchedFilters = append(matchedFilters, tag)
+			} else {
+				_, ok := vals[tag.Value]
+				if ok {
+					matchedFilters = append(matchedFilters, tag)
+				}
+			}
+		}
+	}
+	return matchedFilters
+}
