@@ -166,7 +166,7 @@ func TestSummaryBySlices(t *testing.T) {
 		s.Insert(int64(i), uint64(i))
 	}
 
-	slices := s.BySlices()
+	slices := s.BySlices(10)
 	b, _ := json.Marshal(slices)
 	fmt.Println(string(b))
 	// FIXME: assert the data, it's not a test!

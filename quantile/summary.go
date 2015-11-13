@@ -220,18 +220,24 @@ type SummarySlice struct {
 // The number of intervals is related to the precision kept in the internal
 // data structure to ensure epsilon*s.N precision on quantiles, but it's bounded.
 // The weights are not exact, they're only upper bounds (see GK paper).
-func (s *Summary) BySlices() []SummarySlice {
+func (s *Summary) BySlices(maxSamples int) []SummarySlice {
 	var slices []SummarySlice
 
 	last := s.data.head
 	cur := last.next[0]
 
 	for cur != nil {
+		var sliceSamples []uint64
+		if len(cur.value.Samples) > maxSamples {
+			sliceSamples = cur.value.Samples[:maxSamples]
+		} else {
+			sliceSamples = cur.value.Samples
+		}
 		ss := SummarySlice{
 			Start:   last.value.V,
 			End:     cur.value.V,
 			Weight:  cur.value.G + cur.value.Delta - 1, // see GK paper section 2.1
-			Samples: cur.value.Samples,
+			Samples: sliceSamples,
 		}
 		slices = append(slices, ss)
 
