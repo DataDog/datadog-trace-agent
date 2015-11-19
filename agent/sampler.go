@@ -12,9 +12,9 @@ import (
 
 // Sampler chooses wich spans to write to the API
 type Sampler struct {
-	inSpans chan model.Span
-	inStats chan model.StatsBucket  // Trigger the flush of the sampler when stats are received
-	out     chan model.AgentPayload // Output the stats + samples
+	inSpans    chan model.Span
+	inPayloads chan model.AgentPayload // Trigger the flush of the sampler when stats are received
+	out        chan model.AgentPayload // Output the stats + samples
 
 	conf *config.AgentConfig
 
@@ -28,18 +28,18 @@ type Sampler struct {
 // SamplerEngine cares about ingesting spans and stats to return a sampled payload
 type SamplerEngine interface {
 	AddSpan(span model.Span)
-	FlushPayload(sb model.StatsBucket) model.AgentPayload
+	FlushPayload(sb model.AgentPayload) model.AgentPayload
 }
 
 // NewSampler creates a new empty sampler
 func NewSampler(
-	inSpans chan model.Span, inStats chan model.StatsBucket, conf *config.AgentConfig, exit chan struct{}, exitGroup *sync.WaitGroup,
+	inSpans chan model.Span, inPayloads chan model.AgentPayload, conf *config.AgentConfig, exit chan struct{}, exitGroup *sync.WaitGroup,
 ) *Sampler {
 
 	return &Sampler{
-		inSpans: inSpans,
-		inStats: inStats,
-		out:     make(chan model.AgentPayload),
+		inSpans:    inSpans,
+		inPayloads: inPayloads,
+		out:        make(chan model.AgentPayload),
 
 		conf: conf,
 
@@ -66,9 +66,9 @@ func (s *Sampler) run() {
 		select {
 		case span := <-s.inSpans:
 			s.se.AddSpan(span)
-		case bucket := <-s.inStats:
-			log.Info("Received a bucket from concentrator, initiating a sampling+flush")
-			s.out <- s.se.FlushPayload(bucket)
+		case ap := <-s.inPayloads:
+			log.Info("Received a payload, initiating a sampling + flush")
+			s.out <- s.se.FlushPayload(ap)
 		case <-s.exit:
 			log.Info("Sampler exiting")
 			s.exitGroup.Done()

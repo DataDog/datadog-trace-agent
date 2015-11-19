@@ -42,7 +42,7 @@ func (s *ResourceQuantileSampler) AddSpan(span model.Span) {
 	s.mu.Unlock()
 }
 
-func (s *ResourceQuantileSampler) FlushPayload(sb model.StatsBucket) model.AgentPayload {
+func (s *ResourceQuantileSampler) FlushPayload(ap model.AgentPayload) model.AgentPayload {
 	// Freeze sampler state
 	s.mu.Lock()
 	traceIDBySpanID := s.TraceIDBySpanID
@@ -51,11 +51,8 @@ func (s *ResourceQuantileSampler) FlushPayload(sb model.StatsBucket) model.Agent
 	s.SpansByTraceID = map[uint64][]model.Span{}
 	s.mu.Unlock()
 
-	samples := s.GetSamples(traceIDBySpanID, spansByTraceID, sb)
-	return model.AgentPayload{
-		Stats: sb,
-		Spans: samples,
-	}
+	ap.Spans = s.GetSamples(traceIDBySpanID, spansByTraceID, ap.Stats)
+	return ap
 }
 
 func (s *ResourceQuantileSampler) GetSamples(

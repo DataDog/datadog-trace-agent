@@ -13,6 +13,7 @@ type Agent struct {
 	Receiver     Receiver // Receiver is an interface
 	Quantizer    *Quantizer
 	Concentrator *Concentrator
+	Grapher      *Grapher
 	Sampler      *Sampler
 	Writer       *Writer
 
@@ -33,10 +34,11 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 	r := NewHTTPReceiver(exit, &exitGroup)
 	q := NewQuantizer(r.out, exit, &exitGroup)
 
-	spansToConcentrator, spansToSampler := spanTPipe(q.out)
+	spansToConcentrator, spansToGrapher, spansToSampler := spanDoubleTPipe(q.out)
 
 	c := NewConcentrator(spansToConcentrator, conf, exit, &exitGroup)
-	s := NewSampler(spansToSampler, c.out, conf, exit, &exitGroup)
+	g := NewGrapher(spansToGrapher, c.out, conf, exit, &exitGroup)
+	s := NewSampler(spansToSampler, g.out, conf, exit, &exitGroup)
 	w := NewWriter(s.out, conf, exit, &exitGroup)
 
 	return &Agent{
@@ -44,6 +46,7 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 		Receiver:     r,
 		Quantizer:    q,
 		Concentrator: c,
+		Grapher:      g,
 		Sampler:      s,
 		Writer:       w,
 		exit:         exit,
@@ -59,6 +62,7 @@ func (a *Agent) Start() error {
 	a.Writer.Start()
 	a.Sampler.Start()
 	a.Concentrator.Start()
+	a.Grapher.Start()
 	a.Quantizer.Start()
 	a.Receiver.Start()
 
@@ -74,17 +78,19 @@ func (a *Agent) Join() {
 	log.Info("DONE. Exiting now, over and out.")
 }
 
-// Distribute spans from the quantizer to the concentrator and the sampler
-func spanTPipe(in chan model.Span) (chan model.Span, chan model.Span) {
+// Distribute spans from the quantizer to the concentrator, grapher and sampler
+func spanDoubleTPipe(in chan model.Span) (chan model.Span, chan model.Span, chan model.Span) {
 	out1 := make(chan model.Span)
 	out2 := make(chan model.Span)
+	out3 := make(chan model.Span)
 
 	go func() {
 		for s := range in {
 			out1 <- s
 			out2 <- s
+			out3 <- s
 		}
 	}()
 
-	return out1, out2
+	return out1, out2, out3
 }

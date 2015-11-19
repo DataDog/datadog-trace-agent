@@ -26,7 +26,7 @@ var DefaultAggregators = []string{"service", "resource"}
 // It also takes care of inserting the spans in a sampler.
 type Concentrator struct {
 	in          chan model.Span             // incoming spans to process
-	out         chan model.StatsBucket      // outgoing buckets
+	out         chan model.AgentPayload     // outgoing buckets
 	buckets     map[int64]model.StatsBucket // buckets use to aggregate stats per timestamp
 	aggregators []string                    // we'll always aggregate (if possible) to this finest grain
 	lock        sync.Mutex                  // lock to read/write buckets
@@ -44,7 +44,7 @@ func NewConcentrator(
 ) *Concentrator {
 	return &Concentrator{
 		in:          in,
-		out:         make(chan model.StatsBucket),
+		out:         make(chan model.AgentPayload),
 		buckets:     make(map[int64]model.StatsBucket),
 		aggregators: append(DefaultAggregators, conf.ExtraAggregators...),
 		conf:        conf,
@@ -106,7 +106,7 @@ func (c *Concentrator) flush() {
 		// flush & expire old buckets that cannot be hit anymore
 		if ts < now-c.conf.OldestSpanCutoff && ts != lastBucketTs {
 			log.Infof("Concentrator flushed bucket %d", ts)
-			c.out <- bucket
+			c.out <- model.AgentPayload{Stats: bucket}
 			delete(c.buckets, ts)
 		}
 	}

@@ -98,8 +98,8 @@ func TestConcentratorStatsCounts(t *testing.T) {
 			case <-maxWaitFlushTimer:
 				close(waitingForBucket)
 				break
-			case bucket := <-c.out:
-				receivedBuckets = append(receivedBuckets, bucket)
+			case payload := <-c.out:
+				receivedBuckets = append(receivedBuckets, payload.Stats)
 			}
 		}
 	}()
