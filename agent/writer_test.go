@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"sync"
 	"testing"
 	"time"
 
@@ -15,9 +14,6 @@ import (
 )
 
 func NewTestWriter() *Writer {
-	exit := make(chan struct{})
-	var exitGroup sync.WaitGroup
-
 	conf := config.NewDefaultAgentConfig()
 	conf.APIKey = "9d6e1075bb75e28ea6e720a4561f6b6d"
 	conf.APIEndpoint = "http://localhost:8080"
@@ -26,8 +22,6 @@ func NewTestWriter() *Writer {
 	return NewWriter(
 		in,
 		conf,
-		exit,
-		&exitGroup,
 	)
 }
 
@@ -40,7 +34,7 @@ func TestWriterExitsGracefully(t *testing.T) {
 	receivedExit := make(chan struct{}, 1)
 	go func() {
 		close(w.exit)
-		w.exitGroup.Wait()
+		w.wg.Wait()
 		close(receivedExit)
 	}()
 	for {
@@ -112,7 +106,7 @@ func TestWriterBufferFlush(t *testing.T) {
 	// point our writer to it
 	// We have to stop the writer so that we don't get a race when we change w.endpoint
 	close(w.exit)
-	w.exitGroup.Wait()
+	w.wg.Wait()
 	fakeAPIKey := "9d6e1075bb75e28ea6e720a4561f6b6d"
 	w.endpoint = NewAPIEndpoint(fakeAPI.URL+"/api/v0.1", fakeAPIKey)
 	w.Start()

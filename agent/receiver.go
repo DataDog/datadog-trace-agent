@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/DataDog/raclette/model"
@@ -15,23 +14,24 @@ import (
 // Receiver is the common interface for an agent span collector, it receives spans from clients
 type Receiver interface {
 	Start()
+	Stop()
 }
 
 // HTTPReceiver is a collector that uses HTTP protocol and just holds
 // a chan where the spans received are sent one by one
 type HTTPReceiver struct {
-	out       chan model.Span
-	exit      chan struct{}
-	exitGroup *sync.WaitGroup
+	out chan model.Span
+
+	Worker
 }
 
 // NewHTTPReceiver returns a pointer to a new HTTPReceiver
-func NewHTTPReceiver(exit chan struct{}, exitGroup *sync.WaitGroup) *HTTPReceiver {
-	return &HTTPReceiver{
-		out:       make(chan model.Span),
-		exit:      exit,
-		exitGroup: exitGroup,
+func NewHTTPReceiver() *HTTPReceiver {
+	l := &HTTPReceiver{
+		out: make(chan model.Span),
 	}
+	l.Init()
+	return l
 }
 
 // Start actually starts the HTTP server and returns any error that could
@@ -53,11 +53,10 @@ func (l *HTTPReceiver) Start() {
 	// avoid leaks
 	server := http.Server{ReadTimeout: 5 * time.Second}
 
-	l.exitGroup.Add(1)
-	defer l.exitGroup.Done()
+	l.wg.Add(1)
+	defer l.wg.Done()
 
-	// Will return when closed using exit channels
-	server.Serve(sl)
+	go server.Serve(sl)
 }
 
 // handleSpan handle a request with a single span

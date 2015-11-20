@@ -22,9 +22,7 @@ type Grapher struct {
 
 	mu sync.Mutex
 
-	// exit channels used for synchronisation and sending stop signals
-	exit      chan struct{}
-	exitGroup *sync.WaitGroup
+	Worker
 }
 
 // Node is a node of the graph: only host + section for now
@@ -47,10 +45,10 @@ func (e *Edge) Key() string {
 
 // NewGrapher creates a new empty grapher
 func NewGrapher(
-	inSpans chan model.Span, inPayloads chan model.AgentPayload, conf *config.AgentConfig, exit chan struct{}, exitGroup *sync.WaitGroup,
+	inSpans chan model.Span, inPayloads chan model.AgentPayload, conf *config.AgentConfig,
 ) *Grapher {
 
-	return &Grapher{
+	g := &Grapher{
 		inSpans:    inSpans,
 		inPayloads: inPayloads,
 		out:        make(chan model.AgentPayload),
@@ -58,16 +56,15 @@ func NewGrapher(
 		conf: conf,
 
 		graph: make(map[string][]uint64),
-
-		exit:      exit,
-		exitGroup: exitGroup,
 	}
+	g.Init()
+	return g
 }
 
 // Start runs the writer by consuming spans in a buffer and periodically
 // flushing to the API
 func (g *Grapher) Start() {
-	g.exitGroup.Add(1)
+	g.wg.Add(1)
 	go g.run()
 
 	log.Info("Grapher started")
@@ -85,7 +82,7 @@ func (g *Grapher) run() {
 			g.out <- g.FlushPayload(bucket)
 		case <-g.exit:
 			log.Info("Grapher exiting")
-			g.exitGroup.Done()
+			g.wg.Done()
 			return
 		}
 	}

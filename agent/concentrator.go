@@ -33,29 +33,27 @@ type Concentrator struct {
 
 	conf *config.AgentConfig
 
-	// exit channels used for synchronisation and sending stop signals
-	exit      chan struct{}
-	exitGroup *sync.WaitGroup
+	Worker
 }
 
 // NewConcentrator initializes a new concentrator ready to be started and aggregate stats
 func NewConcentrator(
-	in chan model.Span, conf *config.AgentConfig, exit chan struct{}, exitGroup *sync.WaitGroup,
+	in chan model.Span, conf *config.AgentConfig,
 ) *Concentrator {
-	return &Concentrator{
+	c := &Concentrator{
 		in:          in,
 		out:         make(chan model.AgentPayload),
 		buckets:     make(map[int64]model.StatsBucket),
 		aggregators: append(DefaultAggregators, conf.ExtraAggregators...),
 		conf:        conf,
-		exit:        exit,
-		exitGroup:   exitGroup,
 	}
+	c.Init()
+	return c
 }
 
 // Start initializes the first structures and starts consuming stuff
 func (c *Concentrator) Start() {
-	c.exitGroup.Add(1)
+	c.wg.Add(1)
 
 	go func() {
 		// should return when upstream span channel is closed
@@ -119,12 +117,8 @@ func (c *Concentrator) closeBuckets() {
 		select {
 		case <-c.exit:
 			log.Info("Concentrator exiting")
-			// FIXME: don't flush, because downstream the writer is already shutting down
-			// c.flush()
-
-			// return cleanly and close writer chans
-			close(c.out)
-			c.exitGroup.Done()
+			c.flush()
+			c.wg.Done()
 			return
 		case <-ticker:
 			c.flush()

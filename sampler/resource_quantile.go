@@ -80,7 +80,7 @@ func (s *ResourceQuantileSampler) GetSamples(
 		if spanID != 0 {
 			traceID, ok := traceIDBySpanID[spanID]
 			if !ok {
-				log.Errorf("SpanID reported by Quantiles not available in Sampler, SpanID=%d", spanID)
+				log.Errorf("Span not available in Sampler, SpanID=%d", spanID)
 			} else {
 				traceIDSet[traceID] = token
 			}

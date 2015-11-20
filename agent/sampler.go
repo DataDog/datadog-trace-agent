@@ -1,8 +1,6 @@
 package main
 
 import (
-	"sync"
-
 	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/raclette/config"
@@ -20,9 +18,7 @@ type Sampler struct {
 
 	se SamplerEngine
 
-	// exit channels used for synchronisation and sending stop signals
-	exit      chan struct{}
-	exitGroup *sync.WaitGroup
+	Worker
 }
 
 // SamplerEngine cares about ingesting spans and stats to return a sampled payload
@@ -33,27 +29,25 @@ type SamplerEngine interface {
 
 // NewSampler creates a new empty sampler
 func NewSampler(
-	inSpans chan model.Span, inPayloads chan model.AgentPayload, conf *config.AgentConfig, exit chan struct{}, exitGroup *sync.WaitGroup,
+	inSpans chan model.Span, inPayloads chan model.AgentPayload, conf *config.AgentConfig,
 ) *Sampler {
-
-	return &Sampler{
+	s := &Sampler{
 		inSpans:    inSpans,
 		inPayloads: inPayloads,
 		out:        make(chan model.AgentPayload),
 
 		conf: conf,
 
-		exit:      exit,
-		exitGroup: exitGroup,
-
 		se: sampler.NewResourceQuantileSampler(conf),
 	}
+	s.Init()
+	return s
 }
 
 // Start runs the writer by consuming spans in a buffer and periodically
 // flushing to the API
 func (s *Sampler) Start() {
-	s.exitGroup.Add(1)
+	s.wg.Add(1)
 	go s.run()
 
 	log.Info("Sampler started")
@@ -71,7 +65,7 @@ func (s *Sampler) run() {
 			s.out <- s.se.FlushPayload(ap)
 		case <-s.exit:
 			log.Info("Sampler exiting")
-			s.exitGroup.Done()
+			s.wg.Done()
 			return
 		}
 	}

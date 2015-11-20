@@ -68,8 +68,7 @@ func main() {
 	agent := NewAgent(agentConf)
 
 	// Handle stops properly
-	defer agent.Join()
 	go handleSignal(agent.exit)
 
-	agent.Start()
+	agent.Run()
 }

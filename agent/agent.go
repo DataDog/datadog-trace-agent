@@ -1,8 +1,6 @@
 package main
 
 import (
-	"sync"
-
 	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
 	log "github.com/cihub/seelog"
@@ -21,25 +19,22 @@ type Agent struct {
 	Config *config.AgentConfig
 
 	// Used to synchronize on a clean exit
-	exit      chan struct{}
-	exitGroup *sync.WaitGroup
+	exit chan struct{}
 }
 
 // NewAgent returns a new Agent object, ready to be initialized and started
 func NewAgent(conf *config.AgentConfig) *Agent {
-
 	exit := make(chan struct{})
-	var exitGroup sync.WaitGroup
 
-	r := NewHTTPReceiver(exit, &exitGroup)
-	q := NewQuantizer(r.out, exit, &exitGroup)
+	r := NewHTTPReceiver()
+	q := NewQuantizer(r.out)
 
 	spansToConcentrator, spansToGrapher, spansToSampler := spanDoubleTPipe(q.out)
 
-	c := NewConcentrator(spansToConcentrator, conf, exit, &exitGroup)
-	g := NewGrapher(spansToGrapher, c.out, conf, exit, &exitGroup)
-	s := NewSampler(spansToSampler, g.out, conf, exit, &exitGroup)
-	w := NewWriter(s.out, conf, exit, &exitGroup)
+	c := NewConcentrator(spansToConcentrator, conf)
+	g := NewGrapher(spansToGrapher, c.out, conf)
+	s := NewSampler(spansToSampler, g.out, conf)
+	w := NewWriter(s.out, conf)
 
 	return &Agent{
 		Config:       conf,
@@ -50,8 +45,17 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 		Sampler:      s,
 		Writer:       w,
 		exit:         exit,
-		exitGroup:    &exitGroup,
 	}
+}
+
+// Start starts routers routines and individual pieces forever
+func (a *Agent) Run() {
+	// Start all workers
+	a.Start()
+	// Wait for the exit order
+	<-a.exit
+	// Stop all workers
+	a.Stop()
 }
 
 // Start starts routers routines and individual pieces forever
@@ -70,12 +74,18 @@ func (a *Agent) Start() error {
 	return nil
 }
 
-// Join an agent should be called when its exit channel has been closed and waits for sub-routines to return before returning
-func (a *Agent) Join() {
-	// FIXME: check if the exit channel is closed, otherwise panic as it will never return. Optionally use a timeout here?
-	log.Info("Agent stopping, waiting for all running routines to finish")
-	a.exitGroup.Wait()
-	log.Info("DONE. Exiting now, over and out.")
+// Stop stops routers routines and individual pieces
+func (a *Agent) Stop() error {
+	log.Info("Stopping agent")
+
+	a.Receiver.Stop()
+	a.Quantizer.Stop()
+	a.Concentrator.Stop()
+	a.Grapher.Stop()
+	a.Sampler.Stop()
+	a.Writer.Stop()
+
+	return nil
 }
 
 // Distribute spans from the quantizer to the concentrator, grapher and sampler

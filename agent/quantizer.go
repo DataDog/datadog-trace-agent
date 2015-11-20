@@ -1,8 +1,6 @@
 package main
 
 import (
-	"sync"
-
 	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/raclette/model"
@@ -11,20 +9,20 @@ import (
 
 // Quantizer generates meaningul resource for spans
 type Quantizer struct {
-	in        chan model.Span
-	out       chan model.Span
-	exit      chan struct{}
-	exitGroup *sync.WaitGroup
+	in  chan model.Span
+	out chan model.Span
+
+	Worker
 }
 
 // NewQuantizer creates a new Quantizer
-func NewQuantizer(inSpans chan model.Span, exit chan struct{}, exitGroup *sync.WaitGroup) *Quantizer {
-	return &Quantizer{
-		in:        inSpans,
-		out:       make(chan model.Span),
-		exit:      exit,
-		exitGroup: exitGroup,
+func NewQuantizer(inSpans chan model.Span) *Quantizer {
+	q := &Quantizer{
+		in:  inSpans,
+		out: make(chan model.Span),
 	}
+	q.Init()
+	return q
 }
 
 // Start runs the Quantizer by quantizing spans from the channel
@@ -35,12 +33,12 @@ func (q *Quantizer) Start() {
 		}
 	}()
 
-	q.exitGroup.Add(1)
+	q.wg.Add(1)
 	go func() {
 		<-q.exit
 		log.Info("Quantizer exiting")
 		close(q.in)
-		q.exitGroup.Done()
+		q.wg.Done()
 		return
 	}()
 

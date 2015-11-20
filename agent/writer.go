@@ -22,13 +22,11 @@ type Writer struct {
 	payloadsToWrite []model.AgentPayload    // buffers to write to the API and currently written to from upstream
 	mu              sync.Mutex              // mutex on data above
 
-	// exit channels
-	exit      chan struct{}
-	exitGroup *sync.WaitGroup
+	Worker
 }
 
 // NewWriter returns a new Writer
-func NewWriter(in chan model.AgentPayload, conf *config.AgentConfig, exit chan struct{}, exitGroup *sync.WaitGroup) *Writer {
+func NewWriter(in chan model.AgentPayload, conf *config.AgentConfig) *Writer {
 	var endpoint BucketEndpoint
 	if conf.APIEnabled {
 		endpoint = NewAPIEndpoint(conf.APIEndpoint, conf.APIKey)
@@ -38,11 +36,10 @@ func NewWriter(in chan model.AgentPayload, conf *config.AgentConfig, exit chan s
 	}
 
 	w := Writer{
-		endpoint:  endpoint,
-		in:        in,
-		exit:      exit,
-		exitGroup: exitGroup,
+		endpoint: endpoint,
+		in:       in,
 	}
+	w.Init()
 
 	return &w
 }
@@ -50,7 +47,7 @@ func NewWriter(in chan model.AgentPayload, conf *config.AgentConfig, exit chan s
 // Start runs the writer by consuming spans in a buffer and periodically
 // flushing to the API
 func (w *Writer) Start() {
-	w.exitGroup.Add(1)
+	w.wg.Add(1)
 	go w.run()
 
 	log.Info("Writer started")
@@ -70,7 +67,7 @@ func (w *Writer) run() {
 		case <-w.exit:
 			log.Info("Writer exiting, trying to flush all remaining data")
 			w.Flush()
-			w.exitGroup.Done()
+			w.wg.Done()
 			return
 		}
 	}

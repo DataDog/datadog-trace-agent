@@ -2,7 +2,6 @@ package main
 
 import (
 	"math/rand"
-	"sync"
 	"testing"
 	"time"
 
@@ -12,9 +11,6 @@ import (
 )
 
 func NewTestConcentrator() *Concentrator {
-	exit := make(chan struct{})
-	var exitGroup sync.WaitGroup
-
 	conf := config.NewDefaultAgentConfig()
 	conf.BucketInterval = time.Duration(1) * time.Second
 
@@ -23,8 +19,6 @@ func NewTestConcentrator() *Concentrator {
 	return NewConcentrator(
 		in,
 		conf,
-		exit,
-		&exitGroup,
 	)
 }
 
@@ -38,7 +32,7 @@ func TestConcentratorExitsGracefully(t *testing.T) {
 	receivedExit := make(chan struct{}, 1)
 	go func() {
 		close(c.exit)
-		c.exitGroup.Wait()
+		c.wg.Wait()
 		close(receivedExit)
 	}()
 	for {
