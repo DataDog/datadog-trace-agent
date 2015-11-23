@@ -10,9 +10,8 @@ import (
 
 // Sampler chooses wich spans to write to the API
 type Sampler struct {
-	inSpans    chan model.Span
-	inPayloads chan model.AgentPayload // Trigger the flush of the sampler when stats are received
-	out        chan model.AgentPayload // Output the stats + samples
+	in  chan model.Span
+	out chan []model.Span
 
 	conf *config.AgentConfig
 
@@ -24,17 +23,16 @@ type Sampler struct {
 // SamplerEngine cares about ingesting spans and stats to return a sampled payload
 type SamplerEngine interface {
 	AddSpan(span model.Span)
-	FlushPayload(sb model.AgentPayload) model.AgentPayload
+	Flush() []model.Span
 }
 
 // NewSampler creates a new empty sampler
 func NewSampler(
-	inSpans chan model.Span, inPayloads chan model.AgentPayload, conf *config.AgentConfig,
+	in chan model.Span, conf *config.AgentConfig,
 ) *Sampler {
 	s := &Sampler{
-		inSpans:    inSpans,
-		inPayloads: inPayloads,
-		out:        make(chan model.AgentPayload),
+		in:  in,
+		out: make(chan []model.Span),
 
 		conf: conf,
 
@@ -58,13 +56,18 @@ func (s *Sampler) Start() {
 func (s *Sampler) run() {
 	for {
 		select {
-		case span := <-s.inSpans:
-			s.se.AddSpan(span)
-		case ap := <-s.inPayloads:
-			log.Info("Received a payload, initiating a sampling + flush")
-			s.out <- s.se.FlushPayload(ap)
+		case span := <-s.in:
+			if span.IsFlushMarker() {
+				log.Debug("Sampler starts a flush")
+				spans := s.se.Flush()
+				log.Debugf("Sampler flushes %d spans", len(spans))
+				s.out <- spans
+			} else {
+				s.se.AddSpan(span)
+			}
 		case <-s.exit:
 			log.Info("Sampler exiting")
+			close(s.out)
 			s.wg.Done()
 			return
 		}

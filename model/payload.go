@@ -4,11 +4,11 @@ package model
 type AgentPayload struct {
 	HostName string              `json:"hostname"`
 	Spans    []Span              `json:"spans"`
-	Stats    StatsBucket         `json:"stats"`
+	Stats    []StatsBucket       `json:"stats"`
 	Graph    map[string][]uint64 `json:"graph"`
 }
 
 // IsEmpty tells if the payload is empty (and don't need to be sent)
 func (p *AgentPayload) IsEmpty() bool {
-	return len(p.Spans) == 0 && p.Stats.IsEmpty()
+	return len(p.Spans) == 0 && len(p.Stats) == 0 // Use p.Stats.IsEmpty()?
 }

@@ -27,19 +27,19 @@ func NewQuantizer(inSpans chan model.Span) *Quantizer {
 
 // Start runs the Quantizer by quantizing spans from the channel
 func (q *Quantizer) Start() {
-	go func() {
-		for span := range q.in {
-			q.out <- quantizer.Quantize(span)
-		}
-	}()
-
 	q.wg.Add(1)
 	go func() {
-		<-q.exit
-		log.Info("Quantizer exiting")
-		close(q.in)
-		q.wg.Done()
-		return
+		for {
+			select {
+			case span := <-q.in:
+				q.out <- quantizer.Quantize(span)
+			case <-q.exit:
+				log.Info("Quantizer exiting")
+				close(q.out)
+				q.wg.Done()
+				return
+			}
+		}
 	}()
 
 	log.Info("Quantizer started")

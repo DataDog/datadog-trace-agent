@@ -10,19 +10,24 @@ import (
 	"github.com/DataDog/raclette/model"
 )
 
+var DefaultAggregators = []string{"service", "resource"}
+
 // Sampler chooses wich spans to write to the API
 type ResourceQuantileSampler struct {
-	TraceIDBySpanID map[uint64]uint64
-	SpansByTraceID  map[uint64][]model.Span
-	conf            *config.AgentConfig
-	mu              sync.Mutex
+	stats           model.StatsBucket
+	traceIDBySpanID map[uint64]uint64
+	spansByTraceID  map[uint64][]model.Span
+
+	conf *config.AgentConfig
+	mu   sync.Mutex
 }
 
 // NewResourceQuantileSampler creates a ResourceQuantileSampler
 func NewResourceQuantileSampler(conf *config.AgentConfig) *ResourceQuantileSampler {
 	return &ResourceQuantileSampler{
-		TraceIDBySpanID: map[uint64]uint64{},
-		SpansByTraceID:  map[uint64][]model.Span{},
+		stats:           model.NewStatsBucket(0, 1),
+		traceIDBySpanID: map[uint64]uint64{},
+		spansByTraceID:  map[uint64][]model.Span{},
 		conf:            conf,
 	}
 }
@@ -30,39 +35,42 @@ func NewResourceQuantileSampler(conf *config.AgentConfig) *ResourceQuantileSampl
 // AddSpan adds a span to the sampler internal momory
 func (s *ResourceQuantileSampler) AddSpan(span model.Span) {
 	s.mu.Lock()
-	s.TraceIDBySpanID[span.SpanID] = span.TraceID
+	s.traceIDBySpanID[span.SpanID] = span.TraceID
 
-	spans, ok := s.SpansByTraceID[span.TraceID]
+	spans, ok := s.spansByTraceID[span.TraceID]
 	if !ok {
 		spans = []model.Span{span}
 	} else {
 		spans = append(spans, span)
 	}
-	s.SpansByTraceID[span.TraceID] = spans
+	s.spansByTraceID[span.TraceID] = spans
+
+	s.stats.HandleSpan(span, DefaultAggregators)
 	s.mu.Unlock()
 }
 
-func (s *ResourceQuantileSampler) FlushPayload(ap model.AgentPayload) model.AgentPayload {
-	// Freeze sampler state
+func (s *ResourceQuantileSampler) Flush() []model.Span {
 	s.mu.Lock()
-	traceIDBySpanID := s.TraceIDBySpanID
-	spansByTraceID := s.SpansByTraceID
-	s.TraceIDBySpanID = map[uint64]uint64{}
-	s.SpansByTraceID = map[uint64][]model.Span{}
+	traceIDBySpanID := s.traceIDBySpanID
+	spansByTraceID := s.spansByTraceID
+	stats := s.stats
+	s.traceIDBySpanID = map[uint64]uint64{}
+	s.spansByTraceID = map[uint64][]model.Span{}
+	s.stats = model.NewStatsBucket(0, 1)
 	s.mu.Unlock()
 
-	ap.Spans = s.GetSamples(traceIDBySpanID, spansByTraceID, ap.Stats)
-	return ap
+	return s.GetSamples(traceIDBySpanID, spansByTraceID, stats)
 }
 
 func (s *ResourceQuantileSampler) GetSamples(
-	traceIDBySpanID map[uint64]uint64, spansByTraceID map[uint64][]model.Span, sb model.StatsBucket,
+	traceIDBySpanID map[uint64]uint64, spansByTraceID map[uint64][]model.Span, stats model.StatsBucket,
 ) []model.Span {
+	// We should merge them instead of picking a random one
 	startTime := time.Now()
-	spanIDs := make([]uint64, len(sb.Distributions)*len(s.conf.SamplerQuantiles))
+	spanIDs := make([]uint64, len(stats.Distributions)*len(s.conf.SamplerQuantiles))
 
 	// Look at the stats to find representative spans
-	for _, d := range sb.Distributions {
+	for _, d := range stats.Distributions {
 		for _, q := range s.conf.SamplerQuantiles {
 			_, sIDs := d.Summary.Quantile(q)
 

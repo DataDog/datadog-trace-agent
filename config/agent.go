@@ -16,7 +16,7 @@ type AgentConfig struct {
 	APIEnabled  bool
 
 	BucketInterval   time.Duration // the size of our pre-aggregation per bucket
-	OldestSpanCutoff int64         // maximum time we wait before discarding straggling spans
+	OldestSpanCutoff int64         // maximum time we wait before discarding straggling spans, in ns
 
 	ExtraAggregators []string
 
