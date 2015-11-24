@@ -13,6 +13,7 @@ import (
 
 	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
+	"github.com/DataDog/raclette/statsd"
 )
 
 // Writer implements a Writer and writes to the Datadog API bucketed stats & spans
@@ -157,8 +158,8 @@ func (a APIEndpoint) Write(payload model.AgentPayload) error {
 
 	flushTime := time.Since(startFlush)
 	log.Infof("Payload flushed to the API (time=%s, size=%d)", flushTime, len(jsonStr))
-	Statsd.Gauge("trace_agent.writer.flush_duration", flushTime.Seconds(), nil, 1)
-	Statsd.Count("trace_agent.writer.payload_bytes", int64(len(jsonStr)), nil, 1)
+	statsd.Client.Gauge("trace_agent.writer.flush_duration", flushTime.Seconds(), nil, 1)
+	statsd.Client.Count("trace_agent.writer.payload_bytes", int64(len(jsonStr)), nil, 1)
 
 	return nil
 }

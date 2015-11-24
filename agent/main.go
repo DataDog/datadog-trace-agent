@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/DataDog/raclette/config"
+	"github.com/DataDog/raclette/statsd"
 	log "github.com/cihub/seelog"
 )
 
@@ -54,7 +55,7 @@ func main() {
 	defer log.Flush()
 
 	// Initialize dogstatsd client
-	err = ConfigureStatsd(conf, "dogstatsd")
+	err = statsd.Configure(conf, "dogstatsd")
 	if err != nil {
 		panic(fmt.Sprintf("Error configuring dogstatsd: %v", err))
 	}
