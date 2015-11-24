@@ -12,7 +12,7 @@ import (
 
 var DefaultAggregators = []string{"service", "resource"}
 
-// Sampler chooses wich spans to write to the API
+// ResourceQuantileSampler samples by selectic spans representative of each sampler quantiles for each resource from local statistics
 type ResourceQuantileSampler struct {
 	stats           model.StatsBucket
 	traceIDBySpanID map[uint64]uint64
@@ -22,7 +22,7 @@ type ResourceQuantileSampler struct {
 	mu   sync.Mutex
 }
 
-// NewResourceQuantileSampler creates a ResourceQuantileSampler
+// NewResourceQuantileSampler creates a new ResourceQuantileSampler, ready to ingest spans
 func NewResourceQuantileSampler(conf *config.AgentConfig) *ResourceQuantileSampler {
 	return &ResourceQuantileSampler{
 		stats:           model.NewStatsBucket(0, 1),
@@ -32,7 +32,7 @@ func NewResourceQuantileSampler(conf *config.AgentConfig) *ResourceQuantileSampl
 	}
 }
 
-// AddSpan adds a span to the sampler internal momory
+// AddSpan adds a span to the ResourceQuantileSampler internal memory
 func (s *ResourceQuantileSampler) AddSpan(span model.Span) {
 	s.mu.Lock()
 	s.traceIDBySpanID[span.SpanID] = span.TraceID
@@ -49,6 +49,7 @@ func (s *ResourceQuantileSampler) AddSpan(span model.Span) {
 	s.mu.Unlock()
 }
 
+// Flush returns representative spans based on GetSamples and reset its internal memory
 func (s *ResourceQuantileSampler) Flush() []model.Span {
 	s.mu.Lock()
 	traceIDBySpanID := s.traceIDBySpanID
@@ -62,6 +63,7 @@ func (s *ResourceQuantileSampler) Flush() []model.Span {
 	return s.GetSamples(traceIDBySpanID, spansByTraceID, stats)
 }
 
+// GetSamples returns interesting spans by picking a representative of each SamplerQuantiles of each resource
 func (s *ResourceQuantileSampler) GetSamples(
 	traceIDBySpanID map[uint64]uint64, spansByTraceID map[uint64][]model.Span, stats model.StatsBucket,
 ) []model.Span {
@@ -101,15 +103,15 @@ func (s *ResourceQuantileSampler) GetSamples(
 		spans = append(spans, spansByTraceID[traceID]...)
 	}
 
-	// Statsd.Count("trace_agent.sampler.trace.total", int64(len(spansByTraceID)), nil, 1)
-	// Statsd.Count("trace_agent.sampler.trace.kept", int64(len(traceIDSet)), nil, 1)
-	// Statsd.Count("trace_agent.sampler.span.total", int64(len(traceIDBySpanID)), nil, 1)
-	// Statsd.Count("trace_agent.sampler.span.kept", int64(len(spans)), nil, 1)
-
 	execTime := time.Since(startTime)
 	log.Infof("Sampled %d traces out of %d, %d spans out of %d, in %s",
 		len(traceIDSet), len(spansByTraceID), len(spans), len(traceIDBySpanID), execTime)
 
+	// TODO(Benjamin): Restore stats with a global statsd, or by moving the sampler inside the agent package
+	// Statsd.Count("trace_agent.sampler.trace.total", int64(len(spansByTraceID)), nil, 1)
+	// Statsd.Count("trace_agent.sampler.trace.kept", int64(len(traceIDSet)), nil, 1)
+	// Statsd.Count("trace_agent.sampler.span.total", int64(len(traceIDBySpanID)), nil, 1)
+	// Statsd.Count("trace_agent.sampler.span.kept", int64(len(spans)), nil, 1)
 	// Statsd.Gauge("trace_agent.sampler.sample_duration", execTime.Seconds(), nil, 1)
 
 	return spans

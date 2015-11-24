@@ -9,7 +9,7 @@ import (
 	log "github.com/cihub/seelog"
 )
 
-// Agent struct holds all the sub-routines structs and some channels to stream data in those
+// Agent struct holds all the sub-routines structs and make the data flow between them
 type Agent struct {
 	Receiver     Receiver // Receiver is an interface
 	Quantizer    *Quantizer
@@ -25,7 +25,7 @@ type Agent struct {
 	exit chan struct{}
 }
 
-// NewAgent returns a new Agent object, ready to be initialized and started
+// NewAgent returns a new Agent object, ready to be started
 func NewAgent(conf *config.AgentConfig) *Agent {
 	exit := make(chan struct{})
 
@@ -52,7 +52,7 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 	}
 }
 
-// Run starts routers routines and individual pieces forever
+// Run starts routers routines and individual pieces then stop them when the exit order is received
 func (a *Agent) Run() {
 	// Start all workers
 	go a.runFlusher()
@@ -63,6 +63,7 @@ func (a *Agent) Run() {
 	a.Stop()
 }
 
+// runFlusher periodically send a flush marker, collect the results and send the payload to the Writer
 func (a *Agent) runFlusher() {
 	ticker := time.NewTicker(a.Config.BucketInterval)
 	for {
@@ -101,7 +102,7 @@ func (a *Agent) runFlusher() {
 	}
 }
 
-// Start starts routers routines and individual pieces forever
+// Start starts all components
 func (a *Agent) Start() error {
 	log.Info("Starting agent")
 
@@ -117,7 +118,7 @@ func (a *Agent) Start() error {
 	return nil
 }
 
-// Stop stops routers routines and individual pieces
+// Stop stops all components
 func (a *Agent) Stop() error {
 	log.Info("Stopping agent")
 
@@ -131,7 +132,7 @@ func (a *Agent) Stop() error {
 	return nil
 }
 
-// Distribute spans from the quantizer to the concentrator, grapher and sampler
+// spanDoubleTPipe redistributes incoming spans to multiple components by returning multiple channels
 func spanDoubleTPipe(in chan model.Span) (chan model.Span, chan model.Span, chan model.Span) {
 	out1 := make(chan model.Span)
 	out2 := make(chan model.Span)

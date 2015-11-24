@@ -10,10 +10,10 @@ import (
 	"github.com/DataDog/raclette/model"
 )
 
-// Grapher builds a graph of all the components
+// Grapher builds a graph representation of all interating elements of the traced system
 type Grapher struct {
 	in  chan model.Span
-	out chan map[string][]uint64 // Output the stats + samples + graph
+	out chan map[string][]uint64
 
 	conf *config.AgentConfig
 
@@ -37,15 +37,13 @@ type Edge struct {
 	Type string
 }
 
-// Key returns a representation of the edge
+// Key returns a serialized representation of the edge
 func (e *Edge) Key() string {
 	return strings.Join([]string{e.From.Host, e.From.Section, e.To.Host, e.To.Section, e.Type}, "|")
 }
 
-// NewGrapher creates a new empty grapher
-func NewGrapher(
-	in chan model.Span, conf *config.AgentConfig,
-) *Grapher {
+// NewGrapher creates a new empty grapher, ready to start
+func NewGrapher(in chan model.Span, conf *config.AgentConfig) *Grapher {
 
 	g := &Grapher{
 		in:  in,
@@ -59,18 +57,14 @@ func NewGrapher(
 	return g
 }
 
-// Start runs the writer by consuming spans in a buffer and periodically
-// flushing to the API
+// Start runs the Grapher which builds the graph with incoming spans and flushes it on demand
 func (g *Grapher) Start() {
-	g.wg.Add(1)
 	go g.run()
-
 	log.Info("Grapher started")
 }
 
-// We rely on the concentrator ticker to flush periodically traces "aligning" on the buckets
-// (it's not perfect, but we don't really care, traces of this stats bucket may arrive in the next flush)
 func (g *Grapher) run() {
+	g.wg.Add(1)
 	for {
 		select {
 		case span := <-g.in:
@@ -78,7 +72,7 @@ func (g *Grapher) run() {
 				log.Debug("Grapher starts a flush")
 				g.out <- g.Flush()
 			} else {
-				g.AddSpan(span)
+				g.HandleSpan(span)
 			}
 		case <-g.exit:
 			log.Info("Grapher exiting")
@@ -89,8 +83,9 @@ func (g *Grapher) run() {
 	}
 }
 
-// AddSpan adds a span to the sampler internal momory
-func (g *Grapher) AddSpan(s model.Span) {
+// HandleSpan processes a span to extend our graph representation
+func (g *Grapher) HandleSpan(s model.Span) {
+	// If the span doesn't contain graph metadata, skip it
 	if s.Meta["in.host"] == "" && s.Meta["out.host"] == "" {
 		return
 	}
@@ -98,11 +93,14 @@ func (g *Grapher) AddSpan(s model.Span) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
+	// Build the edge based on the span metadata
+	// TODO: Hostname resolution
 	edge := Edge{
 		From: Node{Host: s.Meta["in.host"], Section: s.Meta["in.section"]},
 		To:   Node{Host: s.Meta["out.host"], Section: s.Meta["out.section"]},
 		Type: s.Type,
 	}
+
 	key := edge.Key()
 	if _, ok := g.graph[key]; ok {
 		g.graph[key] = append(g.graph[key], s.SpanID)
@@ -111,6 +109,7 @@ func (g *Grapher) AddSpan(s model.Span) {
 	}
 }
 
+// Flush returns a graph representation and reset the Grapher state
 func (g *Grapher) Flush() map[string][]uint64 {
 	g.mu.Lock()
 	graph := g.graph

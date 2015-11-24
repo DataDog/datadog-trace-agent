@@ -26,34 +26,26 @@ type SamplerEngine interface {
 	Flush() []model.Span
 }
 
-// NewSampler creates a new empty sampler
-func NewSampler(
-	in chan model.Span, conf *config.AgentConfig,
-) *Sampler {
+// NewSampler creates a new empty sampler ready to be started
+func NewSampler(in chan model.Span, conf *config.AgentConfig) *Sampler {
 	s := &Sampler{
-		in:  in,
-		out: make(chan []model.Span),
-
+		in:   in,
+		out:  make(chan []model.Span),
 		conf: conf,
-
-		se: sampler.NewResourceQuantileSampler(conf),
+		se:   sampler.NewResourceQuantileSampler(conf),
 	}
 	s.Init()
 	return s
 }
 
-// Start runs the writer by consuming spans in a buffer and periodically
-// flushing to the API
+// Start runs the Sampler by sending incoming spans to the SamplerEngine and flushing it on demand
 func (s *Sampler) Start() {
-	s.wg.Add(1)
 	go s.run()
-
 	log.Info("Sampler started")
 }
 
-// We rely on the concentrator ticker to flush periodically traces "aligning" on the buckets
-// (it's not perfect, but we don't really care, traces of this stats bucket may arrive in the next flush)
 func (s *Sampler) run() {
+	s.wg.Add(1)
 	for {
 		select {
 		case span := <-s.in:

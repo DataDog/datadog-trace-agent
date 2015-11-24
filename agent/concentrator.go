@@ -16,7 +16,7 @@ var (
 	eLateSpans = expvar.NewInt("LateSpans")
 )
 
-// By default the finest grain we aggregate to
+// DefaultAggregators are the finest grain we aggregate to by default
 var DefaultAggregators = []string{"service", "resource"}
 
 // Concentrator produces time bucketed statistics from a stream of raw traces.
@@ -36,10 +36,8 @@ type Concentrator struct {
 	Worker
 }
 
-// NewConcentrator initializes a new concentrator ready to be started and aggregate stats
-func NewConcentrator(
-	in chan model.Span, conf *config.AgentConfig,
-) *Concentrator {
+// NewConcentrator initializes a new concentrator ready to be started
+func NewConcentrator(in chan model.Span, conf *config.AgentConfig) *Concentrator {
 	c := &Concentrator{
 		in:          in,
 		out:         make(chan []model.StatsBucket),
@@ -51,31 +49,30 @@ func NewConcentrator(
 	return c
 }
 
-// Start initializes the first structures and starts consuming stuff
+// Start initializes the first structures and starts consuming spans
 func (c *Concentrator) Start() {
 	c.wg.Add(1)
 
 	go func() {
-		// should return when upstream span channel is closed
-		for s := range c.in {
-			if s.IsFlushMarker() {
-				log.Debug("Concentrator starts a flush")
-				c.out <- c.Flush()
-			} else {
-				err := c.HandleNewSpan(s)
-				if err != nil {
-					log.Debugf("Span %v rejected by concentrator. Reason: %v", s.SpanID, err)
+		for {
+			select {
+			case s := <-c.in:
+				if s.IsFlushMarker() {
+					log.Debug("Concentrator starts a flush")
+					c.out <- c.Flush()
+				} else {
+					err := c.HandleNewSpan(s)
+					if err != nil {
+						log.Debugf("Span %v rejected by concentrator. Reason: %v", s.SpanID, err)
+					}
 				}
+			case <-c.exit:
+				log.Info("Concentrator exiting")
+				close(c.out)
+				c.wg.Done()
+				return
 			}
 		}
-	}()
-
-	go func() {
-		<-c.exit
-		log.Info("Concentrator exiting")
-		close(c.out)
-		c.wg.Done()
-		return
 	}()
 
 	log.Info("Concentrator started")
@@ -110,11 +107,9 @@ type Int64Slice []int64
 func (p Int64Slice) Len() int           { return len(p) }
 func (p Int64Slice) Less(i, j int) bool { return p[i] < p[j] }
 func (p Int64Slice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func sortInts64(a []int64)              { sort.Sort(Int64Slice(a)) }
 
-func SortInts64(a []int64) {
-	sort.Sort(Int64Slice(a))
-}
-
+// Flush deletes and returns complete statistic buckets
 func (c *Concentrator) Flush() []model.StatsBucket {
 	now := model.Now()
 	lastBucketTs := now - now%c.conf.BucketInterval.Nanoseconds()
@@ -128,7 +123,7 @@ func (c *Concentrator) Flush() []model.StatsBucket {
 	for k := range c.buckets {
 		keys = append(keys, k)
 	}
-	SortInts64(keys)
+	sortInts64(keys)
 
 	for i := range keys {
 		ts := keys[i]

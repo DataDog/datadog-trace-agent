@@ -31,31 +31,27 @@ func NewWriter(conf *config.AgentConfig) *Writer {
 	if conf.APIEnabled {
 		endpoint = NewAPIEndpoint(conf.APIEndpoint, conf.APIKey)
 	} else {
-		log.Info("using null endpoint")
+		log.Info("API interface is disabled, use NullEndpoint instead")
 		endpoint = NullEndpoint{}
 	}
 
-	w := Writer{
+	w := &Writer{
 		endpoint: endpoint,
 		in:       make(chan model.AgentPayload),
 	}
 	w.Init()
 
-	return &w
+	return w
 }
 
-// Start runs the writer by consuming spans in a buffer and periodically
-// flushing to the API
+// Start runs the Writer by flushing any incoming payload
 func (w *Writer) Start() {
-	w.wg.Add(1)
 	go w.run()
-
 	log.Info("Writer started")
 }
 
-// We rely on the concentrator ticker to flush periodically traces "aligning" on the buckets
-// (it's not perfect, but we don't really care, traces of this stats bucket may arrive in the next flush)
 func (w *Writer) run() {
+	w.wg.Add(1)
 	for {
 		select {
 		case p := <-w.in:
@@ -107,7 +103,7 @@ func (w *Writer) Flush() {
 	log.Infof("Flushed %d/%d payloads", flushed, total)
 }
 
-// BucketEndpoint is a place where we can write payloads.
+// BucketEndpoint is a place where we can write payloads
 type BucketEndpoint interface {
 	Write(b model.AgentPayload) error
 }
@@ -120,7 +116,7 @@ type APIEndpoint struct {
 	collectorURL string
 }
 
-// NewAPIEndpoint creates an endpoint writing to the given url and apiKey.
+// NewAPIEndpoint creates an endpoint writing to the given url and apiKey
 func NewAPIEndpoint(url string, apiKey string) APIEndpoint {
 	// FIXME[leo]: allow overriding it from config?
 	hostname, err := os.Hostname()
@@ -132,7 +128,7 @@ func NewAPIEndpoint(url string, apiKey string) APIEndpoint {
 	return APIEndpoint{hostname: hostname, apiKey: apiKey, url: url, collectorURL: collectorURL}
 }
 
-// Write writes the bucket to the api.
+// Write writes the bucket to the API
 func (a APIEndpoint) Write(payload model.AgentPayload) error {
 	startFlush := time.Now()
 	payload.HostName = a.hostname
@@ -167,10 +163,10 @@ func (a APIEndpoint) Write(payload model.AgentPayload) error {
 	return nil
 }
 
-// NullEndpoint is a place where bucket go to die.
+// NullEndpoint is a place where bucket go the void
 type NullEndpoint struct{}
 
-// Write drops the bucket on the floor.
+// Write drops the bucket on the floor
 func (ne NullEndpoint) Write(p model.AgentPayload) error {
 	log.Debug("Null endpoint is dropping bucket")
 	return nil

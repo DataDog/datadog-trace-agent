@@ -84,7 +84,7 @@ func RandomID() uint64 {
 
 const flushMarkerType = "_FLUSH_MARKER"
 
-// IsFlushMarker tells if this is a marker span, meaning that the system should flush
+// IsFlushMarker tells if this is a marker span, which signals the system to flush
 func (s *Span) IsFlushMarker() bool {
 	return s.Type == flushMarkerType
 }

@@ -15,10 +15,10 @@ type Quantizer struct {
 	Worker
 }
 
-// NewQuantizer creates a new Quantizer
-func NewQuantizer(inSpans chan model.Span) *Quantizer {
+// NewQuantizer creates a new Quantizer ready to be started
+func NewQuantizer(in chan model.Span) *Quantizer {
 	q := &Quantizer{
-		in:  inSpans,
+		in:  in,
 		out: make(chan model.Span),
 	}
 	q.Init()

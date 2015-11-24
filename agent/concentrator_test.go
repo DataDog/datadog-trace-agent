@@ -16,18 +16,14 @@ func NewTestConcentrator() *Concentrator {
 
 	in := make(chan model.Span)
 
-	return NewConcentrator(
-		in,
-		conf,
-	)
+	return NewConcentrator(in, conf)
 }
 
 func TestConcentratorExitsGracefully(t *testing.T) {
-	// Start a concentrator
 	c := NewTestConcentrator()
 	c.Start()
 
-	// And now try to stop it in a given time, by closing the exit channel
+	// Try to stop it in a given time, by closing the exit channel
 	timer := time.NewTimer(100 * time.Millisecond).C
 	receivedExit := make(chan struct{}, 1)
 	go func() {
@@ -45,7 +41,7 @@ func TestConcentratorExitsGracefully(t *testing.T) {
 	}
 }
 
-// getTsInBucket(now(), 1s, 3) get you a nanosecond timestamp, 3 buckets earlier from now (buckets aligned on 1s)
+// getTsInBucket gives a timestamp in ns which is `offset` buckets late
 func getTsInBucket(alignedNow int64, bucketInterval time.Duration, offset int64) int64 {
 	return alignedNow - offset*bucketInterval.Nanoseconds() + rand.Int63n(bucketInterval.Nanoseconds())
 }
@@ -91,10 +87,17 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	// Triggers the flush
 	c.in <- model.NewFlushMarker()
 
-	// Get the payload
+	// Send several spans which shouldn't be considered by this flush
+	go func() {
+		c.in <- model.Span{SpanID: 100, Duration: 1, Start: getTsInBucket(alignedNow, bucketInterval, 0), Service: "service1", Resource: "resource1"}
+		c.in <- model.Span{SpanID: 101, Duration: 1, Start: getTsInBucket(alignedNow, bucketInterval, 1), Service: "service1", Resource: "resource1"}
+		c.in <- model.Span{SpanID: 102, Duration: 1, Start: getTsInBucket(alignedNow, bucketInterval, 2), Service: "service1", Resource: "resource1"}
+	}()
+
+	// Get the stats from the flush
 	stats := <-c.out
 
-	if !assert.Equal(len(stats), 2) {
+	if !assert.Equal(len(stats), 2, "We should get exactly 2 StatsBucket") {
 		t.FailNow()
 	}
 
