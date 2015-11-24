@@ -60,7 +60,12 @@ func main() {
 	// Seed rand
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	agent := NewAgent(conf)
+	agentConf, err := config.NewAgentConfig(conf)
+	if err != nil {
+		panic(err)
+	}
+
+	agent := NewAgent(agentConf)
 
 	// Handle stops properly
 	defer agent.Join()

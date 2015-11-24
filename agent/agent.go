@@ -1,11 +1,10 @@
 package main
 
 import (
-	"strconv"
 	"sync"
-	"time"
 
 	"github.com/DataDog/raclette/config"
+	"github.com/DataDog/raclette/model"
 	log "github.com/cihub/seelog"
 )
 
@@ -14,79 +13,38 @@ type Agent struct {
 	Receiver     Receiver // Receiver is an interface
 	Quantizer    *Quantizer
 	Concentrator *Concentrator
+	Sampler      *Sampler
 	Writer       *Writer
 
 	// config
-	Config *config.File
+	Config *config.AgentConfig
 
 	// Used to synchronize on a clean exit
 	exit      chan struct{}
 	exitGroup *sync.WaitGroup
 }
 
-func getQuantilesFromConfig(conf *config.File) ([]float64, error) {
-	confQuantiles, err := conf.GetStrArray("trace.concentrator", "quantiles", ",")
-
-	if err != nil {
-		return nil, err
-	}
-
-	quantiles := make([]float64, len(confQuantiles))
-
-	for index, q := range confQuantiles {
-		value, err := strconv.ParseFloat(q, 64)
-		if err != nil {
-			return nil, err
-		}
-		quantiles[index] = value
-	}
-	return quantiles, nil
-}
-
 // NewAgent returns a new Agent object, ready to be initialized and started
-func NewAgent(conf *config.File) *Agent {
+func NewAgent(conf *config.AgentConfig) *Agent {
 
 	exit := make(chan struct{})
 	var exitGroup sync.WaitGroup
 
-	r, rawSpans := NewHTTPReceiver(exit, &exitGroup)
-	q, quantizedSpans := NewQuantizer(rawSpans, exit, &exitGroup)
+	r := NewHTTPReceiver(exit, &exitGroup)
+	q := NewQuantizer(r.out, exit, &exitGroup)
 
-	extraAggr, err := conf.GetStrArray("trace.concentrator", "extra_aggregators", ",")
-	if err != nil {
-		log.Info("No aggregator configuration, using defaults")
-	}
+	spansToConcentrator, spansToSampler := spanTPipe(q.out)
 
-	bucketSize := conf.GetIntDefault("trace.concentrator", "bucket_size_seconds", 10)
-	bucketQuantiles, err := getQuantilesFromConfig(conf)
-
-	// fail if quantiles configuration missing
-	if err != nil {
-		panic(err)
-	}
-
-	c, concentratedBuckets := NewConcentrator(time.Duration(bucketSize)*time.Second, quantizedSpans, extraAggr, exit, &exitGroup, bucketQuantiles)
-
-	var endpoint BucketEndpoint
-	if conf.GetBool("trace.api", "enabled", true) {
-		apiKey, err := conf.Get("trace.api", "api_key")
-		if err != nil {
-			panic(err)
-		}
-		url := conf.GetDefault("trace.api", "endpoint", "http://localhost:8012/api/v0.1")
-		endpoint = NewAPIEndpoint(url, apiKey)
-	} else {
-		log.Info("using null endpoint")
-		endpoint = NullEndpoint{}
-	}
-
-	w := NewWriter(endpoint, concentratedBuckets, exit, &exitGroup)
+	c := NewConcentrator(spansToConcentrator, conf, exit, &exitGroup)
+	s := NewSampler(spansToSampler, c.out, conf, exit, &exitGroup)
+	w := NewWriter(s.out, conf, exit, &exitGroup)
 
 	return &Agent{
 		Config:       conf,
 		Receiver:     r,
 		Quantizer:    q,
 		Concentrator: c,
+		Sampler:      s,
 		Writer:       w,
 		exit:         exit,
 		exitGroup:    &exitGroup,
@@ -99,6 +57,7 @@ func (a *Agent) Start() error {
 
 	// Build the pipeline in the opposite way the data is processed
 	a.Writer.Start()
+	a.Sampler.Start()
 	a.Concentrator.Start()
 	a.Quantizer.Start()
 	a.Receiver.Start()
@@ -113,4 +72,19 @@ func (a *Agent) Join() {
 	log.Info("Agent stopping, waiting for all running routines to finish")
 	a.exitGroup.Wait()
 	log.Info("DONE. Exiting now, over and out.")
+}
+
+// Distribute spans from the quantizer to the concentrator and the sampler
+func spanTPipe(in chan model.Span) (chan model.Span, chan model.Span) {
+	out1 := make(chan model.Span)
+	out2 := make(chan model.Span)
+
+	go func() {
+		for s := range in {
+			out1 <- s
+			out2 <- s
+		}
+	}()
+
+	return out1, out2
 }

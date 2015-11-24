@@ -6,3 +6,8 @@ type AgentPayload struct {
 	Spans    []Span      `json:"spans"`
 	Stats    StatsBucket `json:"stats"`
 }
+
+// IsEmpty tells if the payload is empty (and don't need to be sent)
+func (p *AgentPayload) IsEmpty() bool {
+	return len(p.Spans) == 0 && p.Stats.IsEmpty()
+}

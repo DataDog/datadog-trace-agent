@@ -1,9 +1,10 @@
-package main
+package sampler
 
 import (
 	"sort"
 	"testing"
 
+	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -11,8 +12,9 @@ import (
 func TestSampler(t *testing.T) {
 	assert := assert.New(t)
 
-	sampler := NewSampler([]float64{0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 1})
-	assert.True(sampler.IsEmpty())
+	conf := config.NewDefaultAgentConfig()
+	conf.SamplerQuantiles = []float64{0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 1}
+	sampler := NewResourceQuantileSampler(conf)
 
 	type sampleResult struct {
 		quantile float64
@@ -78,7 +80,7 @@ func TestSampler(t *testing.T) {
 
 	// Add one fake distribution for choosing
 	stats.Distributions["whatever"] = d
-	chosen := sampler.GetSamples(stats)
+	chosen := sampler.GetSamples(sampler.TraceIDBySpanID, sampler.SpansByTraceID, stats)
 
 	// step1: chosen spans by distributions: 18, 12, 11
 	chosenSID := make([]int, len(chosen))

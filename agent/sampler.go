@@ -1,94 +1,78 @@
 package main
 
 import (
-	"time"
+	"sync"
 
 	log "github.com/cihub/seelog"
 
+	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
+	"github.com/DataDog/raclette/sampler"
 )
 
 // Sampler chooses wich spans to write to the API
 type Sampler struct {
-	TraceIDBySpanID  map[uint64]uint64
-	SpansByTraceID   map[uint64][]model.Span
-	SamplerQuantiles []float64
+	inSpans chan model.Span
+	inStats chan model.StatsBucket  // Trigger the flush of the sampler when stats are received
+	out     chan model.AgentPayload // Output the stats + samples
+
+	conf *config.AgentConfig
+
+	se SamplerEngine
+
+	// exit channels used for synchronisation and sending stop signals
+	exit      chan struct{}
+	exitGroup *sync.WaitGroup
+}
+
+// SamplerEngine cares about ingesting spans and stats to return a sampled payload
+type SamplerEngine interface {
+	AddSpan(span model.Span)
+	FlushPayload(sb model.StatsBucket) model.AgentPayload
 }
 
 // NewSampler creates a new empty sampler
-func NewSampler(quantiles []float64) Sampler {
-	return Sampler{
-		TraceIDBySpanID:  map[uint64]uint64{},
-		SpansByTraceID:   map[uint64][]model.Span{},
-		SamplerQuantiles: quantiles,
+func NewSampler(
+	inSpans chan model.Span, inStats chan model.StatsBucket, conf *config.AgentConfig, exit chan struct{}, exitGroup *sync.WaitGroup,
+) *Sampler {
+
+	return &Sampler{
+		inSpans: inSpans,
+		inStats: inStats,
+		out:     make(chan model.AgentPayload),
+
+		conf: conf,
+
+		exit:      exit,
+		exitGroup: exitGroup,
+
+		se: sampler.NewResourceQuantileSampler(conf),
 	}
 }
 
-// IsEmpty tells if the sampler contains no span
-func (s Sampler) IsEmpty() bool {
-	return len(s.TraceIDBySpanID) == 0
+// Start runs the writer by consuming spans in a buffer and periodically
+// flushing to the API
+func (s *Sampler) Start() {
+	s.exitGroup.Add(1)
+	go s.run()
+
+	log.Info("Sampler started")
 }
 
-// AddSpan adds a span to the sampler internal momory
-func (s Sampler) AddSpan(span model.Span) {
-	s.TraceIDBySpanID[span.SpanID] = span.TraceID
-
-	spans, ok := s.SpansByTraceID[span.TraceID]
-	if !ok {
-		spans = []model.Span{span}
-	} else {
-		spans = append(spans, span)
-	}
-	s.SpansByTraceID[span.TraceID] = spans
-}
-
-// GetSamples returns a list of representative spans to write
-func (s *Sampler) GetSamples(sb model.StatsBucket) []model.Span {
-	startTime := time.Now()
-	spanIDs := make([]uint64, len(sb.Distributions)*len(s.SamplerQuantiles))
-
-	// Look at the stats to find representative spans
-	for _, d := range sb.Distributions {
-		for _, q := range s.SamplerQuantiles {
-			_, sIDs := d.Summary.Quantile(q)
-
-			if len(sIDs) > 0 { // TODO: not sure this condition is required
-				spanIDs = append(spanIDs, sIDs[0])
-			}
+// We rely on the concentrator ticker to flush periodically traces "aligning" on the buckets
+// (it's not perfect, but we don't really care, traces of this stats bucket may arrive in the next flush)
+func (s *Sampler) run() {
+	for {
+		select {
+		case span := <-s.inSpans:
+			s.se.AddSpan(span)
+		case bucket := <-s.inStats:
+			log.Info("Received a bucket from concentrator, initiating a sampling+flush")
+			s.out <- s.se.FlushPayload(bucket)
+		case <-s.exit:
+			log.Info("Sampler exiting")
+			s.exitGroup.Done()
+			return
 		}
 	}
-
-	// Then find the trace IDs thanks to a spanID -> traceID map
-	traceIDSet := make(map[uint64]struct{})
-	var token struct{}
-	for _, spanID := range spanIDs {
-		// spanIDs is pre-allocated, so it may contain zeros
-		if spanID != 0 {
-			traceID, ok := s.TraceIDBySpanID[spanID]
-			if !ok {
-				log.Errorf("SpanID reported by Quantiles not available in Sampler, SpanID=%d", spanID)
-			} else {
-				traceIDSet[traceID] = token
-			}
-		}
-	}
-
-	// Then get the traces (ie. set of spans) thanks to a traceID -> []spanID map
-	spans := []model.Span{}
-	for traceID := range traceIDSet {
-		spans = append(spans, s.SpansByTraceID[traceID]...)
-	}
-
-	Statsd.Count("trace_agent.sampler.trace.total", int64(len(s.SpansByTraceID)), nil, 1)
-	Statsd.Count("trace_agent.sampler.trace.kept", int64(len(traceIDSet)), nil, 1)
-	Statsd.Count("trace_agent.sampler.span.total", int64(len(s.TraceIDBySpanID)), nil, 1)
-	Statsd.Count("trace_agent.sampler.span.kept", int64(len(spans)), nil, 1)
-
-	execTime := time.Since(startTime)
-	log.Infof("Sampled %d traces out of %d, %d spans out of %d, in %s",
-		len(traceIDSet), len(s.SpansByTraceID), len(spans), len(s.TraceIDBySpanID), execTime)
-
-	Statsd.Gauge("trace_agent.sampler.sample_duration", execTime.Seconds(), nil, 1)
-
-	return spans
 }

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -17,12 +18,14 @@ func NewTestWriter() *Writer {
 	exit := make(chan struct{})
 	var exitGroup sync.WaitGroup
 
-	fakeAPIKey := "9d6e1075bb75e28ea6e720a4561f6b6d"
-	inBuckets := make(chan ConcentratorBucket)
+	conf := config.NewDefaultAgentConfig()
+	conf.APIKey = "9d6e1075bb75e28ea6e720a4561f6b6d"
+	conf.APIEndpoint = "http://localhost:8080"
+	in := make(chan model.AgentPayload)
 
 	return NewWriter(
-		NewAPIEndpoint("http://localhost:8080", fakeAPIKey),
-		inBuckets,
+		in,
+		conf,
 		exit,
 		&exitGroup,
 	)
@@ -50,20 +53,20 @@ func TestWriterExitsGracefully(t *testing.T) {
 	}
 }
 
-func getTestConcentratorBucket() ConcentratorBucket {
+func getTestStatsBucket() model.StatsBucket {
 	now := model.Now()
 	bucketSize := time.Duration(5 * time.Second).Nanoseconds()
-	cb := newBucket(now, bucketSize, []float64{0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 1})
+	sb := model.NewStatsBucket(now, bucketSize)
 
 	testSpans := []model.Span{
 		model.Span{TraceID: 0, SpanID: 1},
 		model.Span{TraceID: 1, SpanID: 2},
 	}
 	for _, s := range testSpans {
-		cb.handleSpan(s, DefaultAggregators)
+		sb.HandleSpan(s, DefaultAggregators)
 	}
 
-	return cb
+	return sb
 }
 
 // Testing the real logic of the writer
@@ -84,25 +87,25 @@ func TestWriterBufferFlush(t *testing.T) {
 	w.Start()
 
 	// light the fire by sending a bucket
-	w.inBuckets <- getTestConcentratorBucket()
+	w.in <- model.AgentPayload{Stats: getTestStatsBucket()}
 
 	// the bucket should be added to our queue pretty fast
 	// HTTP endpoint is down so the bucket should stay in the queue
 	ticker := time.NewTicker(10 * time.Millisecond).C
 	loop := 0
 	maxFlushWait := 10
-	buckets := 0
+	payloads := 0
 	for range ticker {
 		// toWrite is dangerously written to by other routines
 		w.mu.Lock()
-		buckets = len(w.bucketsToWrite)
+		payloads = len(w.payloadsToWrite)
 		w.mu.Unlock()
-		if buckets > 1 || loop >= maxFlushWait {
+		if payloads > 1 || loop >= maxFlushWait {
 			break
 		}
 		loop++
 	}
-	assert.Equal(1, buckets, "New bucket was not added to the flush queue, broken pipes?")
+	assert.Equal(1, payloads, "New payload was not added to the flush queue, broken pipes?")
 
 	// now start our HTTPServer and send stuff to it
 	fakeAPI.Start()
