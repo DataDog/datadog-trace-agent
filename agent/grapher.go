@@ -1,7 +1,6 @@
 package main
 
 import (
-	"strings"
 	"sync"
 
 	log "github.com/cihub/seelog"
@@ -22,24 +21,6 @@ type Grapher struct {
 	mu sync.Mutex
 
 	Worker
-}
-
-// Node is a node of the graph: only host + section for now
-type Node struct {
-	Host    string
-	Section string
-}
-
-// Edge is an edge of the graph: relation between 2 nodes with a type
-type Edge struct {
-	From Node
-	To   Node
-	Type string
-}
-
-// Key returns a serialized representation of the edge
-func (e *Edge) Key() string {
-	return strings.Join([]string{e.From.Host, e.From.Section, e.To.Host, e.To.Section, e.Type}, "|")
 }
 
 // NewGrapher creates a new empty grapher, ready to start
@@ -95,9 +76,9 @@ func (g *Grapher) HandleSpan(s model.Span) {
 
 	// Build the edge based on the span metadata
 	// TODO: Hostname resolution
-	edge := Edge{
-		From: Node{Host: s.Meta["in.host"], Section: s.Meta["in.section"]},
-		To:   Node{Host: s.Meta["out.host"], Section: s.Meta["out.section"]},
+	edge := model.Edge{
+		From: model.Node{Host: s.Meta["in.host"], Section: s.Meta["in.section"]},
+		To:   model.Node{Host: s.Meta["out.host"], Section: s.Meta["out.section"]},
 		Type: s.Type,
 	}
 
