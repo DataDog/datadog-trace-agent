@@ -2,17 +2,19 @@ package main
 
 import (
 	"sync"
+	"time"
 
 	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
 	log "github.com/cihub/seelog"
 )
 
-// Agent struct holds all the sub-routines structs and some channels to stream data in those
+// Agent struct holds all the sub-routines structs and make the data flow between them
 type Agent struct {
 	Receiver     Receiver // Receiver is an interface
 	Quantizer    *Quantizer
 	Concentrator *Concentrator
+	Grapher      *Grapher
 	Sampler      *Sampler
 	Writer       *Writer
 
@@ -20,38 +22,87 @@ type Agent struct {
 	Config *config.AgentConfig
 
 	// Used to synchronize on a clean exit
-	exit      chan struct{}
-	exitGroup *sync.WaitGroup
+	exit chan struct{}
 }
 
-// NewAgent returns a new Agent object, ready to be initialized and started
+// NewAgent returns a new Agent object, ready to be started
 func NewAgent(conf *config.AgentConfig) *Agent {
-
 	exit := make(chan struct{})
-	var exitGroup sync.WaitGroup
 
-	r := NewHTTPReceiver(exit, &exitGroup)
-	q := NewQuantizer(r.out, exit, &exitGroup)
+	r := NewHTTPReceiver()
+	q := NewQuantizer(r.out)
 
-	spansToConcentrator, spansToSampler := spanTPipe(q.out)
+	spansToConcentrator, spansToGrapher, spansToSampler := spanDoubleTPipe(q.out)
 
-	c := NewConcentrator(spansToConcentrator, conf, exit, &exitGroup)
-	s := NewSampler(spansToSampler, c.out, conf, exit, &exitGroup)
-	w := NewWriter(s.out, conf, exit, &exitGroup)
+	c := NewConcentrator(spansToConcentrator, conf)
+	g := NewGrapher(spansToGrapher, conf)
+	s := NewSampler(spansToSampler, conf)
+
+	w := NewWriter(conf)
 
 	return &Agent{
 		Config:       conf,
 		Receiver:     r,
 		Quantizer:    q,
 		Concentrator: c,
+		Grapher:      g,
 		Sampler:      s,
 		Writer:       w,
 		exit:         exit,
-		exitGroup:    &exitGroup,
 	}
 }
 
-// Start starts routers routines and individual pieces forever
+// Run starts routers routines and individual pieces then stop them when the exit order is received
+func (a *Agent) Run() {
+	// Start all workers
+	go a.runFlusher()
+	a.Start()
+	// Wait for the exit order
+	<-a.exit
+	// Stop all workers
+	a.Stop()
+}
+
+// runFlusher periodically send a flush marker, collect the results and send the payload to the Writer
+func (a *Agent) runFlusher() {
+	ticker := time.NewTicker(a.Config.BucketInterval)
+	for {
+		select {
+		case <-ticker.C:
+			log.Debug("Trigger a flush")
+			a.Quantizer.out <- model.NewFlushMarker()
+
+			// Collect and merge partial flushs
+			var wg sync.WaitGroup
+			p := model.AgentPayload{}
+			wg.Add(3)
+			go func() {
+				defer wg.Done()
+				p.Stats = <-a.Concentrator.out
+			}()
+			go func() {
+				defer wg.Done()
+				p.Graph = <-a.Grapher.out
+			}()
+			go func() {
+				defer wg.Done()
+				p.Spans = <-a.Sampler.out
+			}()
+			wg.Wait()
+
+			if !p.IsEmpty() {
+				a.Writer.in <- p
+			} else {
+				log.Debug("Empty payload, skipping")
+			}
+		case <-a.exit:
+			ticker.Stop()
+			return
+		}
+	}
+}
+
+// Start starts all components
 func (a *Agent) Start() error {
 	log.Info("Starting agent")
 
@@ -59,6 +110,7 @@ func (a *Agent) Start() error {
 	a.Writer.Start()
 	a.Sampler.Start()
 	a.Concentrator.Start()
+	a.Grapher.Start()
 	a.Quantizer.Start()
 	a.Receiver.Start()
 
@@ -66,25 +118,33 @@ func (a *Agent) Start() error {
 	return nil
 }
 
-// Join an agent should be called when its exit channel has been closed and waits for sub-routines to return before returning
-func (a *Agent) Join() {
-	// FIXME: check if the exit channel is closed, otherwise panic as it will never return. Optionally use a timeout here?
-	log.Info("Agent stopping, waiting for all running routines to finish")
-	a.exitGroup.Wait()
-	log.Info("DONE. Exiting now, over and out.")
+// Stop stops all components
+func (a *Agent) Stop() error {
+	log.Info("Stopping agent")
+
+	a.Receiver.Stop()
+	a.Quantizer.Stop()
+	a.Concentrator.Stop()
+	a.Grapher.Stop()
+	a.Sampler.Stop()
+	a.Writer.Stop()
+
+	return nil
 }
 
-// Distribute spans from the quantizer to the concentrator and the sampler
-func spanTPipe(in chan model.Span) (chan model.Span, chan model.Span) {
+// spanDoubleTPipe redistributes incoming spans to multiple components by returning multiple channels
+func spanDoubleTPipe(in chan model.Span) (chan model.Span, chan model.Span, chan model.Span) {
 	out1 := make(chan model.Span)
 	out2 := make(chan model.Span)
+	out3 := make(chan model.Span)
 
 	go func() {
 		for s := range in {
 			out1 <- s
 			out2 <- s
+			out3 <- s
 		}
 	}()
 
-	return out1, out2
+	return out1, out2, out3
 }

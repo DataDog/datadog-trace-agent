@@ -8,64 +8,72 @@ import (
 
 	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
+	"github.com/DataDog/raclette/statsd"
 )
 
-// Sampler chooses wich spans to write to the API
+var DefaultAggregators = []string{"service", "resource"}
+
+// ResourceQuantileSampler samples by selectic spans representative of each sampler quantiles for each resource from local statistics
 type ResourceQuantileSampler struct {
-	TraceIDBySpanID map[uint64]uint64
-	SpansByTraceID  map[uint64][]model.Span
-	conf            *config.AgentConfig
-	mu              sync.Mutex
+	stats           model.StatsBucket
+	traceIDBySpanID map[uint64]uint64
+	spansByTraceID  map[uint64][]model.Span
+
+	conf *config.AgentConfig
+	mu   sync.Mutex
 }
 
-// NewResourceQuantileSampler creates a ResourceQuantileSampler
+// NewResourceQuantileSampler creates a new ResourceQuantileSampler, ready to ingest spans
 func NewResourceQuantileSampler(conf *config.AgentConfig) *ResourceQuantileSampler {
 	return &ResourceQuantileSampler{
-		TraceIDBySpanID: map[uint64]uint64{},
-		SpansByTraceID:  map[uint64][]model.Span{},
+		stats:           model.NewStatsBucket(0, 1),
+		traceIDBySpanID: map[uint64]uint64{},
+		spansByTraceID:  map[uint64][]model.Span{},
 		conf:            conf,
 	}
 }
 
-// AddSpan adds a span to the sampler internal momory
+// AddSpan adds a span to the ResourceQuantileSampler internal memory
 func (s *ResourceQuantileSampler) AddSpan(span model.Span) {
 	s.mu.Lock()
-	s.TraceIDBySpanID[span.SpanID] = span.TraceID
+	s.traceIDBySpanID[span.SpanID] = span.TraceID
 
-	spans, ok := s.SpansByTraceID[span.TraceID]
+	spans, ok := s.spansByTraceID[span.TraceID]
 	if !ok {
 		spans = []model.Span{span}
 	} else {
 		spans = append(spans, span)
 	}
-	s.SpansByTraceID[span.TraceID] = spans
+	s.spansByTraceID[span.TraceID] = spans
+
+	s.stats.HandleSpan(span, DefaultAggregators)
 	s.mu.Unlock()
 }
 
-func (s *ResourceQuantileSampler) FlushPayload(sb model.StatsBucket) model.AgentPayload {
-	// Freeze sampler state
+// Flush returns representative spans based on GetSamples and reset its internal memory
+func (s *ResourceQuantileSampler) Flush() []model.Span {
 	s.mu.Lock()
-	traceIDBySpanID := s.TraceIDBySpanID
-	spansByTraceID := s.SpansByTraceID
-	s.TraceIDBySpanID = map[uint64]uint64{}
-	s.SpansByTraceID = map[uint64][]model.Span{}
+	traceIDBySpanID := s.traceIDBySpanID
+	spansByTraceID := s.spansByTraceID
+	stats := s.stats
+	s.traceIDBySpanID = map[uint64]uint64{}
+	s.spansByTraceID = map[uint64][]model.Span{}
+	s.stats = model.NewStatsBucket(0, 1)
 	s.mu.Unlock()
 
-	samples := s.GetSamples(traceIDBySpanID, spansByTraceID, sb)
-	return model.AgentPayload{
-		Stats: sb,
-		Spans: samples,
-	}
+	return s.GetSamples(traceIDBySpanID, spansByTraceID, stats)
 }
 
+// GetSamples returns interesting spans by picking a representative of each SamplerQuantiles of each resource
 func (s *ResourceQuantileSampler) GetSamples(
-	traceIDBySpanID map[uint64]uint64, spansByTraceID map[uint64][]model.Span, sb model.StatsBucket,
+	traceIDBySpanID map[uint64]uint64, spansByTraceID map[uint64][]model.Span, stats model.StatsBucket,
 ) []model.Span {
+	// We should merge them instead of picking a random one
 	startTime := time.Now()
-	spanIDs := make([]uint64, len(sb.Distributions)*len(s.conf.SamplerQuantiles))
+	spanIDs := make([]uint64, len(stats.Distributions)*len(s.conf.SamplerQuantiles))
 
 	// Look at the stats to find representative spans
-	for _, d := range sb.Distributions {
+	for _, d := range stats.Distributions {
 		for _, q := range s.conf.SamplerQuantiles {
 			_, sIDs := d.Summary.Quantile(q)
 
@@ -83,7 +91,7 @@ func (s *ResourceQuantileSampler) GetSamples(
 		if spanID != 0 {
 			traceID, ok := traceIDBySpanID[spanID]
 			if !ok {
-				log.Errorf("SpanID reported by Quantiles not available in Sampler, SpanID=%d", spanID)
+				log.Errorf("Span not available in Sampler, SpanID=%d", spanID)
 			} else {
 				traceIDSet[traceID] = token
 			}
@@ -96,16 +104,15 @@ func (s *ResourceQuantileSampler) GetSamples(
 		spans = append(spans, spansByTraceID[traceID]...)
 	}
 
-	// Statsd.Count("trace_agent.sampler.trace.total", int64(len(spansByTraceID)), nil, 1)
-	// Statsd.Count("trace_agent.sampler.trace.kept", int64(len(traceIDSet)), nil, 1)
-	// Statsd.Count("trace_agent.sampler.span.total", int64(len(traceIDBySpanID)), nil, 1)
-	// Statsd.Count("trace_agent.sampler.span.kept", int64(len(spans)), nil, 1)
-
 	execTime := time.Since(startTime)
 	log.Infof("Sampled %d traces out of %d, %d spans out of %d, in %s",
 		len(traceIDSet), len(spansByTraceID), len(spans), len(traceIDBySpanID), execTime)
 
-	// Statsd.Gauge("trace_agent.sampler.sample_duration", execTime.Seconds(), nil, 1)
+	statsd.Client.Count("trace_agent.sampler.trace.total", int64(len(spansByTraceID)), nil, 1)
+	statsd.Client.Count("trace_agent.sampler.trace.kept", int64(len(traceIDSet)), nil, 1)
+	statsd.Client.Count("trace_agent.sampler.span.total", int64(len(traceIDBySpanID)), nil, 1)
+	statsd.Client.Count("trace_agent.sampler.span.kept", int64(len(spans)), nil, 1)
+	statsd.Client.Gauge("trace_agent.sampler.sample_duration", execTime.Seconds(), nil, 1)
 
 	return spans
 }

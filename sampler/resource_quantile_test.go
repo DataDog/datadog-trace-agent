@@ -80,7 +80,7 @@ func TestSampler(t *testing.T) {
 
 	// Add one fake distribution for choosing
 	stats.Distributions["whatever"] = d
-	chosen := sampler.GetSamples(sampler.TraceIDBySpanID, sampler.SpansByTraceID, stats)
+	chosen := sampler.GetSamples(sampler.traceIDBySpanID, sampler.spansByTraceID, stats)
 
 	// step1: chosen spans by distributions: 18, 12, 11
 	chosenSID := make([]int, len(chosen))

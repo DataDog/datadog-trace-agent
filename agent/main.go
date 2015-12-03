@@ -11,10 +11,11 @@ import (
 	"time"
 
 	"github.com/DataDog/raclette/config"
+	"github.com/DataDog/raclette/statsd"
 	log "github.com/cihub/seelog"
 )
 
-// dumb handler that closes a channel to exit cleanly from routines
+// handleSignal closes a channel to exit cleanly from routines
 func handleSignal(exit chan struct{}) {
 	sigChan := make(chan os.Signal, 10)
 	signal.Notify(sigChan)
@@ -27,11 +28,13 @@ func handleSignal(exit chan struct{}) {
 	}
 }
 
+// opts are the command-line options
 var opts struct {
 	configFile    string
 	logConfigFile string
 }
 
+// main is the entrypoint of our code
 func main() {
 	flag.StringVar(&opts.configFile, "config", "/etc/datadog/trace-agent.ini", "Trace agent ini config file.")
 	flag.StringVar(&opts.logConfigFile, "log_config", "/etc/datadog/trace-agent_seelog.xml", "Trace agent log config file.")
@@ -52,7 +55,7 @@ func main() {
 	defer log.Flush()
 
 	// Initialize dogstatsd client
-	err = ConfigureStatsd(conf, "dogstatsd")
+	err = statsd.Configure(conf, "dogstatsd")
 	if err != nil {
 		panic(fmt.Sprintf("Error configuring dogstatsd: %v", err))
 	}
@@ -68,8 +71,7 @@ func main() {
 	agent := NewAgent(agentConf)
 
 	// Handle stops properly
-	defer agent.Join()
 	go handleSignal(agent.exit)
 
-	agent.Start()
+	agent.Run()
 }
