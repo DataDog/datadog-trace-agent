@@ -45,21 +45,9 @@ func (q *NetworkTopology) Start() {
 	log.Info("NetworkTopology started")
 }
 
-func buildEdge(from string, to string) (edge model.Edge, err error) {
-	if err := json.NewDecoder(strings.NewReader(from)).Decode(&edge.From); err != nil {
-		return edge, err
-	}
-
-	if err = json.NewDecoder(strings.NewReader(to)).Decode(&edge.To); err != nil {
-		return edge, err
-	}
-	return edge, nil
-}
-
 func (q *NetworkTopology) getTCPstats() ([]model.Edge, error) {
 	cmd := exec.Command("/bin/ss", "-rt4", "not", "src", "localhost", "and", "not", "dst", "localhost")
 	stdout, err := cmd.Output()
-	var from, to []byte
 	var edges = make([]model.Edge, 0)
 
 	// something went wrong, drop it like it's hot!
@@ -67,17 +55,22 @@ func (q *NetworkTopology) getTCPstats() ([]model.Edge, error) {
 		return nil, err
 	}
 
-	// find all matching lines and expand them into json-like string
-	for _, s := range ssOutputRegexp.FindAllSubmatchIndex(stdout, -1) {
-		from = ssOutputRegexp.Expand([]byte{}, []byte(`{"Host": "$localAddr", "Section": "$localPort"}`), stdout, s)
-		to = ssOutputRegexp.Expand([]byte{}, []byte(`{"Host": "$remoteAddr", "Section": "$remotePort"}`), stdout, s)
-
-		edge, err := buildEdge(string(from), string(to))
-		if err != nil {
-			continue
+	groupNames := ssOutputRegexp.SubexpNames()[1:]
+	for _, submatches := range ssOutputRegexp.FindAllStringSubmatch(string(stdout), -1) {
+		e := model.Edge{Type: "tcp_network"}
+		for i, s := range submatches[1:] {
+			switch groupNames[i] {
+			case "localAddr":
+				e.From.Host = s
+			case "localPort":
+				e.From.Section = s
+			case "remoteAddr":
+				e.To.Host = s
+			case "remotePort":
+				e.To.Section = s
+			}
 		}
-
-		edges = append(edges, edge)
+		edges = append(edges, e)
 	}
 
 	log.Infof("NetworkTopology reported %d edges", len(edges))
