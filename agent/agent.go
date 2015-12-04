@@ -11,12 +11,13 @@ import (
 
 // Agent struct holds all the sub-routines structs and make the data flow between them
 type Agent struct {
-	Receiver     Receiver // Receiver is an interface
-	Quantizer    *Quantizer
-	Concentrator *Concentrator
-	Grapher      *Grapher
-	Sampler      *Sampler
-	Writer       *Writer
+	Receiver        Receiver // Receiver is an interface
+	Quantizer       *Quantizer
+	Concentrator    *Concentrator
+	Grapher         *Grapher
+	Sampler         *Sampler
+	Writer          *Writer
+	NetworkTopology *NetworkTopology
 
 	// config
 	Config *config.AgentConfig
@@ -31,24 +32,26 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 
 	r := NewHTTPReceiver()
 	q := NewQuantizer(r.out)
+	n := NewNetworkTopology()
 
 	spansToConcentrator, spansToGrapher, spansToSampler := spanDoubleTPipe(q.out)
 
 	c := NewConcentrator(spansToConcentrator, conf)
-	g := NewGrapher(spansToGrapher, conf)
+	g := NewGrapher(spansToGrapher, n.out, conf)
 	s := NewSampler(spansToSampler, conf)
 
 	w := NewWriter(conf)
 
 	return &Agent{
-		Config:       conf,
-		Receiver:     r,
-		Quantizer:    q,
-		Concentrator: c,
-		Grapher:      g,
-		Sampler:      s,
-		Writer:       w,
-		exit:         exit,
+		Config:          conf,
+		Receiver:        r,
+		Quantizer:       q,
+		Concentrator:    c,
+		Grapher:         g,
+		Sampler:         s,
+		NetworkTopology: n,
+		Writer:          w,
+		exit:            exit,
 	}
 }
 
@@ -113,6 +116,7 @@ func (a *Agent) Start() error {
 	a.Grapher.Start()
 	a.Quantizer.Start()
 	a.Receiver.Start()
+	a.NetworkTopology.Start()
 
 	// FIXME: catch start errors
 	return nil
@@ -122,6 +126,7 @@ func (a *Agent) Start() error {
 func (a *Agent) Stop() error {
 	log.Info("Stopping agent")
 
+	a.NetworkTopology.Stop()
 	a.Receiver.Stop()
 	a.Quantizer.Stop()
 	a.Concentrator.Stop()

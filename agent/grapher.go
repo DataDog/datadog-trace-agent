@@ -11,8 +11,9 @@ import (
 
 // Grapher builds a graph representation of all interating elements of the traced system
 type Grapher struct {
-	in  chan model.Span
-	out chan map[string][]uint64
+	in      chan model.Span
+	inEdges chan []model.Edge
+	out     chan map[string][]uint64
 
 	conf *config.AgentConfig
 
@@ -24,11 +25,12 @@ type Grapher struct {
 }
 
 // NewGrapher creates a new empty grapher, ready to start
-func NewGrapher(in chan model.Span, conf *config.AgentConfig) *Grapher {
+func NewGrapher(in chan model.Span, inEdges chan []model.Edge, conf *config.AgentConfig) *Grapher {
 
 	g := &Grapher{
-		in:  in,
-		out: make(chan map[string][]uint64),
+		in:      in,
+		inEdges: inEdges,
+		out:     make(chan map[string][]uint64),
 
 		conf: conf,
 
@@ -55,6 +57,8 @@ func (g *Grapher) run() {
 			} else {
 				g.HandleSpan(span)
 			}
+		case edges := <-g.inEdges:
+			g.addEdges(edges)
 		case <-g.exit:
 			log.Info("Grapher exiting")
 			close(g.out)
@@ -87,6 +91,18 @@ func (g *Grapher) HandleSpan(s model.Span) {
 		g.graph[key] = append(g.graph[key], s.SpanID)
 	} else {
 		g.graph[key] = []uint64{s.SpanID}
+	}
+}
+
+func (g *Grapher) addEdges(edges []model.Edge) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	for _, edge := range edges {
+		key := edge.Key()
+		if _, ok := g.graph[key]; !ok {
+			g.graph[key] = []uint64{}
+		}
 	}
 }
 
