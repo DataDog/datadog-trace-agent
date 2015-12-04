@@ -101,7 +101,7 @@ func (g *Grapher) addEdges(edges []model.Edge) {
 	for _, edge := range edges {
 		key := edge.Key()
 		if _, ok := g.graph[key]; !ok {
-			g.graph[key] = []uint64{}
+			g.graph[key] = nil
 		}
 	}
 }

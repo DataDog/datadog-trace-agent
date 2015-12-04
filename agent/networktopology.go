@@ -10,6 +10,7 @@ import (
 )
 
 var ssOutputRegexp = regexp.MustCompile(`(?m)^ESTAB\s+\d+\s+\d+\s+(?P<localAddr>[^:]+):(?P<localPort>\d+)\s+(?P<remoteAddr>[^:]+):(?P<remotePort>\d+)(\s+)?$`)
+var getNetworkTopologyTick = time.Second * 2
 
 // NetworkTopology generates meaningul resource for spans
 type NetworkTopology struct {
@@ -30,7 +31,7 @@ func NewNetworkTopology() *NetworkTopology {
 // Start runs the NetworkTopology by quantizing spans from the channel
 func (q *NetworkTopology) Start() {
 	go func() {
-		for range time.Tick(time.Second * 2) {
+		for range time.Tick(getNetworkTopologyTick) {
 			edges, err := q.getTCPstats()
 			if err != nil {
 				log.Error(err)
@@ -46,7 +47,7 @@ func (q *NetworkTopology) Start() {
 func (q *NetworkTopology) getTCPstats() ([]model.Edge, error) {
 	cmd := exec.Command("/bin/ss", "-rt4", "not", "src", "localhost", "and", "not", "dst", "localhost")
 	stdout, err := cmd.Output()
-	var edges = make([]model.Edge, 0)
+	var edges []model.Edge
 
 	// something went wrong, drop it like it's hot!
 	if err != nil {
