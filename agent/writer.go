@@ -94,12 +94,9 @@ func (w *Writer) Flush() {
 		flushed++
 	}
 
-	if flushed == total {
-		// all payloads were properly flushed.
-		w.payloadsToWrite = nil
-	} else if 0 < flushed {
-		w.payloadsToWrite = w.payloadsToWrite[flushed:]
-	}
+	// regardless if the http post was was success or not. We don't want to buffer
+	//  data in case of api outage
+	w.payloadsToWrite = nil
 
 	log.Infof("Flushed %d/%d payloads", flushed, total)
 }
