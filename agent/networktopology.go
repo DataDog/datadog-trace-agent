@@ -1,11 +1,9 @@
 package main
 
 import (
-	"encoding/json"
 	log "github.com/cihub/seelog"
 	"os/exec"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/DataDog/raclette/model"
