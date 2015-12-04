@@ -60,52 +60,29 @@ func getTestStatsBuckets() []model.StatsBucket {
 }
 
 // Testing the real logic of the writer
-func TestWriterBufferFlush(t *testing.T) {
+func TestWriterFlush(t *testing.T) {
 	assert := assert.New(t)
 
 	// Create a fake API for the writer
 	receivedData := false
-	fakeAPI := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	testAPI := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := ioutil.ReadAll(r.Body)
 		fmt.Println(string(b))
 		receivedData = true
 		w.WriteHeader(200)
 	}))
-	defer fakeAPI.Close()
+	defer testAPI.Close()
+	testAPI.Start()
 
-	w := NewTestWriter()
+	// Start our writer with the test API
+	conf := config.NewDefaultAgentConfig()
+	conf.APIKey = "9d6e1075bb75e28ea6e720a4561f6b6d"
+	conf.APIEndpoint = testAPI.URL + "/api/v0.1"
+	w := NewWriter(conf)
 	w.Start()
 
 	// light the fire by sending a bucket
 	w.in <- model.AgentPayload{Stats: getTestStatsBuckets()}
-
-	// the bucket should be added to our queue pretty fast
-	// HTTP endpoint is down so the bucket should stay in the queue
-	ticker := time.NewTicker(10 * time.Millisecond).C
-	loop := 0
-	maxFlushWait := 10
-	payloads := 0
-	for range ticker {
-		// toWrite is dangerously written to by other routines
-		w.mu.Lock()
-		payloads = len(w.payloadsToWrite)
-		w.mu.Unlock()
-		if payloads > 1 || loop >= maxFlushWait {
-			break
-		}
-		loop++
-	}
-	assert.Equal(1, payloads, "New payload was not added to the flush queue, broken pipes?")
-
-	// now start our HTTPServer and send stuff to it
-	fakeAPI.Start()
-	// point our writer to it
-	// We have to stop the writer so that we don't get a race when we change w.endpoint
-	close(w.exit)
-	w.wg.Wait()
-	fakeAPIKey := "9d6e1075bb75e28ea6e720a4561f6b6d"
-	w.endpoint = NewAPIEndpoint(fakeAPI.URL+"/api/v0.1", fakeAPIKey)
-	w.Start()
 
 	// Reflush, manually! synchronous
 	w.Flush()
