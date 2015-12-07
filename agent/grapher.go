@@ -13,7 +13,9 @@ import (
 type Grapher struct {
 	in      chan model.Span
 	inEdges chan []model.Edge
-	out     chan map[string][]uint64
+
+	// output channel send a list of Spans mapped by the Edge.Key()
+	out chan map[string][]uint64
 
 	conf *config.AgentConfig
 
