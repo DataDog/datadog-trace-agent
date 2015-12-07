@@ -88,8 +88,8 @@ func (g *Grapher) HandleSpan(s model.Span) {
 		Type: s.Type,
 	}
 
-	// resolve Edge hosts
-	edge.LookupHosts()
+	// Expand Edge hosts
+	edge.ExpandHosts()
 
 	key := edge.Key()
 	if _, ok := g.graph[key]; ok {

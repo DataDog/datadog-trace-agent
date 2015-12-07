@@ -2,6 +2,7 @@ package model
 
 import (
 	"net"
+	"os"
 	"strings"
 )
 
@@ -37,17 +38,29 @@ func lookupHost(ip string) (string, error) {
 	}
 }
 
-// LookupHost tries to resolve Node's Host
-func (e *Edge) LookupHosts() {
+// ExpandHosts is a method that lookup both From and To host.
+// in case the From.Host is missing it's going to be filled with os.Hostname
+func (e *Edge) ExpandHosts() {
 
-	// make sure both From and To has a Host filled
-	if len(e.From.Host) < 1 || len(e.To.Host) < 1 {
+	// we need at least To.Host to consider this Edge as a valid one
+	// just return if it's missing - nothing here to be done
+	if e.To.Host == "" {
 		return
 	}
 
-	from, err := lookupHost(e.From.Host)
-	if err == nil {
-		e.From.Host = from
+	// fill the empty From.Host with os.Hostname
+	if e.From.Host == "" {
+		hostname, err := os.Hostname()
+		if err != nil {
+			e.From.Host = hostname
+		} else {
+			return
+		}
+	} else {
+		from, err := lookupHost(e.From.Host)
+		if err == nil {
+			e.From.Host = from
+		}
 	}
 
 	to, err := lookupHost(e.To.Host)
