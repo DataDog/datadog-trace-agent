@@ -23,9 +23,8 @@ func (e *Edge) Key() string {
 	return strings.Join([]string{e.From.Host, e.From.Section, e.To.Host, e.To.Section, e.Type}, "|")
 }
 
-// LookupHost tries to resolve Node's Host
-func (n *Node) LookupHost() (string, error) {
-	hostname, err := net.LookupHost(n.Host)
+func lookupHost(ip string) (string, error) {
+	hostname, err := net.LookupHost(ip)
 	if err != nil {
 		return "", err
 	}
@@ -34,7 +33,26 @@ func (n *Node) LookupHost() (string, error) {
 	if len(hostname) > 0 {
 		return hostname[0], nil
 	} else {
-		return n.Host, nil
+		return ip, nil
+	}
+}
+
+// LookupHost tries to resolve Node's Host
+func (e *Edge) LookupHosts() {
+
+	// make sure both From and To has a Host filled
+	if len(e.From.Host) < 1 || len(e.To.Host) < 1 {
+		return
+	}
+
+	from, err := lookupHost(e.From.Host)
+	if err == nil {
+		e.From.Host = from
+	}
+
+	to, err := lookupHost(e.To.Host)
+	if err == nil {
+		e.To.Host = to
 	}
 }
 

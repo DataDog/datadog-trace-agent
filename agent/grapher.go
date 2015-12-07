@@ -88,6 +88,9 @@ func (g *Grapher) HandleSpan(s model.Span) {
 		Type: s.Type,
 	}
 
+	// resolve Edge hosts
+	edge.LookupHosts()
+
 	key := edge.Key()
 	if _, ok := g.graph[key]; ok {
 		g.graph[key] = append(g.graph[key], s.SpanID)
