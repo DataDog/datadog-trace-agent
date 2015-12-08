@@ -33,9 +33,9 @@ func lookupHost(ip string) (string, error) {
 	// return the first host from the list
 	if len(hostname) > 0 {
 		return hostname[0], nil
-	} else {
-		return ip, nil
 	}
+
+	return ip, nil
 }
 
 // ExpandHosts is a method that lookup both From and To host.
