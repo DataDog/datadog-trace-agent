@@ -83,10 +83,16 @@ func (q *NetworkTopology) getTCPstats() ([]model.Edge, error) {
 			}
 		}
 
-		// add edge only if From.Section or To.Section is on the trace list
-		if q.portOnTraceList(e.From.Section) || q.portOnTraceList(e.To.Section) {
+		if !q.portOnTraceList(e.From.Section) {
+			e.From.Section = ""
+		}
+		if !q.portOnTraceList(e.To.Section) {
+			e.To.Section = ""
+		}
+		if e.From.Section != "" || e.To.Section != "" {
 			edges = append(edges, e)
 		}
+
 	}
 
 	log.Infof("NetworkTopology reported %d edges", len(edges))
