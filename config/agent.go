@@ -21,6 +21,8 @@ type AgentConfig struct {
 	ExtraAggregators []string
 
 	SamplerQuantiles []float64
+
+	TracePortsList []string
 }
 
 // NewDefaultAgentConfig returns a configuration with the default values
@@ -75,6 +77,11 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 			quantiles[index] = value
 		}
 		c.SamplerQuantiles = quantiles
+	}
+
+	if tracePortsList, e := conf.GetStrArray("graph.networktopology", "tracePortsList", ","); e == nil {
+		log.Infof("Tracing ports : %s", tracePortsList)
+		c.TracePortsList = tracePortsList
 	}
 
 	return c, nil

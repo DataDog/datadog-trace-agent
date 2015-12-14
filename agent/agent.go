@@ -32,7 +32,7 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 
 	r := NewHTTPReceiver()
 	q := NewQuantizer(r.out)
-	n := NewNetworkTopology()
+	n := NewNetworkTopology(conf)
 
 	spansToConcentrator, spansToGrapher, spansToSampler := spanDoubleTPipe(q.out)
 

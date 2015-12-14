@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
 )
 
@@ -14,15 +15,18 @@ var getNetworkTopologyTick = time.Second * 2
 
 // NetworkTopology generates meaningul resource for spans
 type NetworkTopology struct {
-	out chan []model.Edge
+	out            chan []model.Edge
+	tracePortsList []string
 
 	Worker
 }
 
 // NewNetworkTopology creates a new NetworkTopology ready to be started
-func NewNetworkTopology() *NetworkTopology {
+func NewNetworkTopology(conf *config.AgentConfig) *NetworkTopology {
+
 	q := &NetworkTopology{
-		out: make(chan []model.Edge),
+		out:            make(chan []model.Edge),
+		tracePortsList: conf.TracePortsList,
 	}
 	q.Init()
 	return q
@@ -42,6 +46,15 @@ func (q *NetworkTopology) Start() {
 	}()
 
 	log.Info("NetworkTopology started")
+}
+
+func (q *NetworkTopology) portOnTraceList(port string) bool {
+	for _, p := range q.tracePortsList {
+		if p == port {
+			return true
+		}
+	}
+	return false
 }
 
 func (q *NetworkTopology) getTCPstats() ([]model.Edge, error) {
@@ -69,7 +82,11 @@ func (q *NetworkTopology) getTCPstats() ([]model.Edge, error) {
 				e.To.Section = s
 			}
 		}
-		edges = append(edges, e)
+
+		// add edge only if From.Section or To.Section is on the trace list
+		if q.portOnTraceList(e.From.Section) || q.portOnTraceList(e.To.Section) {
+			edges = append(edges, e)
+		}
 	}
 
 	log.Infof("NetworkTopology reported %d edges", len(edges))
