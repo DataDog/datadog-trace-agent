@@ -79,7 +79,7 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 		c.SamplerQuantiles = quantiles
 	}
 
-	if tracePortsList, e := conf.GetStrArray("graph.networktopology", "tracePortsList", ","); e == nil {
+	if tracePortsList, e := conf.GetStrArray("graph.networktopology", "trace_ports_list", ","); e == nil {
 		log.Infof("Tracing ports : %s", tracePortsList)
 		c.TracePortsList = tracePortsList
 	}
