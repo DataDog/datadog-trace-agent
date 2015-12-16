@@ -116,11 +116,7 @@ func (d Distribution) Add(s Span) {
 
 // Merge is used when 2 Distributions represent the same thing and it merges the 2 underlying summaries
 func (d Distribution) Merge(d2 Distribution) {
-	if d.Key != d2.Key {
-		err := fmt.Errorf("Trying to merge non-homogoneous distros [%s] and [%s]", d.Key, d2.Key)
-		panic(err)
-	}
-
+	// We don't check tagsets for distributions as we reaggregate without reallocating new structs
 	d.Summary.Merge(d2.Summary)
 }
 

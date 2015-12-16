@@ -19,3 +19,11 @@ func TestStatsBucket() model.StatsBucket {
 	sb.HandleSpan(TestSpan(), defaultAggregators)
 	return sb
 }
+
+func StatsBucketWithSpans(s []model.Span) model.StatsBucket {
+	sb := model.NewStatsBucket(0, 1e9)
+	for _, s := range s {
+		sb.HandleSpan(s, defaultAggregators)
+	}
+	return sb
+}
