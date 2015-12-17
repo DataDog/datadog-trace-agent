@@ -14,9 +14,10 @@ type Node struct {
 
 // Edge is an edge of the graph: relation between 2 nodes with a type
 type Edge struct {
-	From Node
-	To   Node
-	Type string
+	From  Node
+	To    Node
+	Type  string
+	OrgID int32
 }
 
 // Key returns a serialized representation of the edge
