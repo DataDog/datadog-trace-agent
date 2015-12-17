@@ -22,7 +22,7 @@ type Edge struct {
 
 // Key returns a serialized representation of the edge
 func (e *Edge) Key() string {
-	return strings.Join([]string{e.From.Host, e.From.Section, e.To.Host, e.To.Section, e.Type}, "|")
+	return strings.Join([]string{e.From.Host, e.From.Section, e.To.Host, e.To.Section, e.Type, e.OrgID}, "|")
 }
 
 func lookupHost(ip string) (string, error) {
