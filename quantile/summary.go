@@ -155,23 +155,30 @@ func (s *Summary) compress() {
 		next := elt.next[0]
 		t := elt.value
 		nt := &next.value
+		// TODO[leo]: for now we keep only one sample, at random, figure it out
+		changeSample := rand.Intn(1) == 0
 
 		// value merging
 		if t.V == nt.V {
 			missing += nt.G
 			nt.Delta += missing
 			nt.G = t.G
-			nt.Samples = append(nt.Samples, t.Samples...)
+			if changeSample {
+				nt.Samples = t.Samples
+			}
 			s.data.Remove(elt)
 		} else if t.G+nt.G+missing+nt.Delta < epsN {
 			nt.G += t.G + missing
-			nt.Samples = append(nt.Samples, t.Samples...)
+			if changeSample {
+				nt.Samples = t.Samples
+			}
 			missing = 0
 			s.data.Remove(elt)
 		} else {
 			nt.G += missing
 			missing = 0
 		}
+
 		elt = next
 	}
 }
