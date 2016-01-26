@@ -101,16 +101,6 @@ func NewDistribution(m string, tgs TagSet) Distribution {
 	}
 }
 
-func CopyDistribution(d Distribution) Distribution {
-	dcopy := Distribution{
-		Key:    d.Key,
-		Name:   d.Name,
-		TagSet: d.TagSet,
-	}
-	*dcopy.Summary = *d.Summary
-	return dcopy
-}
-
 // Add inserts the proper values in a given distribution from a span
 func (d Distribution) Add(s Span) {
 	if d.Name == DURATION {

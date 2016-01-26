@@ -44,10 +44,10 @@ var resources = []string{
 }
 
 var layers = []string{
-	"dogweb.pylons",
-	"dogweb.pylons.template",
-	"dogweb.pylons.routes",
-	"dogweb.pylons.controllers",
+	"app.pylons",
+	"app.pylons.template",
+	"app.pylons.routes",
+	"app.pylons.controllers",
 	"postgres.psycopg2",
 	"sqlalchemy",
 }

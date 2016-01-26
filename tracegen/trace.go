@@ -15,7 +15,7 @@ func generateTrace(s Service, traceID uint64, parentID uint64, traces *[]model.S
 		TraceID:  traceID,
 		SpanID:   model.RandomID(),
 		ParentID: parentID,
-		Service:  s.Name,
+		Layer:    s.Name,
 		Resource: s.ResourceMaker(),
 		Type:     "custom",
 		Duration: s.DurationMaker(),
