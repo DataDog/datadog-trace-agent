@@ -123,15 +123,15 @@ func (t TagSet) MatchFilters(filters []string) TagSet {
 	filterMap := make(map[string]map[string]struct{})
 
 	for _, f := range filters {
-		s := strings.SplitN(f, ":", 2)
-		m, ok := filterMap[s[0]]
+		g, v := SplitTag(f)
+		m, ok := filterMap[g]
 		if !ok {
 			m = make(map[string]struct{})
-			filterMap[s[0]] = m
+			filterMap[g] = m
 		}
 
-		if s[1] != "" {
-			filterMap[s[0]][s[1]] = struct{}{}
+		if v != "" {
+			filterMap[g][v] = struct{}{}
 		}
 	}
 
