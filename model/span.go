@@ -12,7 +12,7 @@ type Span struct {
 	Duration int64  `json:"duration"` // in nanoseconds
 	Error    int32  `json:"error"`    // error status of the span, 0 == OK
 	Resource string `json:"resource"` // the natural key of what we measure
-	Service  string `json:"service"`  // the name of the high-level application generating this span
+	Layer    string `json:"layer"`    // dot based pattern to specify the layer of the code traced, the first part before a dot is the top-level "app"
 	SpanID   uint64 `json:"span_id"`  // unique ID given to any span
 	Start    int64  `json:"start"`    // nanosecond epoch of span start
 	TraceID  uint64 `json:"trace_id"` // ID that all spans in the same trace share
@@ -27,22 +27,22 @@ type Span struct {
 // String formats a Span struct to be displayed as a string
 func (s Span) String() string {
 	return fmt.Sprintf(
-		"Span[t_id=%d,s_id=%d,p_id=%d,s=%s]",
+		"Span[t_id=%d,s_id=%d,p_id=%d,layer=%s]",
 		s.TraceID,
 		s.SpanID,
 		s.ParentID,
-		s.Service,
+		s.Layer,
 	)
 }
 
 // FullString formats a Span struct as a string with its full content
 func (s Span) FullString() string {
 	return fmt.Sprintf(
-		"Span[t_id=%d,s_id=%d,p_id=%d,s=%s,r=%s,e=%d,st=%d,d=%d,t=%s,meta=%v,metrics=%v]",
+		"Span[t_id=%d,s_id=%d,p_id=%d,layer=%s,r=%s,e=%d,st=%d,d=%d,t=%s,meta=%v,metrics=%v]",
 		s.TraceID,
 		s.SpanID,
 		s.ParentID,
-		s.Service,
+		s.Layer,
 		s.Resource,
 		s.Error,
 		s.Start,
@@ -63,8 +63,11 @@ func (s *Span) Normalize() error {
 	if s.SpanID == 0 {
 		s.SpanID = RandomID()
 	}
-	if s.Service == "" {
-		return errors.New("span.normalize: `service` must be set in span")
+	if s.Layer == "" {
+		return errors.New("span.normalize: `Layer` must be set in span")
+	}
+	if s.Resource == "" {
+		return errors.New("span.normalize: `Resource` must be set in span")
 	}
 	// an Error - if not set - is 0 which is equivalent to a success status
 	if s.Start == 0 {

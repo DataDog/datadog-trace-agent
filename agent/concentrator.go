@@ -17,7 +17,7 @@ var (
 )
 
 // DefaultAggregators are the finest grain we aggregate to by default
-var DefaultAggregators = []string{"service", "resource"}
+var DefaultAggregators = []string{"layer", "resource"}
 
 // Concentrator produces time bucketed statistics from a stream of raw traces.
 // https://en.wikipedia.org/wiki/Knelson_concentrator

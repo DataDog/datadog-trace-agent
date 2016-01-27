@@ -1,8 +1,8 @@
 package model
 
 import (
-	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/DataDog/raclette/quantile"
 	log "github.com/cihub/seelog"
@@ -79,7 +79,8 @@ func (c Count) Add(s Span) (Count, error) {
 // Merge is used when 2 Counts represent the same thing and adds Values
 func (c Count) Merge(c2 Count) Count {
 	if c.Key != c2.Key {
-		panic(errors.New("Trying to merge counts not representing the same thing"))
+		err := fmt.Errorf("Trying to merge non-homogoneous counts [%s] and [%s]", c.Key, c2.Key)
+		panic(err)
 	}
 
 	return Count{
@@ -115,6 +116,7 @@ func (d Distribution) Add(s Span) {
 
 // Merge is used when 2 Distributions represent the same thing and it merges the 2 underlying summaries
 func (d Distribution) Merge(d2 Distribution) {
+	// We don't check tagsets for distributions as we reaggregate without reallocating new structs
 	d.Summary.Merge(d2.Summary)
 }
 
@@ -148,8 +150,16 @@ func (sb *StatsBucket) HandleSpan(s Span, aggregators []string) {
 
 	for _, agg := range aggregators {
 		switch agg {
-		case "service":
-			finestGrain = append(finestGrain, Tag{Name: "service", Value: s.Service})
+		case "service": // backwards-compat with aggregators
+		case "layer":
+			// peel layers
+			layers := strings.Split(s.Layer, ".")
+			finestGrain = append(finestGrain, Tag{Name: "app", Value: layers[0]})
+
+			if len(layers) > 1 {
+				// right now don't support nested layers
+				finestGrain = append(finestGrain, Tag{Name: "layer", Value: layers[1]})
+			}
 		case "resource":
 			finestGrain = append(finestGrain, Tag{Name: "resource", Value: s.Resource})
 		// custom aggregators asked by people
