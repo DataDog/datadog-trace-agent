@@ -15,11 +15,13 @@ const (
 	DURATION        = "duration"
 )
 
-// These represents the default stats we keep track of, Counts
-var DefaultCounts = [...]string{HITS, ERRORS, DURATION}
-
-// and Distributions
-var DefaultDistributions = [...]string{DURATION}
+var (
+	// DefaultCounts is an array of the measures we represent as Count by default
+	DefaultCounts = [...]string{HITS, ERRORS, DURATION}
+	// DefaultDistributions is an array of the measures we represent as Distribution by default
+	// Not really used right now as we don't have a way to easily add new distros
+	DefaultDistributions = [...]string{DURATION}
+)
 
 // Count represents one specific "metric" we track for a given tagset
 type Count struct {
