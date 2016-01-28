@@ -32,5 +32,5 @@ Checkout `dogweb:dogtrace` to have access to the `dogtrace` library.
 
 ```
 # Send a trace manually
-curl "http://localhost:7777" -X POST -d '{"span_id": 1234, "trace_id": 46, "type": "demo", "meta": {"client":"curl", "apache.version": "2.2.2"}}'
+curl "http://localhost:7777/span" -X POST -d '{"span_id": 1234, "trace_id": 46, "type": "demo", "meta": {"client":"curl", "apache.version": "2.2.2"}}'
 ```
