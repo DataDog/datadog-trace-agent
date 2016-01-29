@@ -2,7 +2,6 @@ package model
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/DataDog/raclette/quantile"
 	log "github.com/cihub/seelog"
@@ -152,16 +151,12 @@ func (sb *StatsBucket) HandleSpan(s Span, aggregators []string) {
 
 	for _, agg := range aggregators {
 		switch agg {
-		case "service": // backwards-compat with aggregators
-		case "layer":
-			// peel layers
-			layers := strings.Split(s.Layer, ".")
-			finestGrain = append(finestGrain, Tag{Name: "app", Value: layers[0]})
-
-			if len(layers) > 1 {
-				// right now don't support nested layers
-				finestGrain = append(finestGrain, Tag{Name: "layer", Value: layers[1]})
-			}
+		case "app":
+			finestGrain = append(finestGrain, Tag{Name: "app", Value: s.App})
+		case "service":
+			finestGrain = append(finestGrain, Tag{Name: "service", Value: s.Service})
+		case "name":
+			finestGrain = append(finestGrain, Tag{Name: "name", Value: s.Name})
 		case "resource":
 			finestGrain = append(finestGrain, Tag{Name: "resource", Value: s.Resource})
 		// custom aggregators asked by people

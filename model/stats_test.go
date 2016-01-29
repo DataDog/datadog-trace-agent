@@ -62,47 +62,47 @@ func TestCounts(t *testing.T) {
 }
 
 var testSpans = []Span{
-	Span{Layer: "A", Resource: "α", Duration: 1},
-	Span{Layer: "A", Resource: "β", Duration: 2, Error: 1},
-	Span{Layer: "B.a", Resource: "γ", Duration: 3},
-	Span{Layer: "B.a", Resource: "ε", Duration: 4, Error: 404},
-	Span{Layer: "B.b", Resource: "ζ", Duration: 5, Meta: map[string]string{"version": "1.3"}},
-	Span{Layer: "B", Resource: "ζ", Duration: 6, Meta: map[string]string{"version": "1.4"}},
-	Span{Layer: "C", Resource: "δ", Duration: 7},
-	Span{Layer: "C", Resource: "δ", Duration: 8},
+	Span{App: "A1", Service: "A", Name: "A.foo", Resource: "α", Duration: 1},
+	Span{App: "A1", Service: "A", Name: "A.foo", Resource: "β", Duration: 2, Error: 1},
+	Span{App: "B1", Service: "B", Name: "B.foo", Resource: "γ", Duration: 3},
+	Span{App: "B2", Service: "B", Name: "B.foo", Resource: "ε", Duration: 4, Error: 404},
+	Span{App: "B2", Service: "B", Name: "B.foo", Resource: "ζ", Duration: 5, Meta: map[string]string{"version": "1.3"}},
+	Span{App: "B2", Service: "B", Name: "sql.query", Resource: "ζ", Duration: 6, Meta: map[string]string{"version": "1.4"}},
+	Span{App: "C1", Service: "C", Name: "sql.query", Resource: "δ", Duration: 7},
+	Span{App: "C1", Service: "C", Name: "sql.query", Resource: "δ", Duration: 8},
 }
 
 func TestStatsBucketDefault(t *testing.T) {
 	assert := assert.New(t)
 
 	sb := NewStatsBucket(0, 1e9)
-	aggr := []string{"app", "layer", "resource"}
+	aggr := []string{"app", "service", "name", "resource"}
 	for _, s := range testSpans {
 		sb.HandleSpan(s, aggr)
 	}
 
 	expectedCounts := map[string]int64{
-		"duration|app:A,resource:α":         1,
-		"duration|app:A,resource:β":         2,
-		"duration|app:B,layer:a,resource:γ": 3,
-		"duration|app:B,layer:a,resource:ε": 4,
-		"duration|app:B,layer:b,resource:ζ": 5,
-		"duration|app:B,resource:ζ":         6,
-		"duration|app:C,resource:δ":         15,
-		"errors|app:A,resource:α":           0,
-		"errors|app:A,resource:β":           1,
-		"errors|app:B,layer:a,resource:γ":   0,
-		"errors|app:B,layer:a,resource:ε":   1,
-		"errors|app:B,layer:b,resource:ζ":   0,
-		"errors|app:B,resource:ζ":           0,
-		"errors|app:C,resource:δ":           0,
-		"hits|app:A,resource:α":             1,
-		"hits|app:A,resource:β":             1,
-		"hits|app:B,layer:a,resource:γ":     1,
-		"hits|app:B,layer:a,resource:ε":     1,
-		"hits|app:B,layer:b,resource:ζ":     1,
-		"hits|app:B,resource:ζ":             1,
-		"hits|app:C,resource:δ":             2,
+		"duration|app:A1,name:A.foo,resource:α,service:A":     1,
+		"duration|app:A1,name:A.foo,resource:β,service:A":     2,
+		"duration|app:B1,name:B.foo,resource:γ,service:B":     3,
+		"duration|app:B2,name:B.foo,resource:ε,service:B":     4,
+		"duration|app:B2,name:B.foo,resource:ζ,service:B":     5,
+		"duration|app:B2,name:sql.query,resource:ζ,service:B": 6,
+		"duration|app:C1,name:sql.query,resource:δ,service:C": 15,
+		"errors|app:A1,name:A.foo,resource:α,service:A":       0,
+		"errors|app:A1,name:A.foo,resource:β,service:A":       1,
+		"errors|app:B1,name:B.foo,resource:γ,service:B":       0,
+		"errors|app:B2,name:B.foo,resource:ε,service:B":       1,
+		"errors|app:B2,name:B.foo,resource:ζ,service:B":       0,
+		"errors|app:B2,name:sql.query,resource:ζ,service:B":   0,
+		"errors|app:C1,name:sql.query,resource:δ,service:C":   0,
+		"hits|app:A1,name:A.foo,resource:α,service:A":         1,
+		"hits|app:A1,name:A.foo,resource:β,service:A":         1,
+		"hits|app:B1,name:B.foo,resource:γ,service:B":         1,
+		"hits|app:B2,name:B.foo,resource:ε,service:B":         1,
+		"hits|app:B2,name:B.foo,resource:ζ,service:B":         1,
+		"hits|app:B2,name:sql.query,resource:ζ,service:B":     1,
+		"hits|app:C1,name:sql.query,resource:δ,service:C":     2,
 	}
 
 	assert.Len(sb.Counts, len(expectedCounts), "Missing counts!")
@@ -119,27 +119,27 @@ func TestStatsBucketExtraAggregators(t *testing.T) {
 	assert := assert.New(t)
 
 	sb := NewStatsBucket(0, 1e9)
-	aggr := []string{"layer", "version"}
+	aggr := []string{"name", "version"}
 	for _, s := range testSpans {
 		sb.HandleSpan(s, aggr)
 	}
 
 	expectedCounts := map[string]int64{
-		"duration|app:A":                     3,
-		"duration|app:B,layer:a":             7,
-		"duration|app:B,layer:b,version:1.3": 5,
-		"duration|app:B,version:1.4":         6,
-		"duration|app:C":                     15,
-		"errors|app:A":                       1,
-		"errors|app:B,layer:a":               1,
-		"errors|app:B,layer:b,version:1.3":   0,
-		"errors|app:B,version:1.4":           0,
-		"errors|app:C":                       0,
-		"hits|app:A":                         2,
-		"hits|app:B,layer:a":                 2,
-		"hits|app:B,layer:b,version:1.3":     1,
-		"hits|app:B,version:1.4":             1,
-		"hits|app:C":                         2,
+		"duration|name:A.foo":                 3,
+		"duration|name:B.foo":                 7,
+		"duration|name:B.foo,version:1.3":     5,
+		"duration|name:sql.query":             15,
+		"duration|name:sql.query,version:1.4": 6,
+		"errors|name:A.foo":                   1,
+		"errors|name:B.foo":                   1,
+		"errors|name:B.foo,version:1.3":       0,
+		"errors|name:sql.query":               0,
+		"errors|name:sql.query,version:1.4":   0,
+		"hits|name:A.foo":                     2,
+		"hits|name:B.foo":                     2,
+		"hits|name:B.foo,version:1.3":         1,
+		"hits|name:sql.query":                 2,
+		"hits|name:sql.query,version:1.4":     1,
 	}
 
 	assert.Len(sb.Counts, len(expectedCounts), "Missing counts!")

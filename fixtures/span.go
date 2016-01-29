@@ -43,13 +43,22 @@ var resources = []string{
 	"GET /url/test/fixture/resource/42",
 }
 
-var layers = []string{
-	"app.pylons",
-	"app.pylons.template",
-	"app.pylons.routes",
-	"app.pylons.controllers",
-	"postgres.psycopg2",
+var apps = []string{
+	"appX",
+	"appY",
+	"appZ",
+}
+
+var services = []string{
+	"rails",
+	"django",
+	"web-billing",
+}
+
+var names = []string{
+	"web.query",
 	"sqlalchemy",
+	"web.template",
 }
 
 var metas = map[string][]string{
@@ -165,9 +174,19 @@ func RandomSpanResource() string {
 	return stringRandomChoice(resources)
 }
 
-// RandomSpanLayer generates a random span layer string
-func RandomSpanLayer() string {
-	return stringRandomChoice(layers)
+// RandomSpanApp generates a random span app string
+func RandomSpanApp() string {
+	return stringRandomChoice(apps)
+}
+
+// RandomSpanService generates a random span service string
+func RandomSpanService() string {
+	return stringRandomChoice(services)
+}
+
+// RandomSpanName generates a random span name string
+func RandomSpanName() string {
+	return stringRandomChoice(names)
 }
 
 // RandomSpanID generates a random span ID
@@ -232,7 +251,9 @@ func RandomSpan() model.Span {
 		Duration: RandomSpanDuration(),
 		Error:    RandomSpanError(),
 		Resource: RandomSpanResource(),
-		Layer:    RandomSpanLayer(),
+		App:      RandomSpanApp(),
+		Service:  RandomSpanService(),
+		Name:     RandomSpanName(),
 		SpanID:   RandomSpanID(),
 		Start:    RandomSpanStart(),
 		TraceID:  RandomSpanTraceID(),
@@ -249,7 +270,9 @@ func TestSpan() model.Span {
 		Duration: 10000000,
 		Error:    0,
 		Resource: "GET /some/raclette",
-		Layer:    "app.cheese",
+		App:      "mytestapp",
+		Service:  "django",
+		Name:     "django.controller",
 		SpanID:   42,
 		Start:    1448466874000,
 		TraceID:  424242,
