@@ -8,9 +8,6 @@ rake
 
 # Run it
 ./raclette
-
-# Run the trace generator
-./generator
 ```
 
 
