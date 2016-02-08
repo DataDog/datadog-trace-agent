@@ -19,7 +19,6 @@ PACKAGES = %w(
   ./agent
   ./model
   ./quantile
-  ./tracegen
 )
 
 task :default => [:ci]
@@ -27,13 +26,11 @@ task :default => [:ci]
 desc "Build Raclette agent"
 task :build do
   go_build("github.com/DataDog/raclette/agent", :cmd => "go build -a -o raclette")
-  go_build("github.com/DataDog/raclette/tracegen", :cmd => "go build -a -o generator")
 end
 
 desc "Install Raclette agent"
 task :install do
   go_build("github.com/DataDog/raclette/agent", :cmd=>"go install")
-  go_build("github.com/DataDog/raclette/tracegen", :cmd=>"go install")
 end
 
 desc "Test Raclette agent"

@@ -2,7 +2,7 @@ package fixtures
 
 import "github.com/DataDog/raclette/model"
 
-var defaultAggregators = []string{"layer", "resource"}
+var defaultAggregators = []string{"app", "service", "name", "resource"}
 
 // RandomStatsBucket returns a bucket made from n random spans, useful to run benchmarks and tests
 func RandomStatsBucket(n int) model.StatsBucket {

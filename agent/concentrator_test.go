@@ -60,17 +60,17 @@ func TestConcentratorStatsCounts(t *testing.T) {
 
 	testSpans := []model.Span{
 		// first bucket
-		model.Span{SpanID: 1, Duration: 24, Start: getTsInBucket(alignedNow, bucketInterval, 2), Layer: "service1", Resource: "resource1"},
-		model.Span{SpanID: 2, Duration: 12, Start: getTsInBucket(alignedNow, bucketInterval, 2), Layer: "service1", Resource: "resource1", Error: 2},
-		model.Span{SpanID: 3, Duration: 40, Start: getTsInBucket(alignedNow, bucketInterval, 2), Layer: "service1", Resource: "resource2", Error: 2},
-		model.Span{SpanID: 4, Duration: 30, Start: getTsInBucket(alignedNow, bucketInterval, 2), Layer: "service1", Resource: "resource2", Error: 2},
-		model.Span{SpanID: 5, Duration: 30, Start: getTsInBucket(alignedNow, bucketInterval, 2), Layer: "service2", Resource: "resourcefoo"},
+		model.Span{SpanID: 1, Duration: 24, Start: getTsInBucket(alignedNow, bucketInterval, 2), App: "A1", Service: "A", Name: "query", Resource: "resource1"},
+		model.Span{SpanID: 2, Duration: 12, Start: getTsInBucket(alignedNow, bucketInterval, 2), App: "A1", Service: "A", Name: "query", Resource: "resource1", Error: 2},
+		model.Span{SpanID: 3, Duration: 40, Start: getTsInBucket(alignedNow, bucketInterval, 2), App: "A2", Service: "A", Name: "query", Resource: "resource2", Error: 2},
+		model.Span{SpanID: 4, Duration: 30, Start: getTsInBucket(alignedNow, bucketInterval, 2), App: "A2", Service: "A", Name: "query", Resource: "resource2", Error: 2},
+		model.Span{SpanID: 5, Duration: 30, Start: getTsInBucket(alignedNow, bucketInterval, 2), App: "A2", Service: "A", Name: "query", Resource: "resourcefoo"},
 		// second bucket
-		model.Span{SpanID: 6, Duration: 24, Start: getTsInBucket(alignedNow, bucketInterval, 1), Layer: "service1", Resource: "resource2"},
-		model.Span{SpanID: 7, Duration: 12, Start: getTsInBucket(alignedNow, bucketInterval, 1), Layer: "service1", Resource: "resource1", Error: 2},
-		model.Span{SpanID: 8, Duration: 40, Start: getTsInBucket(alignedNow, bucketInterval, 1), Layer: "service1", Resource: "resource1", Error: 2},
-		model.Span{SpanID: 9, Duration: 30, Start: getTsInBucket(alignedNow, bucketInterval, 1), Layer: "service1", Resource: "resource2", Error: 2},
-		model.Span{SpanID: 10, Duration: 20, Start: getTsInBucket(alignedNow, bucketInterval, 1), Layer: "service2", Resource: "resourcefoo"},
+		model.Span{SpanID: 6, Duration: 24, Start: getTsInBucket(alignedNow, bucketInterval, 1), App: "A1", Service: "A", Name: "query", Resource: "resource2"},
+		model.Span{SpanID: 7, Duration: 12, Start: getTsInBucket(alignedNow, bucketInterval, 1), App: "A1", Service: "A", Name: "query", Resource: "resource1", Error: 2},
+		model.Span{SpanID: 8, Duration: 40, Start: getTsInBucket(alignedNow, bucketInterval, 1), App: "A2", Service: "A", Name: "query", Resource: "resource1", Error: 2},
+		model.Span{SpanID: 9, Duration: 30, Start: getTsInBucket(alignedNow, bucketInterval, 1), App: "A2", Service: "A", Name: "query", Resource: "resource2", Error: 2},
+		model.Span{SpanID: 10, Duration: 20, Start: getTsInBucket(alignedNow, bucketInterval, 1), App: "A2", Service: "A", Name: "query", Resource: "resourcefoo"},
 	}
 
 	c.Start()
@@ -89,9 +89,9 @@ func TestConcentratorStatsCounts(t *testing.T) {
 
 	// Send several spans which shouldn't be considered by this flush
 	go func() {
-		c.in <- model.Span{SpanID: 100, Duration: 1, Start: getTsInBucket(alignedNow, bucketInterval, 0), Layer: "service1", Resource: "resource1"}
-		c.in <- model.Span{SpanID: 101, Duration: 1, Start: getTsInBucket(alignedNow, bucketInterval, 1), Layer: "service1", Resource: "resource1"}
-		c.in <- model.Span{SpanID: 102, Duration: 1, Start: getTsInBucket(alignedNow, bucketInterval, 2), Layer: "service1", Resource: "resource1"}
+		c.in <- model.Span{SpanID: 100, Duration: 1, Start: getTsInBucket(alignedNow, bucketInterval, 0), App: "A1", Service: "A", Name: "query", Resource: "resource1"}
+		c.in <- model.Span{SpanID: 101, Duration: 1, Start: getTsInBucket(alignedNow, bucketInterval, 1), App: "A1", Service: "A", Name: "query", Resource: "resource1"}
+		c.in <- model.Span{SpanID: 102, Duration: 1, Start: getTsInBucket(alignedNow, bucketInterval, 2), App: "A1", Service: "A", Name: "query", Resource: "resource1"}
 	}()
 
 	// Get the stats from the flush
@@ -111,17 +111,16 @@ func TestConcentratorStatsCounts(t *testing.T) {
 
 	// Start with the first/older bucket
 	receivedCounts = receivedBuckets[0].Counts
-	t.Log(receivedCounts)
 	expectedCountValByKey := map[string]int64{
-		"hits|app:service1,resource:resource1":       2,
-		"hits|app:service1,resource:resource2":       2,
-		"hits|app:service2,resource:resourcefoo":     1,
-		"errors|app:service1,resource:resource1":     1,
-		"errors|app:service1,resource:resource2":     2,
-		"errors|app:service2,resource:resourcefoo":   0,
-		"duration|app:service1,resource:resource1":   36,
-		"duration|app:service1,resource:resource2":   70,
-		"duration|app:service2,resource:resourcefoo": 30,
+		"duration|app:A1,name:query,resource:resource1,service:A":   36,
+		"duration|app:A2,name:query,resource:resource2,service:A":   70,
+		"duration|app:A2,name:query,resource:resourcefoo,service:A": 30,
+		"errors|app:A1,name:query,resource:resource1,service:A":     1,
+		"errors|app:A2,name:query,resource:resource2,service:A":     2,
+		"errors|app:A2,name:query,resource:resourcefoo,service:A":   0,
+		"hits|app:A1,name:query,resource:resource1,service:A":       2,
+		"hits|app:A2,name:query,resource:resource2,service:A":       2,
+		"hits|app:A2,name:query,resource:resourcefoo,service:A":     1,
 	}
 
 	// FIXME[leo]: assert distributions!
@@ -136,17 +135,22 @@ func TestConcentratorStatsCounts(t *testing.T) {
 
 	// same for second bucket
 	receivedCounts = receivedBuckets[1].Counts
-	t.Log(receivedCounts)
 	expectedCountValByKey = map[string]int64{
-		"hits|app:service1,resource:resource1":       2,
-		"hits|app:service1,resource:resource2":       2,
-		"hits|app:service2,resource:resourcefoo":     1,
-		"errors|app:service1,resource:resource1":     2,
-		"errors|app:service1,resource:resource2":     1,
-		"errors|app:service2,resource:resourcefoo":   0,
-		"duration|app:service1,resource:resource1":   52,
-		"duration|app:service1,resource:resource2":   54,
-		"duration|app:service2,resource:resourcefoo": 20,
+		"duration|app:A1,name:query,resource:resource1,service:A":   12,
+		"duration|app:A1,name:query,resource:resource2,service:A":   24,
+		"duration|app:A2,name:query,resource:resource1,service:A":   40,
+		"duration|app:A2,name:query,resource:resource2,service:A":   30,
+		"duration|app:A2,name:query,resource:resourcefoo,service:A": 20,
+		"errors|app:A1,name:query,resource:resource1,service:A":     1,
+		"errors|app:A1,name:query,resource:resource2,service:A":     0,
+		"errors|app:A2,name:query,resource:resource1,service:A":     1,
+		"errors|app:A2,name:query,resource:resource2,service:A":     1,
+		"errors|app:A2,name:query,resource:resourcefoo,service:A":   0,
+		"hits|app:A1,name:query,resource:resource1,service:A":       1,
+		"hits|app:A1,name:query,resource:resource2,service:A":       1,
+		"hits|app:A2,name:query,resource:resource1,service:A":       1,
+		"hits|app:A2,name:query,resource:resource2,service:A":       1,
+		"hits|app:A2,name:query,resource:resourcefoo,service:A":     1,
 	}
 
 	// verify we got all counts
