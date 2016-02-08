@@ -116,7 +116,7 @@ func (l *HTTPReceiver) handleSpans(w http.ResponseWriter, r *http.Request) {
 		err := s.Normalize()
 		if err != nil {
 			statsd.Client.Count("trace_agent.receiver.error", 1, []string{"error:normalize"}, 1)
-			log.Errorf("Dropped a span, could not normalize span: %v", s)
+			log.Errorf("Dropped a span, could not normalize span because of err: %v", err)
 			continue
 		}
 
