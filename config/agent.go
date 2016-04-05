@@ -33,7 +33,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 		APIEnabled:  true,
 
 		BucketInterval:   time.Duration(5) * time.Second,
-		OldestSpanCutoff: time.Duration(5 * time.Second).Nanoseconds(),
+		OldestSpanCutoff: time.Duration(30 * time.Second).Nanoseconds(),
 
 		ExtraAggregators: []string{},
 
@@ -59,6 +59,10 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 
 	if v, e := conf.GetInt("trace.concentrator", "bucket_size_seconds"); e == nil {
 		c.BucketInterval = time.Duration(v) * time.Second
+	}
+
+	if v, e := conf.GetInt("trace.concentrator", "oldest_span_cutoff_seconds"); e == nil {
+		c.OldestSpanCutoff = time.Duration(v * time.Second).Nanoseconds()
 	}
 
 	if v, e := conf.GetStrArray("trace.concentrator", "extra_aggregators", ","); e == nil {
