@@ -62,7 +62,7 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 	}
 
 	if v, e := conf.GetInt("trace.concentrator", "oldest_span_cutoff_seconds"); e == nil {
-		c.OldestSpanCutoff = time.Duration(v * time.Second).Nanoseconds()
+		c.OldestSpanCutoff = (time.Duration(v) * time.Second).Nanoseconds()
 	}
 
 	if v, e := conf.GetStrArray("trace.concentrator", "extra_aggregators", ","); e == nil {
