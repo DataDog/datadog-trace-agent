@@ -3,11 +3,13 @@
 #### The Agent
 
 ```
-# Run verifications & build the binaries
-rake
+# Download ES 2.0+
+
+# Setup ES schema
+rake trace:reset_es
 
 # Run it
-./raclette
+supe start trace:
 ```
 
 
