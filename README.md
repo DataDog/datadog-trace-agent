@@ -10,16 +10,11 @@
 wget https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/tar/elasticsearch/2.3.1/elasticsearch-2.3.1.tar.gz
 tar xvfz elasticsearch-2.3.1.tar.gz
 ./elasticsearch-2.3.1/bin/elasticsearch
-```
-
 
 3. Setup ES schema
-```
 rake trace:reset_es
-```
 
 4. Run it
-```
 supe start trace:
 ```
 
