@@ -57,7 +57,7 @@ func (t TagSet) TagKey(m string) string {
 
 func (t TagSet) Len() int           { return len(t) }
 func (t TagSet) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
-func (t TagSet) Less(i, j int) bool { return t[i].Name < t[j].Name && t[i].Value < t[j].Value }
+func (t TagSet) Less(i, j int) bool { return t[i].Name < t[j].Name || t[i].Value < t[j].Value }
 
 // Key returns a string representing a new set of tags.
 func (t TagSet) Key() string {
@@ -151,4 +151,35 @@ func (t TagSet) MatchFilters(filters []string) TagSet {
 		}
 	}
 	return matchedFilters
+}
+
+func MergeTagSets(t1, t2 TagSet) TagSet {
+	if t1 == nil {
+		return t2
+	}
+	if t2 == nil {
+		return t1
+	}
+	t := append(t1, t2...)
+
+	if len(t) < 2 {
+		return t
+	}
+
+	// sorting is actually expensive so skip it if we can
+	if !sort.IsSorted(t) {
+		sort.Sort(t)
+	}
+
+	last := t[0]
+	idx := 1
+	for i := 1; i < len(t); i++ {
+		if t[i].Name != last.Name || t[i].Value != last.Value {
+			last = t[i]
+			t[idx] = last
+			idx++
+
+		}
+	}
+	return t[:idx]
 }
