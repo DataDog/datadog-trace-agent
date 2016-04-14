@@ -43,22 +43,20 @@ var resources = []string{
 	"GET /url/test/fixture/resource/42",
 }
 
-var apps = []string{
-	"appX",
-	"appY",
-	"appZ",
-}
-
 var services = []string{
 	"rails",
 	"django",
 	"web-billing",
+	"pg-master",
+	"pylons",
 }
 
 var names = []string{
 	"web.query",
 	"sqlalchemy",
 	"web.template",
+	"pylons.controller",
+	"postgres.query",
 }
 
 var metas = map[string][]string{
@@ -174,11 +172,6 @@ func RandomSpanResource() string {
 	return stringRandomChoice(resources)
 }
 
-// RandomSpanApp generates a random span app string
-func RandomSpanApp() string {
-	return stringRandomChoice(apps)
-}
-
 // RandomSpanService generates a random span service string
 func RandomSpanService() string {
 	return stringRandomChoice(services)
@@ -251,7 +244,6 @@ func RandomSpan() model.Span {
 		Duration: RandomSpanDuration(),
 		Error:    RandomSpanError(),
 		Resource: RandomSpanResource(),
-		App:      RandomSpanApp(),
 		Service:  RandomSpanService(),
 		Name:     RandomSpanName(),
 		SpanID:   RandomSpanID(),
@@ -270,7 +262,6 @@ func TestSpan() model.Span {
 		Duration: 10000000,
 		Error:    0,
 		Resource: "GET /some/raclette",
-		App:      "mytestapp",
 		Service:  "django",
 		Name:     "django.controller",
 		SpanID:   42,
