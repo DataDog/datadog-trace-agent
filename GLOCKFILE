@@ -1,7 +1,7 @@
 cmd github.com/golang/lint/golint
 github.com/DataDog/datadog-go a9c7a9896c1847c9cc2b068a2ae68e9d74540a5d
-github.com/cihub/seelog c510775bb50d98213cfafca75a4bc5e3fddc8d8f
-github.com/golang/lint f42f5c1c440621302702cb0741e9d2ca547ae80f
-github.com/stretchr/testify 7c2b1e5640dcf2631213ca962d892bffa1e08860
+github.com/cihub/seelog 83d0dcad636b63c066856045962befa246e00c79
+github.com/golang/lint 32a87160691b3c96046c0c678fe57c5bef761456
+github.com/stretchr/testify 8ce79b9f0b77745113f82c17d0756771456ccbd3
 github.com/vaughan0/go-ini a98ad7ee00ec53921f08832bc06ecf7fd600e6a1
-golang.org/x/tools a6d2a4254ebe0154bc44ff9b8473b8738f0d68e8
+golang.org/x/tools 344080534465c5613c3563c30fd38c031073841d
