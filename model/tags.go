@@ -153,6 +153,7 @@ func (t TagSet) MatchFilters(filters []string) TagSet {
 	return matchedFilters
 }
 
+// MergeTagSets merge two tag sets lazily
 func MergeTagSets(t1, t2 TagSet) TagSet {
 	if t1 == nil {
 		return t2
