@@ -133,7 +133,7 @@ var TestDistroValues = []int64{
 }
 
 func TestDistribution() model.Distribution {
-	tgs := model.NewTagsFromString("app:X,layer:Y,host:Z")
+	tgs := model.NewTagsFromString("service:X,name:Y,host:Z")
 	d := model.NewDistribution("duration", tgs)
 	for i, v := range TestDistroValues {
 		s := model.Span{SpanID: uint64(i), Duration: v}
