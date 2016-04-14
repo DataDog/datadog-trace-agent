@@ -9,8 +9,7 @@ import (
 // Span is the common struct we use to represent a dapper-like span
 type Span struct {
 	// Mandatory
-	// App & Service together determine what software we are measuring
-	App      string `json:"app"`      // the user instance of the service running (e.g. dogweb)
+	// Service & Name together determine what software we are measuring
 	Service  string `json:"service"`  // the software running (e.g. pylons)
 	Name     string `json:"name"`     // the metric name aka. the thing we're measuring (e.g. pylons.render OR psycopg2.query)
 	Resource string `json:"resource"` // the natural key of what we measure (/index OR SELECT * FROM a WHERE id = ?)
@@ -30,10 +29,10 @@ type Span struct {
 // String formats a Span struct to be displayed as a string
 func (s Span) String() string {
 	return fmt.Sprintf(
-		"Span[tid:%d,sid:%d,app:%s,ser:%s,nam:%s,res:%s]",
+		"Span[t_id:%d,s_id:%d,p_id:%d,ser:%s,name:%s,res:%s]",
 		s.TraceID,
 		s.SpanID,
-		s.App,
+		s.ParentID,
 		s.Service,
 		s.Name,
 		s.Resource,
@@ -43,15 +42,11 @@ func (s Span) String() string {
 // Normalize makes sure a Span is properly initialized and encloses the minimum required info
 func (s *Span) Normalize() error {
 	// Mandatory data
-	// Int63() generates a non-negative pseudo-random 63-bit integer
 	if s.TraceID == 0 {
 		s.TraceID = RandomID()
 	}
 	if s.SpanID == 0 {
 		s.SpanID = RandomID()
-	}
-	if s.App == "" {
-		return errors.New("span.normalize: `App` must be set in span")
 	}
 	if s.Service == "" {
 		return errors.New("span.normalize: `Service` must be set in span")

@@ -151,8 +151,6 @@ func (sb *StatsBucket) HandleSpan(s Span, aggregators []string) {
 
 	for _, agg := range aggregators {
 		switch agg {
-		case "app":
-			finestGrain = append(finestGrain, Tag{Name: "app", Value: s.App})
 		case "service":
 			finestGrain = append(finestGrain, Tag{Name: "service", Value: s.Service})
 		case "name":

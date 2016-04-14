@@ -62,47 +62,47 @@ func TestCounts(t *testing.T) {
 }
 
 var testSpans = []Span{
-	Span{App: "A1", Service: "A", Name: "A.foo", Resource: "α", Duration: 1},
-	Span{App: "A1", Service: "A", Name: "A.foo", Resource: "β", Duration: 2, Error: 1},
-	Span{App: "B1", Service: "B", Name: "B.foo", Resource: "γ", Duration: 3},
-	Span{App: "B2", Service: "B", Name: "B.foo", Resource: "ε", Duration: 4, Error: 404},
-	Span{App: "B2", Service: "B", Name: "B.foo", Resource: "ζ", Duration: 5, Meta: map[string]string{"version": "1.3"}},
-	Span{App: "B2", Service: "B", Name: "sql.query", Resource: "ζ", Duration: 6, Meta: map[string]string{"version": "1.4"}},
-	Span{App: "C1", Service: "C", Name: "sql.query", Resource: "δ", Duration: 7},
-	Span{App: "C1", Service: "C", Name: "sql.query", Resource: "δ", Duration: 8},
+	Span{Service: "A", Name: "A.foo", Resource: "α", Duration: 1},
+	Span{Service: "A", Name: "A.foo", Resource: "β", Duration: 2, Error: 1},
+	Span{Service: "B", Name: "B.foo", Resource: "γ", Duration: 3},
+	Span{Service: "B", Name: "B.foo", Resource: "ε", Duration: 4, Error: 404},
+	Span{Service: "B", Name: "B.foo", Resource: "ζ", Duration: 5, Meta: map[string]string{"version": "1.3"}},
+	Span{Service: "B", Name: "sql.query", Resource: "ζ", Duration: 6, Meta: map[string]string{"version": "1.4"}},
+	Span{Service: "C", Name: "sql.query", Resource: "δ", Duration: 7},
+	Span{Service: "C", Name: "sql.query", Resource: "δ", Duration: 8},
 }
 
 func TestStatsBucketDefault(t *testing.T) {
 	assert := assert.New(t)
 
 	sb := NewStatsBucket(0, 1e9)
-	aggr := []string{"app", "service", "name", "resource"}
+	aggr := []string{"service", "name", "resource"}
 	for _, s := range testSpans {
 		sb.HandleSpan(s, aggr)
 	}
 
 	expectedCounts := map[string]int64{
-		"duration|app:A1,name:A.foo,resource:α,service:A":     1,
-		"duration|app:A1,name:A.foo,resource:β,service:A":     2,
-		"duration|app:B1,name:B.foo,resource:γ,service:B":     3,
-		"duration|app:B2,name:B.foo,resource:ε,service:B":     4,
-		"duration|app:B2,name:B.foo,resource:ζ,service:B":     5,
-		"duration|app:B2,name:sql.query,resource:ζ,service:B": 6,
-		"duration|app:C1,name:sql.query,resource:δ,service:C": 15,
-		"errors|app:A1,name:A.foo,resource:α,service:A":       0,
-		"errors|app:A1,name:A.foo,resource:β,service:A":       1,
-		"errors|app:B1,name:B.foo,resource:γ,service:B":       0,
-		"errors|app:B2,name:B.foo,resource:ε,service:B":       1,
-		"errors|app:B2,name:B.foo,resource:ζ,service:B":       0,
-		"errors|app:B2,name:sql.query,resource:ζ,service:B":   0,
-		"errors|app:C1,name:sql.query,resource:δ,service:C":   0,
-		"hits|app:A1,name:A.foo,resource:α,service:A":         1,
-		"hits|app:A1,name:A.foo,resource:β,service:A":         1,
-		"hits|app:B1,name:B.foo,resource:γ,service:B":         1,
-		"hits|app:B2,name:B.foo,resource:ε,service:B":         1,
-		"hits|app:B2,name:B.foo,resource:ζ,service:B":         1,
-		"hits|app:B2,name:sql.query,resource:ζ,service:B":     1,
-		"hits|app:C1,name:sql.query,resource:δ,service:C":     2,
+		"duration|name:A.foo,resource:α,service:A":     1,
+		"duration|name:A.foo,resource:β,service:A":     2,
+		"duration|name:B.foo,resource:γ,service:B":     3,
+		"duration|name:B.foo,resource:ε,service:B":     4,
+		"duration|name:B.foo,resource:ζ,service:B":     5,
+		"duration|name:sql.query,resource:ζ,service:B": 6,
+		"duration|name:sql.query,resource:δ,service:C": 15,
+		"errors|name:A.foo,resource:α,service:A":       0,
+		"errors|name:A.foo,resource:β,service:A":       1,
+		"errors|name:B.foo,resource:γ,service:B":       0,
+		"errors|name:B.foo,resource:ε,service:B":       1,
+		"errors|name:B.foo,resource:ζ,service:B":       0,
+		"errors|name:sql.query,resource:ζ,service:B":   0,
+		"errors|name:sql.query,resource:δ,service:C":   0,
+		"hits|name:A.foo,resource:α,service:A":         1,
+		"hits|name:A.foo,resource:β,service:A":         1,
+		"hits|name:B.foo,resource:γ,service:B":         1,
+		"hits|name:B.foo,resource:ε,service:B":         1,
+		"hits|name:B.foo,resource:ζ,service:B":         1,
+		"hits|name:sql.query,resource:ζ,service:B":     1,
+		"hits|name:sql.query,resource:δ,service:C":     2,
 	}
 
 	assert.Len(sb.Counts, len(expectedCounts), "Missing counts!")
