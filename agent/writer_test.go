@@ -10,7 +10,6 @@ import (
 
 	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
-	"github.com/stretchr/testify/assert"
 )
 
 func NewTestWriter() *Writer {
@@ -61,14 +60,12 @@ func getTestStatsBuckets() []model.StatsBucket {
 
 // Testing the real logic of the writer
 func TestWriterFlush(t *testing.T) {
-	assert := assert.New(t)
-
 	// Create a fake API for the writer
-	receivedData := false
+	receivedData := make(chan struct{}, 1)
 	testAPI := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := ioutil.ReadAll(r.Body)
 		fmt.Println(string(b))
-		receivedData = true
+		receivedData <- struct{}{}
 		w.WriteHeader(200)
 	}))
 	defer testAPI.Close()
@@ -86,6 +83,15 @@ func TestWriterFlush(t *testing.T) {
 
 	// Reflush, manually! synchronous
 	w.Flush()
-	// verify that we flushed!!
-	assert.True(receivedData)
+	timeout := make(chan struct{}, 1)
+	go func() {
+		time.Sleep(time.Second)
+		timeout <- struct{}{}
+	}()
+
+	select {
+	case <-timeout:
+		t.Fatal("did not receive http payload in time")
+	case <-receivedData:
+	}
 }
