@@ -32,12 +32,14 @@ func handleSignal(exit chan struct{}) {
 var opts struct {
 	configFile    string
 	logConfigFile string
+	topology      bool
 }
 
 // main is the entrypoint of our code
 func main() {
 	flag.StringVar(&opts.configFile, "config", "/etc/datadog/trace-agent.ini", "Trace agent ini config file.")
 	flag.StringVar(&opts.logConfigFile, "log_config", "/etc/datadog/trace-agent_seelog.xml", "Trace agent log config file.")
+	flag.BoolVar(&opts.topology, "topology", false, "Use TCP conns info to draw network topology")
 	flag.Parse()
 
 	// Instantiate the config
@@ -67,6 +69,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	agentConf.Topology = opts.topology
 
 	agent := NewAgent(agentConf)
 

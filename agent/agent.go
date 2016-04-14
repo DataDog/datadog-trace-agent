@@ -32,7 +32,11 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 
 	r := NewHTTPReceiver()
 	q := NewQuantizer(r.out)
-	n := NewNetworkTopology(conf)
+
+	var n *NetworkTopology
+	if conf.Topology {
+		n = NewNetworkTopology(conf)
+	}
 
 	spansToConcentrator, spansToGrapher, spansToSampler := spanDoubleTPipe(q.out)
 
@@ -116,7 +120,9 @@ func (a *Agent) Start() error {
 	a.Grapher.Start()
 	a.Quantizer.Start()
 	a.Receiver.Start()
-	a.NetworkTopology.Start()
+	if a.NetworkTopology != nil {
+		a.NetworkTopology.Start()
+	}
 
 	// FIXME: catch start errors
 	return nil
@@ -126,7 +132,9 @@ func (a *Agent) Start() error {
 func (a *Agent) Stop() error {
 	log.Info("Stopping agent")
 
-	a.NetworkTopology.Stop()
+	if a.NetworkTopology != nil {
+		a.NetworkTopology.Stop()
+	}
 	a.Receiver.Stop()
 	a.Quantizer.Stop()
 	a.Concentrator.Stop()
