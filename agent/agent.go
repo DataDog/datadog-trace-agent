@@ -33,16 +33,17 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 	r := NewHTTPReceiver()
 	q := NewQuantizer(r.out)
 
-	var n *NetworkTopology
-	if conf.Topology {
-		n = NewNetworkTopology(conf)
-	}
-
 	spansToConcentrator, spansToGrapher, spansToSampler := spanDoubleTPipe(q.out)
 
 	c := NewConcentrator(spansToConcentrator, conf)
-	g := NewGrapher(spansToGrapher, n.out, conf)
 	s := NewSampler(spansToSampler, conf)
+
+	var n *NetworkTopology
+	var g *Grapher
+	if conf.Topology {
+		n = NewNetworkTopology(conf)
+		g = NewGrapher(spansToGrapher, n.out, conf)
+	}
 
 	w := NewWriter(conf)
 
@@ -117,12 +118,16 @@ func (a *Agent) Start() error {
 	a.Writer.Start()
 	a.Sampler.Start()
 	a.Concentrator.Start()
-	a.Grapher.Start()
-	a.Quantizer.Start()
-	a.Receiver.Start()
+
+	if a.Grapher != nil {
+		a.Grapher.Start()
+	}
 	if a.NetworkTopology != nil {
 		a.NetworkTopology.Start()
 	}
+
+	a.Quantizer.Start()
+	a.Receiver.Start()
 
 	// FIXME: catch start errors
 	return nil
@@ -132,13 +137,15 @@ func (a *Agent) Start() error {
 func (a *Agent) Stop() error {
 	log.Info("Stopping agent")
 
-	if a.NetworkTopology != nil {
-		a.NetworkTopology.Stop()
-	}
 	a.Receiver.Stop()
 	a.Quantizer.Stop()
 	a.Concentrator.Stop()
-	a.Grapher.Stop()
+	if a.NetworkTopology != nil {
+		a.NetworkTopology.Stop()
+	}
+	if a.Grapher != nil {
+		a.Grapher.Stop()
+	}
 	a.Sampler.Stop()
 	a.Writer.Stop()
 
