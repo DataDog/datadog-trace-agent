@@ -23,6 +23,8 @@ type AgentConfig struct {
 	SamplerQuantiles []float64
 
 	TracePortsList []string
+
+	Topology bool // enable topology graph collection
 }
 
 // NewDefaultAgentConfig returns a configuration with the default values
