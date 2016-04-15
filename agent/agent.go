@@ -89,17 +89,17 @@ func (a *Agent) runFlusher() {
 			// Collect and merge partial flushs
 			var wg sync.WaitGroup
 			p := model.AgentPayload{}
-			wg.Add(3)
+			wg.Add(a.spanConsumers)
 			go func() {
 				defer wg.Done()
 				p.Stats = <-a.Concentrator.out
 			}()
-			go func() {
-				defer wg.Done()
-				if a.Grapher != nil {
+			if a.Grapher != nil {
+				go func() {
+					defer wg.Done()
 					p.Graph = <-a.Grapher.out
-				}
-			}()
+				}()
+			}
 			go func() {
 				defer wg.Done()
 				p.Spans = <-a.Sampler.out
