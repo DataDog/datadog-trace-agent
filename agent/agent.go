@@ -90,7 +90,9 @@ func (a *Agent) runFlusher() {
 			}()
 			go func() {
 				defer wg.Done()
-				p.Graph = <-a.Grapher.out
+				if a.Grapher != nil {
+					p.Graph = <-a.Grapher.out
+				}
 			}()
 			go func() {
 				defer wg.Done()
