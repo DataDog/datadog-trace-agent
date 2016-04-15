@@ -20,7 +20,8 @@ type Agent struct {
 	NetworkTopology *NetworkTopology
 
 	// config
-	Config *config.AgentConfig
+	Config        *config.AgentConfig
+	spanConsumers int
 
 	// Used to synchronize on a clean exit
 	exit chan struct{}
@@ -33,16 +34,20 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 	r := NewHTTPReceiver()
 	q := NewQuantizer(r.out)
 
-	spansToConcentrator, spansToGrapher, spansToSampler := spanDoubleTPipe(q.out)
+	spanConsumers := 2
+	if conf.Topology {
+		spanConsumers++
+	}
+	spanChans := spanFanOut(q.out, spanConsumers)
 
-	c := NewConcentrator(spansToConcentrator, conf)
-	s := NewSampler(spansToSampler, conf)
+	c := NewConcentrator(spanChans[0], conf)
+	s := NewSampler(spanChans[1], conf)
 
 	var n *NetworkTopology
 	var g *Grapher
 	if conf.Topology {
 		n = NewNetworkTopology(conf)
-		g = NewGrapher(spansToGrapher, n.out, conf)
+		g = NewGrapher(spanChans[2], n.out, conf)
 	}
 
 	w := NewWriter(conf)
@@ -56,6 +61,7 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 		Sampler:         s,
 		NetworkTopology: n,
 		Writer:          w,
+		spanConsumers:   spanConsumers,
 		exit:            exit,
 	}
 }
@@ -154,19 +160,19 @@ func (a *Agent) Stop() error {
 	return nil
 }
 
-// spanDoubleTPipe redistributes incoming spans to multiple components by returning multiple channels
-func spanDoubleTPipe(in chan model.Span) (chan model.Span, chan model.Span, chan model.Span) {
-	out1 := make(chan model.Span)
-	out2 := make(chan model.Span)
-	out3 := make(chan model.Span)
-
+// spanFanOut redistributes incoming spans to multiple components by returning multiple channels
+func spanFanOut(in chan model.Span, n int) []chan model.Span {
+	outChans := make([]chan model.Span, 0, n)
+	for i := 0; i < n; i++ {
+		outChans = append(outChans, make(chan model.Span))
+	}
 	go func() {
 		for s := range in {
-			out1 <- s
-			out2 <- s
-			out3 <- s
+			for _, outc := range outChans {
+				outc <- s
+			}
 		}
 	}()
 
-	return out1, out2, out3
+	return outChans
 }
