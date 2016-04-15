@@ -20,7 +20,8 @@ type Agent struct {
 	NetworkTopology *NetworkTopology
 
 	// config
-	Config *config.AgentConfig
+	Config        *config.AgentConfig
+	spanConsumers int
 
 	// Used to synchronize on a clean exit
 	exit chan struct{}
@@ -33,16 +34,21 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 	r := NewHTTPReceiver()
 	q := NewQuantizer(r.out)
 
+	spanConsumers := 2
+	if conf.Topology {
+		spanConsumers++
+	}
+	spanChans := spanFanOut(q.out, spanConsumers)
+
+	c := NewConcentrator(spanChans[0], conf)
+	s := NewSampler(spanChans[1], conf)
+
 	var n *NetworkTopology
+	var g *Grapher
 	if conf.Topology {
 		n = NewNetworkTopology(conf)
+		g = NewGrapher(spanChans[2], n.out, conf)
 	}
-
-	spansToConcentrator, spansToGrapher, spansToSampler := spanDoubleTPipe(q.out)
-
-	c := NewConcentrator(spansToConcentrator, conf)
-	g := NewGrapher(spansToGrapher, n.out, conf)
-	s := NewSampler(spansToSampler, conf)
 
 	w := NewWriter(conf)
 
@@ -55,6 +61,7 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 		Sampler:         s,
 		NetworkTopology: n,
 		Writer:          w,
+		spanConsumers:   spanConsumers,
 		exit:            exit,
 	}
 }
@@ -82,15 +89,17 @@ func (a *Agent) runFlusher() {
 			// Collect and merge partial flushs
 			var wg sync.WaitGroup
 			p := model.AgentPayload{}
-			wg.Add(3)
+			wg.Add(a.spanConsumers)
 			go func() {
 				defer wg.Done()
 				p.Stats = <-a.Concentrator.out
 			}()
-			go func() {
-				defer wg.Done()
-				p.Graph = <-a.Grapher.out
-			}()
+			if a.Grapher != nil {
+				go func() {
+					defer wg.Done()
+					p.Graph = <-a.Grapher.out
+				}()
+			}
 			go func() {
 				defer wg.Done()
 				p.Spans = <-a.Sampler.out
@@ -117,12 +126,16 @@ func (a *Agent) Start() error {
 	a.Writer.Start()
 	a.Sampler.Start()
 	a.Concentrator.Start()
-	a.Grapher.Start()
-	a.Quantizer.Start()
-	a.Receiver.Start()
+
+	if a.Grapher != nil {
+		a.Grapher.Start()
+	}
 	if a.NetworkTopology != nil {
 		a.NetworkTopology.Start()
 	}
+
+	a.Quantizer.Start()
+	a.Receiver.Start()
 
 	// FIXME: catch start errors
 	return nil
@@ -132,32 +145,34 @@ func (a *Agent) Start() error {
 func (a *Agent) Stop() error {
 	log.Info("Stopping agent")
 
-	if a.NetworkTopology != nil {
-		a.NetworkTopology.Stop()
-	}
 	a.Receiver.Stop()
 	a.Quantizer.Stop()
 	a.Concentrator.Stop()
-	a.Grapher.Stop()
+	if a.NetworkTopology != nil {
+		a.NetworkTopology.Stop()
+	}
+	if a.Grapher != nil {
+		a.Grapher.Stop()
+	}
 	a.Sampler.Stop()
 	a.Writer.Stop()
 
 	return nil
 }
 
-// spanDoubleTPipe redistributes incoming spans to multiple components by returning multiple channels
-func spanDoubleTPipe(in chan model.Span) (chan model.Span, chan model.Span, chan model.Span) {
-	out1 := make(chan model.Span)
-	out2 := make(chan model.Span)
-	out3 := make(chan model.Span)
-
+// spanFanOut redistributes incoming spans to multiple components by returning multiple channels
+func spanFanOut(in chan model.Span, n int) []chan model.Span {
+	outChans := make([]chan model.Span, 0, n)
+	for i := 0; i < n; i++ {
+		outChans = append(outChans, make(chan model.Span))
+	}
 	go func() {
 		for s := range in {
-			out1 <- s
-			out2 <- s
-			out3 <- s
+			for _, outc := range outChans {
+				outc <- s
+			}
 		}
 	}()
 
-	return out1, out2, out3
+	return outChans
 }
