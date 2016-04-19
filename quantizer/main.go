@@ -10,21 +10,29 @@ import (
 )
 
 const (
-	sqlType     = "sql"
-	redisType   = "redis"
-	tabCode     = uint8(9)
-	newLineCode = uint8(10)
-	spaceCode   = uint8(32)
+	sqlType       = "sql"
+	redisType     = "redis"
+	cassandraType = "cassandra"
+	tabCode       = uint8(9)
+	newLineCode   = uint8(10)
+	spaceCode     = uint8(32)
 )
 
 var nonUniformSpacesRegexp = regexp.MustCompile("\\s+")
 
+type QuantizeFunction func(model.Span) model.Span
+
+var spanTypeToQuantizer = map[string]QuantizeFunction{
+	sqlType:       QuantizeSQL,
+	redisType:     QuantizeRedis,
+	cassandraType: QuantizeCassandra,
+}
+
 // Quantize generates meaningul resource for a span, depending on its type
 func Quantize(span model.Span) model.Span {
-	if span.Type == sqlType {
-		return QuantizeSQL(span)
-	} else if span.Type == redisType {
-		return QuantizeRedis(span)
+	quantizer := spanTypeToQuantizer[span.Type]
+	if quantizer != nil {
+		return quantizer(span)
 	}
 	log.Debugf("No quantization for this span, Type: %s", span.Type)
 
