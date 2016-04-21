@@ -30,8 +30,7 @@ var spanTypeToQuantizer = map[string]QuantizeFunction{
 
 // Quantize generates meaningul resource for a span, depending on its type
 func Quantize(span model.Span) model.Span {
-	quantizer := spanTypeToQuantizer[span.Type]
-	if quantizer != nil {
+	if quantizer, ok := spanTypeToQuantizer[span.Type]; ok {
 		return quantizer(span)
 	}
 	log.Debugf("No quantization for this span, Type: %s", span.Type)
