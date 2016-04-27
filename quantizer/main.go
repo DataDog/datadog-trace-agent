@@ -30,12 +30,21 @@ var spanTypeToQuantizer = map[string]QuantizeFunction{
 
 // Quantize generates meaningul resource for a span, depending on its type
 func Quantize(span model.Span) model.Span {
-	if quantizer, ok := spanTypeToQuantizer[span.Type]; ok {
-		return quantizer(span)
+	switch span.Type {
+	case sqlType:
+		//sql
+		return QuantizeSQL(span)
+	case cassandraType:
+		// sql
+		return QuantizeSQL(span)
+	case redisType:
+		// redis
+		return QuantizeRedis(span)
+	default:
+		log.Debugf("No quantization for this span, Type: %s", span.Type)
+		return span
 	}
-	log.Debugf("No quantization for this span, Type: %s", span.Type)
 
-	return span
 }
 
 // compactAllSpaces transforms any sequence of space-like characters (including line breaks) into a single standard space
