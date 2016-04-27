@@ -9,7 +9,7 @@ import (
 )
 
 //
-var cqlListVariablesRegex = regexp.MustCompile(`(%s[,]?)+`) // (%s, %s, %s, %s)
+var cqlListVariablesRegex = regexp.MustCompile(`%s(([,\s]|%s)+%s\s*|)`) // (%s, %s, %s, %s)
 
 // QuantizeCassandra generates resources for Cassandra spans
 func QuantizeCassandra(span model.Span) model.Span {
