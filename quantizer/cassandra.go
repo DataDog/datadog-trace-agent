@@ -20,11 +20,8 @@ func QuantizeCassandra(span model.Span) model.Span {
 	}
 	// First treat the span as SQL and normalize it
 	span = QuantizeSQL(span)
-	resource := span.Resource
 
 	// Replace parenthesized variable lists (%s, %s, %s, %s)
-	resource = cqlListVariablesRegex.ReplaceAllString(resource, sqlVariableReplacement)
-
-	span.Resource = resource
+	span.Resource = cqlListVariablesRegex.ReplaceAllString(span.Resource, sqlVariableReplacement)
 	return span
 }
