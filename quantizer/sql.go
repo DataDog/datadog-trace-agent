@@ -16,6 +16,9 @@ var sqlalchemyVariablesRegexp = regexp.MustCompile("%\\(.+?\\)s")
 var sqlListVariablesRegexp = regexp.MustCompile("\\?[\\? ,]+\\?")
 var sqlCommentsRegexp = regexp.MustCompile("--[^\n]*")
 
+// CQL encodes query params with %s
+var cqlListVariablesRegex = regexp.MustCompile(`%s(([,\s]|%s)+%s\s*|)`) // (%s, %s, %s, %s)
+
 // QuantizeSQL generates resource for SQL spans
 func QuantizeSQL(span model.Span) model.Span {
 	query, ok := span.Meta["query"]
@@ -40,6 +43,9 @@ func QuantizeSQL(span model.Span) model.Span {
 
 	// Uniform spacing
 	resource = compactAllSpaces(resource)
+
+	// Replace parenthesized variable lists (%s, %s, %s, %s)
+	resource = cqlListVariablesRegex.ReplaceAllString(resource, sqlVariableReplacement)
 
 	span.Resource = resource
 
