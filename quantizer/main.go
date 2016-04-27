@@ -25,7 +25,7 @@ type QuantizeFunction func(model.Span) model.Span
 var spanTypeToQuantizer = map[string]QuantizeFunction{
 	sqlType:       QuantizeSQL,
 	redisType:     QuantizeRedis,
-	cassandraType: QuantizeCassandra,
+	cassandraType: QuantizeSQL,
 }
 
 // Quantize generates meaningul resource for a span, depending on its type
