@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"time"
@@ -62,25 +61,18 @@ func (l *HTTPReceiver) Start() {
 
 // handleSpan handle a request with a single span
 func (l *HTTPReceiver) handleSpan(w http.ResponseWriter, r *http.Request) {
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		log.Error(err)
-		return
-	}
-
+	decoder := json.NewDecoder(r.Body)
 	var s model.Span
-	//log.Printf("%s", body)
-	err = json.Unmarshal(body, &s)
+	err := decoder.Decode(&s)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Error(err)
 		return
 	}
-
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK\n"))
 
+	// FIXME[matt] this can return an error which is clearly ignored.
 	s.Normalize()
 
 	l.out <- s
@@ -90,16 +82,9 @@ func (l *HTTPReceiver) handleSpan(w http.ResponseWriter, r *http.Request) {
 func (l *HTTPReceiver) handleSpans(w http.ResponseWriter, r *http.Request) {
 	statsd.Client.Count("trace_agent.receiver.payload", 1, nil, 1)
 
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		log.Error(err)
-		statsd.Client.Count("trace_agent.receiver.error", 1, []string{"error:read-io"}, 1)
-		return
-	}
-
+	decoder := json.NewDecoder(r.Body)
 	var spans []model.Span
-	err = json.Unmarshal(body, &spans)
+	err := decoder.Decode(&spans)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Error(err)
