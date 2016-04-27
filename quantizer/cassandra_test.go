@@ -18,15 +18,10 @@ func CassSpan(query string) model.Span {
 	}
 }
 
-type cassTestCase struct {
-	query            string
-	expectedResource string
-}
-
 func TestCassQuantizer(t *testing.T) {
 	assert := assert.New(t)
 
-	queryToExpected := []cassTestCase{
+	queryToExpected := []struct{ in, expected string }{
 		// List compacted and replaced
 		{"select key, status, modified from org_check_run where org_id = %s and check in (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)", "select key, status, modified from org_check_run where org_id = ? and check in (?)"},
 
@@ -43,6 +38,6 @@ func TestCassQuantizer(t *testing.T) {
 	}
 
 	for _, testCase := range queryToExpected {
-		assert.Equal(testCase.expectedResource, Quantize(CassSpan(testCase.query)).Resource)
+		assert.Equal(testCase.expected, Quantize(CassSpan(testCase.in)).Resource)
 	}
 }
