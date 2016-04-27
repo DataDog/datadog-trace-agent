@@ -17,7 +17,7 @@ func NewTestWriter() *Writer {
 	conf.APIKey = "9d6e1075bb75e28ea6e720a4561f6b6d"
 	conf.APIEndpoint = "http://localhost:8080"
 
-	return NewWriter(conf)
+	return NewWriter(conf, make(chan model.ServicesMetadata))
 }
 
 func TestWriterExitsGracefully(t *testing.T) {
@@ -75,7 +75,7 @@ func TestWriterFlush(t *testing.T) {
 	conf := config.NewDefaultAgentConfig()
 	conf.APIKey = "9d6e1075bb75e28ea6e720a4561f6b6d"
 	conf.APIEndpoint = testAPI.URL + "/api/v0.1"
-	w := NewWriter(conf)
+	w := NewWriter(conf, make(chan model.ServicesMetadata))
 	w.Start()
 
 	// light the fire by sending a bucket

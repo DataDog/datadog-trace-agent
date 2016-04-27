@@ -50,7 +50,7 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 		g = NewGrapher(spanChans[2], n.out, conf)
 	}
 
-	w := NewWriter(conf)
+	w := NewWriter(conf, r.services)
 
 	return &Agent{
 		Config:          conf,

@@ -18,16 +18,21 @@ import (
 
 // Writer implements a Writer and writes to the Datadog API bucketed stats & spans
 type Writer struct {
-	endpoint        BucketEndpoint          // config, where we're writing the data
-	in              chan model.AgentPayload // data input, payloads of concentrated spans/stats
-	payloadsToWrite []model.AgentPayload    // buffers to write to the API and currently written to from upstream
-	mu              sync.Mutex              // mutex on data above
+	endpoint   BucketEndpoint              // config, where we're writing the data
+	in         chan model.AgentPayload     // data input, payloads of concentrated spans/stats
+	inServices chan model.ServicesMetadata // the metadata we receive form the client to be stored in the backend
+
+	mu              sync.Mutex             // mutex on data above
+	payloadsToWrite []model.AgentPayload   // buffers to write to the API and currently written to from upstream
+	svcs            model.ServicesMetadata // the current up-to-date services
+	svcsVer         int64                  // the current version of services
+	svcsFlushed     int64                  // the last flushed version of services
 
 	Worker
 }
 
 // NewWriter returns a new Writer
-func NewWriter(conf *config.AgentConfig) *Writer {
+func NewWriter(conf *config.AgentConfig, inServices chan model.ServicesMetadata) *Writer {
 	var endpoint BucketEndpoint
 	if conf.APIEnabled {
 		endpoint = NewAPIEndpoint(conf.APIEndpoint, conf.APIKey)
@@ -37,8 +42,10 @@ func NewWriter(conf *config.AgentConfig) *Writer {
 	}
 
 	w := &Writer{
-		endpoint: endpoint,
-		in:       make(chan model.AgentPayload),
+		endpoint:   endpoint,
+		in:         make(chan model.AgentPayload),
+		inServices: inServices,
+		svcs:       make(model.ServicesMetadata),
 	}
 	w.Init()
 
@@ -61,6 +68,12 @@ func (w *Writer) run() {
 			w.payloadsToWrite = append(w.payloadsToWrite, p)
 			w.mu.Unlock()
 			w.Flush()
+			w.FlushServices()
+		case sm := <-w.inServices:
+			w.mu.Lock()
+			w.svcs.Update(sm)
+			w.svcsVer++
+			w.mu.Unlock()
 		case <-w.exit:
 			log.Info("Writer exiting, trying to flush all remaining data")
 			w.Flush()
@@ -68,6 +81,23 @@ func (w *Writer) run() {
 			return
 		}
 	}
+}
+
+// FlushServices initiate a flush of the services to the services endpoint
+func (w *Writer) FlushServices() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if w.svcsFlushed == w.svcsVer {
+		return
+	}
+
+	err := w.endpoint.WriteServices(w.svcs)
+	if err != nil {
+		log.Errorf("could not flush services: %v", err)
+	}
+
+	w.svcsFlushed = w.svcsVer
 }
 
 // Flush actually writes the data in the API
@@ -104,14 +134,14 @@ func (w *Writer) Flush() {
 // BucketEndpoint is a place where we can write payloads
 type BucketEndpoint interface {
 	Write(b model.AgentPayload) error
+	WriteServices(s model.ServicesMetadata) error
 }
 
 // APIEndpoint is the api we write to.
 type APIEndpoint struct {
-	hostname     string
-	apiKey       string
-	url          string
-	collectorURL string
+	hostname string
+	apiKey   string
+	url      string
 }
 
 // NewAPIEndpoint creates an endpoint writing to the given url and apiKey
@@ -122,11 +152,10 @@ func NewAPIEndpoint(url string, apiKey string) APIEndpoint {
 		panic(fmt.Errorf("Could not get hostname: %v", err))
 	}
 
-	collectorURL := url + "/collector"
-	return APIEndpoint{hostname: hostname, apiKey: apiKey, url: url, collectorURL: collectorURL}
+	return APIEndpoint{hostname: hostname, apiKey: apiKey, url: url}
 }
 
-// Write writes the bucket to the API
+// Write writes the bucket to the API collector endpoint
 func (a APIEndpoint) Write(payload model.AgentPayload) error {
 	startFlush := time.Now()
 	payload.HostName = a.hostname
@@ -136,7 +165,7 @@ func (a APIEndpoint) Write(payload model.AgentPayload) error {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", a.collectorURL, bytes.NewBuffer(jsonStr))
+	req, err := http.NewRequest("POST", a.url+"/collector", bytes.NewBuffer(jsonStr))
 	if err != nil {
 		return err
 	}
@@ -161,11 +190,46 @@ func (a APIEndpoint) Write(payload model.AgentPayload) error {
 	return nil
 }
 
+// WriteServices writes services to the services endpoint
+func (a APIEndpoint) WriteServices(s model.ServicesMetadata) error {
+	jsonStr, err := json.Marshal(s)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", a.url+"/services", bytes.NewBuffer(jsonStr))
+	if err != nil {
+		return err
+	}
+
+	queryParams := req.URL.Query()
+	queryParams.Add("api_key", a.apiKey)
+	req.URL.RawQuery = queryParams.Encode()
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	log.Infof("flushed %d services to the API", len(s))
+
+	return nil
+}
+
 // NullEndpoint is a place where bucket go the void
 type NullEndpoint struct{}
 
 // Write drops the bucket on the floor
 func (ne NullEndpoint) Write(p model.AgentPayload) error {
 	log.Debug("Null endpoint is dropping bucket")
+	return nil
+}
+
+// WriteServices NOOP
+func (ne NullEndpoint) WriteServices(s model.ServicesMetadata) error {
+	log.Debug("Null endpoint dropping services info: %v", s)
 	return nil
 }
