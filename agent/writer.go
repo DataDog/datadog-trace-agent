@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -160,12 +161,15 @@ func (a APIEndpoint) Write(payload model.AgentPayload) error {
 	startFlush := time.Now()
 	payload.HostName = a.hostname
 
-	jsonStr, err := json.Marshal(payload)
+	var body bytes.Buffer
+	gz := gzip.NewWriter(&body)
+	err := json.NewEncoder(gz).Encode(payload)
 	if err != nil {
 		return err
 	}
+	gz.Close()
 
-	req, err := http.NewRequest("POST", a.url+"/collector", bytes.NewBuffer(jsonStr))
+	req, err := http.NewRequest("POST", a.url+"/collector", &body)
 	if err != nil {
 		return err
 	}
@@ -174,6 +178,7 @@ func (a APIEndpoint) Write(payload model.AgentPayload) error {
 	queryParams.Add("api_key", a.apiKey)
 	req.URL.RawQuery = queryParams.Encode()
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -183,9 +188,9 @@ func (a APIEndpoint) Write(payload model.AgentPayload) error {
 	defer resp.Body.Close()
 
 	flushTime := time.Since(startFlush)
-	log.Infof("Payload flushed to the API (time=%s, size=%d)", flushTime, len(jsonStr))
+	log.Infof("Payload flushed to the API (time=%s, size=%d)", flushTime, body.Len())
 	statsd.Client.Gauge("trace_agent.writer.flush_duration", flushTime.Seconds(), nil, 1)
-	statsd.Client.Count("trace_agent.writer.payload_bytes", int64(len(jsonStr)), nil, 1)
+	statsd.Client.Count("trace_agent.writer.payload_bytes", int64(body.Len()), nil, 1)
 
 	return nil
 }
