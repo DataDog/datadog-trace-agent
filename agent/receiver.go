@@ -21,7 +21,8 @@ type Receiver interface {
 // HTTPReceiver is a collector that uses HTTP protocol and just holds
 // a chan where the spans received are sent one by one
 type HTTPReceiver struct {
-	out chan model.Span
+	out      chan model.Span
+	services chan model.ServicesMetadata
 
 	Worker
 }
@@ -29,7 +30,8 @@ type HTTPReceiver struct {
 // NewHTTPReceiver returns a pointer to a new HTTPReceiver
 func NewHTTPReceiver() *HTTPReceiver {
 	l := &HTTPReceiver{
-		out: make(chan model.Span),
+		out:      make(chan model.Span),
+		services: make(chan model.ServicesMetadata),
 	}
 	l.Init()
 	return l
@@ -40,6 +42,7 @@ func NewHTTPReceiver() *HTTPReceiver {
 func (l *HTTPReceiver) Start() {
 	http.HandleFunc("/span", l.handleSpan)
 	http.HandleFunc("/spans", l.handleSpans)
+	http.HandleFunc("/services", l.handleServices)
 	addr := ":7777"
 	log.Infof("HTTP Listener starting on %s", addr)
 
@@ -94,7 +97,7 @@ func (l *HTTPReceiver) handleSpans(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Error(err)
-		statsd.Client.Count("trace_agent.receiver.error", 1, []string{"error:read-io"}, 1)
+		statsd.Client.Count("trace_agent.receiver.error", 1, []string{"error:read-io", "handler:services"}, 1)
 		return
 	}
 
@@ -103,7 +106,7 @@ func (l *HTTPReceiver) handleSpans(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Error(err)
-		statsd.Client.Count("trace_agent.receiver.error", 1, []string{"error:unmarshal-json"}, 1)
+		statsd.Client.Count("trace_agent.receiver.error", 1, []string{"error:unmarshal-json", "handler:services"}, 1)
 		return
 	}
 
@@ -115,7 +118,7 @@ func (l *HTTPReceiver) handleSpans(w http.ResponseWriter, r *http.Request) {
 	for _, s := range spans {
 		err := s.Normalize()
 		if err != nil {
-			statsd.Client.Count("trace_agent.receiver.error", 1, []string{"error:normalize"}, 1)
+			statsd.Client.Count("trace_agent.receiver.error", 1, []string{"error:normalize", "handler:spans"}, 1)
 			log.Errorf("Dropped a span, could not normalize span: %v, err: %v", s, err)
 			continue
 		}
@@ -123,4 +126,32 @@ func (l *HTTPReceiver) handleSpans(w http.ResponseWriter, r *http.Request) {
 		log.Debugf("Received a span %v", s)
 		l.out <- s
 	}
+}
+
+// handleServices handle a request with a list of several services
+func (l *HTTPReceiver) handleServices(w http.ResponseWriter, r *http.Request) {
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Error(err)
+		statsd.Client.Count("trace_agent.receiver.error", 1, []string{"error:read-io", "handler:services"}, 1)
+		return
+	}
+
+	var servicesMeta model.ServicesMetadata
+	err = json.Unmarshal(body, &servicesMeta)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Error(err)
+		statsd.Client.Count("trace_agent.receiver.error", 1, []string{"error:unmarshal-json", "handler:services"}, 1)
+		return
+	}
+
+	log.Debugf("received services: %v", servicesMeta)
+
+	statsd.Client.Count("trace_agent.receiver.service", int64(len(servicesMeta)), nil, 1)
+	l.services <- servicesMeta
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK\n"))
 }
