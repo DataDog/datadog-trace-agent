@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 
@@ -19,7 +17,8 @@ import (
 
 // Writer implements a Writer and writes to the Datadog API bucketed stats & spans
 type Writer struct {
-	endpoint   BucketEndpoint              // config, where we're writing the data
+	endpoint BucketEndpoint // config, where we're writing the data
+
 	in         chan model.AgentPayload     // data input, payloads of concentrated spans/stats
 	inServices chan model.ServicesMetadata // the metadata we receive form the client to be stored in the backend
 
@@ -36,7 +35,7 @@ type Writer struct {
 func NewWriter(conf *config.AgentConfig, inServices chan model.ServicesMetadata) *Writer {
 	var endpoint BucketEndpoint
 	if conf.APIEnabled {
-		endpoint = NewAPIEndpoint(conf.APIEndpoint, conf.APIKey)
+		endpoint = NewAPIEndpoint(conf.APIEndpoint, conf.APIKey, conf.HostName)
 	} else {
 		log.Info("API interface is disabled, use NullEndpoint instead")
 		endpoint = NullEndpoint{}
@@ -146,13 +145,7 @@ type APIEndpoint struct {
 }
 
 // NewAPIEndpoint creates an endpoint writing to the given url and apiKey
-func NewAPIEndpoint(url string, apiKey string) APIEndpoint {
-	// FIXME[leo]: allow overriding it from config?
-	hostname, err := os.Hostname()
-	if err != nil {
-		panic(fmt.Errorf("Could not get hostname: %v", err))
-	}
-
+func NewAPIEndpoint(url string, apiKey string, hostname string) APIEndpoint {
 	return APIEndpoint{hostname: hostname, apiKey: apiKey, url: url}
 }
 
