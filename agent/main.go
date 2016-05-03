@@ -30,15 +30,15 @@ func handleSignal(exit chan struct{}) {
 
 // opts are the command-line options
 var opts struct {
-	configFile    string
-	logConfigFile string
-	topology      bool
+	configFile string
+	debug      bool
+	topology   bool
 }
 
 // main is the entrypoint of our code
 func main() {
 	flag.StringVar(&opts.configFile, "config", "/etc/datadog/trace-agent.ini", "Trace agent ini config file.")
-	flag.StringVar(&opts.logConfigFile, "log_config", "/etc/datadog/trace-agent_seelog.xml", "Trace agent log config file.")
+	flag.BoolVar(&opts.debug, "debug", false, "Turn on debug mode")
 	flag.BoolVar(&opts.topology, "topology", false, "Use TCP conns info to draw network topology")
 	flag.Parse()
 
@@ -49,11 +49,10 @@ func main() {
 	}
 
 	// Initialize logging
-	logger, err := log.LoggerFromConfigAsFile(opts.logConfigFile)
+	err = config.NewLoggerLevel(opts.debug)
 	if err != nil {
-		panic(fmt.Sprintf("Error loading logging config: %v", err))
+		panic(fmt.Errorf("error with logger: %v", err))
 	}
-	log.ReplaceLogger(logger)
 	defer log.Flush()
 
 	// Initialize dogstatsd client
