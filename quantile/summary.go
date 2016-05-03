@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/rand"
 )
 
@@ -44,6 +45,18 @@ func NewSummary() *Summary {
 	return &Summary{
 		data: NewSkiplist(),
 	}
+}
+
+func (s Summary) String() string {
+	var b bytes.Buffer
+	b.WriteString(fmt.Sprintf("samples: %d\n", s.N))
+	curr := s.data.head
+	for curr != nil {
+		e := curr.value
+		b.WriteString(fmt.Sprintf("v:%d g:%d d:%d\n", e.V, e.G, e.Delta))
+		curr = curr.next[0]
+	}
+	return b.String()
 }
 
 // MarshalJSON is used to send the data over to the API
