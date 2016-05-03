@@ -37,7 +37,7 @@ desc "Test Raclette agent"
 task :test do go_test("./agent") end
 
 desc "Run Raclette agent"
-task :run do
+task :run => :build do
   sh "./raclette -config ./agent/trace-agent.ini -log_config ./seelog.xml"
 end
 
