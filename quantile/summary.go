@@ -278,7 +278,11 @@ func (s *Summary) Merge(s2 *Summary) {
 	// Iterate on s2 elements and insert/merge them
 	curElt := s2.data.head
 	for curElt != nil {
-		s.data.Insert(curElt.value)
+		if 0 < curElt.value.G {
+			// NOTE[matt] we store an empty head node. don't
+			// include that in the merge.
+			s.data.Insert(curElt.value)
+		}
 		curElt = curElt.next[0]
 	}
 	// Force compression

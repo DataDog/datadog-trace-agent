@@ -156,18 +156,28 @@ func TestSummaryGob(t *testing.T) {
 	ss.GobDecode(bytes)
 
 	assert.Equal(s.N, ss.N)
-	fmt.Printf("%v\n%v\n", s.EncodedData, ss.EncodedData)
+}
+
+func TestSummaryNonZeroMerge(t *testing.T) {
+	assert := assert.New(t)
+	s1 := NewSummary()
+	s2 := NewSummary()
+	for i := 1; i < 6; i++ {
+		s1.Insert(int64(i), uint64(i))
+		s2.Insert(int64(i), uint64(i))
+	}
+	s1.Merge(s2)
+
+	fmt.Println(s1.String())
+	v, _ := s1.Quantile(0)
+	assert.Equal(v, 1)
+	v, _ = s1.Quantile(0.5)
+	assert.Equal(v, 3)
+	v, _ = s1.Quantile(1)
+	assert.Equal(v, 5)
 }
 
 func TestSummaryBySlices(t *testing.T) {
-	s := NewSummary()
-
-	for i := 0; i < 10000; i++ {
-		s.Insert(int64(i), uint64(i))
-	}
-
-	slices := s.BySlices(10)
-	b, _ := json.Marshal(slices)
-	fmt.Println(string(b))
-	// FIXME: assert the data, it's not a test!
+	// Write a test!
+	t.Skip()
 }
