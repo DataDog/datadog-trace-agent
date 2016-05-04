@@ -2,12 +2,7 @@ require "./gorake.rb"
 
 desc 'Bootstrap CI environment'
 task :bootstrap do
-  groot = `go env GOROOT`
   sh 'go get github.com/robfig/glock'
-  # Don't get vet in the dev environment
-  unless groot and groot.include? "/usr/"
-    sh 'go get golang.org/x/tools/cmd/vet'
-  end
 end
 
 desc 'Restore from glockfile'
@@ -25,12 +20,12 @@ task :default => [:ci]
 
 desc "Build Raclette agent"
 task :build do
-  go_build("github.com/DataDog/raclette/agent", :cmd => "go build -a -o raclette")
+  go_build("github.com/DataDog/raclette/agent", :cmd => "go build -a -o trace-agent")
 end
 
 desc "Install Raclette agent"
 task :install do
-  go_build("github.com/DataDog/raclette/agent", :cmd=>"go install")
+  go_build("github.com/DataDog/raclette/agent", :cmd=>"go build -i -o $GOPATH/bin/trace-agent")
 end
 
 desc "Test Raclette agent"
@@ -38,7 +33,7 @@ task :test do go_test("./agent") end
 
 desc "Run Raclette agent"
 task :run do
-  sh "./raclette -config ./agent/trace-agent.ini -log_config ./seelog.xml"
+  sh "./trace-agent -config ./agent/trace-agent.ini"
 end
 
 task :lint do
