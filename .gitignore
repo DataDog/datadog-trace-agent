@@ -1,4 +1,5 @@
 raclette
+trace-agent
 generator
 *.swp
 python/raclette.egg-info

@@ -2,7 +2,6 @@ package quantile
 
 import (
 	"encoding/json"
-	"fmt"
 	"math/rand"
 	"testing"
 
@@ -127,25 +126,6 @@ func TestSummaryMarshal(t *testing.T) {
 	assert.True(samp2Correct, "2: sample %v incorrect for quantile %d", samp2, v2)
 }
 
-func TestSummaryMerge(t *testing.T) {
-	assert := assert.New(t)
-
-	s := NewSummaryWithTestData()
-	s2 := NewSummary()
-	samples := []int64{32987, 987, 9879, 879, 87938327, 9823, 25585683826277574}
-
-	for i, v := range samples {
-		s2.Insert(v, uint64(42000+i))
-	}
-
-	assert.Equal(len(TestArray), s.N)
-	s.Merge(s2)
-	assert.Equal(len(TestArray)+len(samples), s.N)
-
-	s.Quantile(0.9)
-	// FIXME[leo] assert results of merged quantiles
-}
-
 func TestSummaryGob(t *testing.T) {
 	assert := assert.New(t)
 
@@ -156,18 +136,59 @@ func TestSummaryGob(t *testing.T) {
 	ss.GobDecode(bytes)
 
 	assert.Equal(s.N, ss.N)
-	fmt.Printf("%v\n%v\n", s.EncodedData, ss.EncodedData)
+}
+
+func TestSummaryMerge(t *testing.T) {
+	assert := assert.New(t)
+	s1 := NewSummary()
+	for i := 0; i < 101; i++ {
+		s1.Insert(int64(i), uint64(i))
+	}
+
+	s2 := NewSummary()
+	for i := 0; i < 50; i++ {
+		s2.Insert(int64(i), uint64(i))
+	}
+
+	s1.Merge(s2)
+
+	expected := map[float64]int{
+		0.0: 0,
+		0.2: 15,
+		0.4: 30,
+		0.6: 45,
+		0.8: 71,
+		1.0: 100,
+	}
+
+	for q, e := range expected {
+		v, _ := s1.Quantile(q)
+		assert.Equal(e, v)
+	}
+
+}
+
+// TestSummaryNonZeroMerge ensures we can safely merge samples with non-zero
+// values (these were previously causing a bug).
+func TestSummaryNonZeroMerge(t *testing.T) {
+	assert := assert.New(t)
+	s1 := NewSummary()
+	s2 := NewSummary()
+	for i := 1; i < 6; i++ {
+		s1.Insert(int64(i), uint64(i))
+		s2.Insert(int64(i), uint64(i))
+	}
+	s1.Merge(s2)
+
+	v, _ := s1.Quantile(0)
+	assert.Equal(v, 1)
+	v, _ = s1.Quantile(0.5)
+	assert.Equal(v, 3)
+	v, _ = s1.Quantile(1)
+	assert.Equal(v, 5)
 }
 
 func TestSummaryBySlices(t *testing.T) {
-	s := NewSummary()
-
-	for i := 0; i < 10000; i++ {
-		s.Insert(int64(i), uint64(i))
-	}
-
-	slices := s.BySlices(10)
-	b, _ := json.Marshal(slices)
-	fmt.Println(string(b))
-	// FIXME: assert the data, it's not a test!
+	// Write a test!
+	t.Skip()
 }
