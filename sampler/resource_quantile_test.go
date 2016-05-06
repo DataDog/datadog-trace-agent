@@ -3,6 +3,7 @@ package sampler
 import (
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
@@ -65,11 +66,12 @@ func TestSampler(t *testing.T) {
 	}
 
 	// Now prepare distributions
-	stats := model.NewStatsBucket(0, 1)
+	reso := time.Nanosecond
+	stats := model.NewStatsBucket(0, 1, reso)
 	tgs := model.NewTagsFromString("service:dogweb,resource:dash.list")
 	d := model.NewDistribution(model.DURATION, tgs)
 	for _, span := range testSpans {
-		d.Add(span)
+		d.Add(span, reso)
 	}
 
 	for _, r := range expectedResults {
