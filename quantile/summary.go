@@ -34,7 +34,7 @@ type Summary struct {
 
 // Entry is an element of the skiplist, see GK paper for description
 type Entry struct {
-	V       int64    `json:"v"`
+	V       float64  `json:"v"`
 	G       int      `json:"g"`
 	Delta   int      `json:"delta"`
 	Samples []uint64 `json:"samples"` // Span IDs of traces representing this part of the spectrum
@@ -53,7 +53,7 @@ func (s Summary) String() string {
 	curr := s.data.head
 	for curr != nil {
 		e := curr.value
-		b.WriteString(fmt.Sprintf("v:%d g:%d d:%d\n", e.V, e.G, e.Delta))
+		b.WriteString(fmt.Sprintf("v:%f g:%d d:%d\n", e.V, e.G, e.Delta))
 		curr = curr.next[0]
 	}
 	return b.String()
@@ -138,7 +138,7 @@ func (s *Summary) GobDecode(data []byte) error {
 }
 
 // Insert inserts a new value v in the summary paired with t (the ID of the span it was reported from)
-func (s *Summary) Insert(v int64, t uint64) {
+func (s *Summary) Insert(v float64, t uint64) {
 	e := Entry{
 		V:       v,
 		G:       1,
@@ -197,7 +197,7 @@ func (s *Summary) compress() {
 }
 
 // Quantile returns an EPSILON estimate of the element at quantile 'q' (0 <= q <= 1)
-func (s *Summary) Quantile(q float64) (int64, []uint64) {
+func (s *Summary) Quantile(q float64) (float64, []uint64) {
 
 	// convert quantile to rank
 	r := int(q*float64(s.N) + 0.5)
@@ -227,8 +227,8 @@ func (s *Summary) Quantile(q float64) (int64, []uint64) {
 
 // SummarySlice reprensents how many values are in a [Start, End] range
 type SummarySlice struct {
-	Start   int64
-	End     int64
+	Start   float64
+	End     float64
 	Weight  int
 	Samples []uint64
 }
