@@ -36,13 +36,18 @@ func NewTagFromString(raw string) Tag {
 // TagSet is an ordered and unique combination of tags
 type TagSet []Tag
 
-// NewTagsFromString returns a new TagSet from a raw string
-func NewTagsFromString(raw string) TagSet {
+// NewTagSetFromString returns a new TagSet from a raw string
+func NewTagSetFromString(raw string) TagSet {
 	var tags TagSet
 	for _, t := range strings.Split(raw, ",") {
 		tags = append(tags, NewTagFromString(t))
 	}
 	return tags
+}
+
+func NewTagsFromString(r string) TagSet {
+	// FIXME[matt] kill me
+	return NewTagSetFromString(r)
 }
 
 // TagKey returns a unique key from the string given and the tagset, useful to index stuff on tagsets
@@ -183,4 +188,30 @@ func MergeTagSets(t1, t2 TagSet) TagSet {
 		}
 	}
 	return t[:idx]
+}
+
+// TagGroup will return the tag group from the given string. For example,
+// "host:abc" => "host"
+func TagGroup(tag string) string {
+	for i, c := range tag {
+		if c == ':' {
+			return tag[0:i]
+		}
+	}
+	return ""
+}
+
+// FilterTags will return the tags that have the given group.
+func FilterTags(tags, groups []string) []string {
+	var out []string
+	for _, t := range tags {
+		tg := TagGroup(t)
+		for _, g := range groups {
+			if g == tg {
+				out = append(out, t)
+				break
+			}
+		}
+	}
+	return out
 }
