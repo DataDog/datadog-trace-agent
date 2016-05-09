@@ -70,7 +70,7 @@ func (c Count) Add(s Span) (Count, error) {
 			if !ok {
 				return c, fmt.Errorf("Count %s was not initialized", c.Name)
 			}
-			newc.Value = c.Value + float64(val)
+			newc.Value = c.Value + val
 		} else {
 			return c, fmt.Errorf("Not adding span metrics %v to count %s, not compatible", s.Metrics, c.Name)
 		}
