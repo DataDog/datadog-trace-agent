@@ -27,7 +27,8 @@ type Count struct {
 	Key    string `json:"key"`
 	Name   string `json:"name"`   // represents the entity we count, e.g. "hits", "errors", "time"
 	TagSet TagSet `json:"tagset"` // set of tags for which we account this Distribution
-	Value  int64  `json:"value"`  // accumulated values
+
+	Value float64 `json:"value"` // accumulated values
 }
 
 // Distribution represents a true image of the spectrum of values, allowing arbitrary quantile queries
@@ -40,7 +41,7 @@ type Distribution struct {
 
 // NewCount returns a new Count for a metric and a given tag set
 func NewCount(m string, tgs TagSet) Count {
-	return Count{Key: tgs.TagKey(m), Name: m, TagSet: tgs, Value: 0}
+	return Count{Key: tgs.TagKey(m), Name: m, TagSet: tgs, Value: 0.0}
 }
 
 // Add adds a Span to a Count, returns an error if it cannot add values
@@ -61,7 +62,7 @@ func (c Count) Add(s Span) (Count, error) {
 			return c, nil
 		}
 	case DURATION:
-		newc.Value = c.Value + s.Duration
+		newc.Value = c.Value + float64(s.Duration)
 	default:
 		// arbitrary metrics implementation
 		if s.Metrics != nil {
@@ -69,7 +70,7 @@ func (c Count) Add(s Span) (Count, error) {
 			if !ok {
 				return c, fmt.Errorf("Count %s was not initialized", c.Name)
 			}
-			newc.Value = c.Value + val
+			newc.Value = c.Value + float64(val)
 		} else {
 			return c, fmt.Errorf("Not adding span metrics %v to count %s, not compatible", s.Metrics, c.Name)
 		}
@@ -104,14 +105,16 @@ func NewDistribution(m string, tgs TagSet) Distribution {
 
 // Add inserts the proper values in a given distribution from a span
 func (d Distribution) Add(s Span) {
+	// NOTE we treat DURATION specially here as a member of the distribution
+	// we have to cast it to float so it fits in our Entry struct
 	if d.Name == DURATION {
-		d.Summary.Insert(s.Duration, s.SpanID)
+		d.Summary.Insert(float64(s.Duration), s.SpanID)
 	} else {
 		val, ok := s.Metrics[d.Name]
 		if !ok {
 			panic(fmt.Errorf("Don't know how to handle a '%s' distribution", d.Name))
 		}
-		d.Summary.Insert(val, s.SpanID)
+		d.Summary.Insert(float64(val), s.SpanID)
 	}
 }
 
