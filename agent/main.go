@@ -38,6 +38,7 @@ var opts struct {
 }
 
 var (
+	Version   string
 	BuildDate string
 	GitCommit string
 	GitBranch string
@@ -48,6 +49,9 @@ var (
 func versionString() string {
 	var buf bytes.Buffer
 
+	if Version != "" {
+		fmt.Fprintf(&buf, "Version: %s\n", Version)
+	}
 	if GitCommit != "" {
 		fmt.Fprintf(&buf, "Git hash: %s\n", GitCommit)
 	}
