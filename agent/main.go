@@ -78,7 +78,7 @@ func main() {
 	flag.Parse()
 
 	if opts.version {
-		fmt.Printf("%s", versionString())
+		fmt.Print(versionString())
 		os.Exit(0)
 	}
 
