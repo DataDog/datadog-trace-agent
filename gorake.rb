@@ -4,12 +4,14 @@ def go_build(program, opts={})
     :cmd => "go build -a"
   }.merge(opts)
 
-  dd = 'github.com/DataDog/raclette'
+  dd = 'main'
   commit = `git rev-parse --short HEAD`.strip
   branch = `git rev-parse --abbrev-ref HEAD`.strip
   date = `date`.strip
   goversion = `go version`.strip
-  ldflags = "-X #{dd}.BuildDate '#{date}' -X #{dd}.GitCommit '#{commit}' -X #{dd}.GitBranch '#{branch}' -X #{dd}.GoVersion '#{goversion}'"
+  agentversion = "1.0.0-unreleased"
+
+  ldflags = "-X #{dd}.BuildDate '#{date}' -X #{dd}.GitCommit '#{commit}' -X #{dd}.GitBranch '#{branch}' -X #{dd}.GoVersion '#{goversion}' -X #{dd}.Version '#{agentversion}'"
 
   cmd = opts[:cmd]
   sh "#{cmd} -ldflags \"#{ldflags}\" #{program}"
