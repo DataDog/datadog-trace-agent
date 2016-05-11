@@ -37,6 +37,7 @@ var opts struct {
 	version    bool
 }
 
+// version info sourced from build flags
 var (
 	Version   string
 	BuildDate string
