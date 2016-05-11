@@ -58,10 +58,10 @@ var testSpan = Span{
 		"http.x-source": "89.89.89.89",
 		"auth":          "valid",
 	},
-	Metrics: map[string]int64{
-		"request_size":  3242379,
-		"response_size": 284302948,
-		"lb_latency":    232,
+	Metrics: map[string]float64{
+		"request_size":  3242379.02,
+		"response_size": 284302948.50,
+		"lb_latency":    232.00,
 	},
 	ParentID: 230948230,
 	Type:     "sql",

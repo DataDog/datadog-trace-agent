@@ -23,11 +23,11 @@ func TestCounts(t *testing.T) {
 		Span{Error: 1, Duration: 25},
 		Span{
 			Duration: 15,
-			Metrics:  map[string]int64{"custom_size": 3},
+			Metrics:  map[string]float64{"custom_size": 3.5},
 		},
 		Span{
 			Duration: 0,
-			Metrics:  map[string]int64{"custom_size": 10},
+			Metrics:  map[string]float64{"custom_size": 10.0},
 		},
 	}
 

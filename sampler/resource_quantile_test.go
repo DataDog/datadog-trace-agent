@@ -18,7 +18,7 @@ func TestSampler(t *testing.T) {
 
 	type sampleResult struct {
 		quantile float64
-		value    int64
+		value    float64
 		samples  []uint64
 	}
 
@@ -47,15 +47,15 @@ func TestSampler(t *testing.T) {
 	}
 
 	expectedResults := []sampleResult{
-		sampleResult{quantile: 0, value: int64(13434), samples: []uint64{23}},
+		sampleResult{quantile: 0, value: float64(13434), samples: []uint64{23}},
 		// TODO[leo]: result different from numpy, investigate
-		sampleResult{quantile: 0.25, value: int64(151384), samples: []uint64{19}},
-		sampleResult{quantile: 0.5, value: int64(769540), samples: []uint64{12}},
-		sampleResult{quantile: 0.75, value: int64(15234234), samples: []uint64{26}},
-		sampleResult{quantile: 0.9, value: int64(152342344), samples: []uint64{25}},
-		sampleResult{quantile: 0.95, value: int64(234923874), samples: []uint64{22}},
-		sampleResult{quantile: 0.99, value: int64(12304982304), samples: []uint64{24}},
-		sampleResult{quantile: 1, value: int64(12304982304), samples: []uint64{24}},
+		sampleResult{quantile: 0.25, value: float64(151384), samples: []uint64{19}},
+		sampleResult{quantile: 0.5, value: float64(769540), samples: []uint64{12}},
+		sampleResult{quantile: 0.75, value: float64(15234234), samples: []uint64{26}},
+		sampleResult{quantile: 0.9, value: float64(152342344), samples: []uint64{25}},
+		sampleResult{quantile: 0.95, value: float64(234923874), samples: []uint64{22}},
+		sampleResult{quantile: 0.99, value: float64(12304982304), samples: []uint64{24}},
+		sampleResult{quantile: 1, value: float64(12304982304), samples: []uint64{24}},
 	}
 
 	shouldChoose := []int{12, 13, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 30}

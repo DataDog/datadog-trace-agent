@@ -216,13 +216,13 @@ func RandomSpanMeta() map[string]string {
 }
 
 // RandomSpanMetrics generates some random span metrics
-func RandomSpanMetrics() map[string]int64 {
-	res := make(map[string]int64)
+func RandomSpanMetrics() map[string]float64 {
+	res := make(map[string]float64)
 
 	// choose some keys
 	n := rand.Intn(len(metrics))
 	for _, i := range rand.Perm(n) {
-		res[metrics[i]] = rand.Int63()
+		res[metrics[i]] = rand.Float64()
 	}
 
 	return res
@@ -271,8 +271,8 @@ func TestSpan() model.Span {
 			"user": "leo",
 			"pool": "fondue",
 		},
-		Metrics: map[string]int64{
-			"cheese_weight": 100000,
+		Metrics: map[string]float64{
+			"cheese_weight": 100000.0,
 		},
 		ParentID: 1111,
 		Type:     "http",
