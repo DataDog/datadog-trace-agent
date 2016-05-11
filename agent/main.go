@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -33,6 +34,34 @@ var opts struct {
 	configFile string
 	debug      bool
 	topology   bool
+	version    bool
+}
+
+var (
+	BuildDate string
+	GitCommit string
+	GitBranch string
+	GoVersion string
+)
+
+// versionString returns the version information filled in at build time
+func versionString() string {
+	var buf bytes.Buffer
+
+	if GitCommit != "" {
+		fmt.Fprintf(&buf, "Git hash: %s\n", GitCommit)
+	}
+	if GitBranch != "" {
+		fmt.Fprintf(&buf, "Git branch: %s\n", GitBranch)
+	}
+	if BuildDate != "" {
+		fmt.Fprintf(&buf, "Build date: %s\n", BuildDate)
+	}
+	if GoVersion != "" {
+		fmt.Fprintf(&buf, "Go Version: %s\n", GoVersion)
+	}
+
+	return buf.String()
 }
 
 // main is the entrypoint of our code
@@ -40,7 +69,13 @@ func main() {
 	flag.StringVar(&opts.configFile, "config", "/etc/datadog/trace-agent.ini", "Trace agent ini config file.")
 	flag.BoolVar(&opts.debug, "debug", false, "Turn on debug mode")
 	flag.BoolVar(&opts.topology, "topology", false, "Use TCP conns info to draw network topology")
+	flag.BoolVar(&opts.version, "version", false, "Show version information and exit")
 	flag.Parse()
+
+	if opts.version {
+		fmt.Printf("%s", versionString())
+		os.Exit(0)
+	}
 
 	// Instantiate the config
 	conf, err := config.New(opts.configFile)
