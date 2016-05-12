@@ -5,3 +5,4 @@ github.com/golang/lint 32a87160691b3c96046c0c678fe57c5bef761456
 github.com/stretchr/testify 8ce79b9f0b77745113f82c17d0756771456ccbd3
 github.com/vaughan0/go-ini a98ad7ee00ec53921f08832bc06ecf7fd600e6a1
 golang.org/x/tools 344080534465c5613c3563c30fd38c031073841d
+gopkg.in/yaml.v2 a83829b6f1293c91addabc89d0571c246397bbf4

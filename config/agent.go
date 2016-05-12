@@ -2,11 +2,13 @@ package config
 
 import (
 	"errors"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"time"
 
 	log "github.com/cihub/seelog"
+	"gopkg.in/yaml.v2"
 )
 
 // AgentConfig handles the interpretation of the configuration (with default
@@ -32,6 +34,41 @@ type AgentConfig struct {
 	// Grapher
 	Topology       bool // enable topology graph collection
 	TracePortsList []string
+
+	// internal telemetry
+	StatsdHost string
+	StatsdPort int
+}
+
+type ddAgentConfig struct {
+	hostname      string `yaml:"hostname"`
+	apiKey        string `yaml:"api_key"`
+	dogstatsdPort int    `yaml:"dogstatsd_port"`
+	dogstatsdHost string `yaml:"bind_host"`
+}
+
+// mergeConfig applies overrides from the dd-agent config to the
+// trace agent
+func mergeConfig(c *AgentConfig, d *ddAgentConfig) {
+	if d == nil {
+		return
+	}
+
+	if d.hostname != "" {
+		c.HostName = d.hostname
+	}
+
+	if d.apiKey != "" {
+		c.APIKey = d.apiKey
+	}
+
+	if d.dogstatsdHost != "" {
+		c.StatsdHost = d.dogstatsdHost
+	}
+
+	if d.dogstatsdPort != 0 {
+		c.StatsdPort = d.dogstatsdPort
+	}
 }
 
 // NewDefaultAgentConfig returns a configuration with the default values
@@ -40,8 +77,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 	if err != nil {
 		hostname = ""
 	}
-
-	return &AgentConfig{
+	ac := &AgentConfig{
 		HostName: hostname,
 
 		APIEndpoint: "http://localhost:8012/api/v0.1",
@@ -56,7 +92,23 @@ func NewDefaultAgentConfig() *AgentConfig {
 
 		Topology:       false,
 		TracePortsList: []string{},
+
+		StatsdHost: "localhost",
+		StatsdPort: 8125,
 	}
+
+	// Check the classic agent's config for overrides
+	var dd *ddAgentConfig
+	data, err := ioutil.ReadFile("/etc/dd-agent/datadog.conf")
+	if err != nil {
+		log.Debug("Failed to read dd-agent config file.")
+	} else {
+		yaml.Unmarshal(data, dd)
+	}
+
+	// Apply overrides
+	mergeConfig(ac, dd)
+	return ac
 }
 
 // NewAgentConfig creates the AgentConfig from the standard config. It handles all the cases.

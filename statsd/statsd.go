@@ -12,10 +12,8 @@ import (
 var Client *statsd.Client
 
 // ConfigureStatsd creates a statsd client from a dogweb.ini style config file and set it to the global Statsd.
-func Configure(conf *config.File, namespace string) error {
-	host := conf.GetDefault(namespace, "host", "localhost")
-	port := conf.GetIntDefault(namespace, "port", 8125)
-	client, err := statsd.New(fmt.Sprintf("%s:%d", host, port))
+func Configure(conf *config.AgentConfig) error {
+	client, err := statsd.New(fmt.Sprintf("%s:%d", conf.StatsdHost, conf.StatsdPort))
 	if err != nil {
 		return err
 	}
