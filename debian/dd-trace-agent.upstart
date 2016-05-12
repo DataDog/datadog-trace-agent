@@ -1,0 +1,13 @@
+description "dd-trace-agent"
+
+# Defaults set by kernel
+limit nofile 1024 4096
+
+start on runlevel[2345]
+stop on runlevel[016]
+
+respawn limit 10 5
+
+setuid dd-trace-agent
+
+exec /opt/dd-trace-agent/bin/trace-agent -config /etc/datadog/dd-trace-agent.ini >> /var/log/datadog/dd-trace-agent.log 2>&1

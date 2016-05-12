@@ -1,0 +1,28 @@
+#!/bin/sh
+
+INSTALL_DIR=/opt/dd-trace-agent/
+LOG_DIR=/var/log/datadog
+CONFIG_DIR=/etc/datadog
+
+set -e
+mkdir -p ${LOG_DIR} || error_exit "Cannot create ${LOG_DIR}!"
+
+case "$1" in
+    configure)
+        echo "Registering service trace-agent"
+	initctl reload-configuration
+	
+	echo "Adding dd-trace-agent user"
+	adduser --system --disabled-password --disabled-login --home /var/empty \
+                --no-create-home --quiet --force-badname --group dd-trace-agent
+	usermod -d /opt/dd-trace-agent dd-trace-agent
+	usermod -f /etc/datadog/dd-trace-agent.ini dd-trace-agent
+	
+	echo "Templating default config file for dd-trace-agent"
+	
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

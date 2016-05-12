@@ -1,0 +1,23 @@
+#!/usr/bin/make -f
+
+DISTRIBUTION = $(shell lsb_release -sr)
+VERSION = 1.0.0
+PACKAGEVERSION = $(VERSION)-0~$(DISTRIBUTION)0
+TARBALL = dd-trace-agent-$(VERSION).tar.gz
+URL = https://github.com/DataDog/raclette
+
+%:
+	dh $@
+
+override_dh_auto_clean:
+override_dh_auto_test:
+override_dh_auto_build:
+override_dh_auto_install:
+	rake build
+	mkdir -p debian/dd-trace-agent/etc/datadog
+	mkdir -p debian/dd-trace-agent/opt/dd-trace-agent/bin
+	mv trace-agent debian/dd-trace-agent/opt/dd-trace-agent/bin
+	cp files/trace-agent.ini.default /etc/datadog/dd-trace-agent.ini
+
+override_dh_gencontrol:
+	dh_gencontrol -- -v$(PACKAGEVERSION)
