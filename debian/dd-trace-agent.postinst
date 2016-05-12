@@ -16,7 +16,8 @@ case "$1" in
 	adduser --system --disabled-password --disabled-login --home /var/empty \
                 --no-create-home --quiet --force-badname --group dd-trace-agent
 	usermod -d /opt/dd-trace-agent dd-trace-agent
-	usermod -f /etc/datadog/dd-trace-agent.ini dd-trace-agent
+	chown "dd-trace-agent:dd-trace-agent" /etc/datadog/dd-trace-agent.ini
+	chown "dd-trace-agent:dd-trace-agent" /var/log/datadog/dd-trace-agent.log
 	
 	echo "Templating default config file for dd-trace-agent"
 	
