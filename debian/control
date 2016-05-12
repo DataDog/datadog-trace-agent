@@ -1,6 +1,5 @@
 Source: dd-trace-agent
 Build-Depends: debhelper( >= 9)
- 
 Maintainer: dev@datadoghq.com <dev@datadoghq.com>
 
 Package: dd-trace-agent
