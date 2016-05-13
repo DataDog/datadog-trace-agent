@@ -8,6 +8,19 @@ import (
 	"testing"
 )
 
+func TestGetStrArray(t *testing.T) {
+	assert := assert.New(t)
+	f, _ := ini.Load([]byte("[Main]\n\nports = 10,15,20,25"))
+	conf := File{
+		f,
+		"some/path",
+	}
+
+	ports, err := conf.GetStrArray("Main", "ports", ",")
+	assert.Nil(err)
+	assert.Equal(ports, []string{"10", "15", "20", "25"})
+}
+
 func TestMergeConfig(t *testing.T) {
 	assert := assert.New(t)
 	agentConfig := AgentConfig{
