@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"os"
 	"strconv"
 	"time"
@@ -72,7 +71,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 	}
 	ac := &AgentConfig{
 		HostName: hostname,
-
+		// TODO: configure a generic default endpoint
 		APIEndpoint: "http://localhost:8012/api/v0.1",
 		APIKey:      "",
 		APIEnabled:  true,
@@ -91,7 +90,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 	}
 
 	// Check the classic agent's config for overrides
-	if dd, err := ini.Load("/etc/dd-agent/datadog.conf"); err != nil {
+	if dd, _ := ini.Load("/etc/dd-agent/datadog.conf"); dd != nil {
 		log.Debug("Found dd-agent config file, applying overrides")
 		mergeConfig(ac, dd)
 	}
@@ -103,24 +102,21 @@ func NewDefaultAgentConfig() *AgentConfig {
 func NewAgentConfig(conf *File) (*AgentConfig, error) {
 	c := NewDefaultAgentConfig()
 
-	if v, e := conf.Get("trace.config", "hostname"); e == nil {
+	// Allow overrides of previously set config without erroring
+	if v, _ := conf.Get("trace.config", "hostname"); v != "" {
 		c.HostName = v
 	}
-	if c.HostName == "" {
-		return c, errors.New("no hostname defined")
+
+	if v, _ := conf.Get("trace.api", "api_key"); v != "" {
+		c.APIKey = v
 	}
 
+	// TODO: endpoint is still required from ini.
 	if v, e := conf.Get("trace.api", "endpoint"); e == nil {
 		c.APIEndpoint = v
-	}
-
-	if v, e := conf.Get("trace.api", "api_key"); e == nil {
-		c.APIKey = v
 	} else {
 		return c, e
 	}
-
-	c.APIEnabled = conf.GetBool("trace.api", "enabled", true)
 
 	if v, e := conf.GetInt("trace.concentrator", "bucket_size_seconds"); e == nil {
 		c.BucketInterval = time.Duration(v) * time.Second
@@ -152,8 +148,6 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 		log.Debugf("Tracing ports : %s", tracePortsList)
 		c.TracePortsList = tracePortsList
 	}
-
-	c.Topology = conf.GetBool("trace.grapher", "enabled", false)
 
 	return c, nil
 }
