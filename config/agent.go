@@ -2,13 +2,12 @@ package config
 
 import (
 	"errors"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"time"
 
 	log "github.com/cihub/seelog"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/ini.v1"
 )
 
 // AgentConfig handles the interpretation of the configuration (with default
@@ -40,34 +39,28 @@ type AgentConfig struct {
 	StatsdPort int
 }
 
-type ddAgentConfig struct {
-	hostname      string `yaml:"hostname"`
-	apiKey        string `yaml:"api_key"`
-	dogstatsdPort int    `yaml:"dogstatsd_port"`
-	dogstatsdHost string `yaml:"bind_host"`
-}
-
 // mergeConfig applies overrides from the dd-agent config to the
 // trace agent
-func mergeConfig(c *AgentConfig, d *ddAgentConfig) {
-	if d == nil {
+func mergeConfig(c *AgentConfig, f *ini.File) {
+	m, err := f.GetSection("Main")
+	if err != nil {
 		return
 	}
 
-	if d.hostname != "" {
-		c.HostName = d.hostname
+	if v := m.Key("hostname").MustString(""); v != "" {
+		c.HostName = v
 	}
 
-	if d.apiKey != "" {
-		c.APIKey = d.apiKey
+	if v := m.Key("api_key").MustString(""); v != "" {
+		c.APIKey = v
 	}
 
-	if d.dogstatsdHost != "" {
-		c.StatsdHost = d.dogstatsdHost
+	if v := m.Key("bind_host").MustString(""); v != "" {
+		c.StatsdHost = v
 	}
 
-	if d.dogstatsdPort != 0 {
-		c.StatsdPort = d.dogstatsdPort
+	if v := m.Key("dogstatsd_port").MustInt(-1); v != -1 {
+		c.StatsdPort = v
 	}
 }
 
@@ -98,16 +91,11 @@ func NewDefaultAgentConfig() *AgentConfig {
 	}
 
 	// Check the classic agent's config for overrides
-	var dd *ddAgentConfig
-	data, err := ioutil.ReadFile("/etc/dd-agent/datadog.conf")
-	if err != nil {
-		log.Debug("Failed to read dd-agent config file.")
-	} else {
-		yaml.Unmarshal(data, dd)
+	if dd, err := ini.Load("/etc/dd-agent/datadog.conf"); err != nil {
+		log.Debug("Found dd-agent config file, applying overrides")
+		mergeConfig(ac, dd)
 	}
 
-	// Apply overrides
-	mergeConfig(ac, dd)
 	return ac
 }
 

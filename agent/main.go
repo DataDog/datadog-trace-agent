@@ -88,7 +88,7 @@ func main() {
 
 	conf, err := config.New(opts.configFile)
 	if conf == nil {
-		fmt.Printf("No valid config file found. Using defaults")
+		fmt.Println("No valid config file found. Using defaults")
 		agentConf = config.NewDefaultAgentConfig()
 	} else {
 		agentConf, err = config.NewAgentConfig(conf)
