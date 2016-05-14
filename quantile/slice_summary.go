@@ -1,5 +1,7 @@
 package quantile
 
+import "sort"
+
 // SliceSummary is a GK-summary with a slice backend
 type SliceSummary struct {
 	Entries []Entry
@@ -20,13 +22,7 @@ func (s *SliceSummary) Insert(v float64, t uint64) {
 		Samples: []uint64{t},
 	}
 
-	var i int
-	for _, e := range s.Entries {
-		if v < e.V {
-			break
-		}
-		i++
-	}
+	i := sort.Search(len(s.Entries), func(i int) bool { return v >= s.Entries[i].V })
 
 	if i == 0 || i == len(s.Entries)-1 {
 		newEntry.Delta = 0
