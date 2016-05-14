@@ -41,3 +41,16 @@ func BenchmarkGKDLLRandom(b *testing.B) {
 		s.Insert(vals[n%randlen], uint64(n))
 	}
 }
+
+func BenchmarkGKSliceRandom(b *testing.B) {
+	s := NewSliceSummary()
+
+	vals := randSlice()
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for n := 0; n < b.N; n++ {
+		s.Insert(vals[n%randlen], uint64(n))
+	}
+}
