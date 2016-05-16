@@ -108,7 +108,7 @@ func main() {
 	// Initialize dogstatsd client
 	err = statsd.Configure(agentConf)
 	if err != nil {
-		fmt.Errorf("Error configuring dogstatsd: %v", err)
+		fmt.Printf("Error configuring dogstatsd: %v", err)
 	}
 
 	// Seed rand
