@@ -1,12 +1,12 @@
 package config
 
 import (
-	"errors"
 	"os"
 	"strconv"
 	"time"
 
 	log "github.com/cihub/seelog"
+	"gopkg.in/ini.v1"
 )
 
 // AgentConfig handles the interpretation of the configuration (with default
@@ -32,6 +32,35 @@ type AgentConfig struct {
 	// Grapher
 	Topology       bool // enable topology graph collection
 	TracePortsList []string
+
+	// internal telemetry
+	StatsdHost string
+	StatsdPort int
+}
+
+// mergeConfig applies overrides from the dd-agent config to the
+// trace agent
+func mergeConfig(c *AgentConfig, f *ini.File) {
+	m, err := f.GetSection("Main")
+	if err != nil {
+		return
+	}
+
+	if v := m.Key("hostname").MustString(""); v != "" {
+		c.HostName = v
+	}
+
+	if v := m.Key("api_key").MustString(""); v != "" {
+		c.APIKey = v
+	}
+
+	if v := m.Key("bind_host").MustString(""); v != "" {
+		c.StatsdHost = v
+	}
+
+	if v := m.Key("dogstatsd_port").MustInt(-1); v != -1 {
+		c.StatsdPort = v
+	}
 }
 
 // NewDefaultAgentConfig returns a configuration with the default values
@@ -40,10 +69,9 @@ func NewDefaultAgentConfig() *AgentConfig {
 	if err != nil {
 		hostname = ""
 	}
-
-	return &AgentConfig{
+	ac := &AgentConfig{
 		HostName: hostname,
-
+		// TODO: configure a generic default endpoint
 		APIEndpoint: "http://localhost:8012/api/v0.1",
 		APIKey:      "",
 		APIEnabled:  true,
@@ -56,31 +84,39 @@ func NewDefaultAgentConfig() *AgentConfig {
 
 		Topology:       false,
 		TracePortsList: []string{},
+
+		StatsdHost: "localhost",
+		StatsdPort: 8125,
 	}
+
+	// Check the classic agent's config for overrides
+	if dd, _ := ini.Load("/etc/dd-agent/datadog.conf"); dd != nil {
+		log.Debug("Found dd-agent config file, applying overrides")
+		mergeConfig(ac, dd)
+	}
+
+	return ac
 }
 
 // NewAgentConfig creates the AgentConfig from the standard config. It handles all the cases.
 func NewAgentConfig(conf *File) (*AgentConfig, error) {
 	c := NewDefaultAgentConfig()
 
-	if v, e := conf.Get("trace.config", "hostname"); e == nil {
+	// Allow overrides of previously set config without erroring
+	if v, _ := conf.Get("trace.config", "hostname"); v != "" {
 		c.HostName = v
 	}
-	if c.HostName == "" {
-		return c, errors.New("no hostname defined")
+
+	if v, _ := conf.Get("trace.api", "api_key"); v != "" {
+		c.APIKey = v
 	}
 
+	// TODO: endpoint is still required from ini.
 	if v, e := conf.Get("trace.api", "endpoint"); e == nil {
 		c.APIEndpoint = v
-	}
-
-	if v, e := conf.Get("trace.api", "api_key"); e == nil {
-		c.APIKey = v
 	} else {
 		return c, e
 	}
-
-	c.APIEnabled = conf.GetBool("trace.api", "enabled", true)
 
 	if v, e := conf.GetInt("trace.concentrator", "bucket_size_seconds"); e == nil {
 		c.BucketInterval = time.Duration(v) * time.Second
@@ -112,8 +148,6 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 		log.Debugf("Tracing ports : %s", tracePortsList)
 		c.TracePortsList = tracePortsList
 	}
-
-	c.Topology = conf.GetBool("trace.grapher", "enabled", false)
 
 	return c, nil
 }

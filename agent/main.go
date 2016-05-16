@@ -83,9 +83,18 @@ func main() {
 	}
 
 	// Instantiate the config
+	var conf *config.File
+	var agentConf *config.AgentConfig
+
 	conf, err := config.New(opts.configFile)
-	if err != nil {
-		panic(err)
+	if conf == nil {
+		fmt.Println("No valid config file found. Using defaults")
+		agentConf = config.NewDefaultAgentConfig()
+	} else {
+		agentConf, err = config.NewAgentConfig(conf)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	// Initialize logging
@@ -94,21 +103,16 @@ func main() {
 		panic(fmt.Errorf("error with logger: %v", err))
 	}
 	defer log.Flush()
+	agentConf.Topology = opts.topology
 
 	// Initialize dogstatsd client
-	err = statsd.Configure(conf, "dogstatsd")
+	err = statsd.Configure(agentConf)
 	if err != nil {
-		panic(fmt.Sprintf("Error configuring dogstatsd: %v", err))
+		fmt.Errorf("Error configuring dogstatsd: %v", err)
 	}
 
 	// Seed rand
 	rand.Seed(time.Now().UTC().UnixNano())
-
-	agentConf, err := config.NewAgentConfig(conf)
-	if err != nil {
-		panic(err)
-	}
-	agentConf.Topology = opts.topology
 
 	agent := NewAgent(agentConf)
 
