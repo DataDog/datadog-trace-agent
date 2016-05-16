@@ -68,8 +68,7 @@ func (c *File) GetInt(section, name string) (int, error) {
 
 // GetStrArray returns the value split across `sep` into an array of strings.
 func (c *File) GetStrArray(section, name, sep string) ([]string, error) {
-	exists := c.instance.Section(section).HasKey(name)
-	if !exists {
+	if exists := c.instance.Section(section).HasKey(name); !exists {
 		return []string{}, fmt.Errorf("missing `%s` value in [%s] section", name, section)
 	}
 

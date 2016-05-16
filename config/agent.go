@@ -48,10 +48,14 @@ func mergeConfig(c *AgentConfig, f *ini.File) {
 
 	if v := m.Key("hostname").MustString(""); v != "" {
 		c.HostName = v
+	} else {
+		log.Info("Failed to parse hostname from dd-agent config")
 	}
 
 	if v := m.Key("api_key").MustString(""); v != "" {
 		c.APIKey = v
+	} else {
+		log.Info("Failed to parse api_key from dd-agent config")
 	}
 
 	if v := m.Key("bind_host").MustString(""); v != "" {
