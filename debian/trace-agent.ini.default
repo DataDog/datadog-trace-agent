@@ -1,5 +1,4 @@
 [trace.api]
-api_key = apikey_2
 endpoint = http://trace-api.service.consul:8012/api/v0.1
 
 [trace.concentrator]

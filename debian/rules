@@ -15,11 +15,10 @@ override_dh_auto_build:
 override_dh_auto_install:
 	rake build
 	mkdir -p debian/dd-trace-agent/etc/datadog
-	mkdir -p debian/dd-trace-agent/opt/dd-trace-agent/bin
+	mkdir -p debian/dd-trace-agent/opt/datadog-agent/bin
 	mkdir -p debian/dd-trace-agent/var/log/datadog
-	touch debian/dd-trace-agent/var/log/datadog/dd-trace-agent.log
-	mv trace-agent debian/dd-trace-agent/opt/dd-trace-agent/bin
-	cp debian/trace-agent.ini.default debian/dd-trace-agent/etc/datadog/dd-trace-agent.ini
+	mv trace-agent debian/dd-trace-agent/opt/datadog-agent/bin
+	cp debian/trace-agent.ini.default debian/dd-trace-agent/etc/datadog/trace-agent.ini
 
 override_dh_gencontrol:
 	dh_gencontrol -- -v$(PACKAGEVERSION)
