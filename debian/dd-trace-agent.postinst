@@ -1,18 +1,13 @@
 #!/bin/sh
 
-INSTALL_DIR=/opt/dd-trace-agent/
-LOG_DIR=/var/log/datadog
-CONFIG_DIR=/etc/datadog
-
 set -e
-mkdir -p ${LOG_DIR} || error_exit "Cannot create ${LOG_DIR}!"
 
 case "$1" in
     configure)
-        echo "Registering service trace-agent"
+        echo "Registering service dd-trace-agent"
 	initctl reload-configuration
 
-        echo "Starting service trace-agent"
+        echo "Starting service dd-trace-agent"
         service dd-trace-agent start
         ;;
 esac
