@@ -1,3 +1,6 @@
+### Background
+https://github.com/Datadog/devops/wiki/Trace-Overview
+
 ### Make it work
 
 #### The Agent
