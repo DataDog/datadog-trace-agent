@@ -36,6 +36,11 @@ task :run do
   sh "./trace-agent -config ./agent/trace-agent.ini"
 end
 
+desc "Build deb from current agent source"
+task :build_deb do
+    sh "cd packaging/ && dpkg-buildpackage -us -uc -b"
+end
+
 task :lint do
   error = false
   PACKAGES.each do |pkg|
