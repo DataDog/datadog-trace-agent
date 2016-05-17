@@ -289,6 +289,12 @@ func (s *Summary) Merge(s2 *Summary) {
 	s.compress()
 }
 
+func (s *Summary) Copy() *Summary {
+	other := NewSummary()
+	other.Merge(s) // cheez
+	return other
+}
+
 const maxHeight = 31
 
 // Skiplist is a pseudo-random data structure used to store nodes and find quickly what we want
