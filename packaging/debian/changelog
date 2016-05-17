@@ -1,4 +1,4 @@
-dd-trace-agent (0-0) UNRELEASED; urgency=medium
+dd-trace-agent (0:0.1.0) UNRELEASED; urgency=medium
 
   * Fake entry.
 
