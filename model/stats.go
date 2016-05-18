@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/DataDog/raclette/quantile"
@@ -186,7 +187,13 @@ func (sb StatsBucket) addToTagSet(s Span, tgs TagSet) {
 		sb.addToCount(m, s, tgs)
 	}
 
+	// produce sublayer statistics
 	// TODO add for s.Metrics ability to define arbitrary counts and distros, check some config?
+	for m, v := range s.Metrics {
+		if strings.HasPrefix(m, "_sublayers") {
+			sb.addToCount(m, s, tgs)
+		}
+	}
 
 	for _, m := range DefaultDistributions {
 		sb.addToDistribution(m, s, tgs)
