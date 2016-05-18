@@ -82,7 +82,16 @@ func (a *Agent) runFlusher() {
 			}()
 			go func() {
 				defer wg.Done()
-				p.Traces = <-a.Sampler.out
+				traces := <-a.Sampler.out
+				if a.Config.APIFlushTraces {
+					p.Traces = traces
+				} else {
+					// try to avoid allocs
+					p.Spans = make([]model.Span, 0, len(traces)*10)
+					for _, t := range traces {
+						p.Spans = append(p.Spans, t...)
+					}
+				}
 			}()
 			wg.Wait()
 
