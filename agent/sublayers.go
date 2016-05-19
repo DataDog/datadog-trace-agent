@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	metricPrefixType    = "_sublayers.byType."
-	metricPrefixService = "_sublayers.byService."
+	metricPrefixType    = "_sublayers.duration.by_type.sublayer_type:"
+	metricPrefixService = "_sublayers.duration.by_service.sublayer_service:"
 )
 
 // SublayerTagger is a dumb worker that adds sublayer stats to traces

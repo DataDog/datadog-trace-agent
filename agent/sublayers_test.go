@@ -44,13 +44,13 @@ func TestSublayerNested(t *testing.T) {
 			assert.Equal(
 				s.Metrics,
 				map[string]float64{
-					"_sublayers.span_count":          5,
-					"_sublayers.byType.web":          1000000000 - 200000000 - 500000,
-					"_sublayers.byType.sql":          200000000,
-					"_sublayers.byType.redis":        500000,
-					"_sublayers.byService.mcnulty":   1000000000 - 199999000 - 500000,
-					"_sublayers.byService.master-db": 199999000,
-					"_sublayers.byService.redis":     500000,
+					"_sublayers.span_count":                                     5,
+					"_sublayers.duration.by_type.sublayer_type:web":             1000000000 - 200000000 - 500000,
+					"_sublayers.duration.by_type.sublayer_type:sql":             200000000,
+					"_sublayers.duration.by_type.sublayer_type:redis":           500000,
+					"_sublayers.duration.by_service.sublayer_service:mcnulty":   1000000000 - 199999000 - 500000,
+					"_sublayers.duration.by_service.sublayer_service:master-db": 199999000,
+					"_sublayers.duration.by_service.sublayer_service:redis":     500000,
 				},
 				"did not get exepected sublayers tagging",
 			)

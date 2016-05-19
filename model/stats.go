@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/DataDog/raclette/quantile"
-	log "github.com/cihub/seelog"
 )
 
 // Hardcoded metric names for ease of reference
@@ -47,38 +46,10 @@ func NewCount(m string, tgs TagSet) Count {
 	return Count{Key: tgs.TagKey(m), Name: m, TagSet: tgs, Value: 0.0}
 }
 
-// Add adds a Span to a Count, returns an error if it cannot add values
-func (c Count) Add(s Span) (Count, error) {
-	newc := Count{
-		Key:    c.Key,
-		Name:   c.Name,
-		TagSet: c.TagSet,
-	}
-
-	switch c.Name {
-	case HITS:
-		newc.Value = c.Value + 1
-	case ERRORS:
-		if s.Error != 0 {
-			newc.Value = c.Value + 1
-		} else {
-			return c, nil
-		}
-	case DURATION:
-		newc.Value = c.Value + float64(s.Duration)
-	default:
-		// arbitrary metrics implementation
-		if s.Metrics != nil {
-			val, ok := s.Metrics[c.Name]
-			if !ok {
-				return c, fmt.Errorf("Count %s was not initialized", c.Name)
-			}
-			newc.Value = c.Value + val
-		} else {
-			return c, fmt.Errorf("Not adding span metrics %v to count %s, not compatible", s.Metrics, c.Name)
-		}
-	}
-	return newc, nil
+// Add adds some values to one count
+func (c Count) Add(v float64) Count {
+	c.Value += v
+	return c
 }
 
 // Merge is used when 2 Counts represent the same thing and adds Values
@@ -88,12 +59,8 @@ func (c Count) Merge(c2 Count) Count {
 		panic(err)
 	}
 
-	return Count{
-		Key:    c.Key,
-		Name:   c.Name,
-		TagSet: c.TagSet,
-		Value:  c.Value + c2.Value,
-	}
+	c.Value += c2.Value
+	return c
 }
 
 // NewDistribution returns a new Distribution for a metric and a given tag set
@@ -107,22 +74,8 @@ func NewDistribution(m string, tgs TagSet) Distribution {
 }
 
 // Add inserts the proper values in a given distribution from a span
-func (d Distribution) Add(s Span, res time.Duration) {
-	var val float64
-
-	// only use the resolution on our duration distrib
-	// which a number of nanoseconds
-	if d.Name == DURATION {
-		val = nsTimestampToFloat(s.Duration, res)
-	} else {
-		var ok bool
-		val, ok = s.Metrics[d.Name]
-		if !ok {
-			panic(fmt.Errorf("Don't know how to handle a '%s' distribution", d.Name))
-		}
-	}
-
-	d.Summary.Insert(val, s.SpanID)
+func (d Distribution) Add(v float64, sampleID uint64) {
+	d.Summary.Insert(v, sampleID)
 }
 
 // Merge is used when 2 Distributions represent the same thing and it merges the 2 underlying summaries
@@ -165,16 +118,16 @@ func (sb *StatsBucket) HandleSpan(s Span, aggregators []string) {
 	for _, agg := range aggregators {
 		switch agg {
 		case "service":
-			finestGrain = append(finestGrain, Tag{Name: "service", Value: s.Service})
+			finestGrain = append(finestGrain, Tag{"service", s.Service})
 		case "name":
-			finestGrain = append(finestGrain, Tag{Name: "name", Value: s.Name})
+			finestGrain = append(finestGrain, Tag{"name", s.Name})
 		case "resource":
-			finestGrain = append(finestGrain, Tag{Name: "resource", Value: s.Resource})
+			finestGrain = append(finestGrain, Tag{"resource", s.Resource})
 		// custom aggregators asked by people
 		default:
 			val, ok := s.Meta[agg]
 			if ok {
-				finestGrain = append(finestGrain, Tag{Name: agg, Value: val})
+				finestGrain = append(finestGrain, Tag{agg, val})
 			}
 		}
 	}
@@ -183,45 +136,61 @@ func (sb *StatsBucket) HandleSpan(s Span, aggregators []string) {
 }
 
 func (sb StatsBucket) addToTagSet(s Span, tgs TagSet) {
-	for _, m := range DefaultCounts {
-		sb.addToCount(m, s, tgs)
+	// HITS
+	sb.addToCount(HITS, 1, tgs)
+	// FIXME: this does not really make sense actually
+	// ERRORS
+	if s.Error != 0 {
+		sb.addToCount(ERRORS, 1, tgs)
+	} else {
+		sb.addToCount(ERRORS, 0, tgs)
 	}
+	// DURATION
+	sb.addToCount(DURATION, float64(s.Duration), tgs)
 
-	// produce sublayer statistics
 	// TODO add for s.Metrics ability to define arbitrary counts and distros, check some config?
 	for m, v := range s.Metrics {
-		if strings.HasPrefix(m, "_sublayers") {
-			sb.addToCount(m, s, tgs)
+		// produce sublayer statistics, span_count is a special metric used in the UI only
+		if strings.HasPrefix(m, "_sublayers") && m != "_sublayers.span_count" {
+			// add tags for breaking down sublayers later on
+			// skip "_sublayers." then there is "duration.by_service.sublayer_service:XXXX"
+			subparsed := strings.SplitN(m[11:], ".", 3)
+			if !strings.HasPrefix(subparsed[1], "by_") {
+				continue
+			}
+
+			sltags := make(TagSet, len(tgs)+1)
+			copy(sltags, tgs)
+			sltags[len(tgs)] = NewTagFromString(subparsed[2])
+
+			// only extract _sublayers.duration.by_service
+			sb.addToCount(m[:len(m)-len(subparsed[2])-1], v, sltags)
 		}
 	}
 
-	for _, m := range DefaultDistributions {
-		sb.addToDistribution(m, s, tgs)
-	}
+	// alter resolution of duration distro
+	trundur := nsTimestampToFloat(s.Duration, sb.DistroResolution)
+	sb.addToDistribution(DURATION, trundur, s.SpanID, tgs)
 }
 
-func (sb StatsBucket) addToCount(m string, s Span, tgs TagSet) {
+func (sb StatsBucket) addToCount(m string, v float64, tgs TagSet) {
 	ckey := tgs.TagKey(m)
 
 	if _, ok := sb.Counts[ckey]; !ok {
 		sb.Counts[ckey] = NewCount(m, tgs)
 	}
 
-	var err error
-	sb.Counts[ckey], err = sb.Counts[ckey].Add(s)
-	if err != nil {
-		log.Infof("Not adding span %d to count %s/%s, %s", s.SpanID, m, ckey, err)
-	}
+	sb.Counts[ckey] = sb.Counts[ckey].Add(v)
 }
 
-func (sb StatsBucket) addToDistribution(m string, s Span, tgs TagSet) {
+func (sb StatsBucket) addToDistribution(m string, v float64, sampleID uint64, tgs TagSet) {
 	ckey := tgs.TagKey(m)
 
 	if _, ok := sb.Distributions[ckey]; !ok {
 		sb.Distributions[ckey] = NewDistribution(m, tgs)
 	}
 
-	sb.Distributions[ckey].Add(s, sb.DistroResolution)
+	sb.Distributions[ckey].Add(v, sampleID)
 }
 
 // IsEmpty just says if this stats bucket has no information (in which case it's useless)

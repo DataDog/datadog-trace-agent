@@ -140,8 +140,7 @@ func TestDistribution() model.Distribution {
 	tgs := model.NewTagsFromString("service:X,name:Y,host:Z")
 	d := model.NewDistribution("duration", tgs)
 	for i, v := range TestDistroValues {
-		s := model.Span{SpanID: uint64(i), Duration: v}
-		d.Add(s, time.Microsecond)
+		d.Add(float64(v), uint64(i))
 	}
 
 	return d
