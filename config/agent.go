@@ -5,9 +5,8 @@ import (
 	"strconv"
 	"time"
 
-	"gopkg.in/ini.v1"
-
 	log "github.com/cihub/seelog"
+	"gopkg.in/ini.v1"
 )
 
 // AgentConfig handles the interpretation of the configuration (with default
@@ -18,10 +17,9 @@ type AgentConfig struct {
 	HostName string
 
 	// API
-	APIEndpoint    string
-	APIKey         string
-	APIEnabled     bool
-	APIFlushTraces bool
+	APIEndpoint string
+	APIKey      string
+	APIEnabled  bool
 
 	// Concentrator
 	BucketInterval    time.Duration // the size of our pre-aggregation per bucket
@@ -79,10 +77,9 @@ func NewDefaultAgentConfig() *AgentConfig {
 	ac := &AgentConfig{
 		HostName: hostname,
 		// TODO: configure a generic default endpoint
-		APIEndpoint:    "http://localhost:8012/api/v0.1",
-		APIKey:         "",
-		APIEnabled:     true,
-		APIFlushTraces: true,
+		APIEndpoint: "http://localhost:8012/api/v0.1",
+		APIKey:      "",
+		APIEnabled:  true,
 
 		BucketInterval:    time.Duration(5) * time.Second,
 		OldestSpanCutoff:  time.Duration(30 * time.Second).Nanoseconds(),
@@ -125,10 +122,6 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 		c.APIEndpoint = v
 	} else {
 		return c, e
-	}
-
-	if v, e := conf.Get("trace.api", "flush_traces"); e == nil && v == "false" {
-		c.APIFlushTraces = false
 	}
 
 	if v, e := conf.GetInt("trace.concentrator", "bucket_size_seconds"); e == nil {

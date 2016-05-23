@@ -289,7 +289,6 @@ func (s *Summary) Merge(s2 *Summary) {
 	s.compress()
 }
 
-// Copy just returns a new summary with the same data
 func (s *Summary) Copy() *Summary {
 	other := NewSummary()
 	other.Merge(s) // cheez

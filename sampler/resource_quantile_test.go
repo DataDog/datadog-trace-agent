@@ -15,7 +15,7 @@ func TestSampler(t *testing.T) {
 
 	conf := config.NewDefaultAgentConfig()
 	conf.SamplerQuantiles = []float64{0, 0.25, 0.5, 0.95, 0.99, 1}
-	conf.LatencyResolution = time.Nanosecond
+	conf.DistroResolution = time.Nanosecond
 	sampler := NewResourceQuantileSampler(conf)
 
 	type sampleResult struct {
