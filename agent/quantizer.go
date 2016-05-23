@@ -9,17 +9,17 @@ import (
 
 // Quantizer generates meaningul resource for spans
 type Quantizer struct {
-	in  chan model.Trace
-	out chan model.Trace
+	in  chan model.Span
+	out chan model.Span
 
 	Worker
 }
 
 // NewQuantizer creates a new Quantizer ready to be started
-func NewQuantizer(in chan model.Trace) *Quantizer {
+func NewQuantizer(in chan model.Span) *Quantizer {
 	q := &Quantizer{
 		in:  in,
-		out: make(chan model.Trace),
+		out: make(chan model.Span),
 	}
 	q.Init()
 	return q
@@ -31,11 +31,8 @@ func (q *Quantizer) Start() {
 	go func() {
 		for {
 			select {
-			case trace := <-q.in:
-				for i, s := range trace {
-					trace[i] = quantizer.Quantize(s)
-				}
-				q.out <- trace
+			case span := <-q.in:
+				q.out <- quantizer.Quantize(span)
 			case <-q.exit:
 				log.Info("Quantizer exiting")
 				close(q.out)

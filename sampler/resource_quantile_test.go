@@ -14,8 +14,7 @@ func TestSampler(t *testing.T) {
 	assert := assert.New(t)
 
 	conf := config.NewDefaultAgentConfig()
-	conf.SamplerQuantiles = []float64{0, 0.25, 0.5, 0.95, 0.99, 1}
-	conf.DistroResolution = time.Nanosecond
+	conf.SamplerQuantiles = []float64{0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 1}
 	sampler := NewResourceQuantileSampler(conf)
 
 	type sampleResult struct {
@@ -24,119 +23,139 @@ func TestSampler(t *testing.T) {
 		samples  []uint64
 	}
 
-	testTraces := []model.Trace{
-		model.Trace{
-			model.Span{TraceID: 100, SpanID: 10, Service: "x", Name: "y", Resource: "z", Duration: 573496},
-			model.Span{TraceID: 100, SpanID: 14, Service: "x", Name: "y", Resource: "z", Duration: 513323},
-		},
-		model.Trace{
-			model.Span{TraceID: 101, SpanID: 13, Service: "x", Name: "y", Resource: "z", Duration: 26965},
-			model.Span{TraceID: 101, SpanID: 18, Service: "x", Name: "y", Resource: "z", Duration: 197884},
-			model.Span{TraceID: 101, SpanID: 24, Service: "x", Name: "y", Resource: "z", Duration: 12304982304},
-			model.Span{TraceID: 101, SpanID: 30, Service: "x", Name: "y", Resource: "z", Duration: 34384993},
-		},
-		model.Trace{
-			model.Span{TraceID: 102, SpanID: 11, Service: "x", Name: "y", Resource: "z", Duration: 992312},
-			model.Span{TraceID: 102, SpanID: 15, Service: "x", Name: "y", Resource: "z", Duration: 34347},
-			model.Span{TraceID: 102, SpanID: 28, Service: "x", Name: "y", Resource: "z", Duration: 349944},
-		},
-		model.Trace{
-			model.Span{TraceID: 103, SpanID: 17, Service: "x", Name: "y", Resource: "z", Duration: 19207},
-			model.Span{TraceID: 103, SpanID: 22, Service: "x", Name: "y", Resource: "z", Duration: 234923874},
-			model.Span{TraceID: 103, SpanID: 25, Service: "x", Name: "y", Resource: "z", Duration: 152342344},
-			model.Span{TraceID: 103, SpanID: 27, Service: "x", Name: "y", Resource: "z", Duration: 1523444},
-		},
-		model.Trace{
-			model.Span{TraceID: 104, SpanID: 19, Service: "x", Name: "y", Resource: "z", Duration: 151384},
-			model.Span{TraceID: 104, SpanID: 20, Service: "x", Name: "y", Resource: "z", Duration: 8937423},
-			model.Span{TraceID: 104, SpanID: 21, Service: "x", Name: "y", Resource: "z", Duration: 2342342},
-			model.Span{TraceID: 104, SpanID: 26, Service: "x", Name: "y", Resource: "z", Duration: 15234234},
-		},
-		model.Trace{
-			model.Span{TraceID: 105, SpanID: 23, Service: "x", Name: "y", Resource: "z", Duration: 13434},
-		},
-		model.Trace{
-			model.Span{TraceID: 106, SpanID: 29, Service: "x", Name: "y", Resource: "z", Duration: 29999934},
-		},
-		model.Trace{
-			model.Span{TraceID: 108, SpanID: 12, Service: "x", Name: "y", Resource: "z", Duration: 769540},
-		},
-		model.Trace{
-			model.Span{TraceID: 109, SpanID: 16, Service: "x", Name: "y", Resource: "z", Duration: 498798},
-		},
+	testSpans := []model.Span{
+		model.Span{TraceID: 100, SpanID: 10, Duration: 573496},
+		model.Span{TraceID: 102, SpanID: 11, Duration: 992312},
+		model.Span{TraceID: 108, SpanID: 12, Duration: 769540},
+		model.Span{TraceID: 101, SpanID: 13, Duration: 26965},
+		model.Span{TraceID: 100, SpanID: 14, Duration: 513323},
+		model.Span{TraceID: 102, SpanID: 15, Duration: 34347},
+		model.Span{TraceID: 109, SpanID: 16, Duration: 498798},
+		model.Span{TraceID: 103, SpanID: 17, Duration: 19207},
+		model.Span{TraceID: 101, SpanID: 18, Duration: 197884},
+		model.Span{TraceID: 104, SpanID: 19, Duration: 151384},
+		model.Span{TraceID: 104, SpanID: 20, Duration: 8937423},
+		model.Span{TraceID: 104, SpanID: 21, Duration: 2342342},
+		model.Span{TraceID: 103, SpanID: 22, Duration: 234923874},
+		model.Span{TraceID: 105, SpanID: 23, Duration: 13434},
+		model.Span{TraceID: 101, SpanID: 24, Duration: 12304982304},
+		model.Span{TraceID: 103, SpanID: 25, Duration: 152342344},
+		model.Span{TraceID: 104, SpanID: 26, Duration: 15234234},
+		model.Span{TraceID: 103, SpanID: 27, Duration: 1523444},
+		model.Span{TraceID: 102, SpanID: 28, Duration: 349944},
+		model.Span{TraceID: 106, SpanID: 29, Duration: 29999934},
+		model.Span{TraceID: 101, SpanID: 30, Duration: 34384993},
 	}
 
-	for _, t := range testTraces {
-		sampler.AddTrace(t)
+	expectedResults := []sampleResult{
+		sampleResult{quantile: 0, value: float64(13434), samples: []uint64{23}},
+		// TODO[leo]: result different from numpy, investigate
+		sampleResult{quantile: 0.25, value: float64(151384), samples: []uint64{19}},
+		sampleResult{quantile: 0.5, value: float64(769540), samples: []uint64{12}},
+		sampleResult{quantile: 0.75, value: float64(15234234), samples: []uint64{26}},
+		sampleResult{quantile: 0.9, value: float64(152342344), samples: []uint64{25}},
+		sampleResult{quantile: 0.95, value: float64(234923874), samples: []uint64{22}},
+		sampleResult{quantile: 0.99, value: float64(12304982304), samples: []uint64{24}},
+		sampleResult{quantile: 1, value: float64(12304982304), samples: []uint64{24}},
 	}
 
-	selected := sampler.Flush()
+	shouldChoose := []int{12, 13, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 30}
 
-	/* Test results explanations:
-	samples = [
-		573496, 513323, 26965, 197884, 12304982304, 34384993,
-		992312, 34347, 349944, 19207, 234923874, 152342344, 1523444,
-		151384, 8937423, 2342342, 15234234, 13434, 29999934, 769540, 498798,
-	]
-
-	# find the quantiles
-	qs = [0, 0.25, 0.5, 0.95, 0.99, 1]
-	import numpy as np
-	for q in qs:
-		print "q:", q, " v:", np.percentile(samples, q*100, interpolation='nearest')
-
-	>>>
-	q: 0  v: 13434
-		span: 23, selects trace 105
-
-	FIXME[leo]: here we select span 19 for some reason??
-	q: 0.25  v: 197884
-		span: 18, selects trace 101
-	q: 0.5  v: 769540
-		span: 12, selects trace 108
-	q: 0.95  v: 234923874
-		span: 22, selects trace 103
-	q: 0.99  v: 12304982304
-		span: 24, selects trace 101
-	q: 1  v: 12304982304
-		span: 24, selects trace 101
-	*/
-
-	texp := []int{
-		101,
-		103,
-		104,
-		105,
-		108,
-	}
-	sexp := []int{
-		13, 18, 24, 30, // 101
-		17, 22, 25, 27, // 103
-		19, 20, 21, 26, // 104
-		23, // 105
-		12, // 108
+	for _, s := range testSpans {
+		sampler.AddSpan(s)
 	}
 
-	var tgot []int
-	var sgot []int
-	for _, t := range selected {
-		tgot = append(tgot, int(t[0].TraceID))
-		for _, s := range t {
-			sgot = append(sgot, int(s.SpanID))
-		}
+	// Now prepare distributions
+	reso := time.Nanosecond
+	stats := model.NewStatsBucket(0, 1, reso)
+	tgs := model.NewTagsFromString("service:dogweb,resource:dash.list")
+	d := model.NewDistribution(model.DURATION, tgs)
+	for _, span := range testSpans {
+		d.Add(span, reso)
 	}
 
-	sort.Ints(tgot)
-	sort.Ints(sgot)
-	sort.Ints(texp)
-	sort.Ints(sexp)
+	for _, r := range expectedResults {
+		val, samples := d.Summary.Quantile(r.quantile)
+		assert.Equal(r.value, val, "Expected value %d instead of %d for quantile %f", r.value, val, r.quantile)
+		assert.Equal(r.samples, samples, "Expected samples %v instead of %v for quantile %f", r.samples, samples, r.quantile)
+	}
 
-	assert.Equal(texp, tgot, "sampled the wrong traces")
-	assert.Equal(sexp, sgot, "sampled the wrong spans")
+	// Add one fake distribution for choosing
+	stats.Distributions["whatever"] = d
+	chosen := sampler.GetSamples(sampler.traceIDBySpanID, sampler.spansByTraceID, stats)
+
+	// step1: chosen spans by distributions: 18, 12, 11
+	chosenSID := make([]int, len(chosen))
+	for i, s := range chosen {
+		chosenSID[i] = int(s.SpanID)
+	}
+	sort.Ints(chosenSID)
+
+	// Verify that are our samples are correct
+	assert.Equal(shouldChoose, chosenSID)
 }
 
-type uintslice []uint64
+/* small python helper to generate the test values above
+import numpy as np
+import re
 
-func (s uintslice) Len() int           { return len(s) }
-func (s uintslice) Less(i, j int) bool { return s[i] <= s[j] }
-func (s uintslice) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+R_DUR = re.compile(r'TraceID: (\d+),\s+SpanID: (\d+),\s+Duration: (\d+)')
+
+vals = """
+    testSpans := []model.Span{
+        model.Span{TraceID: 100, SpanID: 10, Duration: 573496},
+        model.Span{TraceID: 102, SpanID: 11, Duration: 992312},
+        model.Span{TraceID: 108, SpanID: 12, Duration: 769540},
+        model.Span{TraceID: 101, SpanID: 13, Duration: 26965},
+        model.Span{TraceID: 100, SpanID: 14, Duration: 513323},
+        model.Span{TraceID: 102, SpanID: 15, Duration: 34347},
+        model.Span{TraceID: 109, SpanID: 16, Duration: 498798},
+        model.Span{TraceID: 103, SpanID: 17, Duration: 19207},
+        model.Span{TraceID: 101, SpanID: 18, Duration: 197884},
+        model.Span{TraceID: 104, SpanID: 19, Duration: 151384},
+        model.Span{TraceID: 104, SpanID: 20, Duration: 8937423},
+        model.Span{TraceID: 104, SpanID: 21, Duration: 2342342},
+        model.Span{TraceID: 103, SpanID: 22, Duration: 234923874},
+        model.Span{TraceID: 105, SpanID: 23, Duration: 13434},
+        model.Span{TraceID: 101, SpanID: 24, Duration: 12304982304},
+        model.Span{TraceID: 103, SpanID: 25, Duration: 152342344},
+        model.Span{TraceID: 104, SpanID: 26, Duration: 15234234},
+        model.Span{TraceID: 103, SpanID: 27, Duration: 1523444},
+        model.Span{TraceID: 102, SpanID: 28, Duration: 349944},
+        model.Span{TraceID: 106, SpanID: 29, Duration: 29999934},
+        model.Span{TraceID: 101, SpanID: 30, Duration: 34384993},
+    }
+"""
+print vals
+
+quantiles = [0, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99, 1]
+traces, spans, durations = [], [], []
+
+for line in vals.splitlines():
+    m = R_DUR.search(line)
+    if not m:
+        continue
+
+    g = m.groups()
+    assert len(g) == 3
+    traces.append(int(g[0]))
+    spans.append(int(g[1]))
+    durations.append(int(g[2]))
+
+expected_quantiles = []
+straces = {}
+
+print "expectedResults := []sampleResult{"
+for q in quantiles:
+    val = np.percentile(durations, q*100, interpolation='nearest')
+    idx = durations.index(val)
+    straces[traces[idx]] = True
+    print "  sampleResult{{quantile: {0}, value: int64({1}), samples: []uint64{{{2}}}}},".format(q, val, spans[idx])
+print "}"
+
+chosen = []
+for s, t in zip(spans, traces):
+    if straces.get(t):
+        chosen.append(str(s))
+print "shouldChoose := []uint64{%s}" % ','.join(sorted(chosen))
+*/

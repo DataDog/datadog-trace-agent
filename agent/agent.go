@@ -11,15 +11,17 @@ import (
 
 // Agent struct holds all the sub-routines structs and make the data flow between them
 type Agent struct {
-	Receiver     Receiver // Receiver is an interface
-	Quantizer    *Quantizer
-	Concentrator *Concentrator
-	Sampler      *Sampler
-	Writer       *Writer
+	Receiver        Receiver // Receiver is an interface
+	Quantizer       *Quantizer
+	Concentrator    *Concentrator
+	Grapher         *Grapher
+	Sampler         *Sampler
+	Writer          *Writer
+	NetworkTopology *NetworkTopology
 
 	// config
-	Config         *config.AgentConfig
-	traceConsumers int
+	Config        *config.AgentConfig
+	spanConsumers int
 
 	// Used to synchronize on a clean exit
 	exit chan struct{}
@@ -30,25 +32,37 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 	exit := make(chan struct{})
 
 	r := NewHTTPReceiver()
-	q := NewQuantizer(r.traces)
+	q := NewQuantizer(r.out)
 
-	traceConsumers := 2
-	traceChans := traceFanOut(q.out, traceConsumers)
+	spanConsumers := 2
+	if conf.Topology {
+		spanConsumers++
+	}
+	spanChans := spanFanOut(q.out, spanConsumers)
 
-	c := NewConcentrator(traceChans[0], conf)
-	s := NewSampler(traceChans[1], conf)
+	c := NewConcentrator(spanChans[0], conf)
+	s := NewSampler(spanChans[1], conf)
+
+	var n *NetworkTopology
+	var g *Grapher
+	if conf.Topology {
+		n = NewNetworkTopology(conf)
+		g = NewGrapher(spanChans[2], n.out, conf)
+	}
 
 	w := NewWriter(conf, r.services)
 
 	return &Agent{
-		Config:         conf,
-		Receiver:       r,
-		Quantizer:      q,
-		Concentrator:   c,
-		Sampler:        s,
-		Writer:         w,
-		traceConsumers: traceConsumers,
-		exit:           exit,
+		Config:          conf,
+		Receiver:        r,
+		Quantizer:       q,
+		Concentrator:    c,
+		Grapher:         g,
+		Sampler:         s,
+		NetworkTopology: n,
+		Writer:          w,
+		spanConsumers:   spanConsumers,
+		exit:            exit,
 	}
 }
 
@@ -70,19 +84,25 @@ func (a *Agent) runFlusher() {
 		select {
 		case <-ticker.C:
 			log.Debug("Trigger a flush")
-			a.Quantizer.out <- model.NewTraceFlushMarker()
+			a.Quantizer.out <- model.NewFlushMarker()
 
 			// Collect and merge partial flushs
 			var wg sync.WaitGroup
 			p := model.AgentPayload{}
-			wg.Add(a.traceConsumers)
+			wg.Add(a.spanConsumers)
 			go func() {
 				defer wg.Done()
 				p.Stats = <-a.Concentrator.out
 			}()
+			if a.Grapher != nil {
+				go func() {
+					defer wg.Done()
+					p.Graph = <-a.Grapher.out
+				}()
+			}
 			go func() {
 				defer wg.Done()
-				p.Traces = <-a.Sampler.out
+				p.Spans = <-a.Sampler.out
 			}()
 			wg.Wait()
 
@@ -106,6 +126,14 @@ func (a *Agent) Start() error {
 	a.Writer.Start()
 	a.Sampler.Start()
 	a.Concentrator.Start()
+
+	if a.Grapher != nil {
+		a.Grapher.Start()
+	}
+	if a.NetworkTopology != nil {
+		a.NetworkTopology.Start()
+	}
+
 	a.Quantizer.Start()
 	a.Receiver.Start()
 
@@ -120,22 +148,28 @@ func (a *Agent) Stop() error {
 	a.Receiver.Stop()
 	a.Quantizer.Stop()
 	a.Concentrator.Stop()
+	if a.NetworkTopology != nil {
+		a.NetworkTopology.Stop()
+	}
+	if a.Grapher != nil {
+		a.Grapher.Stop()
+	}
 	a.Sampler.Stop()
 	a.Writer.Stop()
 
 	return nil
 }
 
-// traceFanOut redistributes incoming traces to multiple components by returning multiple channels
-func traceFanOut(in chan model.Trace, n int) []chan model.Trace {
-	outChans := make([]chan model.Trace, 0, n)
+// spanFanOut redistributes incoming spans to multiple components by returning multiple channels
+func spanFanOut(in chan model.Span, n int) []chan model.Span {
+	outChans := make([]chan model.Span, 0, n)
 	for i := 0; i < n; i++ {
-		outChans = append(outChans, make(chan model.Trace))
+		outChans = append(outChans, make(chan model.Span))
 	}
 	go func() {
-		for t := range in {
+		for s := range in {
 			for _, outc := range outChans {
-				outc <- t
+				outc <- s
 			}
 		}
 	}()
