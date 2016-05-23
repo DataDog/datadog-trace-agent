@@ -2,7 +2,6 @@ package model
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -76,7 +75,7 @@ var testSpans = []Span{
 func TestStatsBucketDefault(t *testing.T) {
 	assert := assert.New(t)
 
-	sb := NewStatsBucket(0, 1e9, time.Millisecond)
+	sb := NewStatsBucket(0, 1e9)
 	aggr := []string{"service", "name", "resource"}
 	for _, s := range testSpans {
 		sb.HandleSpan(s, aggr)
@@ -119,7 +118,7 @@ func TestStatsBucketDefault(t *testing.T) {
 func TestStatsBucketExtraAggregators(t *testing.T) {
 	assert := assert.New(t)
 
-	sb := NewStatsBucket(0, 1e9, time.Millisecond)
+	sb := NewStatsBucket(0, 1e9)
 	aggr := []string{"name", "version"}
 	for _, s := range testSpans {
 		sb.HandleSpan(s, aggr)
@@ -150,38 +149,5 @@ func TestStatsBucketExtraAggregators(t *testing.T) {
 			assert.Fail("Unexpected count %s", ckey)
 		}
 		assert.Equal(val, c.Value, "Count %s wrong value", ckey)
-	}
-}
-
-func TestResos(t *testing.T) {
-	assert := assert.New(t)
-
-	durations := []int64{
-		3 * 1e9,
-		32432874923,
-		1000,
-		45,
-		41000234,
-	}
-
-	type testcase struct {
-		res time.Duration
-		exp []float64
-	}
-
-	cases := []testcase{
-		{time.Second, []float64{3000000000, 32000000000, 0, 0, 0}},
-		{time.Millisecond, []float64{3000000000, 32432000000, 0, 0, 41000000}},
-		{time.Microsecond, []float64{3000000000, 32432874000, 1000, 0, 41000000}},
-		{time.Nanosecond, []float64{3000000000, 32432874923, 1000, 45, 41000234}},
-	}
-
-	for _, c := range cases {
-		results := []float64{}
-		for _, d := range durations {
-			results = append(results, NSTimestampToFloat(d, c.res))
-		}
-
-		assert.Equal(c.exp, results, "resolution conversion failed")
 	}
 }
