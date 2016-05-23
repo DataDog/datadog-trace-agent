@@ -112,7 +112,7 @@ func (d Distribution) Add(s Span, res time.Duration) {
 	// only use the resolution on our duration distrib
 	// which a number of nanoseconds
 	if d.Name == DURATION {
-		val = nsTimestampToFloat(s.Duration, res)
+		val = NSTimestampToFloat(s.Duration, res)
 	} else {
 		var ok bool
 		// FIXME: s.Metrics should have float64 vals
@@ -225,7 +225,7 @@ func (sb StatsBucket) IsEmpty() bool {
 	return len(sb.Counts) == 0 && len(sb.Distributions) == 0
 }
 
-// nsTimestampToFloat converts a nanosec timestamp into a float nanosecond timestamp truncated at given resoultion
-func nsTimestampToFloat(ns int64, res time.Duration) float64 {
+// NSTimestampToFloat converts a nanosec timestamp into a float nanosecond timestamp truncated at given resoultion
+func NSTimestampToFloat(ns int64, res time.Duration) float64 {
 	return math.Trunc(float64(ns)/float64(res)) * float64(res)
 }

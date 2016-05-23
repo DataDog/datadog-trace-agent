@@ -1,6 +1,7 @@
 package sampler
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -38,6 +39,7 @@ func NewResourceQuantileSampler(conf *config.AgentConfig) *ResourceQuantileSampl
 // AddSpan adds a span to the ResourceQuantileSampler internal memory
 func (s *ResourceQuantileSampler) AddTrace(trace model.Trace) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	for _, span := range trace {
 		s.traceBySpanID[span.SpanID] = &trace
@@ -46,7 +48,6 @@ func (s *ResourceQuantileSampler) AddTrace(trace model.Trace) {
 	}
 	s.traces++
 
-	s.mu.Unlock()
 }
 
 // Flush returns representative spans based on GetSamples and reset its internal memory
@@ -78,6 +79,7 @@ func (s *ResourceQuantileSampler) GetSamples(
 	for _, d := range stats.Distributions {
 		for _, q := range s.conf.SamplerQuantiles {
 			_, sIDs := d.Summary.Quantile(q)
+			fmt.Printf("q: %f, %v\n", q, sIDs)
 
 			if len(sIDs) > 0 {
 				t, ok := traceBySpanID[sIDs[0]]
@@ -88,19 +90,20 @@ func (s *ResourceQuantileSampler) GetSamples(
 		}
 	}
 
-	var kSpans int
+	var kTraces, kSpans int
 	result := make([]model.Trace, 0, len(selected))
-	for tptr := range selected {
+	for tptr, _ := range selected {
 		result = append(result, *tptr)
+		kTraces++
 		kSpans += len(*tptr)
 	}
 
 	execTime := time.Since(startTime)
 	log.Infof("Sampled %d traces out of %d, %d spans out of %d, in %s",
-		len(result), traces, kSpans, spans, execTime)
+		kTraces, traces, kSpans, spans, execTime)
 
 	statsd.Client.Count("trace_agent.sampler.trace.total", int64(traces), nil, 1)
-	statsd.Client.Count("trace_agent.sampler.trace.kept", int64(len(result)), nil, 1)
+	statsd.Client.Count("trace_agent.sampler.trace.kept", int64(kTraces), nil, 1)
 	statsd.Client.Count("trace_agent.sampler.span.total", int64(spans), nil, 1)
 	statsd.Client.Count("trace_agent.sampler.span.kept", int64(kSpans), nil, 1)
 	statsd.Client.Gauge("trace_agent.sampler.sample_duration", execTime.Seconds(), nil, 1)

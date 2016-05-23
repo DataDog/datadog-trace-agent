@@ -179,7 +179,7 @@ func TestResos(t *testing.T) {
 	for _, c := range cases {
 		results := []float64{}
 		for _, d := range durations {
-			results = append(results, nsTimestampToFloat(d, c.res))
+			results = append(results, NSTimestampToFloat(d, c.res))
 		}
 
 		assert.Equal(c.exp, results, "resolution conversion failed")
