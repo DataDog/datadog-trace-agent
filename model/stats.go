@@ -115,13 +115,10 @@ func (d Distribution) Add(s Span, res time.Duration) {
 		val = nsTimestampToFloat(s.Duration, res)
 	} else {
 		var ok bool
-		// FIXME: s.Metrics should have float64 vals
-		var intval int64
-		intval, ok = s.Metrics[d.Name]
+		val, ok = s.Metrics[d.Name]
 		if !ok {
 			panic(fmt.Errorf("Don't know how to handle a '%s' distribution", d.Name))
 		}
-		val = float64(intval)
 	}
 
 	d.Summary.Insert(val, s.SpanID)

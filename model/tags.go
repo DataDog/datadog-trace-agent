@@ -45,6 +45,7 @@ func NewTagSetFromString(raw string) TagSet {
 	return tags
 }
 
+// NewTagsFromString is deprecated
 func NewTagsFromString(r string) TagSet {
 	// FIXME[matt] kill me
 	return NewTagSetFromString(r)
