@@ -19,9 +19,11 @@ Annotations are used to record the existance of an event in time.
 
 ### Make it work
 
-#### The Agent
+#### Installation (RPM)
 
-TODO: updateme with an RPM install
+Coming soon!
+
+#### The Agent
 
 1. Enable your personal-chef [godev environment](https://github.com/DataDog/devops/wiki/Development-Environment#select-your-environment)
 
@@ -41,6 +43,9 @@ supe start trace:
 
 ### Instrumentation
 
+#### Django + Flask
+
+Coming soon!
 
 #### The Python lib
 
