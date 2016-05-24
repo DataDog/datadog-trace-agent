@@ -1,0 +1,5 @@
+#!/bin/sh
+
+set -e
+service dd-trace-agent stop || true
+exit 0

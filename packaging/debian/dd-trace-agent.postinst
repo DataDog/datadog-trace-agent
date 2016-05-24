@@ -1,0 +1,17 @@
+#!/bin/sh
+
+set -e
+
+case "$1" in
+    configure)
+        echo "Registering service dd-trace-agent"
+	initctl reload-configuration
+
+        echo "Starting service dd-trace-agent"
+        service dd-trace-agent start
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

@@ -9,7 +9,7 @@ def go_build(program, opts={})
   branch = `git rev-parse --abbrev-ref HEAD`.strip
   date = `date`.strip
   goversion = `go version`.strip
-  agentversion = "1.0.0-unreleased"
+  agentversion = ENV["TRACE_AGENT_VERSION"] || "0.99.0"
 
   ldflags = "-X #{dd}.BuildDate '#{date}' -X #{dd}.GitCommit '#{commit}' -X #{dd}.GitBranch '#{branch}' -X #{dd}.GoVersion '#{goversion}' -X #{dd}.Version '#{agentversion}'"
 
