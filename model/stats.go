@@ -2,6 +2,8 @@ package model
 
 import (
 	"fmt"
+	"math"
+	"time"
 
 	"github.com/DataDog/raclette/quantile"
 	log "github.com/cihub/seelog"
@@ -104,18 +106,22 @@ func NewDistribution(m string, tgs TagSet) Distribution {
 }
 
 // Add inserts the proper values in a given distribution from a span
-func (d Distribution) Add(s Span) {
-	// NOTE we treat DURATION specially here as a member of the distribution
-	// we have to cast it to float so it fits in our Entry struct
+func (d Distribution) Add(s Span, res time.Duration) {
+	var val float64
+
+	// only use the resolution on our duration distrib
+	// which a number of nanoseconds
 	if d.Name == DURATION {
-		d.Summary.Insert(float64(s.Duration), s.SpanID)
+		val = nsTimestampToFloat(s.Duration, res)
 	} else {
-		val, ok := s.Metrics[d.Name]
+		var ok bool
+		val, ok = s.Metrics[d.Name]
 		if !ok {
 			panic(fmt.Errorf("Don't know how to handle a '%s' distribution", d.Name))
 		}
-		d.Summary.Insert(float64(val), s.SpanID)
 	}
+
+	d.Summary.Insert(val, s.SpanID)
 }
 
 // Merge is used when 2 Distributions represent the same thing and it merges the 2 underlying summaries
@@ -129,22 +135,25 @@ type StatsBucket struct {
 	Start    int64 // timestamp of start in our format
 	Duration int64 // duration of a bucket in nanoseconds
 
+	DistroResolution time.Duration // the time res we use for distros
+
 	// stats indexed by keys
 	Counts        map[string]Count        // All the true counts we keep
 	Distributions map[string]Distribution // All the true distribution we keep to answer quantile queries
 }
 
 // NewStatsBucket opens a new bucket for time ts and initializes it properly
-func NewStatsBucket(ts, d int64) StatsBucket {
+func NewStatsBucket(ts, d int64, res time.Duration) StatsBucket {
 	counts := make(map[string]Count)
 	distros := make(map[string]Distribution)
 
 	// The only non-initialized value is the Duration which should be set by whoever closes that bucket
 	return StatsBucket{
-		Start:         ts,
-		Duration:      d,
-		Counts:        counts,
-		Distributions: distros,
+		Start:            ts,
+		Duration:         d,
+		Counts:           counts,
+		Distributions:    distros,
+		DistroResolution: res,
 	}
 }
 
@@ -205,10 +214,15 @@ func (sb StatsBucket) addToDistribution(m string, s Span, tgs TagSet) {
 		sb.Distributions[ckey] = NewDistribution(m, tgs)
 	}
 
-	sb.Distributions[ckey].Add(s)
+	sb.Distributions[ckey].Add(s, sb.DistroResolution)
 }
 
 // IsEmpty just says if this stats bucket has no information (in which case it's useless)
 func (sb StatsBucket) IsEmpty() bool {
 	return len(sb.Counts) == 0 && len(sb.Distributions) == 0
+}
+
+// nsTimestampToFloat converts a nanosec timestamp into a float nanosecond timestamp truncated at given resoultion
+func nsTimestampToFloat(ns int64, res time.Duration) float64 {
+	return math.Trunc(float64(ns)/float64(res)) * float64(res)
 }

@@ -1,18 +1,22 @@
 package fixtures
 
-import "github.com/DataDog/raclette/model"
+import (
+	"time"
+
+	"github.com/DataDog/raclette/model"
+)
 
 var defaultAggregators = []string{"service", "name", "resource"}
 
 // TestStatsBucket returns a fixed stats bucket to be used in unit tests
 func TestStatsBucket() model.StatsBucket {
-	sb := model.NewStatsBucket(0, 1e9)
+	sb := model.NewStatsBucket(0, 1e9, time.Microsecond)
 	sb.HandleSpan(TestSpan(), defaultAggregators)
 	return sb
 }
 
 func StatsBucketWithSpans(s []model.Span) model.StatsBucket {
-	sb := model.NewStatsBucket(0, 1e9)
+	sb := model.NewStatsBucket(0, 1e9, time.Microsecond)
 	for _, s := range s {
 		sb.HandleSpan(s, defaultAggregators)
 	}
@@ -137,7 +141,7 @@ func TestDistribution() model.Distribution {
 	d := model.NewDistribution("duration", tgs)
 	for i, v := range TestDistroValues {
 		s := model.Span{SpanID: uint64(i), Duration: v}
-		d.Add(s)
+		d.Add(s, time.Microsecond)
 	}
 
 	return d

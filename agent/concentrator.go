@@ -25,7 +25,7 @@ var DefaultAggregators = []string{"service", "name", "resource"}
 // allowing to find the gold (stats) amongst the traces.
 // It also takes care of inserting the spans in a sampler.
 type Concentrator struct {
-	in          chan model.Span             // incoming spans to process
+	in          chan model.Trace            // incoming spans to process
 	out         chan []model.StatsBucket    // outgoing payload
 	buckets     map[int64]model.StatsBucket // buckets use to aggregate stats per timestamp
 	aggregators []string                    // we'll always aggregate (if possible) to this finest grain
@@ -37,7 +37,7 @@ type Concentrator struct {
 }
 
 // NewConcentrator initializes a new concentrator ready to be started
-func NewConcentrator(in chan model.Span, conf *config.AgentConfig) *Concentrator {
+func NewConcentrator(in chan model.Trace, conf *config.AgentConfig) *Concentrator {
 	c := &Concentrator{
 		in:          in,
 		out:         make(chan []model.StatsBucket),
@@ -56,14 +56,16 @@ func (c *Concentrator) Start() {
 	go func() {
 		for {
 			select {
-			case s := <-c.in:
-				if s.IsFlushMarker() {
+			case t := <-c.in:
+				if len(t) == 1 && t[0].IsFlushMarker() {
 					log.Debug("Concentrator starts a flush")
 					c.out <- c.Flush()
 				} else {
-					err := c.HandleNewSpan(s)
-					if err != nil {
-						log.Debugf("Span %v rejected by concentrator. Reason: %v", s.SpanID, err)
+					for _, s := range t {
+						err := c.HandleNewSpan(s)
+						if err != nil {
+							log.Debugf("Span %v rejected by concentrator. Reason: %v", s.SpanID, err)
+						}
 					}
 				}
 			case <-c.exit:
@@ -93,7 +95,9 @@ func (c *Concentrator) HandleNewSpan(s model.Span) error {
 
 	b, ok := c.buckets[bucketTs]
 	if !ok {
-		b = model.NewStatsBucket(bucketTs, c.conf.BucketInterval.Nanoseconds())
+		b = model.NewStatsBucket(
+			bucketTs, c.conf.BucketInterval.Nanoseconds(), c.conf.LatencyResolution,
+		)
 		c.buckets[bucketTs] = b
 	}
 

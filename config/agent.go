@@ -5,8 +5,9 @@ import (
 	"strconv"
 	"time"
 
-	log "github.com/cihub/seelog"
 	"gopkg.in/ini.v1"
+
+	log "github.com/cihub/seelog"
 )
 
 // AgentConfig handles the interpretation of the configuration (with default
@@ -17,14 +18,16 @@ type AgentConfig struct {
 	HostName string
 
 	// API
-	APIEndpoint string
-	APIKey      string
-	APIEnabled  bool
+	APIEndpoint    string
+	APIKey         string
+	APIEnabled     bool
+	APIFlushTraces bool
 
 	// Concentrator
-	BucketInterval   time.Duration // the size of our pre-aggregation per bucket
-	OldestSpanCutoff int64         // maximum time we wait before discarding straggling spans, in ns
-	ExtraAggregators []string
+	BucketInterval    time.Duration // the size of our pre-aggregation per bucket
+	OldestSpanCutoff  int64         // maximum time we wait before discarding straggling spans, in ns
+	ExtraAggregators  []string
+	LatencyResolution time.Duration
 
 	// Sampler
 	SamplerQuantiles []float64
@@ -76,13 +79,15 @@ func NewDefaultAgentConfig() *AgentConfig {
 	ac := &AgentConfig{
 		HostName: hostname,
 		// TODO: configure a generic default endpoint
-		APIEndpoint: "http://localhost:8012/api/v0.1",
-		APIKey:      "",
-		APIEnabled:  true,
+		APIEndpoint:    "http://localhost:8012/api/v0.1",
+		APIKey:         "",
+		APIEnabled:     true,
+		APIFlushTraces: true,
 
-		BucketInterval:   time.Duration(5) * time.Second,
-		OldestSpanCutoff: time.Duration(30 * time.Second).Nanoseconds(),
-		ExtraAggregators: []string{},
+		BucketInterval:    time.Duration(5) * time.Second,
+		OldestSpanCutoff:  time.Duration(30 * time.Second).Nanoseconds(),
+		ExtraAggregators:  []string{},
+		LatencyResolution: time.Millisecond,
 
 		SamplerQuantiles: []float64{0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 1},
 
@@ -122,6 +127,10 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 		return c, e
 	}
 
+	if v, e := conf.Get("trace.api", "flush_traces"); e == nil && v == "false" {
+		c.APIFlushTraces = false
+	}
+
 	if v, e := conf.GetInt("trace.concentrator", "bucket_size_seconds"); e == nil {
 		c.BucketInterval = time.Duration(v) * time.Second
 	}
@@ -134,6 +143,17 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 		c.ExtraAggregators = v
 	} else {
 		log.Debug("No aggregator configuration, using defaults")
+	}
+
+	if v, e := conf.Get("trace.concentrator", "latency_res"); e == nil {
+		switch v {
+		case "millisecond":
+			c.LatencyResolution = time.Millisecond
+		case "microsecond":
+			c.LatencyResolution = time.Microsecond
+		case "nanosecond":
+			c.LatencyResolution = time.Nanosecond
+		}
 	}
 
 	if v, e := conf.GetStrArray("trace.sampler", "quantiles", ","); e == nil {

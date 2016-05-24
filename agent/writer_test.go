@@ -45,7 +45,7 @@ func TestWriterExitsGracefully(t *testing.T) {
 func getTestStatsBuckets() []model.StatsBucket {
 	now := model.Now()
 	bucketSize := time.Duration(5 * time.Second).Nanoseconds()
-	sb := model.NewStatsBucket(now, bucketSize)
+	sb := model.NewStatsBucket(now, bucketSize, time.Millisecond)
 
 	testSpans := []model.Span{
 		model.Span{TraceID: 0, SpanID: 1},

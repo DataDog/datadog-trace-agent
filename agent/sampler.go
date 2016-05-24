@@ -10,8 +10,8 @@ import (
 
 // Sampler chooses wich spans to write to the API
 type Sampler struct {
-	in  chan model.Span
-	out chan []model.Span
+	in  chan model.Trace
+	out chan []model.Trace
 
 	conf *config.AgentConfig
 
@@ -22,15 +22,15 @@ type Sampler struct {
 
 // SamplerEngine cares about ingesting spans and stats to return a sampled payload
 type SamplerEngine interface {
-	AddSpan(span model.Span)
-	Flush() []model.Span
+	AddTrace(t model.Trace)
+	Flush() []model.Trace
 }
 
 // NewSampler creates a new empty sampler ready to be started
-func NewSampler(in chan model.Span, conf *config.AgentConfig) *Sampler {
+func NewSampler(in chan model.Trace, conf *config.AgentConfig) *Sampler {
 	s := &Sampler{
 		in:   in,
-		out:  make(chan []model.Span),
+		out:  make(chan []model.Trace),
 		conf: conf,
 		se:   sampler.NewResourceQuantileSampler(conf),
 	}
@@ -48,14 +48,14 @@ func (s *Sampler) run() {
 	s.wg.Add(1)
 	for {
 		select {
-		case span := <-s.in:
-			if span.IsFlushMarker() {
+		case trace := <-s.in:
+			if len(trace) == 1 && trace[0].IsFlushMarker() {
 				log.Debug("Sampler starts a flush")
-				spans := s.se.Flush()
-				log.Debugf("Sampler flushes %d spans", len(spans))
-				s.out <- spans
+				traces := s.se.Flush()
+				log.Debugf("Sampler flushes %d traces", len(traces))
+				s.out <- traces
 			} else {
-				s.se.AddSpan(span)
+				s.se.AddTrace(trace)
 			}
 		case <-s.exit:
 			log.Info("Sampler exiting")

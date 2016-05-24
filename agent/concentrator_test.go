@@ -14,7 +14,7 @@ func NewTestConcentrator() *Concentrator {
 	conf := config.NewDefaultAgentConfig()
 	conf.BucketInterval = time.Duration(1) * time.Second
 
-	in := make(chan model.Span)
+	in := make(chan model.Trace)
 
 	return NewConcentrator(in, conf)
 }
@@ -58,7 +58,7 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	now := model.Now()
 	alignedNow := now - now%bucketInterval.Nanoseconds()
 
-	testSpans := []model.Span{
+	testSpans := model.Trace{
 		// first bucket
 		model.Span{SpanID: 1, Duration: 24, Start: getTsInBucket(alignedNow, bucketInterval, 2), Service: "A1", Name: "query", Resource: "resource1"},
 		model.Span{SpanID: 2, Duration: 12, Start: getTsInBucket(alignedNow, bucketInterval, 2), Service: "A1", Name: "query", Resource: "resource1", Error: 2},
@@ -76,22 +76,20 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	c.Start()
 
 	// insert the spans
-	for _, s := range testSpans {
-		c.in <- s
-	}
+	c.in <- testSpans
 
 	// Restore the correct cutoff after being sure we processed all the spans
 	time.Sleep(10 * time.Millisecond)
 	c.conf.OldestSpanCutoff = time.Second.Nanoseconds()
 
 	// Triggers the flush
-	c.in <- model.NewFlushMarker()
+	c.in <- model.NewTraceFlushMarker()
 
 	// Send several spans which shouldn't be considered by this flush
 	go func() {
-		c.in <- model.Span{SpanID: 100, Duration: 1, Start: getTsInBucket(alignedNow, bucketInterval, 0), Service: "A1", Name: "query", Resource: "resource1"}
-		c.in <- model.Span{SpanID: 101, Duration: 1, Start: getTsInBucket(alignedNow, bucketInterval, 1), Service: "A1", Name: "query", Resource: "resource1"}
-		c.in <- model.Span{SpanID: 102, Duration: 1, Start: getTsInBucket(alignedNow, bucketInterval, 2), Service: "A1", Name: "query", Resource: "resource1"}
+		c.in <- model.Trace{model.Span{SpanID: 100, Duration: 1, Start: getTsInBucket(alignedNow, bucketInterval, 0), Service: "A1", Name: "query", Resource: "resource1"}}
+		c.in <- model.Trace{model.Span{SpanID: 101, Duration: 1, Start: getTsInBucket(alignedNow, bucketInterval, 1), Service: "A1", Name: "query", Resource: "resource1"}}
+		c.in <- model.Trace{model.Span{SpanID: 102, Duration: 1, Start: getTsInBucket(alignedNow, bucketInterval, 2), Service: "A1", Name: "query", Resource: "resource1"}}
 	}()
 
 	// Get the stats from the flush
