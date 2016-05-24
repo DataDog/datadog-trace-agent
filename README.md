@@ -1,9 +1,27 @@
 ### Background
 https://github.com/Datadog/devops/wiki/Trace-Overview
 
+#### Data Model
+
+_From <https://cloud.google.com/trace/api/#data_model>:_
+
+##### Span
+
+The basic unit of work. A span describes the amount of time it takes an application to complete a suboperation in a trace. For example, it can describe how long it takes for the application to perform a round-trip RPC call to another system when handling a request, or how long it takes to perform another task that is part of a larger operation. Sending an RPC is a new span, as is sending a response to an RPC.
+
+##### Trace
+
+A set of spans. Traces describe the amount of time it takes an application to complete a single operation. For example, it can describe how long it takes for the application to process an incoming request from a user and return a response. Each trace consists of one or more spans, each of which describes the amount of time it takes to complete a suboperation.
+
+##### Annotation
+
+Annotations are used to record the existance of an event in time.
+
 ### Make it work
 
 #### The Agent
+
+TODO: updateme with an RPM install
 
 1. Enable your personal-chef [godev environment](https://github.com/DataDog/devops/wiki/Development-Environment#select-your-environment)
 
@@ -21,22 +39,26 @@ rake trace:reset_es
 supe start trace:
 ```
 
+### Instrumentation
 
-### The Agent UI
-
-Simple web UI to see traces and spans. Spans need to be written in the SQLite DB.
-
-```
-pip install flask
-
-python collector_web/server.py
-```
 
 #### The Python lib
 
 Checkout `dogweb:dogtrace` to have access to the `dogtrace` library.
 
-### Snippets
+#### Snippets
+
+```
+from dogtrace.client import DogTrace
+
+# Need to enable DogTrace to log spans
+DogTrace.reporter.disabled = False
+
+span = DogTrace.begin_span(service='flask', resource='process_request', name=['tag1','tag2'], meta={'key1':'val1'})
+# ... do some work ...
+DogTrace.commit_span()  
+```
+
 
 ```
 # Send a trace manually
