@@ -26,7 +26,7 @@ type ResourceQuantileSampler struct {
 // NewResourceQuantileSampler creates a new ResourceQuantileSampler, ready to ingest spans
 func NewResourceQuantileSampler(conf *config.AgentConfig) *ResourceQuantileSampler {
 	return &ResourceQuantileSampler{
-		stats:           model.NewStatsBucket(0, 1),
+		stats:           model.NewStatsBucket(0, 1, conf.LatencyResolution),
 		traceIDBySpanID: map[uint64]uint64{},
 		spansByTraceID:  map[uint64][]model.Span{},
 		conf:            conf,
@@ -58,7 +58,7 @@ func (s *ResourceQuantileSampler) Flush() []model.Span {
 	stats := s.stats
 	s.traceIDBySpanID = map[uint64]uint64{}
 	s.spansByTraceID = map[uint64][]model.Span{}
-	s.stats = model.NewStatsBucket(0, 1)
+	s.stats = model.NewStatsBucket(0, 1, s.conf.LatencyResolution)
 	s.mu.Unlock()
 
 	return s.GetSamples(traceIDBySpanID, spansByTraceID, stats)
