@@ -19,9 +19,14 @@ Annotations are used to record the existance of an event in time.
 
 ### Make it work
 
-#### Installation (RPM)
+#### Requirements
 
-Coming soon!
+  *	UNIX-like operating systems including Linux, Solaris, FreeBSD and Mac OS X.
+  * Django/Flask plugins work with Python 2.6, 2.7, 3.3 (?)
+
+#### Installation
+
+Install the Agent (RPM) -- Coming soon! 
 
 #### The Agent
 
@@ -51,8 +56,6 @@ Coming soon!
 
 Checkout `dogweb:dogtrace` to have access to the `dogtrace` library.
 
-#### Snippets
-
 ```
 from dogtrace.client import DogTrace
 
@@ -70,3 +73,6 @@ DogTrace.commit_span()
 curl "http://localhost:7777/span" -X POST -d '{"span_id": 1234, "trace_id": 46, "type": "demo", "meta": {"client":"curl", "apache.version": "2.2.2"}}'
 ```
 
+#### API
+
+Coming soon!
