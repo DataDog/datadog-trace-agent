@@ -71,15 +71,9 @@ func BenchmarkSublayerThru(b *testing.B) {
 		model.Span{TraceID: 1, SpanID: 5, ParentID: 1, Start: 700000000, Duration: 700000, Service: "mcnulty", Type: ""},
 	}
 
-	in := make(chan model.Trace)
-	st := NewSublayerTagger(in)
-	st.Start()
-	go func() {
-		for _ = range st.out {
-		}
-	}()
-
+	b.ResetTimer()
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		in <- tr
+		tagSublayers(tr)
 	}
 }

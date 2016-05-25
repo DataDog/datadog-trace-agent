@@ -42,45 +42,7 @@ func (st *SublayerTagger) run() {
 	for {
 		select {
 		case t := <-st.in:
-			iter := model.NewTraceLevelIterator(t)
-			root, err := iter.NextSpan()
-			if err != nil {
-				// no root, skip sublayers
-				st.out <- t
-				continue
-			}
-
-			ss := newSublayerSpan()
-			ss.Add(root)
-
-			for iter.NextLevel() == nil {
-				for cur, err := iter.NextSpan(); err == nil; cur, err = iter.NextSpan() {
-					ss.Add(cur)
-				}
-			}
-
-			// account for sublayer statsx
-			var mName bytes.Buffer
-			byType, byService := ss.OutputStats()
-
-			if root.Metrics == nil {
-				root.Metrics = make(map[string]float64)
-			}
-			root.Metrics["_sublayers.span_count"] = float64(len(t))
-			for k, v := range byType {
-				mName.WriteString(metricPrefixType)
-				mName.WriteString(k)
-				root.Metrics[mName.String()] = float64(v)
-				mName.Reset()
-			}
-			for k, v := range byService {
-				mName.WriteString(metricPrefixService)
-				mName.WriteString(k)
-				root.Metrics[mName.String()] = float64(v)
-				mName.Reset()
-			}
-
-			st.out <- t
+			st.out <- tagSublayers(t)
 		case <-st.exit:
 			log.Info("SublayerTagger exiting")
 			close(st.out)
@@ -88,6 +50,47 @@ func (st *SublayerTagger) run() {
 			return
 		}
 	}
+}
+
+func tagSublayers(t model.Trace) model.Trace {
+	iter := model.NewTraceLevelIterator(t)
+	root, err := iter.NextSpan()
+	if err != nil {
+		// no root, skip sublayers
+		return t
+	}
+
+	ss := newSublayerSpan()
+	ss.Add(root)
+
+	for iter.NextLevel() == nil {
+		for cur, err := iter.NextSpan(); err == nil; cur, err = iter.NextSpan() {
+			ss.Add(cur)
+		}
+	}
+
+	// account for sublayer statsx
+	var mName bytes.Buffer
+	byType, byService := ss.OutputStats()
+
+	if root.Metrics == nil {
+		root.Metrics = make(map[string]float64)
+	}
+	root.Metrics["_sublayers.span_count"] = float64(len(t))
+	for k, v := range byType {
+		mName.WriteString(metricPrefixType)
+		mName.WriteString(k)
+		root.Metrics[mName.String()] = float64(v)
+		mName.Reset()
+	}
+	for k, v := range byService {
+		mName.WriteString(metricPrefixService)
+		mName.WriteString(k)
+		root.Metrics[mName.String()] = float64(v)
+		mName.Reset()
+	}
+
+	return t
 }
 
 type timeSpan struct {
@@ -155,15 +158,15 @@ func (ss *sublayerSpan) Add(s *model.Span) {
 	ss.byService = insertTS(ss.byService, tsService)
 }
 
-func (ss *sublayerSpan) OutputStats() (map[string]int64, map[string]int64) {
-	mType := make(map[string]int64)
-	mService := make(map[string]int64)
+func (ss *sublayerSpan) OutputStats() (map[string]float64, map[string]float64) {
+	mType := make(map[string]float64)
+	mService := make(map[string]float64)
 
 	for _, ts := range ss.byType {
-		mType[ts.Name] += ts.Duration
+		mType[ts.Name] += float64(ts.Duration)
 	}
 	for _, ts := range ss.byService {
-		mService[ts.Name] += ts.Duration
+		mService[ts.Name] += float64(ts.Duration)
 	}
 
 	return mType, mService
