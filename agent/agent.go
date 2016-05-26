@@ -11,11 +11,12 @@ import (
 
 // Agent struct holds all the sub-routines structs and make the data flow between them
 type Agent struct {
-	Receiver     Receiver // Receiver is an interface
-	Quantizer    *Quantizer
-	Concentrator *Concentrator
-	Sampler      *Sampler
-	Writer       *Writer
+	Receiver       Receiver // Receiver is an interface
+	SublayerTagger *SublayerTagger
+	Quantizer      *Quantizer
+	Concentrator   *Concentrator
+	Sampler        *Sampler
+	Writer         *Writer
 
 	// config
 	Config         *config.AgentConfig
@@ -30,7 +31,8 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 	exit := make(chan struct{})
 
 	r := NewHTTPReceiver()
-	q := NewQuantizer(r.traces)
+	st := NewSublayerTagger(r.traces)
+	q := NewQuantizer(st.out)
 
 	traceConsumers := 2
 	traceChans := traceFanOut(q.out, traceConsumers)
@@ -43,6 +45,7 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 	return &Agent{
 		Config:         conf,
 		Receiver:       r,
+		SublayerTagger: st,
 		Quantizer:      q,
 		Concentrator:   c,
 		Sampler:        s,
@@ -116,6 +119,7 @@ func (a *Agent) Start() error {
 	a.Sampler.Start()
 	a.Concentrator.Start()
 	a.Quantizer.Start()
+	a.SublayerTagger.Start()
 	a.Receiver.Start()
 
 	// FIXME: catch start errors
@@ -127,6 +131,7 @@ func (a *Agent) Stop() error {
 	log.Info("Stopping agent")
 
 	a.Receiver.Stop()
+	a.SublayerTagger.Stop()
 	a.Quantizer.Stop()
 	a.Concentrator.Stop()
 	a.Sampler.Stop()
