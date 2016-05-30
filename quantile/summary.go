@@ -67,7 +67,7 @@ func (s Summary) MarshalJSON() ([]byte, error) {
 
 	// TODO[leo] preallocate, not sure: 1/ 2*EPSILON?
 	s.EncodedData = make([]Entry, 0)
-	curr := s.data.head
+	curr := s.data.head.next[0]
 	for curr != nil {
 		s.EncodedData = append(s.EncodedData, curr.value)
 		curr = curr.next[0]
@@ -106,7 +106,7 @@ func (s *Summary) UnmarshalJSON(b []byte) error {
 func (s *Summary) GobEncode() ([]byte, error) {
 	// TODO[leo] preallocate, not sure: 1/ 2*EPSILON?
 	s.EncodedData = make([]Entry, 0)
-	curr := s.data.head
+	curr := s.data.head.next[0]
 	for curr != nil {
 		s.EncodedData = append(s.EncodedData, curr.value)
 		curr = curr.next[0]
@@ -161,9 +161,9 @@ func (s *Summary) Insert(v float64, t uint64) {
 
 func (s *Summary) compress() {
 	var missing int
-
 	epsN := int(2 * EPSILON * float64(s.N))
 
+	// keep first and last element
 	for elt := s.data.head.next[0]; elt != nil && elt.next[0] != nil; {
 		next := elt.next[0]
 		t := elt.value
@@ -180,16 +180,18 @@ func (s *Summary) compress() {
 				nt.Samples = t.Samples
 			}
 			s.data.Remove(elt)
-		} else if t.G+nt.G+missing+nt.Delta < epsN {
-			nt.G += t.G + missing
-			if changeSample {
-				nt.Samples = t.Samples
+		} else if elt != s.data.head.next[0] && next != nil {
+			if t.G+nt.G+missing+nt.Delta < epsN {
+				nt.G += t.G + missing
+				if changeSample {
+					nt.Samples = t.Samples
+				}
+				missing = 0
+				s.data.Remove(elt)
+			} else {
+				nt.G += missing
+				missing = 0
 			}
-			missing = 0
-			s.data.Remove(elt)
-		} else {
-			nt.G += missing
-			missing = 0
 		}
 
 		elt = next
@@ -198,12 +200,10 @@ func (s *Summary) compress() {
 
 // Quantile returns an EPSILON estimate of the element at quantile 'q' (0 <= q <= 1)
 func (s *Summary) Quantile(q float64) (float64, []uint64) {
-
 	// convert quantile to rank
 	r := int(q*float64(s.N) + 0.5)
-
-	var rmin int
 	epsN := int(EPSILON * float64(s.N))
+	var rmin int
 
 	for elt := s.data.head.next[0]; elt != nil; elt = elt.next[0] {
 		t := elt.value
@@ -276,14 +276,8 @@ func (s *Summary) Merge(s2 *Summary) {
 
 	s.N += s2.N
 	// Iterate on s2 elements and insert/merge them
-	curElt := s2.data.head
-	for curElt != nil {
-		if 0 < curElt.value.G {
-			// NOTE[matt] we store an empty head node. don't
-			// include that in the merge.
-			s.data.Insert(curElt.value)
-		}
-		curElt = curElt.next[0]
+	for elt := s2.data.head.next[0]; elt != nil; elt = elt.next[0] {
+		s.data.Insert(elt.value)
 	}
 	// Force compression
 	s.compress()
