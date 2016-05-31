@@ -26,7 +26,7 @@ Annotations are used to record the existance of an event in time.
 
 #### Installation
 
-Install the Agent (RPM) -- Coming soon! 
+[Install the Agent](https://gist.github.com/talwai/d957f310a488c421e3c490ebe18059fb)
 
 #### The Agent
 
