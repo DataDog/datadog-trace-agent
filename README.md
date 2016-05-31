@@ -76,3 +76,7 @@ curl "http://localhost:7777/span" -X POST -d '{"span_id": 1234, "trace_id": 46, 
 #### API
 
 Coming soon!
+
+##### Types
+
+4 built-in types currently exist: web, DB, cache, and custom
