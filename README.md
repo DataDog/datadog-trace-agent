@@ -1,50 +1,5 @@
 ### Background
-https://github.com/Datadog/devops/wiki/Trace-Overview
-
-#### Data Model
-
-_From <https://cloud.google.com/trace/api/#data_model>:_
-
-##### Span
-
-The basic unit of work. A span describes the amount of time it takes an application to complete a suboperation in a trace. For example, it can describe how long it takes for the application to perform a round-trip RPC call to another system when handling a request, or how long it takes to perform another task that is part of a larger operation. Sending an RPC is a new span, as is sending a response to an RPC.
-
-##### Trace
-
-A set of spans. Traces describe the amount of time it takes an application to complete a single operation. For example, it can describe how long it takes for the application to process an incoming request from a user and return a response. Each trace consists of one or more spans, each of which describes the amount of time it takes to complete a suboperation.
-
-##### Annotation
-
-Annotations are used to record the existance of an event in time.
-
-### Make it work
-
-#### Requirements
-
-  *	UNIX-like operating systems including Linux, Solaris, FreeBSD and Mac OS X.
-  * Django/Flask plugins work with Python 2.6, 2.7, 3.3 (?)
-
-#### Installation
-
-[Install the Agent](https://gist.github.com/talwai/d957f310a488c421e3c490ebe18059fb).  The Raclette agent relies on the dd-agent config file for an api key.
-
-#### The Agent
-
-1. Enable your personal-chef [godev environment](https://github.com/DataDog/devops/wiki/Development-Environment#select-your-environment)
-
-2. Download [ES 2.0+](https://www.elastic.co/downloads/elasticsearch), extract, and run:
-
-```
-wget https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/tar/elasticsearch/2.3.1/elasticsearch-2.3.1.tar.gz
-tar xvfz elasticsearch-2.3.1.tar.gz
-./elasticsearch-2.3.1/bin/elasticsearch
-
-3. Setup ES schema
-rake trace:reset_es
-
-4. Run it
-supe start trace:
-```
+See https://github.com/Datadog/devops/wiki/Trace-Overview
 
 ### Instrumentation
 
