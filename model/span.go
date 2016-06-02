@@ -1,7 +1,6 @@
 package model
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 )
@@ -20,9 +19,7 @@ type Span struct {
 	Error    int32  `json:"error"`    // error status of the span, 0 == OK
 
 	// Optional
-	Meta map[string]string `json:"meta"` // arbitrary tags/metadata
-
-	// TODO float64
+	Meta     map[string]string  `json:"meta"`      // arbitrary tags/metadata
 	Metrics  map[string]float64 `json:"metrics"`   // arbitrary metrics
 	ParentID uint64             `json:"parent_id"` // span ID of the span in which this one was created
 	Type     string             `json:"type"`      // protocol associated with the span
@@ -39,35 +36,6 @@ func (s Span) String() string {
 		s.Name,
 		s.Resource,
 	)
-}
-
-// Normalize makes sure a Span is properly initialized and encloses the minimum required info
-func (s *Span) Normalize() error {
-	// Mandatory data
-	if s.TraceID == 0 {
-		s.TraceID = RandomID()
-	}
-	if s.SpanID == 0 {
-		s.SpanID = RandomID()
-	}
-	if s.Service == "" {
-		return errors.New("span.normalize: `Service` must be set in span")
-	}
-	if s.Name == "" {
-		return errors.New("span.normalize: `Name` must be set in span")
-	}
-	if s.Resource == "" {
-		return errors.New("span.normalize: `Resource` must be set in span")
-	}
-	// an Error - if not set - is 0 which is equivalent to a success status
-	if s.Start == 0 {
-		// NOTE[leo] this is probably ok, but we might want to be stricter and error?
-		s.Start = Now()
-	}
-	// a Duration can be zero if it's an annotation...
-
-	// Optional data, Meta & Metrics can be nil
-	return nil
 }
 
 // RandomID generates a random uint64 that we use for IDs
