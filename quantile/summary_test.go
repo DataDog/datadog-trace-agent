@@ -2,7 +2,6 @@ package quantile
 
 import (
 	"encoding/json"
-	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -76,14 +75,6 @@ func TestSummaryQuantile(t *testing.T) {
 	}
 
 	assert.True(foundCorrectQuantile, "Quantile %d (samples=%v) not found", v, samples)
-}
-
-func BenchmarkSummaryInsertion(b *testing.B) {
-	s := NewSummary()
-	for n := 0; n < b.N; n++ {
-		val := rand.Float64()
-		s.Insert(val, uint64(n))
-	}
 }
 
 func TestSummaryMarshal(t *testing.T) {
