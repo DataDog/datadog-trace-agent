@@ -13,6 +13,8 @@ import (
 	"github.com/DataDog/raclette/model"
 )
 
+var YearNS = time.Duration(time.Hour * 24 * 365).Nanoseconds()
+
 var durations = []int64{
 	1 * 1e3,   // 1us
 	10 * 1e3,  // 10us
@@ -154,7 +156,10 @@ func stringRandomChoice(s []string) string {
 }
 
 func randomTime() time.Time {
-	return time.Now().Add(time.Duration(rand.Int63()))
+	// we don't do rand.Int63() nanosecs because the given epoch
+	// (after 2300) can overflow.
+	// any time between now and the next year is good enough
+	return time.Now().Add(time.Duration(rand.Int63n(YearNS)))
 }
 
 // RandomSpanDuration generates a random span duration
