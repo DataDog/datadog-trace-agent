@@ -55,7 +55,7 @@ func NewWriter(conf *config.AgentConfig, inServices chan model.ServicesMetadata)
 // Start runs the Writer by flushing any incoming payload
 func (w *Writer) Start() {
 	go w.run()
-	log.Info("Writer started")
+	log.Debug("started writer")
 }
 
 func (w *Writer) run() {
@@ -63,7 +63,7 @@ func (w *Writer) run() {
 	for {
 		select {
 		case p := <-w.in:
-			log.Info("Received a payload, initiating a flush")
+			log.Debug("new payload received, triggering flush")
 			w.mu.Lock()
 			w.payloadsToWrite = append(w.payloadsToWrite, p)
 			w.mu.Unlock()
@@ -75,7 +75,7 @@ func (w *Writer) run() {
 			w.svcsVer++
 			w.mu.Unlock()
 		case <-w.exit:
-			log.Info("Writer exiting, trying to flush all remaining data")
+			log.Info("trying to flush all remaining data")
 			w.Flush()
 			w.wg.Done()
 			return
@@ -128,7 +128,9 @@ func (w *Writer) Flush() {
 	//  data in case of api outage
 	w.payloadsToWrite = nil
 
-	log.Infof("Flushed %d/%d payloads", flushed, total)
+	if flushed != total {
+		log.Infof("successfully flushed %d payloads to the API but remains %d to flush", flushed, total-flushed)
+	}
 }
 
 // BucketEndpoint is a place where we can write payloads
@@ -161,6 +163,7 @@ func (a APIEndpoint) Write(payload model.AgentPayload) error {
 		return err
 	}
 	gz.Close()
+	payloadLen := body.Len()
 
 	req, err := http.NewRequest("POST", a.url+"/collector", &body)
 	if err != nil {
@@ -181,7 +184,7 @@ func (a APIEndpoint) Write(payload model.AgentPayload) error {
 	defer resp.Body.Close()
 
 	flushTime := time.Since(startFlush)
-	log.Infof("Payload flushed to the API (time=%s, size=%d)", flushTime, body.Len())
+	log.Infof("flushed payload to the API, time:%s, size:%d", flushTime, payloadLen)
 	statsd.Client.Gauge("trace_agent.writer.flush_duration", flushTime.Seconds(), nil, 1)
 	statsd.Client.Count("trace_agent.writer.payload_bytes", int64(body.Len()), nil, 1)
 

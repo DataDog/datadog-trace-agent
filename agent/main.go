@@ -23,7 +23,7 @@ func handleSignal(exit chan struct{}) {
 	for signal := range sigChan {
 		switch signal {
 		case syscall.SIGINT, syscall.SIGTERM:
-			log.Info("Received interruption signal")
+			log.Info("received interruption signal")
 			close(exit)
 		}
 	}
@@ -117,4 +117,5 @@ func main() {
 	go handleSignal(agent.exit)
 
 	agent.Run()
+	log.Info("exiting")
 }

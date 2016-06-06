@@ -68,11 +68,11 @@ func (l *HTTPReceiver) Start() {
 	http.HandleFunc("/v0.2/services", httpHandleWithVersion(v02, l.handleServices))
 
 	addr := ":7777"
-	log.Infof("HTTP Listener starting on %s", addr)
+	log.Infof("listening for traces at http://localhost%s/", addr)
 
 	tcpL, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.Error("Could not create TCP listener")
+		log.Error("could not create TCP listener")
 		panic(err)
 	}
 
@@ -175,7 +175,7 @@ func (l *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, r *http
 			t = t[:len(t)-1]
 		}
 
-		log.Debugf("received a trace, id:%d len:%d", t[0].TraceID, len(t))
+		log.Debugf("received a trace, id:%d spans:%d", t[0].TraceID, len(t))
 		l.traces <- t
 		ttotal++
 	}
