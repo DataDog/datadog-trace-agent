@@ -88,39 +88,35 @@ func (s *Span) Normalize() error {
 	// Error - Nothing to do
 	// Optional data, Meta & Metrics can be nil
 	// Soft fail on those
-	if s.Meta != nil {
-		for k, v := range s.Meta {
-			modified := false
+	for k, v := range s.Meta {
+		modified := false
 
-			if len(k) > MaxMetaKeyLen {
-				log.Debugf("span.normalize: truncating `Meta` key (max %d chars): %s", MaxMetaKeyLen, k)
-				delete(s.Meta, k)
-				k = fmt.Sprintf("%s...", k[:MaxMetaKeyLen])
-				modified = true
-			}
+		if len(k) > MaxMetaKeyLen {
+			log.Debugf("span.normalize: truncating `Meta` key (max %d chars): %s", MaxMetaKeyLen, k)
+			delete(s.Meta, k)
+			k = fmt.Sprintf("%s...", k[:MaxMetaKeyLen])
+			modified = true
+		}
 
-			if len(v) > MaxMetaValLen {
-				v = fmt.Sprintf("%s...", v[:MaxMetaValLen])
-				modified = true
-			}
+		if len(v) > MaxMetaValLen {
+			v = fmt.Sprintf("%s...", v[:MaxMetaValLen])
+			modified = true
+		}
 
-			if modified {
-				s.Meta[k] = v
-			}
+		if modified {
+			s.Meta[k] = v
 		}
 	}
 
-	if s.Metrics != nil {
-		for k, v := range s.Metrics {
-			if len(k) > MaxMetricsKeyLen {
-				log.Debugf("span.normalize: truncating `Metrics` key (max %d chars): %s", MaxMetricsKeyLen, k)
-				delete(s.Metrics, k)
-				k = fmt.Sprintf("%s...", k[:MaxMetricsKeyLen])
+	for k, v := range s.Metrics {
+		if len(k) > MaxMetricsKeyLen {
+			log.Debugf("span.normalize: truncating `Metrics` key (max %d chars): %s", MaxMetricsKeyLen, k)
+			delete(s.Metrics, k)
+			k = fmt.Sprintf("%s...", k[:MaxMetricsKeyLen])
 
-				s.Metrics[k] = v
-			}
-
+			s.Metrics[k] = v
 		}
+
 	}
 
 	// ParentID set on the client side, no way of checking
