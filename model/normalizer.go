@@ -68,10 +68,10 @@ func (s *Span) Normalize() error {
 	// TraceID & SpanID should be set in the client
 	// because they uniquely define the traces and associate them into traces
 	if s.TraceID == 0 {
-		s.TraceID = RandomID()
+		return errors.New("span.normalize: empty `TraceID`")
 	}
 	if s.SpanID == 0 {
-		s.SpanID = RandomID()
+		return errors.New("span.normalize: empty `SpanID`")
 	}
 
 	// Start & Duration as nanoseconds timestamps
