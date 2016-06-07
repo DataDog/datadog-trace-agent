@@ -79,7 +79,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 	ac := &AgentConfig{
 		HostName: hostname,
 		// TODO: configure a generic default endpoint
-		APIEndpoint:    "http://localhost:8012/api/v0.1",
+		APIEndpoint:    "http://trace.datadoghq.com/api/v0.1",
 		APIKey:         "",
 		APIEnabled:     true,
 		APIFlushTraces: true,
@@ -120,11 +120,8 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 		c.APIKey = v
 	}
 
-	// TODO: endpoint is still required from ini.
-	if v, e := conf.Get("trace.api", "endpoint"); e == nil {
+	if v, _ := conf.Get("trace.api", "endpoint"); v != "" {
 		c.APIEndpoint = v
-	} else {
-		return c, e
 	}
 
 	if v, e := conf.Get("trace.api", "flush_traces"); e == nil && v == "false" {
