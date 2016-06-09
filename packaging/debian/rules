@@ -13,6 +13,7 @@ override_dh_auto_clean:
 override_dh_auto_test:
 override_dh_auto_build:
 override_dh_auto_install:
+	rake restore
 	rake build
 	mkdir -p debian/dd-trace-agent/etc/datadog
 	mkdir -p debian/dd-trace-agent/opt/datadog-agent/bin
