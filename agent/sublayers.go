@@ -33,7 +33,7 @@ func NewSublayerTagger(in chan model.Trace) *SublayerTagger {
 // Start starts the tagger
 func (st *SublayerTagger) Start() {
 	go st.run()
-	log.Info("SublayerTagger started")
+	log.Debug("started sublayer tagger")
 }
 
 func (st *SublayerTagger) run() {
@@ -44,7 +44,7 @@ func (st *SublayerTagger) run() {
 		case t := <-st.in:
 			st.out <- tagSublayers(t)
 		case <-st.exit:
-			log.Info("SublayerTagger exiting")
+			log.Debug("stopping sublayer tagger")
 			close(st.out)
 			st.wg.Done()
 			return

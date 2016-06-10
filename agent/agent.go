@@ -72,7 +72,7 @@ func (a *Agent) runFlusher() {
 	for {
 		select {
 		case <-ticker.C:
-			log.Debug("Trigger a flush")
+			log.Debug("tick - agent triggering flush")
 			a.Quantizer.out <- model.NewTraceFlushMarker()
 
 			// Collect and merge partial flushs
@@ -97,11 +97,12 @@ func (a *Agent) runFlusher() {
 				}
 			}()
 			wg.Wait()
+			log.Debugf("tock - all routines flushed (%d stats, %d/%d spans/traces)", len(p.Stats), len(p.Spans), len(p.Traces))
 
 			if !p.IsEmpty() {
 				a.Writer.in <- p
 			} else {
-				log.Debug("Empty payload, skipping")
+				log.Debug("flush produced an empty payload, skipping")
 			}
 		case <-a.exit:
 			ticker.Stop()
@@ -112,7 +113,7 @@ func (a *Agent) runFlusher() {
 
 // Start starts all components
 func (a *Agent) Start() error {
-	log.Info("Starting agent")
+	log.Info("starting the trace-agent")
 
 	// Build the pipeline in the opposite way the data is processed
 	a.Writer.Start()
@@ -128,7 +129,7 @@ func (a *Agent) Start() error {
 
 // Stop stops all components
 func (a *Agent) Stop() error {
-	log.Info("Stopping agent")
+	log.Info("stopping the trace-agent")
 
 	a.Receiver.Stop()
 	a.SublayerTagger.Stop()

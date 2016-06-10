@@ -1,8 +1,7 @@
 package main
 
 import (
-	"errors"
-	"expvar"
+	"fmt"
 	"sort"
 	"sync"
 
@@ -10,10 +9,7 @@ import (
 
 	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
-)
-
-var (
-	eLateSpans = expvar.NewInt("LateSpans")
+	"github.com/DataDog/raclette/statsd"
 )
 
 // DefaultAggregators are the finest grain we aggregate to by default
@@ -58,18 +54,16 @@ func (c *Concentrator) Start() {
 			select {
 			case t := <-c.in:
 				if len(t) == 1 && t[0].IsFlushMarker() {
-					log.Debug("Concentrator starts a flush")
 					c.out <- c.Flush()
 				} else {
 					for _, s := range t {
 						err := c.HandleNewSpan(s)
 						if err != nil {
-							log.Debugf("Span %v rejected by concentrator. Reason: %v", s.SpanID, err)
+							log.Debugf("span %v rejected by concentrator, err: %v", s, err)
 						}
 					}
 				}
 			case <-c.exit:
-				log.Info("Concentrator exiting")
 				close(c.out)
 				c.wg.Done()
 				return
@@ -77,7 +71,7 @@ func (c *Concentrator) Start() {
 		}
 	}()
 
-	log.Info("Concentrator started")
+	log.Debug("started concentrator")
 }
 
 // HandleNewSpan adds to the current bucket the pointed span
@@ -85,12 +79,14 @@ func (c *Concentrator) HandleNewSpan(s model.Span) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	// TODO[leo]: replace by adding the span to the bucket of its end time
 	bucketTs := s.Start - s.Start%c.conf.BucketInterval.Nanoseconds()
 
-	// TODO[leo]: figure out what's the best strategy here
+	// TODO[leo]: when the above todo is completed just cut off the very old crap
+	// here
 	if model.Now()-bucketTs > c.conf.OldestSpanCutoff {
-		eLateSpans.Add(1)
-		return errors.New("Late span rejected")
+		statsd.Client.Count("trace_agent.concentrator.late_span", 1, nil, 1)
+		return fmt.Errorf("rejecting late span, late by %ds", (model.Now()-bucketTs)/1e9)
 	}
 
 	b, ok := c.buckets[bucketTs]
@@ -134,11 +130,11 @@ func (c *Concentrator) Flush() []model.StatsBucket {
 		bucket := c.buckets[ts]
 		// flush & expire old buckets that cannot be hit anymore
 		if ts < now-c.conf.OldestSpanCutoff && ts != lastBucketTs {
-			log.Infof("Concentrator adds bucket to payload %d", ts)
+			log.Debugf("concentrator, bucket:%d is clear and flushed", ts)
 			sb = append(sb, bucket)
 			delete(c.buckets, ts)
 		}
 	}
-	log.Debugf("Concentrator flushes %d stats buckets", len(sb))
+	log.Debugf("concentrator, flush %d stats buckets", len(sb))
 	return sb
 }

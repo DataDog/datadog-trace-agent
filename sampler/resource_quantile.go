@@ -96,8 +96,8 @@ func (s *ResourceQuantileSampler) GetSamples(
 	}
 
 	execTime := time.Since(startTime)
-	log.Infof("Sampled %d traces out of %d, %d spans out of %d, in %s",
-		len(result), traces, kSpans, spans, execTime)
+	log.Infof("sampler: selected %d traces (%.2f %%), %d spans (%.2f %%)",
+		len(result), float64(len(result))*100/float64(traces), kSpans, float64(kSpans)*100/float64(spans))
 
 	statsd.Client.Count("trace_agent.sampler.trace.total", int64(traces), nil, 1)
 	statsd.Client.Count("trace_agent.sampler.trace.kept", int64(len(result)), nil, 1)

@@ -37,7 +37,7 @@ func (q *Quantizer) Start() {
 				}
 				q.out <- trace
 			case <-q.exit:
-				log.Info("Quantizer exiting")
+				log.Debug("stopping quantizer")
 				close(q.out)
 				q.wg.Done()
 				return
@@ -45,5 +45,5 @@ func (q *Quantizer) Start() {
 		}
 	}()
 
-	log.Info("Quantizer started")
+	log.Debug("started quantizer")
 }

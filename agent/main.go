@@ -23,7 +23,7 @@ func handleSignal(exit chan struct{}) {
 	for signal := range sigChan {
 		switch signal {
 		case syscall.SIGINT, syscall.SIGTERM:
-			log.Info("Received interruption signal")
+			log.Info("received interruption signal")
 			close(exit)
 		}
 	}
@@ -33,7 +33,6 @@ func handleSignal(exit chan struct{}) {
 var opts struct {
 	configFile string
 	debug      bool
-	topology   bool
 	version    bool
 }
 
@@ -73,7 +72,6 @@ func versionString() string {
 func main() {
 	flag.StringVar(&opts.configFile, "config", "/etc/datadog/trace-agent.ini", "Trace agent ini config file.")
 	flag.BoolVar(&opts.debug, "debug", false, "Turn on debug mode")
-	flag.BoolVar(&opts.topology, "topology", false, "Use TCP conns info to draw network topology")
 	flag.BoolVar(&opts.version, "version", false, "Show version information and exit")
 	flag.Parse()
 
@@ -103,7 +101,6 @@ func main() {
 		panic(fmt.Errorf("error with logger: %v", err))
 	}
 	defer log.Flush()
-	agentConf.Topology = opts.topology
 
 	// Initialize dogstatsd client
 	err = statsd.Configure(agentConf)
@@ -120,4 +117,5 @@ func main() {
 	go handleSignal(agent.exit)
 
 	agent.Run()
+	log.Info("exiting")
 }

@@ -19,7 +19,7 @@ func NewStoppableListener(l net.Listener, exit chan struct{}) (*StoppableListene
 	tcpL, ok := l.(*net.TCPListener)
 
 	if !ok {
-		return nil, errors.New("Cannot wrap listener")
+		return nil, errors.New("cannot wrap listener")
 	}
 
 	sl := &StoppableListener{exit: exit, TCPListener: tcpL}
@@ -38,8 +38,8 @@ func (sl *StoppableListener) Accept() (net.Conn, error) {
 		//Check for the channel being closed
 		select {
 		case <-sl.exit:
-			log.Info("Stopping Listener")
-			return nil, errors.New("Listener stopped")
+			log.Debug("stopping listener")
+			return nil, errors.New("listener stopped")
 		default:
 			//If the channel is still open, continue as normal
 		}

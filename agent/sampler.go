@@ -41,7 +41,7 @@ func NewSampler(in chan model.Trace, conf *config.AgentConfig) *Sampler {
 // Start runs the Sampler by sending incoming spans to the SamplerEngine and flushing it on demand
 func (s *Sampler) Start() {
 	go s.run()
-	log.Info("Sampler started")
+	log.Debug("started sampler")
 }
 
 func (s *Sampler) run() {
@@ -50,15 +50,14 @@ func (s *Sampler) run() {
 		select {
 		case trace := <-s.in:
 			if len(trace) == 1 && trace[0].IsFlushMarker() {
-				log.Debug("Sampler starts a flush")
 				traces := s.se.Flush()
-				log.Debugf("Sampler flushes %d traces", len(traces))
+				log.Debugf("sampler flushed %d traces", len(traces))
 				s.out <- traces
 			} else {
 				s.se.AddTrace(trace)
 			}
 		case <-s.exit:
-			log.Info("Sampler exiting")
+			log.Debug("stopping sampler")
 			close(s.out)
 			s.wg.Done()
 			return
