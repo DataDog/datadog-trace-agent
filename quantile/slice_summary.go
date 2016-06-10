@@ -136,3 +136,36 @@ func (s *SliceSummary) Copy() *SliceSummary {
 	s2.N = s.N
 	return s2
 }
+
+// BySlices returns a slice of Summary slices that represents weighted ranges of
+// values
+// e.g.    [0, 1]  : 3
+//		   [1, 23] : 12 ...
+// The number of intervals is related to the precision kept in the internal
+// data structure to ensure epsilon*s.N precision on quantiles, but it's bounded.
+// The weights are not exact, they're only upper bounds (see GK paper).
+func (s *SliceSummary) BySlices(maxSamples int) []SummarySlice {
+	var slices []SummarySlice
+
+	var last float64
+	for _, cur := range s.Entries {
+		var sliceSamples []uint64
+		if len(cur.Samples) > maxSamples {
+			sliceSamples = cur.Samples[:maxSamples]
+		} else {
+			sliceSamples = cur.Samples
+		}
+
+		ss := SummarySlice{
+			Start:   last,
+			End:     cur.V,
+			Weight:  cur.G + cur.Delta - 1, // see GK paper section 2.1
+			Samples: sliceSamples,
+		}
+		slices = append(slices, ss)
+
+		last = cur.V
+	}
+
+	return slices
+}
