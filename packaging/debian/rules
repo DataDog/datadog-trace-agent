@@ -18,7 +18,6 @@ override_dh_auto_install:
 	mkdir -p debian/dd-trace-agent/opt/datadog-agent/bin
 	mkdir -p debian/dd-trace-agent/var/log/datadog
 	mv ../trace-agent debian/dd-trace-agent/opt/datadog-agent/bin
-	cp debian/trace-agent.ini.default debian/dd-trace-agent/etc/datadog/trace-agent.ini
 
 override_dh_gencontrol:
 	dh_gencontrol -- -v$(PACKAGEVERSION)

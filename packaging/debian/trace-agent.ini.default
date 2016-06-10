@@ -1,9 +1,0 @@
-[trace.api]
-endpoint = http://trace-api.service.consul:8012/api/v0.1
-
-[trace.concentrator]
-bucket_size_seconds = 10
-oldest_span_cutoff_seconds = 60
-
-[trace.sampler]
-quantiles = 0.1,0.5,0.9,1
