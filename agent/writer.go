@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -115,10 +116,9 @@ func (w *Writer) Flush() {
 
 	// FIXME: this is not ideal we might want to batch this into a single http call
 	for _, p := range w.payloadsToWrite {
-
 		err := w.endpoint.Write(p)
 		if err != nil {
-			log.Errorf("Error writing bucket: %s", err)
+			log.Errorf("could not flush payload: %s", err)
 			break
 		}
 		flushed++
@@ -183,6 +183,10 @@ func (a APIEndpoint) Write(payload model.AgentPayload) error {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode/100 != 2 {
+		return fmt.Errorf("backend responded with %d %s", resp.StatusCode, resp.Status)
+	}
+
 	flushTime := time.Since(startFlush)
 	log.Infof("flushed payload to the API, time:%s, size:%d", flushTime, payloadLen)
 	statsd.Client.Gauge("trace_agent.writer.flush_duration", flushTime.Seconds(), nil, 1)
@@ -214,6 +218,10 @@ func (a APIEndpoint) WriteServices(s model.ServicesMetadata) error {
 		return err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode/100 != 2 {
+		return fmt.Errorf("backend responded with %d %s", resp.StatusCode, resp.Status)
+	}
 
 	log.Infof("flushed %d services to the API", len(s))
 
