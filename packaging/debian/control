@@ -1,5 +1,6 @@
 Source: dd-trace-agent
-Build-Depends: debhelper( >= 9)
+# Note go not listed under Build-Depends because of eccentricities with its deb repo. it must be installed manually in a prior build step
+Build-Depends: debhelper( >= 9), rake( >= 10), git( >= 1.7)
 Maintainer: dev@datadoghq.com <dev@datadoghq.com>
 
 Package: dd-trace-agent
