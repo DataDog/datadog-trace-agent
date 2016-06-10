@@ -98,6 +98,7 @@ func (s *SliceSummary) Quantile(q float64) (float64, []uint64) {
 	return s.Entries[len(s.Entries)-1].V, s.Entries[len(s.Entries)-1].Samples
 }
 
+// Merge two summaries entries together
 func (s *SliceSummary) Merge(s2 *SliceSummary) {
 	pos := 0
 	end := len(s.Entries) - 1
