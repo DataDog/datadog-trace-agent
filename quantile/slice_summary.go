@@ -131,7 +131,7 @@ func (s *SliceSummary) Merge(s2 *SliceSummary) {
 // Copy allocates a new summary with the same data
 func (s *SliceSummary) Copy() *SliceSummary {
 	s2 := NewSliceSummary()
-	s2.Entries = make([]Entry, len(s.Entry))
+	s2.Entries = make([]Entry, len(s.Entries))
 	copy(s2.Entries, s.Entries)
 	s2.N = s.N
 	return s2
