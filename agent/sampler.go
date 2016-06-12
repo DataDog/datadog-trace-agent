@@ -16,8 +16,6 @@ type Sampler struct {
 	conf *config.AgentConfig
 
 	se SamplerEngine
-
-	Worker
 }
 
 // SamplerEngine cares about ingesting spans and stats to return a sampled payload
@@ -28,39 +26,24 @@ type SamplerEngine interface {
 
 // NewSampler creates a new empty sampler ready to be started
 func NewSampler(in chan model.Trace, conf *config.AgentConfig) *Sampler {
-	s := &Sampler{
+	return &Sampler{
 		in:   in,
 		out:  make(chan []model.Trace),
 		conf: conf,
 		se:   sampler.NewResourceQuantileSampler(conf),
 	}
-	s.Init()
-	return s
 }
 
-// Start runs the Sampler by sending incoming spans to the SamplerEngine and flushing it on demand
-func (s *Sampler) Start() {
-	go s.run()
-	log.Debug("started sampler")
-}
-
-func (s *Sampler) run() {
-	s.wg.Add(1)
-	for {
-		select {
-		case trace := <-s.in:
-			if len(trace) == 1 && trace[0].IsFlushMarker() {
-				traces := s.se.Flush()
-				log.Debugf("sampler flushed %d traces", len(traces))
-				s.out <- traces
-			} else {
-				s.se.AddTrace(trace)
-			}
-		case <-s.exit:
-			log.Debug("stopping sampler")
-			close(s.out)
-			s.wg.Done()
-			return
+func (s *Sampler) Run() {
+	for trace := range s.in {
+		if len(trace) == 1 && trace[0].IsFlushMarker() {
+			traces := s.se.Flush()
+			log.Debugf("sampler flushed %d traces", len(traces))
+			s.out <- traces
+		} else {
+			s.se.AddTrace(trace)
 		}
 	}
+
+	close(s.out)
 }

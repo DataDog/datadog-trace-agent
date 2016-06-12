@@ -29,7 +29,7 @@ type Writer struct {
 	svcsVer         int64                  // the current version of services
 	svcsFlushed     int64                  // the last flushed version of services
 
-	Worker
+	exit chan struct{}
 }
 
 // NewWriter returns a new Writer
@@ -42,25 +42,16 @@ func NewWriter(conf *config.AgentConfig, inServices chan model.ServicesMetadata)
 		endpoint = NullEndpoint{}
 	}
 
-	w := &Writer{
+	return &Writer{
 		endpoint:   endpoint,
 		in:         make(chan model.AgentPayload),
 		inServices: inServices,
 		svcs:       make(model.ServicesMetadata),
+		exit:       make(chan struct{}),
 	}
-	w.Init()
-
-	return w
 }
 
-// Start runs the Writer by flushing any incoming payload
-func (w *Writer) Start() {
-	go w.run()
-	log.Debug("started writer")
-}
-
-func (w *Writer) run() {
-	w.wg.Add(1)
+func (w *Writer) Run() {
 	for {
 		select {
 		case p := <-w.in:
@@ -78,7 +69,6 @@ func (w *Writer) run() {
 		case <-w.exit:
 			log.Info("trying to flush all remaining data")
 			w.Flush()
-			w.wg.Done()
 			return
 		}
 	}

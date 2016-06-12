@@ -117,5 +117,4 @@ func main() {
 	go handleSignal(agent.exit)
 
 	agent.Run()
-	log.Info("exiting")
 }
