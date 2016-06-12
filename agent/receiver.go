@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/DataDog/raclette/model"
@@ -26,13 +27,27 @@ type Receiver interface {
 	Stop()
 }
 
+// receiverStats tracks statistics about incoming payloads
+type receiverStats struct {
+	Errors         int64
+	SpansReceived  int64
+	TracesReceived int64
+	SpansDropped   int64
+	TracesDropped  int64
+}
+
+// statsFlushIntervalSec determines how often we flush receiverStats to statsd
+const statsFlushIntervalSec = 10
+
 // HTTPReceiver is a collector that uses HTTP protocol and just holds
 // a chan where the spans received are sent one by one
 type HTTPReceiver struct {
 	traces   chan model.Trace
 	services chan model.ServicesMetadata
-
 	Worker
+
+	// internal telemetry
+	stats receiverStats
 }
 
 // NewHTTPReceiver returns a pointer to a new HTTPReceiver
@@ -84,6 +99,7 @@ func (l *HTTPReceiver) Start() {
 	l.wg.Add(1)
 	defer l.wg.Done()
 
+	go l.logStats()
 	go server.Serve(sl)
 }
 
@@ -99,7 +115,6 @@ func HTTPErrorAndLog(w http.ResponseWriter, code int, errClient string, err erro
 
 // HTTPOK just returns a OK in the response
 func HTTPOK(w http.ResponseWriter, tags []string) {
-	statsd.Client.Count("trace_agent.receiver.request", 1, tags, 1)
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK\n"))
 }
@@ -180,10 +195,11 @@ func (l *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, r *http
 		ttotal++
 	}
 
-	statsd.Client.Count("trace_agent.receiver.trace", int64(ttotal), nil, 1)
-	statsd.Client.Count("trace_agent.receiver.span", int64(stotal), nil, 1)
-	statsd.Client.Count("trace_agent.receiver.trace_dropped", int64(tdropped), nil, 1)
-	statsd.Client.Count("trace_agent.receiver.span_dropped", int64(sdropped), nil, 1)
+	// Log stats
+	atomic.AddInt64(&l.stats.TracesReceived, int64(ttotal))
+	atomic.AddInt64(&l.stats.SpansReceived, int64(stotal))
+	atomic.AddInt64(&l.stats.TracesDropped, int64(tdropped))
+	atomic.AddInt64(&l.stats.SpansDropped, int64(sdropped))
 }
 
 // handleServices handle a request with a list of several services
@@ -203,4 +219,19 @@ func (l *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, r *ht
 	HTTPOK(w, mTags)
 
 	l.services <- servicesMeta
+}
+
+// logStats periodically submits stats about the receiver to statsd
+func (l *HTTPReceiver) logStats() {
+	for range time.Tick(statsFlushIntervalSec * time.Second) {
+		spans := atomic.LoadInt64(&l.stats.SpansReceived)
+		traces := atomic.LoadInt64(&l.stats.TracesReceived)
+		sdropped := atomic.LoadInt64(&l.stats.SpansDropped)
+		tdropped := atomic.LoadInt64(&l.stats.TracesDropped)
+
+		statsd.Client.Count("trace_agent.receiver.span", spans, nil, 1)
+		statsd.Client.Count("trace_agent.receiver.trace", traces, nil, 1)
+		statsd.Client.Count("trace_agent.receiver.span_dropped", sdropped, nil, 1)
+		statsd.Client.Count("trace_agent.receiver.trace_dropped", tdropped, nil, 1)
+	}
 }
