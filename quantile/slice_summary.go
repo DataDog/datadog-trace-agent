@@ -47,7 +47,7 @@ func (s *SliceSummary) Insert(v float64, t uint64) {
 
 	i := sort.Search(len(s.Entries), func(i int) bool { return v < s.Entries[i].V })
 
-	if i == 0 || i == len(s.Entries)-1 {
+	if i == 0 || i == len(s.Entries) {
 		newEntry.Delta = 0
 	}
 
