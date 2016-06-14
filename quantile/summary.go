@@ -50,10 +50,16 @@ func NewSummary() *Summary {
 func (s Summary) String() string {
 	var b bytes.Buffer
 	b.WriteString(fmt.Sprintf("samples: %d\n", s.N))
-	curr := s.data.head
+	curr := s.data.head.next[0]
+	i := 0
+
 	for curr != nil {
 		e := curr.value
-		b.WriteString(fmt.Sprintf("v:%f g:%d d:%d\n", e.V, e.G, e.Delta))
+		b.WriteString(fmt.Sprintf("v:%6.02f g:%05d d:%05d   ", e.V, e.G, e.Delta))
+		if i%10 == 9 {
+			b.WriteRune('\n')
+		}
+		i++
 		curr = curr.next[0]
 	}
 	return b.String()

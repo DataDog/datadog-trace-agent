@@ -1,6 +1,10 @@
 package quantile
 
-import "sort"
+import (
+	"bytes"
+	"fmt"
+	"sort"
+)
 
 // SliceSummary is a GK-summary with a slice backend
 type SliceSummary struct {
@@ -11,6 +15,25 @@ type SliceSummary struct {
 // NewSliceSummary allocates a new GK summary backed by a DLL
 func NewSliceSummary() *SliceSummary {
 	return &SliceSummary{}
+}
+
+func (s SliceSummary) String() string {
+	var b bytes.Buffer
+	b.WriteString("summary size: ")
+	b.WriteString(fmt.Sprintf("%d", s.N))
+	b.WriteRune('\n')
+
+	gsum := 0
+
+	for i, e := range s.Entries {
+		gsum += e.G
+		b.WriteString(fmt.Sprintf("v:%6.02f g:%05d d:%05d rmin:%05d rmax: %05d   ", e.V, e.G, e.Delta, gsum, gsum+e.Delta))
+		if i%3 == 2 {
+			b.WriteRune('\n')
+		}
+	}
+
+	return b.String()
 }
 
 // Insert inserts a new value v in the summary paired with t (the ID of the span it was reported from)

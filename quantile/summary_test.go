@@ -1,6 +1,7 @@
 package quantile
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
@@ -251,4 +252,85 @@ func TestSummarySliceMerge(t *testing.T) {
 		v, _ := s1.Quantile(q)
 		assert.Equal(e, v)
 	}
+}
+
+func TestSummaryRemergeReal10000(t *testing.T) {
+	s := NewSummary()
+	for n := 0; n < 1000; n++ {
+		s1 := NewSummary()
+		for i := 0; i < 100; i++ {
+			s1.Insert(float64(i), uint64(i))
+		}
+		s.Merge(s1)
+
+	}
+
+	fmt.Println(s)
+	slices := s.BySlices(0)
+	fmt.Println(slices)
+	total := 0
+	for _, s := range slices {
+		total += s.Weight
+	}
+	fmt.Println(total)
+}
+
+func TestSliceSummaryRemergeReal10000(t *testing.T) {
+	s := NewSliceSummary()
+	for n := 0; n < 10000; n++ {
+		s1 := NewSliceSummary()
+		for i := 0; i < 100; i++ {
+			s1.Insert(float64(i), uint64(i))
+		}
+		s.Merge(s1)
+
+	}
+
+	fmt.Println(s)
+	slices := s.BySlices(0)
+	fmt.Println(slices)
+	total := 0
+	for _, s := range slices {
+		total += s.Weight
+	}
+	fmt.Println(total)
+}
+
+func TestSliceSummaryRemerge10000(t *testing.T) {
+	s1 := NewSliceSummary()
+	for n := 0; n < 1000; n++ {
+		for i := 0; i < 100; i++ {
+			s1.Insert(float64(i), uint64(i))
+		}
+
+		//      fmt.Println(s1)
+	}
+
+	fmt.Println(s1)
+	slices := s1.BySlices(0)
+	fmt.Println(slices)
+	total := 0
+	for _, s := range slices {
+		total += s.Weight
+	}
+	fmt.Println(total)
+}
+
+func TestSummaryRemerge10000(t *testing.T) {
+	s1 := NewSummary()
+	for n := 0; n < 1000; n++ {
+		for i := 0; i < 100; i++ {
+			s1.Insert(float64(i), uint64(i))
+		}
+		//  fmt.Println(s1)
+	}
+
+	fmt.Println(s1)
+	slices := s1.BySlices(0)
+	fmt.Println(slices)
+	total := 0
+	for _, s := range slices {
+		total += s.Weight
+	}
+	fmt.Println(total)
 }
