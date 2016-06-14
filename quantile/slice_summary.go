@@ -63,35 +63,28 @@ func (s *SliceSummary) Insert(v float64, t uint64) {
 }
 
 func (s *SliceSummary) compress() {
-	var missing int
 	epsN := int(2 * EPSILON * float64(s.N))
 
-	for i := 0; i < len(s.Entries)-1; i++ {
-		elt := s.Entries[i]
-		next := &s.Entries[i+1]
+	var j, sum int
+	for i := len(s.Entries) - 1; i >= 2; i = j - 1 {
+		j = i - 1
+		sum = s.Entries[j].G
 
-		// value merging
-		if elt.V == next.V {
-			missing += next.G
-			next.Delta += missing
-			next.G = elt.G
-			copy(s.Entries[i:], s.Entries[i+1:])
-			s.Entries[len(s.Entries)-1] = Entry{}
-			s.Entries = s.Entries[:len(s.Entries)-1]
-			i--
-		} else if i > 0 && i < len(s.Entries)-1 {
-			// NOTE: do not remove this on min/max
-			if elt.G+next.G+missing+next.Delta < epsN {
-				next.G += elt.G + missing
-				missing = 0
-				copy(s.Entries[i:], s.Entries[i+1:])
-				s.Entries[len(s.Entries)-1] = Entry{}
-				s.Entries = s.Entries[:len(s.Entries)-1]
-				i--
-			} else {
-				next.G += missing
-				missing = 0
-			}
+		for j >= 1 && sum+s.Entries[i].G+s.Entries[i].Delta < epsN {
+			j--
+			sum += s.Entries[j].G
+		}
+		sum -= s.Entries[j].G
+		j++
+
+		if j < i {
+			s.Entries[j].V = s.Entries[i].V
+			s.Entries[j].G = sum + s.Entries[i].G
+			s.Entries[j].Delta = s.Entries[i].Delta
+			// copy the rest
+			copy(s.Entries[j+1:], s.Entries[i+1:])
+			// truncate to the numbers of removed elements
+			s.Entries = s.Entries[:len(s.Entries)-(i-j)]
 		}
 	}
 }
