@@ -175,6 +175,12 @@ func (s *SliceSummary) BySlices(maxSamples int) []SummarySlice {
 
 	var last float64
 	for _, cur := range s.Entries {
+		// skip "empty buckets"
+		if cur.V != 0 && cur.V == last {
+			slices[len(slices)-1].Weight += cur.G
+			continue
+		}
+
 		var sliceSamples []uint64
 		if len(cur.Samples) > maxSamples {
 			sliceSamples = cur.Samples[:maxSamples]
