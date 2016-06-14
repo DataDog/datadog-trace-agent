@@ -123,6 +123,16 @@ func (s *SliceSummary) Quantile(q float64) (float64, []uint64) {
 
 // Merge two summaries entries together
 func (s *SliceSummary) Merge(s2 *SliceSummary) {
+	if s2.N == 0 {
+		return
+	}
+	if s.N == 0 {
+		s.N = s2.N
+		s.Entries = make([]Entry, 0, len(s2.Entries))
+		s.Entries = append(s.Entries, s2.Entries...)
+		return
+	}
+
 	pos := 0
 	end := len(s.Entries) - 1
 
