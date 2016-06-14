@@ -244,7 +244,7 @@ func TestSummarySliceMerge(t *testing.T) {
 		0.2: 15,
 		0.4: 30,
 		0.6: 45,
-		0.8: 71, // should be 70 ? FIXME[leo]
+		0.8: 70,
 		1.0: 100,
 	}
 
