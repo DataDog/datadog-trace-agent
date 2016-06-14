@@ -41,7 +41,7 @@ func NewConcentrator(in chan model.Trace, conf *config.AgentConfig) *Concentrato
 	}
 }
 
-// Start initializes the first structures and starts consuming spans
+// Run starts doing some concentrating work
 func (c *Concentrator) Run() {
 	for t := range c.in {
 		if len(t) == 1 && t[0].IsFlushMarker() {

@@ -25,6 +25,7 @@ func NewSublayerTagger(in chan model.Trace) *SublayerTagger {
 	}
 }
 
+// Run starts tagging sublayers onto traces
 func (st *SublayerTagger) Run() {
 	for t := range st.in {
 		st.out <- tagSublayers(t)

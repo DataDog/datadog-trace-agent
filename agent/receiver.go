@@ -52,8 +52,7 @@ func NewHTTPReceiver() *HTTPReceiver {
 	}
 }
 
-// Start actually starts the HTTP server and returns any error that could
-// have arosen
+// Run starts doing the HTTP server and is ready to receive traces
 func (l *HTTPReceiver) Run() {
 	httpHandleWithVersion := func(v APIVersion, f func(APIVersion, http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
 		return func(w http.ResponseWriter, r *http.Request) {

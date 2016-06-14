@@ -34,6 +34,7 @@ func NewSampler(in chan model.Trace, conf *config.AgentConfig) *Sampler {
 	}
 }
 
+// Run starts sampling traces
 func (s *Sampler) Run() {
 	for trace := range s.in {
 		if len(trace) == 1 && trace[0].IsFlushMarker() {

@@ -19,7 +19,7 @@ func NewQuantizer(in chan model.Trace) *Quantizer {
 	}
 }
 
-// Start runs the Quantizer by quantizing spans from the channel
+// Run starts doing some quantizing
 func (q *Quantizer) Run() {
 	for trace := range q.in {
 		for i, s := range trace {

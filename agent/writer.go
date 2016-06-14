@@ -51,6 +51,7 @@ func NewWriter(conf *config.AgentConfig, inServices chan model.ServicesMetadata)
 	}
 }
 
+// Run starts the writer ready to output traces to the Datadog API
 func (w *Writer) Run() {
 	for {
 		select {
