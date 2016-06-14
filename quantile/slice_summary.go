@@ -192,7 +192,7 @@ func (s *SliceSummary) BySlices(maxSamples int) []SummarySlice {
 		ss := SummarySlice{
 			Start:   last,
 			End:     cur.V,
-			Weight:  cur.G + cur.Delta - 1, // see GK paper section 2.1
+			Weight:  cur.G,
 			Samples: sliceSamples,
 		}
 		slices = append(slices, ss)
