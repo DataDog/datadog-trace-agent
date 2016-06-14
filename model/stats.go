@@ -84,6 +84,13 @@ func (d Distribution) Merge(d2 Distribution) {
 	d.Summary.Merge(d2.Summary)
 }
 
+// Copy returns a distro with the same data but a different underlying summary
+func (d Distribution) Copy() Distribution {
+	d2 := Distribution(d)
+	d2.Summary = d.Summary.Copy()
+	return d2
+}
+
 // StatsBucket is a time bucket to track statistic around multiple Counts
 type StatsBucket struct {
 	Start    int64 // timestamp of start in our format
