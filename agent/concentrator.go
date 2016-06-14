@@ -131,6 +131,9 @@ func (c *Concentrator) Flush() []model.StatsBucket {
 		// flush & expire old buckets that cannot be hit anymore
 		if ts < now-c.conf.OldestSpanCutoff && ts != lastBucketTs {
 			log.Debugf("concentrator, bucket:%d is clear and flushed", ts)
+			for _, d := range bucket.Distributions {
+				statsd.Client.Histogram("trace_agent.distribution.len", float64(d.Summary.N), nil, 1)
+			}
 			sb = append(sb, bucket)
 			delete(c.buckets, ts)
 		}
