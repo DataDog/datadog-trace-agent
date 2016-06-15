@@ -36,9 +36,6 @@ type receiverStats struct {
 	TracesDropped  int64
 }
 
-// statsFlushIntervalSec determines how often we flush receiverStats to statsd
-const statsFlushIntervalSec = 10
-
 // HTTPReceiver is a collector that uses HTTP protocol and just holds
 // a chan where the spans received are sent one by one
 type HTTPReceiver struct {
@@ -223,11 +220,19 @@ func (l *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, r *ht
 
 // logStats periodically submits stats about the receiver to statsd
 func (l *HTTPReceiver) logStats() {
-	for range time.Tick(statsFlushIntervalSec * time.Second) {
+	for range time.Tick(10 * time.Second) {
+		// Load counters and reset them for the next flush
 		spans := atomic.LoadInt64(&l.stats.SpansReceived)
+		l.stats.SpansReceived = 0
+
 		traces := atomic.LoadInt64(&l.stats.TracesReceived)
+		l.stats.TracesReceived = 0
+
 		sdropped := atomic.LoadInt64(&l.stats.SpansDropped)
+		l.stats.SpansDropped = 0
+
 		tdropped := atomic.LoadInt64(&l.stats.TracesDropped)
+		l.stats.TracesDropped = 0
 
 		statsd.Client.Count("trace_agent.receiver.span", spans, nil, 1)
 		statsd.Client.Count("trace_agent.receiver.trace", traces, nil, 1)
