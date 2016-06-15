@@ -35,10 +35,10 @@ type Count struct {
 
 // Distribution represents a true image of the spectrum of values, allowing arbitrary quantile queries
 type Distribution struct {
-	Key     string                 `json:"key"`
-	Name    string                 `json:"name"`    // represents the entity we count, e.g. "hits", "errors", "time"
-	TagSet  TagSet                 `json:"tagset"`  // set of tags for which we account this Distribution
-	Summary *quantile.SliceSummary `json:"summary"` // actual representation of data
+	Key     string            `json:"key"`
+	Name    string            `json:"name"`    // represents the entity we count, e.g. "hits", "errors", "time"
+	TagSet  TagSet            `json:"tagset"`  // set of tags for which we account this Distribution
+	Summary *quantile.Summary `json:"summary"` // actual representation of data
 }
 
 // NewCount returns a new Count for a metric and a given tag set
@@ -69,7 +69,7 @@ func NewDistribution(m string, tgs TagSet) Distribution {
 		Key:     tgs.TagKey(m),
 		Name:    m,
 		TagSet:  tgs,
-		Summary: quantile.NewSliceSummary(),
+		Summary: quantile.NewSummary(),
 	}
 }
 
