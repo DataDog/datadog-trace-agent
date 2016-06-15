@@ -169,30 +169,40 @@ func (s *SliceSummary) Copy() *SliceSummary {
 //		   [1, 23] : 12 ...
 // The number of intervals is related to the precision kept in the internal
 // data structure to ensure epsilon*s.N precision on quantiles, but it's bounded.
-// The weights are not exact, they're only upper bounds (see GK paper).
+// When the bounds of the interval are equal, the weight is the number of times
+// that exact value was inserted in the summary.
 func (s *SliceSummary) BySlices(maxSamples int) []SummarySlice {
 	var slices []SummarySlice
 
-	var last float64
-	for _, cur := range s.Entries {
-		// skip "empty buckets"
-		if cur.V != 0 && cur.V == last {
-			slices[len(slices)-1].Weight += cur.G
+	if len(s.Entries) == 0 {
+		return slices
+	}
+
+	// by def in GK first val is always the min
+	fs := SummarySlice{
+		Start:  s.Entries[0].V,
+		End:    s.Entries[0].V,
+		Weight: 1,
+	}
+	slices = append(slices, fs)
+
+	last := fs.End
+
+	for _, cur := range s.Entries[1:] {
+		lastSlice := &slices[len(slices)-1]
+		if cur.V == lastSlice.Start && cur.V == lastSlice.End {
+			lastSlice.Weight += cur.G
 			continue
 		}
 
-		var sliceSamples []uint64
-		if len(cur.Samples) > maxSamples {
-			sliceSamples = cur.Samples[:maxSamples]
-		} else {
-			sliceSamples = cur.Samples
+		if cur.G == 1 {
+			last = cur.V
 		}
 
 		ss := SummarySlice{
-			Start:   last,
-			End:     cur.V,
-			Weight:  cur.G,
-			Samples: sliceSamples,
+			Start:  last,
+			End:    cur.V,
+			Weight: cur.G,
 		}
 		slices = append(slices, ss)
 

@@ -334,3 +334,27 @@ func TestSummaryRemerge10000(t *testing.T) {
 	}
 	fmt.Println(total)
 }
+
+func TestSummaryBySlices(t *testing.T) {
+	assert := assert.New(t)
+
+	s := NewSliceSummary()
+	for i := 1; i < 11; i++ {
+		s.Insert(float64(i), uint64(i))
+	}
+	s.Insert(float64(5), uint64(42))
+	s.Insert(float64(5), uint64(53))
+
+	slices := s.BySlices(0)
+	fmt.Println(slices)
+	assert.Equal(10, len(slices))
+	for i, sl := range slices {
+		assert.Equal(i+1, sl.Start)
+		assert.Equal(i+1, sl.End)
+		if i == 4 {
+			assert.Equal(3, sl.Weight)
+		} else {
+			assert.Equal(1, sl.Weight)
+		}
+	}
+}
