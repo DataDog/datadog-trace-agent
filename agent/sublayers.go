@@ -4,7 +4,6 @@ import (
 	"bytes"
 
 	"github.com/DataDog/raclette/model"
-	log "github.com/cihub/seelog"
 )
 
 const (
@@ -16,40 +15,23 @@ const (
 type SublayerTagger struct {
 	in  chan model.Trace
 	out chan model.Trace
-	Worker
 }
 
 // NewSublayerTagger inits a new SublayerTagger
 func NewSublayerTagger(in chan model.Trace) *SublayerTagger {
-	st := &SublayerTagger{
+	return &SublayerTagger{
 		in:  in,
 		out: make(chan model.Trace),
 	}
-	st.Init()
-
-	return st
 }
 
-// Start starts the tagger
-func (st *SublayerTagger) Start() {
-	go st.run()
-	log.Debug("started sublayer tagger")
-}
-
-func (st *SublayerTagger) run() {
-	st.wg.Add(1)
-
-	for {
-		select {
-		case t := <-st.in:
-			st.out <- tagSublayers(t)
-		case <-st.exit:
-			log.Debug("stopping sublayer tagger")
-			close(st.out)
-			st.wg.Done()
-			return
-		}
+// Run starts tagging sublayers onto traces
+func (st *SublayerTagger) Run() {
+	for t := range st.in {
+		st.out <- tagSublayers(t)
 	}
+
+	close(st.out)
 }
 
 func tagSublayers(t model.Trace) model.Trace {

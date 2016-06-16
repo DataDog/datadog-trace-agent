@@ -20,28 +20,6 @@ func NewTestWriter() *Writer {
 	return NewWriter(conf, make(chan model.ServicesMetadata))
 }
 
-func TestWriterExitsGracefully(t *testing.T) {
-	w := NewTestWriter()
-	w.Start()
-
-	// And now try to stop it in a given time, by closing the exit channel
-	timer := time.NewTimer(100 * time.Millisecond).C
-	receivedExit := make(chan struct{}, 1)
-	go func() {
-		close(w.exit)
-		w.wg.Wait()
-		close(receivedExit)
-	}()
-	for {
-		select {
-		case <-receivedExit:
-			return
-		case <-timer:
-			t.Fatal("Writer did not exit in time")
-		}
-	}
-}
-
 func getTestStatsBuckets() []model.StatsBucket {
 	now := model.Now()
 	bucketSize := time.Duration(5 * time.Second).Nanoseconds()
@@ -76,7 +54,7 @@ func TestWriterFlush(t *testing.T) {
 	conf.APIKey = "9d6e1075bb75e28ea6e720a4561f6b6d"
 	conf.APIEndpoint = testAPI.URL + "/api/v0.1"
 	w := NewWriter(conf, make(chan model.ServicesMetadata))
-	w.Start()
+	go w.Run()
 
 	// light the fire by sending a bucket
 	w.in <- model.AgentPayload{Stats: getTestStatsBuckets()}

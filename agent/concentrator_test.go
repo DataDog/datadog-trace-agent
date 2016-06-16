@@ -19,28 +19,6 @@ func NewTestConcentrator() *Concentrator {
 	return NewConcentrator(in, conf)
 }
 
-func TestConcentratorExitsGracefully(t *testing.T) {
-	c := NewTestConcentrator()
-	c.Start()
-
-	// Try to stop it in a given time, by closing the exit channel
-	timer := time.NewTimer(100 * time.Millisecond).C
-	receivedExit := make(chan struct{}, 1)
-	go func() {
-		close(c.exit)
-		c.wg.Wait()
-		close(receivedExit)
-	}()
-	for {
-		select {
-		case <-receivedExit:
-			return
-		case <-timer:
-			t.Fatal("Concentrator did not exit in time")
-		}
-	}
-}
-
 // getTsInBucket gives a timestamp in ns which is `offset` buckets late
 func getTsInBucket(alignedNow int64, bucketInterval time.Duration, offset int64) int64 {
 	return alignedNow - offset*bucketInterval.Nanoseconds() + rand.Int63n(bucketInterval.Nanoseconds())
@@ -50,6 +28,7 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	assert := assert.New(t)
 
 	c := NewTestConcentrator()
+	defer close(c.in)
 
 	// accept all the spans by hacking the cutoff
 	c.conf.OldestSpanCutoff = time.Minute.Nanoseconds()
@@ -73,7 +52,7 @@ func TestConcentratorStatsCounts(t *testing.T) {
 		model.Span{SpanID: 10, Duration: 20, Start: getTsInBucket(alignedNow, bucketInterval, 1), Service: "A2", Name: "query", Resource: "resourcefoo"},
 	}
 
-	c.Start()
+	go c.Run()
 
 	// insert the spans
 	c.in <- testSpans
@@ -85,15 +64,12 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	// Triggers the flush
 	c.in <- model.NewTraceFlushMarker()
 
-	// Send several spans which shouldn't be considered by this flush
-	go func() {
-		c.in <- model.Trace{model.Span{SpanID: 100, Duration: 1, Start: getTsInBucket(alignedNow, bucketInterval, 0), Service: "A1", Name: "query", Resource: "resource1"}}
-		c.in <- model.Trace{model.Span{SpanID: 101, Duration: 1, Start: getTsInBucket(alignedNow, bucketInterval, 1), Service: "A1", Name: "query", Resource: "resource1"}}
-		c.in <- model.Trace{model.Span{SpanID: 102, Duration: 1, Start: getTsInBucket(alignedNow, bucketInterval, 2), Service: "A1", Name: "query", Resource: "resource1"}}
-	}()
-
 	// Get the stats from the flush
 	stats := <-c.out
+
+	c.in <- model.Trace{model.Span{SpanID: 100, Duration: 1, Start: getTsInBucket(alignedNow, bucketInterval, 0), Service: "A1", Name: "query", Resource: "resource1"}}
+	c.in <- model.Trace{model.Span{SpanID: 101, Duration: 1, Start: getTsInBucket(alignedNow, bucketInterval, 1), Service: "A1", Name: "query", Resource: "resource1"}}
+	c.in <- model.Trace{model.Span{SpanID: 102, Duration: 1, Start: getTsInBucket(alignedNow, bucketInterval, 2), Service: "A1", Name: "query", Resource: "resource1"}}
 
 	if !assert.Equal(len(stats), 2, "We should get exactly 2 StatsBucket") {
 		t.FailNow()

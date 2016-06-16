@@ -22,7 +22,7 @@ func TestSublayerNested(t *testing.T) {
 
 	in := make(chan model.Trace)
 	st := NewSublayerTagger(in)
-	st.Start()
+	go st.Run()
 
 	timeout := make(chan struct{}, 1)
 	go func() {

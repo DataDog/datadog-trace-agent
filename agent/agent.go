@@ -11,7 +11,7 @@ import (
 
 // Agent struct holds all the sub-routines structs and make the data flow between them
 type Agent struct {
-	Receiver       Receiver // Receiver is an interface
+	Receiver       *HTTPReceiver
 	SublayerTagger *SublayerTagger
 	Quantizer      *Quantizer
 	Concentrator   *Concentrator
@@ -19,8 +19,7 @@ type Agent struct {
 	Writer         *Writer
 
 	// config
-	Config         *config.AgentConfig
-	traceConsumers int
+	Config *config.AgentConfig
 
 	// Used to synchronize on a clean exit
 	exit chan struct{}
@@ -34,9 +33,7 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 	st := NewSublayerTagger(r.traces)
 	q := NewQuantizer(st.out)
 
-	traceConsumers := 2
-	traceChans := traceFanOut(q.out, traceConsumers)
-
+	traceChans := traceFanOut(q.out, 2)
 	c := NewConcentrator(traceChans[0], conf)
 	s := NewSampler(traceChans[1], conf)
 
@@ -50,19 +47,23 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 		Concentrator:   c,
 		Sampler:        s,
 		Writer:         w,
-		traceConsumers: traceConsumers,
 		exit:           exit,
 	}
 }
 
 // Run starts routers routines and individual pieces then stop them when the exit order is received
 func (a *Agent) Run() {
-	// Start all workers
+	// Start all workers, last component first
+	go a.Writer.Run()
 	go a.runFlusher()
-	a.Start()
-	// Wait for the exit order
+	go a.Sampler.Run()
+	go a.Concentrator.Run()
+	go a.Quantizer.Run()
+	go a.SublayerTagger.Run()
+	go a.Receiver.Run()
+
 	<-a.exit
-	// Stop all workers
+	log.Info("exiting")
 	a.Stop()
 }
 
@@ -78,7 +79,7 @@ func (a *Agent) runFlusher() {
 			// Collect and merge partial flushs
 			var wg sync.WaitGroup
 			p := model.AgentPayload{}
-			wg.Add(a.traceConsumers)
+			wg.Add(2)
 			go func() {
 				defer wg.Done()
 				p.Stats = <-a.Concentrator.out
@@ -111,34 +112,15 @@ func (a *Agent) runFlusher() {
 	}
 }
 
-// Start starts all components
-func (a *Agent) Start() error {
-	log.Info("starting the trace-agent")
-
-	// Build the pipeline in the opposite way the data is processed
-	a.Writer.Start()
-	a.Sampler.Start()
-	a.Concentrator.Start()
-	a.Quantizer.Start()
-	a.SublayerTagger.Start()
-	a.Receiver.Start()
-
-	// FIXME: catch start errors
-	return nil
-}
-
 // Stop stops all components
-func (a *Agent) Stop() error {
+func (a *Agent) Stop() {
 	log.Info("stopping the trace-agent")
 
-	a.Receiver.Stop()
-	a.SublayerTagger.Stop()
-	a.Quantizer.Stop()
-	a.Concentrator.Stop()
-	a.Sampler.Stop()
-	a.Writer.Stop()
-
-	return nil
+	close(a.Receiver.exit)
+	// this will stop in chain all of the agent components
+	close(a.SublayerTagger.in)
+	// flush last payload if possible
+	close(a.Writer.exit)
 }
 
 // traceFanOut redistributes incoming traces to multiple components by returning multiple channels

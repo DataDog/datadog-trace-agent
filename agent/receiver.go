@@ -21,12 +21,6 @@ const (
 	v02
 )
 
-// Receiver is the common interface for an agent span collector, it receives spans from clients
-type Receiver interface {
-	Start()
-	Stop()
-}
-
 // receiverStats tracks statistics about incoming payloads
 type receiverStats struct {
 	Errors         int64
@@ -41,26 +35,25 @@ type receiverStats struct {
 type HTTPReceiver struct {
 	traces   chan model.Trace
 	services chan model.ServicesMetadata
-	Worker
 
 	// internal telemetry
 	stats receiverStats
+
+	exit chan struct{}
 }
 
 // NewHTTPReceiver returns a pointer to a new HTTPReceiver
 func NewHTTPReceiver() *HTTPReceiver {
 	// use buffered channels so that handlers are not waiting on downstream processing
-	l := &HTTPReceiver{
+	return &HTTPReceiver{
 		traces:   make(chan model.Trace, 50),
 		services: make(chan model.ServicesMetadata, 50),
+		exit:     make(chan struct{}),
 	}
-	l.Init()
-	return l
 }
 
-// Start actually starts the HTTP server and returns any error that could
-// have arosen
-func (l *HTTPReceiver) Start() {
+// Run starts doing the HTTP server and is ready to receive traces
+func (l *HTTPReceiver) Run() {
 	httpHandleWithVersion := func(v APIVersion, f func(APIVersion, http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
 		return func(w http.ResponseWriter, r *http.Request) {
 			f(v, w, r)
@@ -93,11 +86,9 @@ func (l *HTTPReceiver) Start() {
 	// avoid leaks
 	server := http.Server{ReadTimeout: 5 * time.Second}
 
-	l.wg.Add(1)
-	defer l.wg.Done()
 
 	go l.logStats()
-	go server.Serve(sl)
+	server.Serve(sl)
 }
 
 // HTTPErrorAndLog outputs an HTTP error with a code, a description text + DD metric

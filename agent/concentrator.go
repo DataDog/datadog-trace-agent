@@ -28,50 +28,36 @@ type Concentrator struct {
 	lock        sync.Mutex                  // lock to read/write buckets
 
 	conf *config.AgentConfig
-
-	Worker
 }
 
 // NewConcentrator initializes a new concentrator ready to be started
 func NewConcentrator(in chan model.Trace, conf *config.AgentConfig) *Concentrator {
-	c := &Concentrator{
+	return &Concentrator{
 		in:          in,
 		out:         make(chan []model.StatsBucket),
 		buckets:     make(map[int64]model.StatsBucket),
 		aggregators: append(DefaultAggregators, conf.ExtraAggregators...),
 		conf:        conf,
 	}
-	c.Init()
-	return c
 }
 
-// Start initializes the first structures and starts consuming spans
-func (c *Concentrator) Start() {
-	c.wg.Add(1)
+// Run starts doing some concentrating work
+func (c *Concentrator) Run() {
+	for t := range c.in {
+		if len(t) == 1 && t[0].IsFlushMarker() {
+			c.out <- c.Flush()
+			continue
+		}
 
-	go func() {
-		for {
-			select {
-			case t := <-c.in:
-				if len(t) == 1 && t[0].IsFlushMarker() {
-					c.out <- c.Flush()
-				} else {
-					for _, s := range t {
-						err := c.HandleNewSpan(s)
-						if err != nil {
-							log.Debugf("span %v rejected by concentrator, err: %v", s, err)
-						}
-					}
-				}
-			case <-c.exit:
-				close(c.out)
-				c.wg.Done()
-				return
+		for _, s := range t {
+			err := c.HandleNewSpan(s)
+			if err != nil {
+				log.Debugf("span %v rejected by concentrator, err: %v", s, err)
 			}
 		}
-	}()
+	}
 
-	log.Debug("started concentrator")
+	close(c.out)
 }
 
 // HandleNewSpan adds to the current bucket the pointed span
