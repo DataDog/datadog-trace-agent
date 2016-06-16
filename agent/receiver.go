@@ -86,7 +86,6 @@ func (l *HTTPReceiver) Run() {
 	// avoid leaks
 	server := http.Server{ReadTimeout: 5 * time.Second}
 
-
 	go l.logStats()
 	server.Serve(sl)
 }
