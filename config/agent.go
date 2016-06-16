@@ -77,19 +77,18 @@ func NewDefaultAgentConfig() *AgentConfig {
 		hostname = ""
 	}
 	ac := &AgentConfig{
-		HostName: hostname,
-		// TODO: configure a generic default endpoint
+		HostName:       hostname,
 		APIEndpoint:    "https://trace.datadoghq.com/api/v0.1",
 		APIKey:         "",
 		APIEnabled:     true,
 		APIFlushTraces: true,
 
-		BucketInterval:    time.Duration(5) * time.Second,
-		OldestSpanCutoff:  time.Duration(30 * time.Second).Nanoseconds(),
+		BucketInterval:    time.Duration(10) * time.Second,
+		OldestSpanCutoff:  time.Duration(60 * time.Second).Nanoseconds(),
 		ExtraAggregators:  []string{},
 		LatencyResolution: time.Millisecond,
 
-		SamplerQuantiles: []float64{0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 1},
+		SamplerQuantiles: []float64{0.10, 0.50, 0.90, 1},
 
 		Topology:       false,
 		TracePortsList: []string{},
