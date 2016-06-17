@@ -29,7 +29,7 @@ type Agent struct {
 func NewAgent(conf *config.AgentConfig) *Agent {
 	exit := make(chan struct{})
 
-	r := NewHTTPReceiver()
+	r := NewHTTPReceiver(conf.ConnectionLimit)
 	st := NewSublayerTagger(r.traces)
 	q := NewQuantizer(st.out)
 
@@ -60,7 +60,7 @@ func (a *Agent) Run() {
 	go a.Concentrator.Run()
 	go a.Quantizer.Run()
 	go a.SublayerTagger.Run()
-	go a.Receiver.Run(a.Config.ConnectionLimit)
+	go a.Receiver.Run()
 
 	<-a.exit
 	log.Info("exiting")
