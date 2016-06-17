@@ -10,9 +10,8 @@ import (
 
 // StoppableListener wraps a regular TCPListener with an exit channel so we can exit cleanly from the Serve() loop of our HTTP server
 type StoppableListener struct {
-	exit chan struct{}
-	// How many connections are available for this listener before rate-limiting kicks in
-	connLease int
+	exit      chan struct{}
+	connLease int // How many connections are available for this listener before rate-limiting kicks in
 	*net.TCPListener
 }
 
@@ -29,22 +28,29 @@ func NewStoppableListener(l net.Listener, exit chan struct{}, conns int) (*Stopp
 	return sl, nil
 }
 
-func (sl *StoppableListener) Meter(conns int) {
-	for range time.Tick(10 * time.Second) {
+func (sl *StoppableListener) Refresh(conns int) {
+	for range time.Tick(30 * time.Second) {
 		sl.connLease = conns
-		log.Infof("Refreshed the connLease %d", sl.connLease)
+		log.Debugf("Refreshed the connection lease: %d", sl.connLease)
 	}
 }
+
+type RateLimitedError struct{}
+
+// satisfy net.Error interface
+func (e *RateLimitedError) Error() string   { return "request has been rate-limited" }
+func (e *RateLimitedError) Temporary() bool { return true }
+func (e *RateLimitedError) Timeout() bool   { return false }
 
 // Accept reimplements the regular Accept but adds a check on the exit channel and returns if needed
 func (sl *StoppableListener) Accept() (net.Conn, error) {
 	if sl.connLease <= 0 {
-		log.Infof("This is the connLease %d : rate-limiting is in effect", sl.connLease)
-		return nil, errors.New("receiver has been rate-limited, new conns will be rejected")
+		// we've reached our cap for this lease period, reject the request
+		return nil, &RateLimitedError{}
 	}
 
 	for {
-		//Wait up to one second for a new connection
+		//Wait up to 1 second for Reads and Writes to the new connection
 		sl.SetDeadline(time.Now().Add(time.Second))
 
 		newConn, err := sl.TCPListener.Accept()
@@ -68,7 +74,8 @@ func (sl *StoppableListener) Accept() (net.Conn, error) {
 			}
 		}
 
-		// TODO[aaditya]: is this safe for concurrent access?
+		// decrement available conns
+		// TODO[aaditya]: this is updated concurrently, but probably safe enough? we don't care about a 100% accurate value
 		sl.connLease--
 
 		return newConn, err

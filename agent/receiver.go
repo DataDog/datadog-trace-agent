@@ -81,15 +81,14 @@ func (l *HTTPReceiver) Run() {
 		panic(err)
 	}
 
-	// TODO[aaditya]: config
-	conns := 2000
 	sl, err := NewStoppableListener(tcpL, l.exit, conns)
 	// some clients might use keep-alive and keep open their connections too long
 	// avoid leaks
 	server := http.Server{ReadTimeout: 5 * time.Second}
 
+	conns := 2000
 	go l.logStats()
-	go sl.Meter(conns)
+	go sl.Refresh(conns)
 	go server.Serve(sl)
 }
 
