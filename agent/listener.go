@@ -76,8 +76,6 @@ func (sl *StoppableListener) Accept() (net.Conn, error) {
 		}
 
 		// decrement available conns
-		// TODO[aaditya]: this is updated concurrently
-		// but probably safe enough? we don't care about a 100% accurate value
 		atomic.AddInt32(&sl.connLease, -1)
 
 		return newConn, err
