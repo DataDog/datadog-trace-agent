@@ -175,8 +175,8 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 		c.TracePortsList = tracePortsList
 	}
 
-	if _, e := conf.GetInt("trace.receiver", "connection_limit"); e == nil {
-		c.ConnectionLimit = 2000
+	if v, e := conf.GetInt("trace.receiver", "connection_limit"); e == nil {
+		c.ConnectionLimit = v
 	}
 
 	return c, nil
