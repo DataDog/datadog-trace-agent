@@ -81,3 +81,14 @@ func TestFilterTags(t *testing.T) {
 	}
 
 }
+
+func TestAggrString(t *testing.T) {
+	assert := assert.New(t)
+	span := Span{Service: "thing", Name: "other", Resource: "yo"}
+	aggregators := []string{"service", "name", "resource"}
+
+	res, seps := getAggrString(span, aggregators)
+	assert.Equal(res, "name:other,resource:yo,service:thing")
+	assert.Equal([]int{11, 23}, seps)
+
+}

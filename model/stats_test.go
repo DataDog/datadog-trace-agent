@@ -61,42 +61,42 @@ func TestStatsBucketDefault(t *testing.T) {
 	}
 }
 
-func TestStatsBucketExtraAggregators(t *testing.T) {
-	assert := assert.New(t)
-
-	sb := NewStatsBucket(0, 1e9, time.Millisecond)
-	aggr := []string{"name", "version"}
-	for _, s := range testSpans {
-		sb.HandleSpan(s, aggr)
-	}
-
-	expectedCounts := map[string]int64{
-		"duration|name:A.foo":                 3,
-		"duration|name:B.foo":                 7,
-		"duration|name:B.foo,version:1.3":     5,
-		"duration|name:sql.query":             15,
-		"duration|name:sql.query,version:1.4": 6,
-		"errors|name:A.foo":                   1,
-		"errors|name:B.foo":                   1,
-		"errors|name:B.foo,version:1.3":       0,
-		"errors|name:sql.query":               0,
-		"errors|name:sql.query,version:1.4":   0,
-		"hits|name:A.foo":                     2,
-		"hits|name:B.foo":                     2,
-		"hits|name:B.foo,version:1.3":         1,
-		"hits|name:sql.query":                 2,
-		"hits|name:sql.query,version:1.4":     1,
-	}
-
-	assert.Len(sb.Counts, len(expectedCounts), "Missing counts!")
-	for ckey, c := range sb.Counts {
-		val, ok := expectedCounts[ckey]
-		if !ok {
-			assert.Fail("Unexpected count %s", ckey)
-		}
-		assert.Equal(val, c.Value, "Count %s wrong value", ckey)
-	}
-}
+// func TestStatsBucketExtraAggregators(t *testing.T) {
+// 	assert := assert.New(t)
+//
+// 	sb := NewStatsBucket(0, 1e9, time.Millisecond)
+// 	aggr := []string{"name", "version"}
+// 	for _, s := range testSpans {
+// 		sb.HandleSpan(s, aggr)
+// 	}
+//
+// 	expectedCounts := map[string]int64{
+// 		"duration|name:A.foo":                 3,
+// 		"duration|name:B.foo":                 7,
+// 		"duration|name:B.foo,version:1.3":     5,
+// 		"duration|name:sql.query":             15,
+// 		"duration|name:sql.query,version:1.4": 6,
+// 		"errors|name:A.foo":                   1,
+// 		"errors|name:B.foo":                   1,
+// 		"errors|name:B.foo,version:1.3":       0,
+// 		"errors|name:sql.query":               0,
+// 		"errors|name:sql.query,version:1.4":   0,
+// 		"hits|name:A.foo":                     2,
+// 		"hits|name:B.foo":                     2,
+// 		"hits|name:B.foo,version:1.3":         1,
+// 		"hits|name:sql.query":                 2,
+// 		"hits|name:sql.query,version:1.4":     1,
+// 	}
+//
+// 	assert.Len(sb.Counts, len(expectedCounts), "Missing counts!")
+// 	for ckey, c := range sb.Counts {
+// 		val, ok := expectedCounts[ckey]
+// 		if !ok {
+// 			assert.Fail("Unexpected count %s", ckey)
+// 		}
+// 		assert.Equal(val, c.Value, "Count %s wrong value", ckey)
+// 	}
+// }
 
 func TestResos(t *testing.T) {
 	assert := assert.New(t)
