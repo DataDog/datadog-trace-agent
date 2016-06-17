@@ -53,7 +53,7 @@ func NewHTTPReceiver() *HTTPReceiver {
 }
 
 // Run starts doing the HTTP server and is ready to receive traces
-func (l *HTTPReceiver) Run() {
+func (l *HTTPReceiver) Run(connLimit int) {
 	httpHandleWithVersion := func(v APIVersion, f func(APIVersion, http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
 		return func(w http.ResponseWriter, r *http.Request) {
 			f(v, w, r)
@@ -81,14 +81,13 @@ func (l *HTTPReceiver) Run() {
 		panic(err)
 	}
 
-	sl, err := NewStoppableListener(tcpL, l.exit, conns)
+	sl, err := NewStoppableListener(tcpL, l.exit, connLimit)
 	// some clients might use keep-alive and keep open their connections too long
 	// avoid leaks
 	server := http.Server{ReadTimeout: 5 * time.Second}
 
-	conns := 2000
 	go l.logStats()
-	go sl.Refresh(conns)
+	go sl.Refresh(connLimit)
 	go server.Serve(sl)
 }
 

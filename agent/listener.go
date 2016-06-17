@@ -31,7 +31,7 @@ func NewStoppableListener(l net.Listener, exit chan struct{}, conns int) (*Stopp
 func (sl *StoppableListener) Refresh(conns int) {
 	for range time.Tick(30 * time.Second) {
 		sl.connLease = conns
-		log.Debugf("Refreshed the connection lease: %d", sl.connLease)
+		log.Debugf("Refreshed the connection lease: %d conns available", sl.connLease)
 	}
 }
 
@@ -75,7 +75,8 @@ func (sl *StoppableListener) Accept() (net.Conn, error) {
 		}
 
 		// decrement available conns
-		// TODO[aaditya]: this is updated concurrently, but probably safe enough? we don't care about a 100% accurate value
+		// TODO[aaditya]: this is updated concurrently
+		// but probably safe enough? we don't care about a 100% accurate value
 		sl.connLease--
 
 		return newConn, err

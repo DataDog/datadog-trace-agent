@@ -36,6 +36,9 @@ type AgentConfig struct {
 	Topology       bool // enable topology graph collection
 	TracePortsList []string
 
+	// Receiver
+	ConnectionLimit int // for rate-limiting, how many unique connections to allow in a lease period (30s)
+
 	// internal telemetry
 	StatsdHost string
 	StatsdPort int
@@ -93,6 +96,8 @@ func NewDefaultAgentConfig() *AgentConfig {
 
 		Topology:       false,
 		TracePortsList: []string{},
+
+		ConnectionLimit: 2000,
 
 		StatsdHost: "localhost",
 		StatsdPort: 8125,
@@ -168,6 +173,10 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 	if tracePortsList, e := conf.GetStrArray("trace.grapher", "port_whitelist", ","); e == nil {
 		log.Debugf("Tracing ports : %s", tracePortsList)
 		c.TracePortsList = tracePortsList
+	}
+
+	if _, e := conf.GetInt("trace.receiver", "connection_limit"); e == nil {
+		c.ConnectionLimit = 2000
 	}
 
 	return c, nil

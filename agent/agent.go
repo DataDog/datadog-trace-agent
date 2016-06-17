@@ -60,7 +60,7 @@ func (a *Agent) Run() {
 	go a.Concentrator.Run()
 	go a.Quantizer.Run()
 	go a.SublayerTagger.Run()
-	go a.Receiver.Run()
+	go a.Receiver.Run(a.Config.ConnectionLimit)
 
 	<-a.exit
 	log.Info("exiting")
