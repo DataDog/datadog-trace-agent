@@ -81,13 +81,16 @@ func (l *HTTPReceiver) Run() {
 		panic(err)
 	}
 
-	sl, err := NewStoppableListener(tcpL, l.exit)
+	// TODO[aaditya]: config
+	conns := 2000
+	sl, err := NewStoppableListener(tcpL, l.exit, conns)
 	// some clients might use keep-alive and keep open their connections too long
 	// avoid leaks
 	server := http.Server{ReadTimeout: 5 * time.Second}
 
 	go l.logStats()
-	server.Serve(sl)
+	go sl.Meter(conns)
+	go server.Serve(sl)
 }
 
 // HTTPErrorAndLog outputs an HTTP error with a code, a description text + DD metric
