@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net"
+	"sync/atomic"
 	"time"
 
 	log "github.com/cihub/seelog"
@@ -11,7 +12,7 @@ import (
 // StoppableListener wraps a regular TCPListener with an exit channel so we can exit cleanly from the Serve() loop of our HTTP server
 type StoppableListener struct {
 	exit      chan struct{}
-	connLease int // How many connections are available for this listener before rate-limiting kicks in
+	connLease int32 // How many connections are available for this listener before rate-limiting kicks in
 	*net.TCPListener
 }
 
@@ -23,14 +24,14 @@ func NewStoppableListener(l net.Listener, exit chan struct{}, conns int) (*Stopp
 		return nil, errors.New("cannot wrap listener")
 	}
 
-	sl := &StoppableListener{exit: exit, connLease: conns, TCPListener: tcpL}
+	sl := &StoppableListener{exit: exit, connLease: int32(conns), TCPListener: tcpL}
 
 	return sl, nil
 }
 
 func (sl *StoppableListener) Refresh(conns int) {
 	for range time.Tick(30 * time.Second) {
-		sl.connLease = conns
+		atomic.StoreInt32(&sl.connLease, int32(conns))
 		log.Debugf("Refreshed the connection lease: %d conns available", sl.connLease)
 	}
 }
@@ -77,7 +78,7 @@ func (sl *StoppableListener) Accept() (net.Conn, error) {
 		// decrement available conns
 		// TODO[aaditya]: this is updated concurrently
 		// but probably safe enough? we don't care about a 100% accurate value
-		sl.connLease--
+		atomic.AddInt32(&sl.connLease, -1)
 
 		return newConn, err
 	}
