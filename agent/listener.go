@@ -29,6 +29,7 @@ func NewStoppableListener(l net.Listener, exit chan struct{}, conns int) (*Stopp
 	return sl, nil
 }
 
+// Refresh periodically refreshes the connection lease, and thus cancels any rate limits in place
 func (sl *StoppableListener) Refresh(conns int) {
 	for range time.Tick(30 * time.Second) {
 		atomic.StoreInt32(&sl.connLease, int32(conns))
@@ -36,12 +37,18 @@ func (sl *StoppableListener) Refresh(conns int) {
 	}
 }
 
+// RateLimitedError  indicates a user request being blocked by our rate limit
+// It satisfies the net.Error interface
 type RateLimitedError struct{}
 
-// satisfy net.Error interface
-func (e *RateLimitedError) Error() string   { return "request has been rate-limited" }
+// Error returns an error string
+func (e *RateLimitedError) Error() string { return "request has been rate-limited" }
+
+// Temporary tells the HTTP server loop that this error is temporary and recoverable
 func (e *RateLimitedError) Temporary() bool { return true }
-func (e *RateLimitedError) Timeout() bool   { return false }
+
+// Timeout tells the HTTP server loop that this error is not a timeout
+func (e *RateLimitedError) Timeout() bool { return false }
 
 // Accept reimplements the regular Accept but adds a check on the exit channel and returns if needed
 func (sl *StoppableListener) Accept() (net.Conn, error) {
