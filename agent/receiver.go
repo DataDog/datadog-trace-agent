@@ -33,8 +33,9 @@ type receiverStats struct {
 // HTTPReceiver is a collector that uses HTTP protocol and just holds
 // a chan where the spans received are sent one by one
 type HTTPReceiver struct {
-	traces   chan model.Trace
-	services chan model.ServicesMetadata
+	traces    chan model.Trace
+	services  chan model.ServicesMetadata
+	connLimit int
 
 	// internal telemetry
 	stats receiverStats
@@ -43,12 +44,13 @@ type HTTPReceiver struct {
 }
 
 // NewHTTPReceiver returns a pointer to a new HTTPReceiver
-func NewHTTPReceiver() *HTTPReceiver {
+func NewHTTPReceiver(connLimit int) *HTTPReceiver {
 	// use buffered channels so that handlers are not waiting on downstream processing
 	return &HTTPReceiver{
-		traces:   make(chan model.Trace, 50),
-		services: make(chan model.ServicesMetadata, 50),
-		exit:     make(chan struct{}),
+		traces:    make(chan model.Trace, 50),
+		services:  make(chan model.ServicesMetadata, 50),
+		connLimit: connLimit,
+		exit:      make(chan struct{}),
 	}
 }
 
@@ -81,13 +83,14 @@ func (l *HTTPReceiver) Run() {
 		panic(err)
 	}
 
-	sl, err := NewStoppableListener(tcpL, l.exit)
+	sl, err := NewStoppableListener(tcpL, l.exit, l.connLimit)
 	// some clients might use keep-alive and keep open their connections too long
 	// avoid leaks
 	server := http.Server{ReadTimeout: 5 * time.Second}
 
 	go l.logStats()
-	server.Serve(sl)
+	go sl.Refresh(l.connLimit)
+	go server.Serve(sl)
 }
 
 // HTTPErrorAndLog outputs an HTTP error with a code, a description text + DD metric
