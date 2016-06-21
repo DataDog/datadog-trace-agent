@@ -254,6 +254,27 @@ func TestSummarySliceMerge(t *testing.T) {
 	}
 }
 
+func TestSummaryCombine10000(t *testing.T) {
+	s := NewSliceSummary()
+	for n := 0; n < 3; n++ {
+		s1 := NewSliceSummary()
+		for i := 0; i < 10000; i++ {
+			s1.Insert(float64(i), uint64(i))
+		}
+		s.Combine(s1)
+
+	}
+
+	fmt.Println(s)
+	slices := s.BySlices(0)
+	fmt.Println(slices)
+	total := 0
+	for _, s := range slices {
+		total += s.Weight
+	}
+	fmt.Println(total)
+}
+
 func TestSummaryRemergeReal10000(t *testing.T) {
 	s := NewSummary()
 	for n := 0; n < 1000; n++ {
