@@ -1,5 +1,13 @@
 #!/bin/sh
 
-set -e
-service dd-trace-agent stop || true
+if which stop >/dev/null 2>&1; then
+    stop dd-trace-agent
+else
+    invoke-rc.d dd-trace-agent stop
+
+    # Removing the service form startup (since it's not there anymore)
+    update-rc.d -f dd-trace-agent disable >/dev/null 2>&1
+    update-rc.d -f dd-trace-agent remove
+fi
+
 exit 0
