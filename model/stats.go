@@ -118,24 +118,43 @@ func NewStatsBucket(ts, d int64, res time.Duration) StatsBucket {
 	}
 }
 
-func getAggrString(s Span, aggregators []string) (string, []int) {
-	aggrString := "name:" + s.Name + ","
+// getAggregateString , given a list of aggregators, returns a unique string representation for a spans's aggregate group
+func getAggregateString(s Span, aggregators []string) (string, []int) {
+	// aggregator strings are formatted like name:x,resource:r,service:y,a:some,b:custom,c:aggs
+	// where custom aggregators (a,b,c) are appended to the main string in alphanum order
+	var i, j int
+	var aggrString string
 
-	// Where resource: starts
-	i := len(aggrString)
+	// First deal with our default aggregators
+	if s.Name != "" {
+		aggrString = "name:" + s.Name + ","
+		// Where resource: starts
+		i = len(aggrString)
+	}
 
-	aggrString = aggrString + "resource:" + s.Resource + ","
+	if s.Resource != "" {
+		aggrString = aggrString + "resource:" + s.Resource + ","
+		// Where service: starts
+		j = len(aggrString)
+	}
 
-	// Where service: starts
-	j := len(aggrString)
+	if s.Service != "" {
+		aggrString = aggrString + "service:" + s.Service + ","
+	}
 
-	aggrString = aggrString + "service:" + s.Service
-	return aggrString, []int{i, j}
+	// now add our custom ones. just go in order since the list is already sorted
+	for _, agg := range aggregators {
+		if v, ok := s.Meta[agg]; ok {
+			aggrString = aggrString + agg + ":" + v + ","
+		}
+	}
+
+	return aggrString[:len(aggrString)-1], []int{i, j}
 }
 
 // HandleSpan adds the span to this bucket stats, aggregated with the finest grain matching given aggregators
 func (sb *StatsBucket) HandleSpan(s Span, aggregators []string) {
-	aggrString, separators := getAggrString(s, aggregators)
+	aggrString, separators := getAggregateString(s, aggregators)
 	sb.addToTagSet(s, aggrString, separators)
 }
 

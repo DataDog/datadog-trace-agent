@@ -32,11 +32,13 @@ type Concentrator struct {
 
 // NewConcentrator initializes a new concentrator ready to be started
 func NewConcentrator(in chan model.Trace, conf *config.AgentConfig) *Concentrator {
+	aggregators := sort.Strings(conf.ExtraAggregators)
+
 	return &Concentrator{
 		in:          in,
 		out:         make(chan []model.StatsBucket),
 		buckets:     make(map[int64]model.StatsBucket),
-		aggregators: append(DefaultAggregators, conf.ExtraAggregators...),
+		aggregators: aggregators,
 		conf:        conf,
 	}
 }

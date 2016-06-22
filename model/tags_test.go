@@ -87,7 +87,7 @@ func TestAggrString(t *testing.T) {
 	span := Span{Service: "thing", Name: "other", Resource: "yo"}
 	aggregators := []string{"service", "name", "resource"}
 
-	res, seps := getAggrString(span, aggregators)
+	res, seps := getAggregateString(span, aggregators)
 	assert.Equal(res, "name:other,resource:yo,service:thing")
 	assert.Equal([]int{11, 23}, seps)
 
