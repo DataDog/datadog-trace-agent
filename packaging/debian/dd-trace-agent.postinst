@@ -27,7 +27,7 @@ case "$1" in
         else
             # TODO: fix bogus exit code
             exit 123
-        # fi
+        fi
         ;;
 esac
 
