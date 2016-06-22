@@ -1,6 +1,6 @@
 #!/bin/sh
 
-if which stop >/dev/null 2>&1; then
+if command -v stop >/dev/null 2>&1; then
     stop dd-trace-agent
 else
     invoke-rc.d dd-trace-agent stop
