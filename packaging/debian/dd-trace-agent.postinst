@@ -16,17 +16,17 @@ case "$1" in
             # TODO: fix bogus exit code
             exit 123
         fi
-        #
-        # echo "Starting service dd-trace-agent"
-        # if command -v start > /dev/null 2>&1; then
-        #     stop dd-trace-agent || true
-        #     start dd-trace-agent
-        # elif command -v invoke-rc.d >/dev/null 2>&1; then
-        #     invoke-rc.d dd-trace-agent stop || true
-        #     invoke-rc.d dd-trace-agent start
-        # else
-        #     # TODO: fix bogus exit code
-        #     exit 123
+
+        echo "Starting service dd-trace-agent"
+        if command -v start > /dev/null 2>&1; then
+            stop dd-trace-agent || true
+            start dd-trace-agent || true
+        elif command -v invoke-rc.d >/dev/null 2>&1; then
+            invoke-rc.d dd-trace-agent stop || true
+            invoke-rc.d dd-trace-agent start || true
+        else
+            # TODO: fix bogus exit code
+            exit 123
         # fi
         ;;
 esac
