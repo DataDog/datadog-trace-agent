@@ -119,23 +119,18 @@ func NewStatsBucket(ts, d int64, res time.Duration) StatsBucket {
 }
 
 // getAggregateString , given a list of aggregators, returns a unique string representation for a spans's aggregate group
-func getAggregateString(s Span, aggregators []string) (string, []int) {
+func getAggregateString(s Span, aggregators []string) string {
 	// aggregator strings are formatted like name:x,resource:r,service:y,a:some,b:custom,c:aggs
 	// where custom aggregators (a,b,c) are appended to the main string in alphanum order
-	var i, j int
 	var aggrString string
 
 	// First deal with our default aggregators
 	if s.Name != "" {
 		aggrString = "name:" + s.Name + ","
-		// Where resource: starts
-		i = len(aggrString)
 	}
 
 	if s.Resource != "" {
 		aggrString = aggrString + "resource:" + s.Resource + ","
-		// Where service: starts
-		j = len(aggrString)
 	}
 
 	if s.Service != "" {
@@ -149,27 +144,33 @@ func getAggregateString(s Span, aggregators []string) (string, []int) {
 		}
 	}
 
-	return aggrString[:len(aggrString)-1], []int{i, j}
+	if aggrString == "" {
+		// shouldn't ever happen if we've properly normalized the span
+		return aggrString
+	}
+
+	// strip off trailing comma
+	return aggrString[:len(aggrString)-1]
 }
 
 // HandleSpan adds the span to this bucket stats, aggregated with the finest grain matching given aggregators
 func (sb *StatsBucket) HandleSpan(s Span, aggregators []string) {
-	aggrString, separators := getAggregateString(s, aggregators)
-	sb.addToTagSet(s, aggrString, separators)
+	aggrString := getAggregateString(s, aggregators)
+	sb.addToTagSet(s, aggrString)
 }
 
-func (sb StatsBucket) addToTagSet(s Span, tgs string, separators []int) {
+func (sb StatsBucket) addToTagSet(s Span, tgs string) {
 	// HITS
-	sb.addToCount(HITS, 1, tgs, separators)
+	sb.addToCount(HITS, 1, tgs)
 	// FIXME: this does not really make sense actually
 	// ERRORS
 	if s.Error != 0 {
-		sb.addToCount(ERRORS, 1, tgs, separators)
+		sb.addToCount(ERRORS, 1, tgs)
 	} else {
-		sb.addToCount(ERRORS, 0, tgs, separators)
+		sb.addToCount(ERRORS, 0, tgs)
 	}
 	// DURATION
-	sb.addToCount(DURATION, float64(s.Duration), tgs, separators)
+	sb.addToCount(DURATION, float64(s.Duration), tgs)
 
 	// TODO add for s.Metrics ability to define arbitrary counts and distros, check some config?
 	for m, v := range s.Metrics {
@@ -182,22 +183,19 @@ func (sb StatsBucket) addToTagSet(s Span, tgs string, separators []int) {
 				continue
 			}
 
-			// where sublayer: tag starts
-			k := len(tgs)
-			separators = append(separators, k)
 			tgs = tgs + "," + subparsed[2]
 
 			// only extract _sublayers.duration.by_service
-			sb.addToCount(m[:len(m)-len(subparsed[2])-1], v, tgs, separators)
+			sb.addToCount(m[:len(m)-len(subparsed[2])-1], v, tgs)
 		}
 	}
 
 	// alter resolution of duration distro
 	trundur := nsTimestampToFloat(s.Duration, sb.DistroResolution)
-	sb.addToDistribution(DURATION, trundur, s.SpanID, tgs, separators)
+	sb.addToDistribution(DURATION, trundur, s.SpanID, tgs)
 }
 
-func (sb StatsBucket) addToCount(m string, v float64, aggr string, separators []int) {
+func (sb StatsBucket) addToCount(m string, v float64, aggr string) {
 	ckey := m + "|" + aggr
 	if _, ok := sb.Counts[ckey]; !ok {
 		tgs := NewTagSetFromString(aggr)
@@ -208,7 +206,7 @@ func (sb StatsBucket) addToCount(m string, v float64, aggr string, separators []
 	sb.Counts[ckey] = sb.Counts[ckey].Add(v)
 }
 
-func (sb StatsBucket) addToDistribution(m string, v float64, sampleID uint64, aggr string, separators []int) {
+func (sb StatsBucket) addToDistribution(m string, v float64, sampleID uint64, aggr string) {
 	ckey := m + "|" + aggr
 	if _, ok := sb.Distributions[ckey]; !ok {
 		tgs := NewTagSetFromString(aggr)
