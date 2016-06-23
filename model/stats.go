@@ -1,6 +1,7 @@
 package model
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"strings"
@@ -101,6 +102,9 @@ type StatsBucket struct {
 	// stats indexed by keys
 	Counts        map[string]Count        // All the true counts we keep
 	Distributions map[string]Distribution // All the true distribution we keep to answer quantile queries
+
+	// internal buffer for aggregate strings - not threadsafe
+	keyBuf bytes.Buffer
 }
 
 // NewStatsBucket opens a new bucket for time ts and initializes it properly
@@ -119,31 +123,43 @@ func NewStatsBucket(ts, d int64, res time.Duration) StatsBucket {
 }
 
 // getAggregateString , given a list of aggregators, returns a unique string representation for a spans's aggregate group
-func getAggregateString(s Span, aggregators []string) string {
+func getAggregateString(s Span, aggregators []string, keyBuf bytes.Buffer) string {
 	// aggregator strings are formatted like name:x,resource:r,service:y,a:some,b:custom,c:aggs
 	// where custom aggregators (a,b,c) are appended to the main string in alphanum order
-	var aggrString string
+
+	// clear the buffer
+	keyBuf.Reset()
 
 	// First deal with our default aggregators
 	if s.Name != "" {
-		aggrString = "name:" + s.Name + ","
+		keyBuf.WriteString("name:")
+		keyBuf.WriteString(s.Name)
+		keyBuf.WriteString(",")
 	}
 
 	if s.Resource != "" {
-		aggrString = aggrString + "resource:" + s.Resource + ","
+		keyBuf.WriteString("resource:")
+		keyBuf.WriteString(s.Resource)
+		keyBuf.WriteString(",")
 	}
 
 	if s.Service != "" {
-		aggrString = aggrString + "service:" + s.Service + ","
+		keyBuf.WriteString("service:")
+		keyBuf.WriteString(s.Service)
+		keyBuf.WriteString(",")
 	}
 
 	// now add our custom ones. just go in order since the list is already sorted
 	for _, agg := range aggregators {
 		if v, ok := s.Meta[agg]; ok {
-			aggrString = aggrString + agg + ":" + v + ","
+			keyBuf.WriteString(agg)
+			keyBuf.WriteString(":")
+			keyBuf.WriteString(v)
+			keyBuf.WriteString(",")
 		}
 	}
 
+	aggrString := keyBuf.String()
 	if aggrString == "" {
 		// shouldn't ever happen if we've properly normalized the span
 		return aggrString
@@ -155,7 +171,7 @@ func getAggregateString(s Span, aggregators []string) string {
 
 // HandleSpan adds the span to this bucket stats, aggregated with the finest grain matching given aggregators
 func (sb *StatsBucket) HandleSpan(s Span, aggregators []string) {
-	aggrString := getAggregateString(s, aggregators)
+	aggrString := getAggregateString(s, aggregators, sb.keyBuf)
 	sb.addToTagSet(s, aggrString)
 }
 
