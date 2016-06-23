@@ -134,28 +134,28 @@ func getAggregateString(s Span, aggregators []string, keyBuf bytes.Buffer) strin
 	if s.Name != "" {
 		keyBuf.WriteString("name:")
 		keyBuf.WriteString(s.Name)
-		keyBuf.WriteString(",")
+		keyBuf.WriteRune(',')
 	}
 
 	if s.Resource != "" {
 		keyBuf.WriteString("resource:")
 		keyBuf.WriteString(s.Resource)
-		keyBuf.WriteString(",")
+		keyBuf.WriteRune(',')
 	}
 
 	if s.Service != "" {
 		keyBuf.WriteString("service:")
 		keyBuf.WriteString(s.Service)
-		keyBuf.WriteString(",")
+		keyBuf.WriteRune(',')
 	}
 
 	// now add our custom ones. just go in order since the list is already sorted
 	for _, agg := range aggregators {
 		if v, ok := s.Meta[agg]; ok {
 			keyBuf.WriteString(agg)
-			keyBuf.WriteString(":")
+			keyBuf.WriteRune(':')
 			keyBuf.WriteString(v)
-			keyBuf.WriteString(",")
+			keyBuf.WriteRune(',')
 		}
 	}
 
