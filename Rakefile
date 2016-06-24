@@ -12,6 +12,7 @@ end
 
 PACKAGES = %w(
   ./agent
+  ./fixtures
   ./model
   ./quantile
 )
