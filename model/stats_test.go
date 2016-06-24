@@ -22,7 +22,9 @@ func TestStatsBucketDefault(t *testing.T) {
 	assert := assert.New(t)
 
 	sb := NewStatsBucket(0, 1e9, time.Millisecond)
-	aggr := []string{"service", "name", "resource"}
+
+	// No custom aggregators only the defaults
+	aggr := []string{}
 	for _, s := range testSpans {
 		sb.HandleSpan(s, aggr)
 	}
@@ -65,27 +67,35 @@ func TestStatsBucketExtraAggregators(t *testing.T) {
 	assert := assert.New(t)
 
 	sb := NewStatsBucket(0, 1e9, time.Millisecond)
-	aggr := []string{"name", "version"}
+
+	// one custom aggregator
+	aggr := []string{"version"}
 	for _, s := range testSpans {
 		sb.HandleSpan(s, aggr)
 	}
 
 	expectedCounts := map[string]int64{
-		"duration|name:A.foo":                 3,
-		"duration|name:B.foo":                 7,
-		"duration|name:B.foo,version:1.3":     5,
-		"duration|name:sql.query":             15,
-		"duration|name:sql.query,version:1.4": 6,
-		"errors|name:A.foo":                   1,
-		"errors|name:B.foo":                   1,
-		"errors|name:B.foo,version:1.3":       0,
-		"errors|name:sql.query":               0,
-		"errors|name:sql.query,version:1.4":   0,
-		"hits|name:A.foo":                     2,
-		"hits|name:B.foo":                     2,
-		"hits|name:B.foo,version:1.3":         1,
-		"hits|name:sql.query":                 2,
-		"hits|name:sql.query,version:1.4":     1,
+		"duration|name:A.foo,resource:α,service:A":                 1,
+		"duration|name:A.foo,resource:β,service:A":                 2,
+		"duration|name:B.foo,resource:γ,service:B":                 3,
+		"duration|name:B.foo,resource:ε,service:B":                 4,
+		"duration|name:sql.query,resource:δ,service:C":             15,
+		"errors|name:A.foo,resource:α,service:A":                   0,
+		"errors|name:A.foo,resource:β,service:A":                   1,
+		"errors|name:B.foo,resource:γ,service:B":                   0,
+		"errors|name:B.foo,resource:ε,service:B":                   1,
+		"errors|name:sql.query,resource:δ,service:C":               0,
+		"hits|name:A.foo,resource:α,service:A":                     1,
+		"hits|name:A.foo,resource:β,service:A":                     1,
+		"hits|name:B.foo,resource:γ,service:B":                     1,
+		"hits|name:B.foo,resource:ε,service:B":                     1,
+		"hits|name:sql.query,resource:δ,service:C":                 2,
+		"errors|name:sql.query,resource:ζ,service:B,version:1.4":   0,
+		"hits|name:sql.query,resource:ζ,service:B,version:1.4":     1,
+		"duration|name:sql.query,resource:ζ,service:B,version:1.4": 6,
+		"errors|name:B.foo,resource:ζ,service:B,version:1.3":       0,
+		"duration|name:B.foo,resource:ζ,service:B,version:1.3":     5,
+		"hits|name:B.foo,resource:ζ,service:B,version:1.3":         1,
 	}
 
 	assert.Len(sb.Counts, len(expectedCounts), "Missing counts!")
@@ -129,4 +139,26 @@ func TestResos(t *testing.T) {
 
 		assert.Equal(c.exp, results, "resolution conversion failed")
 	}
+}
+
+func BenchmarkHandleSpan(b *testing.B) {
+	sb := NewStatsBucket(0, 1e9, time.Millisecond)
+	aggr := []string{}
+	for i := 0; i < b.N; i++ {
+		for _, s := range testSpans {
+			sb.HandleSpan(s, aggr)
+		}
+	}
+	b.ReportAllocs()
+}
+
+func BenchmarkGetAggregateString(b *testing.B) {
+	aggr := []string{}
+	sb := NewStatsBucket(0, 1e9, time.Millisecond)
+	for i := 0; i < b.N; i++ {
+		for _, s := range testSpans {
+			getAggregateString(s, aggr, &sb.keyBuf)
+		}
+	}
+	b.ReportAllocs()
 }
