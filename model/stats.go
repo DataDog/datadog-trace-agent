@@ -199,10 +199,10 @@ func (sb StatsBucket) addToTagSet(s Span, tgs string) {
 				continue
 			}
 
-			tgs = tgs + "," + subparsed[2]
+			sublayertgs := tgs + "," + subparsed[2]
 
 			// only extract _sublayers.duration.by_service
-			sb.addToCount(m[:len(m)-len(subparsed[2])-1], v, tgs)
+			sb.addToCount(m[:len(m)-len(subparsed[2])-1], v, sublayertgs)
 		}
 	}
 
