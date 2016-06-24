@@ -32,13 +32,12 @@ type Concentrator struct {
 
 // NewConcentrator initializes a new concentrator ready to be started
 func NewConcentrator(in chan model.Trace, conf *config.AgentConfig) *Concentrator {
-	sort.Strings(conf.ExtraAggregators)
-
 	return &Concentrator{
-		in:      in,
-		out:     make(chan []model.StatsBucket),
-		buckets: make(map[int64]model.StatsBucket),
-		conf:    conf,
+		in:          in,
+		out:         make(chan []model.StatsBucket),
+		buckets:     make(map[int64]model.StatsBucket),
+		aggregators: append(DefaultAggregators, conf.ExtraAggregators...),
+		conf:        conf,
 	}
 }
 
@@ -84,7 +83,7 @@ func (c *Concentrator) HandleNewSpan(s model.Span) error {
 		c.buckets[bucketTs] = b
 	}
 
-	b.HandleSpan(s, c.conf.ExtraAggregators)
+	b.HandleSpan(s, c.aggregators)
 	return nil
 }
 

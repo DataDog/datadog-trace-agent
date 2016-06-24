@@ -1,7 +1,6 @@
 package model
 
 import (
-	"bytes"
 	"fmt"
 	"math"
 	"strings"
@@ -43,8 +42,8 @@ type Distribution struct {
 }
 
 // NewCount returns a new Count for a metric and a given tag set
-func NewCount(m string, ckey string, tgs TagSet) Count {
-	return Count{Key: ckey, Name: m, TagSet: tgs, Value: 0.0}
+func NewCount(m string, tgs TagSet) Count {
+	return Count{Key: tgs.TagKey(m), Name: m, TagSet: tgs, Value: 0.0}
 }
 
 // Add adds some values to one count
@@ -65,9 +64,9 @@ func (c Count) Merge(c2 Count) Count {
 }
 
 // NewDistribution returns a new Distribution for a metric and a given tag set
-func NewDistribution(m string, ckey string, tgs TagSet) Distribution {
+func NewDistribution(m string, tgs TagSet) Distribution {
 	return Distribution{
-		Key:     ckey,
+		Key:     tgs.TagKey(m),
 		Name:    m,
 		TagSet:  tgs,
 		Summary: quantile.NewSliceSummary(),
@@ -102,9 +101,6 @@ type StatsBucket struct {
 	// stats indexed by keys
 	Counts        map[string]Count        // All the true counts we keep
 	Distributions map[string]Distribution // All the true distribution we keep to answer quantile queries
-
-	// internal buffer for aggregate strings - not threadsafe
-	keyBuf bytes.Buffer
 }
 
 // NewStatsBucket opens a new bucket for time ts and initializes it properly
@@ -122,60 +118,31 @@ func NewStatsBucket(ts, d int64, res time.Duration) StatsBucket {
 	}
 }
 
-// getAggregateString , given a list of aggregators, returns a unique string representation for a spans's aggregate group
-func getAggregateString(s Span, aggregators []string, keyBuf *bytes.Buffer) string {
-	// aggregator strings are formatted like name:x,resource:r,service:y,a:some,b:custom,c:aggs
-	// where custom aggregators (a,b,c) are appended to the main string in alphanum order
+// HandleSpan adds the span to this bucket stats, aggregated with the finest grain matching given aggregators
+func (sb *StatsBucket) HandleSpan(s Span, aggregators []string) {
+	finestGrain := TagSet{}
 
-	// clear the buffer
-	keyBuf.Reset()
-
-	// First deal with our default aggregators
-	if s.Name != "" {
-		keyBuf.WriteString("name:")
-		keyBuf.WriteString(s.Name)
-		keyBuf.WriteRune(',')
-	}
-
-	if s.Resource != "" {
-		keyBuf.WriteString("resource:")
-		keyBuf.WriteString(s.Resource)
-		keyBuf.WriteRune(',')
-	}
-
-	if s.Service != "" {
-		keyBuf.WriteString("service:")
-		keyBuf.WriteString(s.Service)
-		keyBuf.WriteRune(',')
-	}
-
-	// now add our custom ones. just go in order since the list is already sorted
 	for _, agg := range aggregators {
-		if v, ok := s.Meta[agg]; ok {
-			keyBuf.WriteString(agg)
-			keyBuf.WriteRune(':')
-			keyBuf.WriteString(v)
-			keyBuf.WriteRune(',')
+		switch agg {
+		case "service":
+			finestGrain = append(finestGrain, Tag{"service", s.Service})
+		case "name":
+			finestGrain = append(finestGrain, Tag{"name", s.Name})
+		case "resource":
+			finestGrain = append(finestGrain, Tag{"resource", s.Resource})
+		// custom aggregators asked by people
+		default:
+			val, ok := s.Meta[agg]
+			if ok {
+				finestGrain = append(finestGrain, Tag{agg, val})
+			}
 		}
 	}
 
-	aggrString := keyBuf.String()
-	if aggrString == "" {
-		// shouldn't ever happen if we've properly normalized the span
-		return aggrString
-	}
-
-	// strip off trailing comma
-	return aggrString[:len(aggrString)-1]
+	sb.addToTagSet(s, finestGrain)
 }
 
-// HandleSpan adds the span to this bucket stats, aggregated with the finest grain matching given aggregators
-func (sb *StatsBucket) HandleSpan(s Span, aggregators []string) {
-	aggrString := getAggregateString(s, aggregators, &sb.keyBuf)
-	sb.addToTagSet(s, aggrString)
-}
-
-func (sb StatsBucket) addToTagSet(s Span, tgs string) {
+func (sb StatsBucket) addToTagSet(s Span, tgs TagSet) {
 	// HITS
 	sb.addToCount(HITS, 1, tgs)
 	// FIXME: this does not really make sense actually
@@ -199,10 +166,12 @@ func (sb StatsBucket) addToTagSet(s Span, tgs string) {
 				continue
 			}
 
-			tgs = tgs + "," + subparsed[2]
+			sltags := make(TagSet, len(tgs)+1)
+			copy(sltags, tgs)
+			sltags[len(tgs)] = NewTagFromString(subparsed[2])
 
 			// only extract _sublayers.duration.by_service
-			sb.addToCount(m[:len(m)-len(subparsed[2])-1], v, tgs)
+			sb.addToCount(m[:len(m)-len(subparsed[2])-1], v, sltags)
 		}
 	}
 
@@ -211,23 +180,21 @@ func (sb StatsBucket) addToTagSet(s Span, tgs string) {
 	sb.addToDistribution(DURATION, trundur, s.SpanID, tgs)
 }
 
-func (sb StatsBucket) addToCount(m string, v float64, aggr string) {
-	ckey := m + "|" + aggr
+func (sb StatsBucket) addToCount(m string, v float64, tgs TagSet) {
+	ckey := tgs.TagKey(m)
 
 	if _, ok := sb.Counts[ckey]; !ok {
-		tgs := NewTagSetFromString(aggr)
-		sb.Counts[ckey] = NewCount(m, ckey, tgs)
+		sb.Counts[ckey] = NewCount(m, tgs)
 	}
 
 	sb.Counts[ckey] = sb.Counts[ckey].Add(v)
 }
 
-func (sb StatsBucket) addToDistribution(m string, v float64, sampleID uint64, aggr string) {
-	ckey := m + "|" + aggr
+func (sb StatsBucket) addToDistribution(m string, v float64, sampleID uint64, tgs TagSet) {
+	ckey := tgs.TagKey(m)
 
 	if _, ok := sb.Distributions[ckey]; !ok {
-		tgs := NewTagSetFromString(aggr)
-		sb.Distributions[ckey] = NewDistribution(m, ckey, tgs)
+		sb.Distributions[ckey] = NewDistribution(m, tgs)
 	}
 
 	sb.Distributions[ckey].Add(v, sampleID)
