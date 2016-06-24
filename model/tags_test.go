@@ -90,15 +90,15 @@ func TestAggrString(t *testing.T) {
 	span := Span{Service: "thing", Name: "other", Resource: "yo"}
 	aggregators := []string{}
 
-	res := getAggregateString(span, aggregators, sb.keyBuf)
+	res := getAggregateString(span, aggregators, &sb.keyBuf)
 	assert.Equal(res, "name:other,resource:yo,service:thing")
 
 	aggregators = []string{"version"}
 
 	span = Span{Service: "thing", Name: "other", Resource: "yo", Meta: map[string]string{"version": "1.5"}}
-	res = getAggregateString(span, aggregators, sb.keyBuf)
+	res = getAggregateString(span, aggregators, &sb.keyBuf)
 	assert.Equal(res, "name:other,resource:yo,service:thing,version:1.5")
 
 	span = Span{TraceID: 0, SpanID: 1}
-	assert.Equal("", getAggregateString(span, []string{}, sb.keyBuf))
+	assert.Equal("", getAggregateString(span, []string{}, &sb.keyBuf))
 }

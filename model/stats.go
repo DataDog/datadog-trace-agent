@@ -123,7 +123,7 @@ func NewStatsBucket(ts, d int64, res time.Duration) StatsBucket {
 }
 
 // getAggregateString , given a list of aggregators, returns a unique string representation for a spans's aggregate group
-func getAggregateString(s Span, aggregators []string, keyBuf bytes.Buffer) string {
+func getAggregateString(s Span, aggregators []string, keyBuf *bytes.Buffer) string {
 	// aggregator strings are formatted like name:x,resource:r,service:y,a:some,b:custom,c:aggs
 	// where custom aggregators (a,b,c) are appended to the main string in alphanum order
 
@@ -171,7 +171,7 @@ func getAggregateString(s Span, aggregators []string, keyBuf bytes.Buffer) strin
 
 // HandleSpan adds the span to this bucket stats, aggregated with the finest grain matching given aggregators
 func (sb *StatsBucket) HandleSpan(s Span, aggregators []string) {
-	aggrString := getAggregateString(s, aggregators, sb.keyBuf)
+	aggrString := getAggregateString(s, aggregators, &sb.keyBuf)
 	sb.addToTagSet(s, aggrString)
 }
 
@@ -213,10 +213,10 @@ func (sb StatsBucket) addToTagSet(s Span, tgs string) {
 
 func (sb StatsBucket) addToCount(m string, v float64, aggr string) {
 	ckey := m + "|" + aggr
+
 	if _, ok := sb.Counts[ckey]; !ok {
 		tgs := NewTagSetFromString(aggr)
 		sb.Counts[ckey] = NewCount(m, ckey, tgs)
-		_, ok = sb.Counts[ckey]
 	}
 
 	sb.Counts[ckey] = sb.Counts[ckey].Add(v)
@@ -224,6 +224,7 @@ func (sb StatsBucket) addToCount(m string, v float64, aggr string) {
 
 func (sb StatsBucket) addToDistribution(m string, v float64, sampleID uint64, aggr string) {
 	ckey := m + "|" + aggr
+
 	if _, ok := sb.Distributions[ckey]; !ok {
 		tgs := NewTagSetFromString(aggr)
 		sb.Distributions[ckey] = NewDistribution(m, ckey, tgs)
