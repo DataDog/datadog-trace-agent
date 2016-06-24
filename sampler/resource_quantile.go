@@ -63,6 +63,7 @@ func (s *ResourceQuantileSampler) Flush() []model.Trace {
 
 	s.traceBySpanID = map[uint64]*model.Trace{}
 	s.stats = model.NewStatsBucket(0, 1, s.conf.LatencyResolution)
+	s.stats.DistroSamples = true
 	s.spans = 0
 	s.traces = 0
 	s.mu.Unlock()
