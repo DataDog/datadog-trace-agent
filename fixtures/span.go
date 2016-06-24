@@ -13,6 +13,7 @@ import (
 	"github.com/DataDog/raclette/model"
 )
 
+// YearNS is a year as a nanoseconds count integer
 var YearNS = time.Duration(time.Hour * 24 * 365).Nanoseconds()
 
 var durations = []int64{
@@ -238,7 +239,7 @@ func RandomSpanParentID() uint64 {
 	return RandomSpanID()
 }
 
-// RandomSpanType() generates a random span type
+// RandomSpanType generates a random span type
 func RandomSpanType() string {
 	return stringRandomChoice(types)
 }
