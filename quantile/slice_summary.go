@@ -36,11 +36,12 @@ func (s SliceSummary) String() string {
 	return b.String()
 }
 
+// Insert just adds a simple val to our summary
 func (s *SliceSummary) Insert(v float64) {
 	s.InsertWithSample(v, nil)
 }
 
-// Insert inserts a new value v in the summary paired with t (the ID of the span it was reported from)
+// InsertWithSample inserts a new value v in the summary paired with t (the ID of the span it was reported from)
 func (s *SliceSummary) InsertWithSample(v float64, t *uint64) {
 	var samples []uint64
 	if t != nil {
