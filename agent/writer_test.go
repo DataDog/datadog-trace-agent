@@ -30,7 +30,7 @@ func getTestStatsBuckets() []model.StatsBucket {
 		model.Span{TraceID: 1, SpanID: 2},
 	}
 	for _, s := range testSpans {
-		sb.HandleSpan(s, []string{})
+		sb.HandleSpan(s, DefaultAggregators)
 	}
 
 	return []model.StatsBucket{sb}
