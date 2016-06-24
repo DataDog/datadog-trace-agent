@@ -36,13 +36,22 @@ func (s SliceSummary) String() string {
 	return b.String()
 }
 
+func (s *SliceSummary) Insert(v float64) {
+	s.InsertWithSample(v, nil)
+}
+
 // Insert inserts a new value v in the summary paired with t (the ID of the span it was reported from)
-func (s *SliceSummary) Insert(v float64, t uint64) {
+func (s *SliceSummary) InsertWithSample(v float64, t *uint64) {
+	var samples []uint64
+	if t != nil {
+		samples = append(samples, *t)
+	}
+
 	newEntry := Entry{
 		V:       v,
 		G:       1,
 		Delta:   int(2 * EPSILON * float64(s.N)),
-		Samples: []uint64{t},
+		Samples: samples,
 	}
 
 	i := sort.Search(len(s.Entries), func(i int) bool { return v < s.Entries[i].V })

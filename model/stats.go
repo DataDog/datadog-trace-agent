@@ -74,8 +74,13 @@ func NewDistribution(m string, tgs TagSet) Distribution {
 }
 
 // Add inserts the proper values in a given distribution from a span
-func (d Distribution) Add(v float64, sampleID uint64) {
-	d.Summary.Insert(v, sampleID)
+func (d Distribution) Add(v float64) {
+	d.Summary.Insert(v)
+}
+
+// AddWithSample adds a value in the distribution with the reference of the span that generated it
+func (d Distribution) AddWithSample(v float64, sampleID uint64) {
+	d.Summary.InsertWithSample(v, &sampleID)
 }
 
 // Merge is used when 2 Distributions represent the same thing and it merges the 2 underlying summaries
@@ -96,7 +101,9 @@ type StatsBucket struct {
 	Start    int64 // timestamp of start in our format
 	Duration int64 // duration of a bucket in nanoseconds
 
+	// config
 	DistroResolution time.Duration // the time res we use for distros
+	DistroSamples    bool          // if we keep samples in our distros
 
 	// stats indexed by keys
 	Counts        map[string]Count        // All the true counts we keep
@@ -115,6 +122,7 @@ func NewStatsBucket(ts, d int64, res time.Duration) StatsBucket {
 		Counts:           counts,
 		Distributions:    distros,
 		DistroResolution: res,
+		DistroSamples:    false,
 	}
 }
 
@@ -197,7 +205,12 @@ func (sb StatsBucket) addToDistribution(m string, v float64, sampleID uint64, tg
 		sb.Distributions[ckey] = NewDistribution(m, tgs)
 	}
 
-	sb.Distributions[ckey].Add(v, sampleID)
+	if sb.DistroSamples {
+		sb.Distributions[ckey].AddWithSample(v, sampleID)
+	} else {
+		sb.Distributions[ckey].Add(v)
+
+	}
 }
 
 // IsEmpty just says if this stats bucket has no information (in which case it's useless)
