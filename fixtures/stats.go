@@ -142,7 +142,7 @@ var TestDistroValues = []int64{
 func TestDistribution() model.Distribution {
 	tgs := model.NewTagsFromString("service:X,name:Y,host:Z")
 	d := model.NewDistribution("duration", tgs)
-	for i, v := range TestDistroValues {
+	for _, v := range TestDistroValues {
 		d.Add(float64(v))
 	}
 
