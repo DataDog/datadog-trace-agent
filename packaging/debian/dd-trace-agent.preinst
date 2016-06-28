@@ -1,0 +1,27 @@
+#!/bin/sh
+
+set -e
+
+
+INSTALL_DD_AGENT_MSG="\033[31m It seems that the Datadog Agent is not running on this machine.\n Please verify that the agent is up and reporting for your host. If you need to install the agent follow instructions here: https://app.datadoghq.com/account/settings#agent/debian \n \033[0m\n"
+
+echo "Checking for installed dd-agent prerequisites"
+if command -v /etc/init.d/datadog-agent > /dev/null 2>&1; then
+    set +e
+    /etc/init.d/datadog-agent status
+    DD_AGENT_OK=$?
+    set -e
+
+    if [ ! $DD_AGENT_OK -eq 0 ]; then
+        echo $INSTALL_DD_AGENT_MSG
+        exit 1
+    fi
+else
+    echo $INSTALL_DD_AGENT_MSG
+    exit 1
+fi
+
+
+#DEBHELPER#
+
+exit 0

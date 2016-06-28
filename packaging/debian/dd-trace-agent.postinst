@@ -5,10 +5,29 @@ set -e
 case "$1" in
     configure)
         echo "Registering service dd-trace-agent"
-	initctl reload-configuration
+        if command -v initctl > /dev/null 2>&1; then
+            # use upstart if available
+            initctl reload-configuration
+        elif command -v update-rc.d >/dev/null 2>&1; then
+            # use sysvinit
+            update-rc.d dd-trace-agent defaults
+            update-rc.d dd-trace-agent enable >/dev/null 2>&1
+        else
+            # TODO: fix bogus exit code
+            exit 123
+        fi
 
         echo "Starting service dd-trace-agent"
-        service dd-trace-agent start
+        if command -v start > /dev/null 2>&1; then
+            stop dd-trace-agent || true
+            start dd-trace-agent || true
+        elif command -v invoke-rc.d >/dev/null 2>&1; then
+            invoke-rc.d dd-trace-agent stop || true
+            invoke-rc.d dd-trace-agent start || true
+        else
+            # TODO: fix bogus exit code
+            exit 123
+        fi
         ;;
 esac
 
