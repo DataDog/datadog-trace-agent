@@ -39,16 +39,16 @@ func TestConcentratorStatsCounts(t *testing.T) {
 
 	testSpans := model.Trace{
 		// first bucket
-		model.Span{SpanID: 1, Duration: 24, Start: getTsInBucket(alignedNow, bucketInterval, 2), Service: "A1", Name: "query", Resource: "resource1"},
-		model.Span{SpanID: 2, Duration: 12, Start: getTsInBucket(alignedNow, bucketInterval, 2), Service: "A1", Name: "query", Resource: "resource1", Error: 2},
-		model.Span{SpanID: 3, Duration: 40, Start: getTsInBucket(alignedNow, bucketInterval, 2), Service: "A2", Name: "query", Resource: "resource2", Error: 2},
+		model.Span{SpanID: 1, Duration: 24, Start: getTsInBucket(alignedNow, bucketInterval, 2), Service: "A1", Name: "query", Resource: "resource1", Weight: 1},
+		model.Span{SpanID: 2, Duration: 12, Start: getTsInBucket(alignedNow, bucketInterval, 2), Service: "A1", Name: "query", Resource: "resource1", Error: 2, Weight: 4},
+		model.Span{SpanID: 3, Duration: 40, Start: getTsInBucket(alignedNow, bucketInterval, 2), Service: "A2", Name: "query", Resource: "resource2", Error: 2, Weight: 1},
 		model.Span{SpanID: 4, Duration: 30, Start: getTsInBucket(alignedNow, bucketInterval, 2), Service: "A2", Name: "query", Resource: "resource2", Error: 2},
 		model.Span{SpanID: 5, Duration: 30, Start: getTsInBucket(alignedNow, bucketInterval, 2), Service: "A2", Name: "query", Resource: "resourcefoo"},
 		// second bucket
-		model.Span{SpanID: 6, Duration: 24, Start: getTsInBucket(alignedNow, bucketInterval, 1), Service: "A1", Name: "query", Resource: "resource2"},
+		model.Span{SpanID: 6, Duration: 24, Start: getTsInBucket(alignedNow, bucketInterval, 1), Service: "A1", Name: "query", Resource: "resource2", Weight: 2.5},
 		model.Span{SpanID: 7, Duration: 12, Start: getTsInBucket(alignedNow, bucketInterval, 1), Service: "A1", Name: "query", Resource: "resource1", Error: 2},
 		model.Span{SpanID: 8, Duration: 40, Start: getTsInBucket(alignedNow, bucketInterval, 1), Service: "A2", Name: "query", Resource: "resource1", Error: 2},
-		model.Span{SpanID: 9, Duration: 30, Start: getTsInBucket(alignedNow, bucketInterval, 1), Service: "A2", Name: "query", Resource: "resource2", Error: 2},
+		model.Span{SpanID: 9, Duration: 30, Start: getTsInBucket(alignedNow, bucketInterval, 1), Service: "A2", Name: "query", Resource: "resource2", Error: 2, Weight: 1},
 		model.Span{SpanID: 10, Duration: 20, Start: getTsInBucket(alignedNow, bucketInterval, 1), Service: "A2", Name: "query", Resource: "resourcefoo"},
 	}
 
@@ -85,14 +85,14 @@ func TestConcentratorStatsCounts(t *testing.T) {
 
 	// Start with the first/older bucket
 	receivedCounts = receivedBuckets[0].Counts
-	expectedCountValByKey := map[string]int64{
-		"duration|name:query,resource:resource1,service:A1":   36,
+	expectedCountValByKey := map[string]float64{
+		"duration|name:query,resource:resource1,service:A1":   48+24,
 		"duration|name:query,resource:resource2,service:A2":   70,
 		"duration|name:query,resource:resourcefoo,service:A2": 30,
-		"errors|name:query,resource:resource1,service:A1":     1,
+		"errors|name:query,resource:resource1,service:A1":     4,
 		"errors|name:query,resource:resource2,service:A2":     2,
 		"errors|name:query,resource:resourcefoo,service:A2":   0,
-		"hits|name:query,resource:resource1,service:A1":       2,
+		"hits|name:query,resource:resource1,service:A1":       5,
 		"hits|name:query,resource:resource2,service:A2":       2,
 		"hits|name:query,resource:resourcefoo,service:A2":     1,
 	}
@@ -109,9 +109,9 @@ func TestConcentratorStatsCounts(t *testing.T) {
 
 	// same for second bucket
 	receivedCounts = receivedBuckets[1].Counts
-	expectedCountValByKey = map[string]int64{
+	expectedCountValByKey = map[string]float64{
 		"duration|name:query,resource:resource1,service:A1":   12,
-		"duration|name:query,resource:resource2,service:A1":   24,
+		"duration|name:query,resource:resource2,service:A1":   60,
 		"duration|name:query,resource:resource1,service:A2":   40,
 		"duration|name:query,resource:resource2,service:A2":   30,
 		"duration|name:query,resource:resourcefoo,service:A2": 20,
@@ -121,7 +121,7 @@ func TestConcentratorStatsCounts(t *testing.T) {
 		"errors|name:query,resource:resource2,service:A2":     1,
 		"errors|name:query,resource:resourcefoo,service:A2":   0,
 		"hits|name:query,resource:resource1,service:A1":       1,
-		"hits|name:query,resource:resource2,service:A1":       1,
+		"hits|name:query,resource:resource2,service:A1":       2.5,
 		"hits|name:query,resource:resource1,service:A2":       1,
 		"hits|name:query,resource:resource2,service:A2":       1,
 		"hits|name:query,resource:resourcefoo,service:A2":     1,

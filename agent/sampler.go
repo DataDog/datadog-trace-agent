@@ -42,6 +42,10 @@ func (s *Sampler) Run() {
 			log.Debugf("sampler flushed %d traces", len(traces))
 			s.out <- traces
 		} else {
+			// Client-side sampling is only useful for stats, so remove it from the trace pipeline
+			for _, s := range trace {
+				s.Weight = 0
+			}
 			s.se.AddTrace(trace)
 		}
 	}

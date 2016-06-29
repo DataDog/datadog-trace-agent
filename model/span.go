@@ -23,6 +23,7 @@ type Span struct {
 	Metrics  map[string]float64 `json:"metrics"`   // arbitrary metrics
 	ParentID uint64             `json:"parent_id"` // span ID of the span in which this one was created
 	Type     string             `json:"type"`      // protocol associated with the span
+	Weight   float64			`json:"weight,omitempty"` // Client-side sampling weight
 }
 
 // String formats a Span struct to be displayed as a string
