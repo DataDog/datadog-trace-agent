@@ -179,7 +179,7 @@ func (sb StatsBucket) addToTagSet(s Span, tgs string) {
 	// Rescale statistics when traces got sampled by the client
 	weight := s.Weight
 	scaleFactor := 1.0
-	if (weight != 0) {
+	if weight != 0 {
 		scaleFactor = weight
 	}
 	// HITS
@@ -192,7 +192,7 @@ func (sb StatsBucket) addToTagSet(s Span, tgs string) {
 		sb.addToCount(ERRORS, 0, tgs)
 	}
 	// DURATION
-	sb.addToCount(DURATION, scaleFactor * float64(s.Duration), tgs)
+	sb.addToCount(DURATION, scaleFactor*float64(s.Duration), tgs)
 
 	// TODO add for s.Metrics ability to define arbitrary counts and distros, check some config?
 	for m, v := range s.Metrics {

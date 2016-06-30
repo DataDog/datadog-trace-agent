@@ -86,7 +86,7 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	// Start with the first/older bucket
 	receivedCounts = receivedBuckets[0].Counts
 	expectedCountValByKey := map[string]float64{
-		"duration|name:query,resource:resource1,service:A1":   48+24,
+		"duration|name:query,resource:resource1,service:A1":   48 + 24,
 		"duration|name:query,resource:resource2,service:A2":   70,
 		"duration|name:query,resource:resourcefoo,service:A2": 30,
 		"errors|name:query,resource:resource1,service:A1":     4,

@@ -19,11 +19,11 @@ type Span struct {
 	Error    int32  `json:"error"`    // error status of the span, 0 == OK
 
 	// Optional
-	Meta     map[string]string  `json:"meta"`      // arbitrary tags/metadata
-	Metrics  map[string]float64 `json:"metrics"`   // arbitrary metrics
-	ParentID uint64             `json:"parent_id"` // span ID of the span in which this one was created
-	Type     string             `json:"type"`      // protocol associated with the span
-	Weight   float64			`json:"weight,omitempty"` // Client-side sampling weight
+	Meta     map[string]string  `json:"meta"`             // arbitrary tags/metadata
+	Metrics  map[string]float64 `json:"metrics"`          // arbitrary metrics
+	ParentID uint64             `json:"parent_id"`        // span ID of the span in which this one was created
+	Type     string             `json:"type"`             // protocol associated with the span
+	Weight   float64            `json:"weight,omitempty"` // Client-side sampling weight
 }
 
 // String formats a Span struct to be displayed as a string
