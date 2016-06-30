@@ -176,17 +176,22 @@ func (sb *StatsBucket) HandleSpan(s Span, aggregators []string) {
 }
 
 func (sb StatsBucket) addToTagSet(s Span, tgs string) {
+	// Rescale statistics when traces got sampled by the client
+	scaleFactor := 1.0
+	if s.Weight != 0 {
+		scaleFactor = s.Weight
+	}
 	// HITS
-	sb.addToCount(HITS, 1, tgs)
+	sb.addToCount(HITS, scaleFactor, tgs)
 	// FIXME: this does not really make sense actually
 	// ERRORS
 	if s.Error != 0 {
-		sb.addToCount(ERRORS, 1, tgs)
+		sb.addToCount(ERRORS, scaleFactor, tgs)
 	} else {
 		sb.addToCount(ERRORS, 0, tgs)
 	}
 	// DURATION
-	sb.addToCount(DURATION, float64(s.Duration), tgs)
+	sb.addToCount(DURATION, scaleFactor*float64(s.Duration), tgs)
 
 	// TODO add for s.Metrics ability to define arbitrary counts and distros, check some config?
 	for m, v := range s.Metrics {
