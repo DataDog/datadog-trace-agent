@@ -157,7 +157,7 @@ func BenchmarkGetAggregateString(b *testing.B) {
 	sb := NewStatsBucket(0, 1e9, time.Millisecond)
 	for i := 0; i < b.N; i++ {
 		for _, s := range testSpans {
-			getAggregateString(s, aggr, &sb.keyBuf)
+			getAggregateGrain(s, aggr, &sb.keyBuf)
 		}
 	}
 	b.ReportAllocs()
