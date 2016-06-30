@@ -91,6 +91,10 @@ func (s *SliceSummary) compress() {
 
 // Quantile returns an EPSILON estimate of the element at quantile 'q' (0 <= q <= 1)
 func (s *SliceSummary) Quantile(q float64) (float64, []uint64) {
+	if len(s.Entries) == 0 {
+		return 0, []uint64{}
+	}
+
 	// convert quantile to rank
 	r := int(q*float64(s.N) + 0.5)
 
