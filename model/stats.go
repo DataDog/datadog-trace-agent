@@ -177,10 +177,9 @@ func (sb *StatsBucket) HandleSpan(s Span, aggregators []string) {
 
 func (sb StatsBucket) addToTagSet(s Span, tgs string) {
 	// Rescale statistics when traces got sampled by the client
-	weight := s.Weight
 	scaleFactor := 1.0
-	if weight != 0 {
-		scaleFactor = weight
+	if s.Weight != 0 {
+		scaleFactor = s.Weight
 	}
 	// HITS
 	sb.addToCount(HITS, scaleFactor, tgs)
