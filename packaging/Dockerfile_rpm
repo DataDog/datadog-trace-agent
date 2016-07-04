@@ -1,0 +1,14 @@
+FROM centos:7
+
+RUN yum install -y gcc g++ make automake autoconf curl-devel rpm-build rubygems ruby-devel git
+RUN gem install fpm && gem install rake
+RUN curl -sL -o /gimme https://raw.githubusercontent.com/travis-ci/gimme/master/gimme && \
+    chmod +x /gimme
+
+RUN echo "$(/gimme 1.6.2) && cd /go/src/github.com/DataDog/raclette && rake restore && rake build && fpm -s dir -t rpm -n dd-trace-agent -v 0.99.0 ./trace-agent" >> /build.sh
+RUN chmod +x /build.sh
+
+VOLUME ["/go/src/github.com/DataDog/raclette"]
+ENV GOPATH=/go
+ENV PATH=/go/bin:$PATH
+ENTRYPOINT ["/bin/sh", "-c", "/build.sh"]
