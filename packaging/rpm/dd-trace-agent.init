@@ -1,0 +1,53 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides: dd-trace-agent
+# Short-Description: Start and stop dd-trace-agent
+# Description: dd-trace-agent is the tracing Agent component for Datadog
+# Required-Start: $remote_fs
+# Required-Stop: $remote_fs
+# Default-Start: 2 3 4 5
+# Default-Stop: 0 1 6
+### END INIT INFO
+
+PATH=$PATH:/sbin # add the location of start-stop-daemon on Debian
+TRACE_PIDFILE=/opt/datadog-agent/run/dd-trace-agent.pid
+DAEMON=/opt/datadog-agent/bin/trace-agent
+
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+case "$1" in
+    start)
+        echo "Starting dd-trace-agent"
+        start-stop-daemon --start --quiet --oknodo --background \
+            --make-pidfile --pidfile $TRACE_PIDFILE --chuid dd-agent \
+            --startas /bin/bash -- -c \
+            "exec $DAEMON >> /var/log/datadog/trace-agent.log 2>&1"
+        ;;
+
+    stop)
+        echo "Stopping dd-trace-agent"
+        start-stop-daemon --stop --retry 30 --quiet --oknodo --pidfile $TRACE_PIDFILE
+        ;;
+
+    restart)
+        echo "Stopping dd-trace-agent"
+        start-stop-daemon --stop --retry 30 --quiet --oknodo --pidfile $TRACE_PIDFILE
+
+        echo "Starting dd-trace-agent"
+        start-stop-daemon --start --quiet --oknodo --background \
+            --make-pidfile --pidfile $TRACE_PIDFILE --chuid dd-agent \
+            --startas /bin/bash -- -c \
+            "exec $DAEMON >> /var/log/datadog/trace-agent.log 2>&1"
+        ;;
+
+    status)
+        status_of_proc -p "$TRACE_PID_FILE" "$DAEMON" dd-trace-agent
+        ;;
+
+esac
+
+exit $?
+
