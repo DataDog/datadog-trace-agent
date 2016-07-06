@@ -15,11 +15,8 @@ type redisTestCase struct {
 
 func RedisSpan(query string) model.Span {
 	return model.Span{
-		Resource: "",
+		Resource: query,
 		Type:     "redis",
-		Meta: map[string]string{
-			"query": query,
-		},
 	}
 }
 

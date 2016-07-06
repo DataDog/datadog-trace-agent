@@ -3,8 +3,6 @@ package quantizer
 import (
 	"strings"
 
-	log "github.com/cihub/seelog"
-
 	"github.com/DataDog/raclette/model"
 )
 
@@ -14,11 +12,7 @@ var redisCompoundCommandSet = map[string]bool{
 
 // QuantizeRedis generates resource for Redis spans
 func QuantizeRedis(span model.Span) model.Span {
-	query, ok := span.Meta["query"]
-	if !ok {
-		log.Debugf("`query` meta is missing in a Redis span, can't quantize it, SpanID: %d", span.SpanID)
-		return span
-	}
+	query := span.Resource
 
 	resource := ""
 	previousCommand := ""
