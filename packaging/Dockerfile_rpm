@@ -5,7 +5,7 @@ RUN gem install fpm && gem install rake
 RUN curl -sL -o /gimme https://raw.githubusercontent.com/travis-ci/gimme/master/gimme && \
     chmod +x /gimme
 
-RUN echo "$(/gimme 1.6.2) && cd /go/src/github.com/DataDog/raclette/packaging/rpm && rpmbuild -bb dd-trace-agent.spec" >> /build.sh
+RUN echo "$(/gimme 1.6.2) && cd /go/src/github.com/DataDog/raclette/packaging/rpm && rpmbuild -bb raclette.spec" >> /build.sh
 RUN chmod +x /build.sh
 
 VOLUME ["/go/src/github.com/DataDog/raclette"]
