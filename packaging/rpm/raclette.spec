@@ -14,9 +14,7 @@ Packager: Datadog <dev@datadoghq.com>
 Datadog's tracing agent
 
 %prep
-rm -rf ./RPMS/
 rake restore
-mkdir -p ./RPMS
 
 %build
 TRACE_AGENT_VERSION=$RPM_PACKAGE_VERSION rake build
