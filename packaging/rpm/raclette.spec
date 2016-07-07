@@ -19,7 +19,7 @@ rake restore
 mkdir -p ./RPMS
 
 %build
-rake build
+TRACE_AGENT_VERSION=$RPM_PACKAGE_VERSION rake build
 
 %install
 mkdir -p $RPM_BUILD_ROOT/opt/datadog-agent/bin
