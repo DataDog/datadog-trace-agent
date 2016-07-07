@@ -9,6 +9,8 @@ License: BSD
 Summary: A tracing agent crafted with <3 from Datadog
 Buildroot: /go/src/github.com/DataDog/raclette
 Packager: Datadog <dev@datadoghq.com>
+%{?systemd_requires}
+BuildRequires: systemd
 
 %description
 Datadog's tracing agent
@@ -21,7 +23,20 @@ TRACE_AGENT_VERSION=$RPM_PACKAGE_VERSION rake build
 
 %install
 mkdir -p $RPM_BUILD_ROOT/opt/datadog-agent/bin
-mv trace-agent $RPM_BUILD_ROOT/opt/datadog-agent/bin/trace-agent
+mkdir -p $RPM_BUILD_ROOT/etc/init.d
+
+install -m 755 trace-agent $RPM_BUILD_ROOT/opt/datadog-agent/bin/trace-agent
+install -m 755 packaging/rpm/dd-trace-agent.init $RPM_BUILD_ROOT/etc/init.d/dd-trace-agent
+
+%post
+%systemd_post packaging/rpm/dd-trace-agent.service
+
+%preun
+%systemd_preun packaging/rpm/dd-trace-agent.service
+
+%postun
+%systemd_postun_with_restart packaging/rpm/dd-trace-agent.service
 
 %files
 /opt/datadog-agent/bin/trace-agent
+/etc/init.d/dd-trace-agent
