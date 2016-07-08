@@ -21,12 +21,18 @@ DAEMON=/opt/datadog-agent/bin/trace-agent
 # Source function library.
 . /etc/rc.d/init.d/functions
 
+makePid() {
+    echo `ps auxf | grep -v grep | grep $1 | awk '{print $2}'` > $TRACE_PIDFILE
+}
 
 start() {
     # no need to test for status before daemon,
     # the daemon function does the right thing
     echo -n "Starting dd-trace-agent"
     daemon --pidfile $TRACE_PIDFILE --user dd-agent "nohup $DAEMON >>/var/log/datadog/trace-agent.log 2>&1 &"
+    [ $? -eq 0 ] && makePid $DAEMON
+    echo
+
     return $?
 }
 
@@ -65,4 +71,3 @@ case "$1" in
 esac
 
 exit $?
-
