@@ -108,15 +108,15 @@ func TestStatsBucketExtraAggregators(t *testing.T) {
 	}
 }
 
-func TestResos(t *testing.T) {
+func TestTsRounding(t *testing.T) {
 	assert := assert.New(t)
 
 	durations := []int64{
-		3 * 1e9,
-		32432874923,
-		1000,
-		45,
-		41000234,
+		3 * 1e9,     // 10110010110100000101111000000000 -> 10110010110000000000000000000000 = 2998927360
+		32432874923, // 11110001101001001100110010110101011 -> 11110001100000000000000000000000000 = 32413581312
+		1000,        // Keep it with full precision
+		45,          // Keep it with full precision
+		41000234,    // 10011100011001110100101010 -> 10011100010000000000000000 = 40960000
 	}
 
 	type testcase struct {
@@ -124,21 +124,13 @@ func TestResos(t *testing.T) {
 		exp []float64
 	}
 
-	cases := []testcase{
-		{time.Second, []float64{3000000000, 32000000000, 0, 0, 0}},
-		{time.Millisecond, []float64{3000000000, 32432000000, 0, 0, 41000000}},
-		{time.Microsecond, []float64{3000000000, 32432874000, 1000, 0, 41000000}},
-		{time.Nanosecond, []float64{3000000000, 32432874923, 1000, 45, 41000234}},
-	}
+	exp := []float64{2998927360, 32413581312, 1000, 45, 40960000}
 
-	for _, c := range cases {
-		results := []float64{}
-		for _, d := range durations {
-			results = append(results, nsTimestampToFloat(d, c.res))
-		}
-
-		assert.Equal(c.exp, results, "resolution conversion failed")
+	results := []float64{}
+	for _, d := range durations {
+		results = append(results, nsTimestampToFloat(d))
 	}
+	assert.Equal(exp, results, "Unproper rounding of timestamp")
 }
 
 func BenchmarkHandleSpan(b *testing.B) {

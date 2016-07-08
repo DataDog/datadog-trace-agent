@@ -3,7 +3,6 @@ package model
 import (
 	"bytes"
 	"fmt"
-	"math"
 	"strings"
 	"time"
 
@@ -97,7 +96,7 @@ type StatsBucket struct {
 	Start    int64 // timestamp of start in our format
 	Duration int64 // duration of a bucket in nanoseconds
 
-	DistroResolution time.Duration // the time res we use for distros
+	DistroResolution time.Duration // TODO: Remove me, we don't use it anymore
 
 	// stats indexed by keys
 	Counts        map[string]Count        // All the true counts we keep
@@ -240,7 +239,7 @@ func (sb StatsBucket) addToTagSet(s Span, aggr string, tgs TagSet) {
 	}
 
 	// alter resolution of duration distro
-	trundur := nsTimestampToFloat(s.Duration, sb.DistroResolution)
+	trundur := nsTimestampToFloat(s.Duration)
 	sb.addToDistribution(DURATION, trundur, s.SpanID, aggr, tgs)
 }
 
@@ -269,7 +268,15 @@ func (sb StatsBucket) IsEmpty() bool {
 	return len(sb.Counts) == 0 && len(sb.Distributions) == 0
 }
 
-// nsTimestampToFloat converts a nanosec timestamp into a float nanosecond timestamp truncated at given resoultion
-func nsTimestampToFloat(ns int64, res time.Duration) float64 {
-	return math.Trunc(float64(ns)/float64(res)) * float64(res)
+// 10 bits precision (any value will be +/- 1/1024)
+const roundMask int64 = 1 << 10
+
+// nsTimestampToFloat converts a nanosec timestamp into a float nanosecond timestamp truncated to a fixed precision
+func nsTimestampToFloat(ns int64) float64 {
+	var shift uint
+	for ns > roundMask {
+		ns = ns >> 1
+		shift += 1
+	}
+	return float64(ns << shift)
 }
