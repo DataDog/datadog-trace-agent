@@ -276,7 +276,7 @@ func nsTimestampToFloat(ns int64) float64 {
 	var shift uint
 	for ns > roundMask {
 		ns = ns >> 1
-		shift += 1
+		shift++
 	}
 	return float64(ns << shift)
 }
