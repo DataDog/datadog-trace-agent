@@ -28,7 +28,11 @@ mkdir -p $RPM_BUILD_ROOT/etc/init.d
 install -m 755 trace-agent $RPM_BUILD_ROOT/opt/datadog-agent/bin/trace-agent
 install -m 755 packaging/rpm/dd-trace-agent.init $RPM_BUILD_ROOT/etc/init.d/dd-trace-agent
 
+
 %post
+# start the service
+$RPM_BUILD_ROOT/etc/init.d/dd-trace-agent start
+
 %systemd_post packaging/rpm/dd-trace-agent.service
 
 %preun

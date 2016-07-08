@@ -1,12 +1,11 @@
 [Unit]
 Description="Datadog Tracing Agent"
-After=network.target,datadog-agent.service
-Requires=datadog-agent.service
+After=network.target
 
 [Service]
 Type=forking
 User=dd-agent
-ExecStart=/opt/datadog-agent/bin/trace-agent
+ExecStart=/opt/datadog-agent/bin/trace-agent >> /var/log/datadog/trace-agent.log 2>&1
 
 [Install]
 WantedBy=multi-user.target
