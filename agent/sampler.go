@@ -30,7 +30,7 @@ func NewSampler(in chan model.Trace, conf *config.AgentConfig) *Sampler {
 		in:   in,
 		out:  make(chan []model.Trace),
 		conf: conf,
-		se:   sampler.NewResourceQuantileSampler(conf),
+		se:   sampler.NewSignatureSampler(conf),
 	}
 }
 

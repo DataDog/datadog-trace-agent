@@ -33,7 +33,7 @@ task :test do go_test("./agent") end
 
 desc "Run Raclette agent"
 task :run do
-  sh "./trace-agent -config ./agent/trace-agent.ini"
+  sh "./trace-agent -debug -config ./agent/trace-agent.ini"
 end
 
 desc "Build deb from current agent source"
