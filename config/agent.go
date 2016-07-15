@@ -35,7 +35,7 @@ type AgentConfig struct {
 	// Signature sampler
 	SamplerTheta  float64
 	SamplerJitter float64
-	SamplerSMin   flaot64
+	SamplerSMin   float64
 
 	// Grapher
 	Topology       bool // enable topology graph collection
