@@ -2,7 +2,6 @@ package sampler
 
 import (
 	"sync"
-	"time"
 
 	log "github.com/cihub/seelog"
 
@@ -12,6 +11,7 @@ import (
 )
 
 var DefaultAggregators = []string{"service", "name", "resource"}
+var statsdQuantileTags = []string{"sampler:quantile"}
 
 // ResourceQuantileSampler samples by selectic spans representative of each sampler quantiles for each resource from local statistics
 type ResourceQuantileSampler struct {
@@ -70,8 +70,6 @@ func (s *ResourceQuantileSampler) Flush() []model.Trace {
 func (s *ResourceQuantileSampler) GetSamples(
 	traceBySpanID map[uint64]*model.Trace, stats model.StatsBucket, spans, traces int,
 ) []model.Trace {
-
-	startTime := time.Now()
 	selected := make(map[*model.Trace]struct{})
 
 	// Look at the stats to find representative spans
@@ -95,15 +93,13 @@ func (s *ResourceQuantileSampler) GetSamples(
 		kSpans += len(*tptr)
 	}
 
-	execTime := time.Since(startTime)
 	log.Infof("sampler: selected %d traces (%.2f %%), %d spans (%.2f %%)",
 		len(result), float64(len(result))*100/float64(traces), kSpans, float64(kSpans)*100/float64(spans))
 
-	statsd.Client.Count("trace_agent.sampler.trace.total", int64(traces), nil, 1)
-	statsd.Client.Count("trace_agent.sampler.trace.kept", int64(len(result)), nil, 1)
-	statsd.Client.Count("trace_agent.sampler.span.total", int64(spans), nil, 1)
-	statsd.Client.Count("trace_agent.sampler.span.kept", int64(kSpans), nil, 1)
-	statsd.Client.Gauge("trace_agent.sampler.sample_duration", execTime.Seconds(), nil, 1)
+	statsd.Client.Count("trace_agent.sampler.trace.total", int64(traces), statsdQuantileTags, 1)
+	statsd.Client.Count("trace_agent.sampler.trace.kept", int64(len(result)), statsdQuantileTags, 1)
+	statsd.Client.Count("trace_agent.sampler.span.total", int64(spans), statsdQuantileTags, 1)
+	statsd.Client.Count("trace_agent.sampler.span.kept", int64(kSpans), statsdQuantileTags, 1)
 
 	return result
 }

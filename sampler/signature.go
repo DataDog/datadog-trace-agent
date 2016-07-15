@@ -12,7 +12,10 @@ import (
 
 	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
+	"github.com/DataDog/raclette/statsd"
 )
+
+var statsdSignatureTags = []string{"sampler:signature"}
 
 // Signature is a simple representation of trace, used to identify simlar traces
 type Signature uint64
@@ -54,14 +57,22 @@ func (s *SignatureSampler) AddTrace(trace model.Trace) {
 	s.mu.Lock()
 
 	score := s.GetScore(signature)
-	if score > s.sMin {
+	sampled := score > s.sMin
+	if sampled {
 		s.sampledTraces = append(s.sampledTraces, trace)
 		s.lastTSBySignature[signature] = float64(time.Now().UnixNano()) / 1e9
 	}
 
 	s.mu.Unlock()
 
-	log.Debugf("trace_id:%v signature:%v score:%v sampled:%v", trace[0].TraceID, signature, score, (score > s.sMin))
+	statsd.Client.Count("trace_agent.sampler.trace.total", 1, statsdSignatureTags, 1)
+	statsd.Client.Count("trace_agent.sampler.span.total", int64(len(trace)), statsdSignatureTags, 1)
+	if sampled {
+		statsd.Client.Count("trace_agent.sampler.trace.kept", 1, statsdSignatureTags, 1)
+		statsd.Client.Count("trace_agent.sampler.span.kept", int64(len(trace)), statsdSignatureTags, 1)
+	}
+
+	log.Debugf("trace_id:%v signature:%v score:%v sampled:%v", trace[0].TraceID, signature, score, sampled)
 }
 
 // GetScore gives a score to a trace reflecting how strong we want to sample it
