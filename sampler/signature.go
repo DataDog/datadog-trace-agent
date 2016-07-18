@@ -26,11 +26,14 @@ type SignatureSampler struct {
 	lastTSBySignature map[Signature]float64
 	// Traces sampled kept until the next flush
 	sampledTraces []model.Trace
+	// Time of the last flush
+	lastFlush float64
 
 	// Scoring configuration
 	sMin   float64 // Score required to be sampled, sample when score is over sMin
 	theta  float64 // Typical last-seen duration (in s) after which we want to sample a trace
 	jitter float64 // Multiplicative random coefficient (0 to 1)
+	tpsMax float64 // Hard-limit on the number of traces per second
 
 	mu sync.Mutex
 }
@@ -38,15 +41,18 @@ type SignatureSampler struct {
 // NewSignatureSampler creates a new SignatureSampler, ready to ingest traces
 func NewSignatureSampler(conf *config.AgentConfig) *SignatureSampler {
 	// TODO: have a go-routine expiring old signatures from lastTSBySignature
+	// TODO: have a max on the size of lastTSBySignature
 
 	return &SignatureSampler{
 		lastTSBySignature: map[Signature]float64{},
 		sampledTraces:     []model.Trace{},
+		lastFlush:         float64(time.Now().UnixNano()) / 1e9,
 
-		// Sane defaults
 		sMin:   conf.SamplerSMin,
 		theta:  conf.SamplerTheta,
 		jitter: conf.SamplerJitter,
+		// Hardcoded hard-limit for now, to prevent massive spam
+		tpsMax: 100,
 	}
 }
 
@@ -178,10 +184,22 @@ func (s *SignatureSampler) getRoot(trace model.Trace) model.Span {
 
 // Flush returns representative spans based on GetSamples and reset its internal memory
 func (s *SignatureSampler) Flush() []model.Trace {
+	now := float64(time.Now().UnixNano()) / 1e9
+	sampledDuration := now - s.lastFlush
+	hardLimit := int(s.tpsMax * sampledDuration)
+
 	s.mu.Lock()
 	samples := s.sampledTraces
 	s.sampledTraces = []model.Trace{}
+	s.lastFlush = now
 	s.mu.Unlock()
+
+	// Ensure the hard limit the dumb way
+	// TODO: adjust sampler configuration instead
+	if len(samples) > hardLimit {
+		log.Warnf("truncate set of sampled traces (from %v to %v), you should reduce sampler sensitivity", len(samples), hardLimit)
+		return samples[:hardLimit]
+	}
 
 	return samples
 }
