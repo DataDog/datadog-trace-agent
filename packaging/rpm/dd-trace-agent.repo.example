@@ -1,0 +1,7 @@
+[datadog-trace]
+name = Datadog, Inc.
+baseurl = http://yum-trace.datad0g.com.s3.amazonaws.com/x86_64/
+enabled=1
+priority=1
+gpgcheck=1
+gpgkey=https://yum-trace.datad0g.com.s3.amazonaws.com/DATADOG_TRACE_RPM.public
