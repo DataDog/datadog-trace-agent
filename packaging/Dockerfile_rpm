@@ -1,0 +1,16 @@
+FROM centos:7
+
+RUN yum install -y gcc g++ make automake autoconf curl-devel rpm-build rpm-sign rubygems ruby-devel git expect
+RUN gem install rake
+RUN curl -sL -o /gimme https://raw.githubusercontent.com/travis-ci/gimme/master/gimme && \
+    chmod +x /gimme
+
+RUN echo "$(/gimme 1.6.2) && cd /go/src/github.com/DataDog/raclette/packaging/rpm && gpg --import ./RPM-SIGNING-KEY.private; ./rpm-build-and-sign" >> /build.sh
+RUN chmod +x /build.sh
+
+ADD rpm/.rpmmacros /root/.rpmmacros
+VOLUME ["/go/src/github.com/DataDog/raclette"]
+
+ENV GOPATH=/go
+ENV PATH=/go/bin:$PATH
+ENTRYPOINT ["/bin/sh", "-c", "/build.sh"]

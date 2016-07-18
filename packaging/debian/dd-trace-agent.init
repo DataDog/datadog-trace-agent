@@ -43,7 +43,7 @@ case "$1" in
         ;;
 
     status)
-        status_of_proc -p "$TRACE_PID_FILE" "$DAEMON" dd-trace-agent
+        status_of_proc -p "$TRACE_PIDFILE" "$DAEMON" dd-trace-agent
         ;;
 
 esac

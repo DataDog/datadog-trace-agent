@@ -1,0 +1,12 @@
+#!/usr/bin/expect -f
+set timeout 600
+### rpm-sign.exp -- Build and sign the trace-agent RPM by sending the passphrase.
+
+spawn rpmbuild --sign -bb raclette.spec
+expect -exact "Enter pass phrase: "
+send -- "$env(RPM_SIGNING_PASSPHRASE)\r"
+log_user 0
+expect eof
+
+## end of rpm-sign.exp
+
