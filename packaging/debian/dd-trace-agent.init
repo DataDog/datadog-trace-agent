@@ -20,17 +20,10 @@ DAEMON=/opt/datadog-agent/bin/trace-agent
 case "$1" in
     start)
         echo "Starting dd-trace-agent"
-         if [ -f $TRACE_PIDFILE ]; then
-                PID=`cat $TRACE_PIDFILE`
-                echo dd-trace-agent already running: $PID
-                exit 2;
-        else
-            start-stop-daemon --start --quiet --oknodo --background \
-                --make-pidfile --pidfile $TRACE_PIDFILE --chuid dd-agent \
-                --startas /bin/bash -- -c \
-                "exec $DAEMON >> /var/log/datadog/trace-agent.log 2>&1"
-        fi
-        echo
+        start-stop-daemon --start --quiet --oknodo --background \
+            --make-pidfile --pidfile $TRACE_PIDFILE --chuid dd-agent \
+            --startas /bin/bash -- -c \
+            "exec $DAEMON >> /var/log/datadog/trace-agent.log 2>&1"
         ;;
 
     stop)
@@ -39,8 +32,14 @@ case "$1" in
         ;;
 
     restart)
-        stop
-        start
+        echo "Stopping dd-trace-agent"
+        start-stop-daemon --stop --retry 30 --quiet --oknodo --pidfile $TRACE_PIDFILE
+
+        echo "Starting dd-trace-agent"
+        start-stop-daemon --start --quiet --oknodo --background \
+            --make-pidfile --pidfile $TRACE_PIDFILE --chuid dd-agent \
+            --startas /bin/bash -- -c \
+            "exec $DAEMON >> /var/log/datadog/trace-agent.log 2>&1"
         ;;
 
     status)
