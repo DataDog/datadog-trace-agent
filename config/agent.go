@@ -98,7 +98,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 
 		SamplerQuantiles: []float64{0.10, 0.50, 0.90, 1},
 
-		SamplerSMin:   1,
+		SamplerSMin:   5,
 		SamplerTheta:  60, // 1 min
 		SamplerJitter: 0.2,
 

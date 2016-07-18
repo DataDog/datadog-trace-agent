@@ -15,6 +15,9 @@ import (
 	"github.com/DataDog/raclette/statsd"
 )
 
+// maxTPS is a hard-limit on the maximum number of traces to sample per second
+const maxTPS = 100
+
 var statsdSignatureTags = []string{"sampler:signature"}
 
 // Signature is a simple representation of trace, used to identify simlar traces
@@ -52,7 +55,7 @@ func NewSignatureSampler(conf *config.AgentConfig) *SignatureSampler {
 		theta:  conf.SamplerTheta,
 		jitter: conf.SamplerJitter,
 		// Hardcoded hard-limit for now, to prevent massive spam
-		tpsMax: 100,
+		tpsMax: maxTPS,
 	}
 }
 
@@ -83,6 +86,7 @@ func (s *SignatureSampler) AddTrace(trace model.Trace) {
 
 // GetScore gives a score to a trace reflecting how strong we want to sample it
 // Current implementation only cares about the last time a similar trace was seen + some randomness
+// Score is from 0 to 10.
 func (s *SignatureSampler) GetScore(signature Signature) float64 {
 	timeScore := s.GetTimeScore(signature)
 
@@ -90,13 +94,31 @@ func (s *SignatureSampler) GetScore(signature Signature) float64 {
 	return timeScore * (1 + s.jitter*(1-2*rand.Float64()))
 }
 
+// GetTimeScore function constants to give it the shape we want
+const (
+	logMultiplier = 10
+	// logRescaler   = 5 * 1 / math.Log(1+logMultiplier)
+	logRescaler = 11.989476363991853
+)
+
 // GetTimeScore gives a score based on the square root of the last time this signature was seen.
-// Score from 0 to 5 (will matter when we will combine different scores together)
+// Current implementation and constant give a score of:
+// | Δ/θ | Score |
+// | --- | ----- |
+// |  0  |    0  |
+// |.02  |  .35  |
+// | .2  |  2.3  |
+// | .5  |  3.7  |
+// |  1  |    5  |
+// |  2  |  6.3  |
+// |  5  |  8.2  |
+// | 10  |  9.6  |
+// | 12+ |   10  |
+// | --- | ----- |
 func (s *SignatureSampler) GetTimeScore(signature Signature) float64 {
-	// Last time seen score: from 0 to 5.
 	ts, seen := s.lastTSBySignature[signature]
 	if !seen {
-		return 5
+		return 10
 	}
 	delta := float64(time.Now().UnixNano())/1e9 - ts
 
@@ -104,7 +126,7 @@ func (s *SignatureSampler) GetTimeScore(signature Signature) float64 {
 		return 0
 	}
 
-	return math.Min(math.Sqrt(delta/s.theta), 5)
+	return math.Min(logRescaler*math.Log(1+logMultiplier*delta/s.theta), 10)
 }
 
 // spanHash is the type of the hashes used during the computation of a signature
