@@ -36,6 +36,7 @@ type AgentConfig struct {
 	SamplerTheta  float64
 	SamplerJitter float64
 	SamplerSMin   float64
+	SamplerTPSMax float64
 
 	// Grapher
 	Topology       bool // enable topology graph collection
@@ -101,6 +102,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 		SamplerSMin:   5,
 		SamplerTheta:  60, // 1 min
 		SamplerJitter: 0.2,
+		SamplerTPSMax: 100,
 
 		Topology:       false,
 		TracePortsList: []string{},

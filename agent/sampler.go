@@ -13,8 +13,6 @@ type Sampler struct {
 	in  chan model.Trace
 	out chan []model.Trace
 
-	conf *config.AgentConfig
-
 	se SamplerEngine
 }
 
@@ -27,10 +25,9 @@ type SamplerEngine interface {
 // NewSampler creates a new empty sampler ready to be started
 func NewSampler(in chan model.Trace, conf *config.AgentConfig) *Sampler {
 	return &Sampler{
-		in:   in,
-		out:  make(chan []model.Trace),
-		conf: conf,
-		se:   sampler.NewSignatureSampler(conf),
+		in:  in,
+		out: make(chan []model.Trace),
+		se:  sampler.NewSignatureSampler(conf.SamplerSMin, conf.SamplerTheta, conf.SamplerJitter, conf.SamplerTPSMax),
 	}
 }
 

@@ -5,17 +5,12 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
 	"github.com/stretchr/testify/assert"
 )
 
 func getTestSampler() *SignatureSampler {
-	conf := config.NewDefaultAgentConfig()
-	conf.SamplerTheta = 60
-	conf.SamplerJitter = 0
-	conf.SamplerSMin = 5
-	sampler := NewSignatureSampler(conf)
+	sampler := NewSignatureSampler(5, 60, 0, 100)
 
 	return sampler
 }

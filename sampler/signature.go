@@ -10,13 +10,9 @@ import (
 
 	log "github.com/cihub/seelog"
 
-	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
 	"github.com/DataDog/raclette/statsd"
 )
-
-// maxTPS is a hard-limit on the maximum number of traces to sample per second
-const maxTPS = 100
 
 var statsdSignatureTags = []string{"sampler:signature"}
 
@@ -31,18 +27,18 @@ type SignatureSampler struct {
 	sampledTraces []model.Trace
 	// Time of the last flush
 	lastFlush float64
+	// Lock to protect our 2 maps
+	mu sync.Mutex
 
 	// Scoring configuration
 	sMin   float64 // Score required to be sampled, sample when score is over sMin
 	theta  float64 // Typical last-seen duration (in s) after which we want to sample a trace
 	jitter float64 // Multiplicative random coefficient (0 to 1)
 	tpsMax float64 // Hard-limit on the number of traces per second
-
-	mu sync.Mutex
 }
 
 // NewSignatureSampler creates a new SignatureSampler, ready to ingest traces
-func NewSignatureSampler(conf *config.AgentConfig) *SignatureSampler {
+func NewSignatureSampler(sMin, theta, jitter, tpsMax float64) *SignatureSampler {
 	// TODO: have a go-routine expiring old signatures from lastTSBySignature
 	// TODO: have a max on the size of lastTSBySignature
 
@@ -51,17 +47,37 @@ func NewSignatureSampler(conf *config.AgentConfig) *SignatureSampler {
 		sampledTraces:     []model.Trace{},
 		lastFlush:         float64(time.Now().UnixNano()) / 1e9,
 
-		sMin:   conf.SamplerSMin,
-		theta:  conf.SamplerTheta,
-		jitter: conf.SamplerJitter,
-		// Hardcoded hard-limit for now, to prevent massive spam
-		tpsMax: maxTPS,
+		sMin:   sMin,
+		theta:  theta,
+		jitter: jitter,
+		tpsMax: tpsMax,
 	}
+}
+
+// Flush returns representative spans based on GetSamples and reset its internal memory
+func (s *SignatureSampler) Flush() []model.Trace {
+	now := float64(time.Now().UnixNano()) / 1e9
+	sampledDuration := now - s.lastFlush
+	hardLimit := int(s.tpsMax * math.Ceil(sampledDuration))
+
+	s.mu.Lock()
+	samples := s.sampledTraces
+	s.sampledTraces = []model.Trace{}
+	s.lastFlush = now
+	s.mu.Unlock()
+
+	// Ensure the hard limit the dumb way
+	if len(samples) > hardLimit {
+		log.Warnf("truncate set of sampled traces (from %v to %v), you should reduce sampler sensitivity", len(samples), hardLimit)
+		return samples[:hardLimit]
+	}
+
+	return samples
 }
 
 // AddTrace samples a trace then keep it until the next flush
 func (s *SignatureSampler) AddTrace(trace model.Trace) {
-	signature := s.ComputeSignature(trace)
+	signature := ComputeSignature(trace)
 
 	s.mu.Lock()
 
@@ -129,21 +145,11 @@ func (s *SignatureSampler) GetTimeScore(signature Signature) float64 {
 	return math.Min(logRescaler*math.Log(1+logMultiplier*delta/s.theta), 10)
 }
 
-// spanHash is the type of the hashes used during the computation of a signature
-// Use FNV for hashing since it is super-cheap and we have no cryptographic needs
-type spanHash uint32
-type spanHashSlice []spanHash
-
-func (p spanHashSlice) Len() int           { return len(p) }
-func (p spanHashSlice) Less(i, j int) bool { return p[i] < p[j] }
-func (p spanHashSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-func sortHashes(hashes []spanHash)         { sort.Sort(spanHashSlice(hashes)) }
-
 // ComputeSignature generates a signature of a trace
 // Signature based on the hash of (service, name, resource, is_error) for the root, plus the set of
 // (service, name, is_error) of each span.
-func (s *SignatureSampler) ComputeSignature(trace model.Trace) Signature {
-	traceHash := computeRootHash(s.getRoot(trace))
+func ComputeSignature(trace model.Trace) Signature {
+	rootHash := computeRootHash(getRoot(trace))
 	spanHashes := make([]spanHash, len(trace))
 
 	for i := range trace {
@@ -154,20 +160,12 @@ func (s *SignatureSampler) ComputeSignature(trace model.Trace) Signature {
 	sortHashes(spanHashes)
 
 	last := spanHashes[0]
-	idx := 1
+	traceHash := last ^ rootHash
 	for i := 1; i < len(spanHashes); i++ {
 		if spanHashes[i] != last {
 			last = spanHashes[i]
-			spanHashes[idx] = last
-			idx++
+			traceHash = spanHashes[i] ^ traceHash
 		}
-	}
-	// spanHashes[:idx] is the sorted and deduped slice
-
-	// Build the signature like a barbarian (with a XOR of all the hashes).
-	// Stupid but cheap and does the job for now.
-	for i := 0; i < idx; i++ {
-		traceHash = spanHashes[i] ^ traceHash
 	}
 
 	return Signature(traceHash)
@@ -193,7 +191,7 @@ func computeRootHash(span model.Span) spanHash {
 }
 
 // getRoot extract the root span from a trace
-func (s *SignatureSampler) getRoot(trace model.Trace) model.Span {
+func getRoot(trace model.Trace) model.Span {
 	// This current implementation is not 100% reliable, and would be wrong if we receive a sub-trace with its local
 	// root not being at the end
 	for i := range trace {
@@ -204,24 +202,12 @@ func (s *SignatureSampler) getRoot(trace model.Trace) model.Span {
 	return trace[len(trace)-1]
 }
 
-// Flush returns representative spans based on GetSamples and reset its internal memory
-func (s *SignatureSampler) Flush() []model.Trace {
-	now := float64(time.Now().UnixNano()) / 1e9
-	sampledDuration := now - s.lastFlush
-	hardLimit := int(s.tpsMax * math.Ceil(sampledDuration))
+// spanHash is the type of the hashes used during the computation of a signature
+// Use FNV for hashing since it is super-cheap and we have no cryptographic needs
+type spanHash uint32
+type spanHashSlice []spanHash
 
-	s.mu.Lock()
-	samples := s.sampledTraces
-	s.sampledTraces = []model.Trace{}
-	s.lastFlush = now
-	s.mu.Unlock()
-
-	// Ensure the hard limit the dumb way
-	// TODO: adjust sampler configuration instead
-	if len(samples) > hardLimit {
-		log.Warnf("truncate set of sampled traces (from %v to %v), you should reduce sampler sensitivity", len(samples), hardLimit)
-		return samples[:hardLimit]
-	}
-
-	return samples
-}
+func (p spanHashSlice) Len() int           { return len(p) }
+func (p spanHashSlice) Less(i, j int) bool { return p[i] < p[j] }
+func (p spanHashSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func sortHashes(hashes []spanHash)         { sort.Sort(spanHashSlice(hashes)) }
