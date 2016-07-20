@@ -13,10 +13,12 @@ end
 PACKAGES = %w(
   ./agent
   ./config
+  ./fixtures
   ./model
   ./quantile
   ./quantizer
   ./sampler
+  ./statsd
 )
 
 task :default => [:ci]
