@@ -208,7 +208,7 @@ func (s *SignatureSampler) getRoot(trace model.Trace) model.Span {
 func (s *SignatureSampler) Flush() []model.Trace {
 	now := float64(time.Now().UnixNano()) / 1e9
 	sampledDuration := now - s.lastFlush
-	hardLimit := int(s.tpsMax * sampledDuration)
+	hardLimit := int(s.tpsMax * math.Ceil(sampledDuration))
 
 	s.mu.Lock()
 	samples := s.sampledTraces
