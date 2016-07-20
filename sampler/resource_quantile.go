@@ -10,6 +10,7 @@ import (
 	"github.com/DataDog/raclette/statsd"
 )
 
+// DefaultAggregators is the set if attributes to use for computing local statistics (that we use to get quantiles)
 var DefaultAggregators = []string{"service", "name", "resource"}
 var statsdQuantileTags = []string{"sampler:quantile"}
 
@@ -35,7 +36,7 @@ func NewResourceQuantileSampler(conf *config.AgentConfig) *ResourceQuantileSampl
 	}
 }
 
-// AddSpan adds a span to the ResourceQuantileSampler internal memory
+// AddTrace adds a span to the ResourceQuantileSampler internal memory
 func (s *ResourceQuantileSampler) AddTrace(trace model.Trace) {
 	s.mu.Lock()
 
@@ -86,20 +87,20 @@ func (s *ResourceQuantileSampler) GetSamples(
 		}
 	}
 
-	var kSpans int
+	var sampledSpans int
 	result := make([]model.Trace, 0, len(selected))
 	for tptr := range selected {
 		result = append(result, *tptr)
-		kSpans += len(*tptr)
+		sampledSpans += len(*tptr)
 	}
 
 	log.Infof("sampler: selected %d traces (%.2f %%), %d spans (%.2f %%)",
-		len(result), float64(len(result))*100/float64(traces), kSpans, float64(kSpans)*100/float64(spans))
+		len(result), float64(len(result))*100/float64(traces), sampledSpans, float64(sampledSpans)*100/float64(spans))
 
 	statsd.Client.Count("trace_agent.sampler.trace.total", int64(traces), statsdQuantileTags, 1)
 	statsd.Client.Count("trace_agent.sampler.trace.kept", int64(len(result)), statsdQuantileTags, 1)
 	statsd.Client.Count("trace_agent.sampler.span.total", int64(spans), statsdQuantileTags, 1)
-	statsd.Client.Count("trace_agent.sampler.span.kept", int64(kSpans), statsdQuantileTags, 1)
+	statsd.Client.Count("trace_agent.sampler.span.kept", int64(sampledSpans), statsdQuantileTags, 1)
 
 	return result
 }

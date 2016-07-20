@@ -137,7 +137,7 @@ type spanHashSlice []spanHash
 func (p spanHashSlice) Len() int           { return len(p) }
 func (p spanHashSlice) Less(i, j int) bool { return p[i] < p[j] }
 func (p spanHashSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-func SortHashes(hashes []spanHash)         { sort.Sort(spanHashSlice(hashes)) }
+func sortHashes(hashes []spanHash)         { sort.Sort(spanHashSlice(hashes)) }
 
 // ComputeSignature generates a signature of a trace
 // Signature based on the hash of (service, name, resource, is_error) for the root, plus the set of
@@ -151,7 +151,7 @@ func (s *SignatureSampler) ComputeSignature(trace model.Trace) Signature {
 	}
 
 	// Now sort, dedupe then merge all the hashes to build the signature
-	SortHashes(spanHashes)
+	sortHashes(spanHashes)
 
 	last := spanHashes[0]
 	idx := 1
