@@ -15,6 +15,7 @@ PACKAGES = %w(
   ./config
   ./model
   ./quantile
+  ./quantizer
   ./sampler
 )
 
