@@ -5,11 +5,15 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
 	"github.com/stretchr/testify/assert"
 )
 
 func getTestSampler() *SignatureSampler {
+	// Disable debug logs in these tests
+	config.NewLoggerLevel(false)
+
 	sampler := NewSignatureSampler(5, 60, 0, 100)
 
 	return sampler
@@ -107,4 +111,28 @@ func TestHardLimit(t *testing.T) {
 	selected := sampler.Flush()
 
 	assert.True(len(selected) <= int(sampler.tpsMax), "We kept more traces than what the hard limit should allow")
+}
+
+func BenchmarkSignatureSampler(b *testing.B) {
+
+	// Up to signatureCount different signatures
+	signatureCount := 20
+
+	sampler := getTestSampler()
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		tr := model.Trace{
+			model.Span{TraceID: 1, SpanID: 1, ParentID: 0, Start: 42, Duration: 1000000000, Service: "mcnulty", Type: "web", Resource: string(rand.Intn(signatureCount))},
+			model.Span{TraceID: 1, SpanID: 2, ParentID: 1, Start: 100, Duration: 200000000, Service: "mcnulty", Type: "sql"},
+			model.Span{TraceID: 1, SpanID: 3, ParentID: 2, Start: 150, Duration: 199999000, Service: "master-db", Type: "sql"},
+			model.Span{TraceID: 1, SpanID: 4, ParentID: 1, Start: 500000000, Duration: 500000, Service: "redis", Type: "redis"},
+			model.Span{TraceID: 1, SpanID: 5, ParentID: 1, Start: 700000000, Duration: 700000, Service: "mcnulty", Type: ""},
+		}
+		sampler.AddTrace(tr)
+	}
+
+	sampler.Flush()
 }
