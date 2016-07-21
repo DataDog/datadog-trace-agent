@@ -16,6 +16,17 @@ import (
 
 var statsdSignatureTags = []string{"sampler:signature"}
 
+const (
+	// GetTimeScore function constants to give it the shape we want
+	logMultiplier = 10
+	logRescaler   = 11.989476363991853 // = 5 * 1 / math.Log(1+logMultiplier)
+
+	// Expire signature when too old. Be sure that it is compatible with GetTimeScore.
+	signatureExpiration = 15 * 60 // 15 minutes
+	// Frequency of expiration
+	expirationPeriod = 60 // 1 minute
+)
+
 // Signature is a simple representation of trace, used to identify simlar traces
 type Signature uint64
 
@@ -64,6 +75,7 @@ func (s *SignatureSampler) Flush() []model.Trace {
 	samples := s.sampledTraces
 	s.sampledTraces = []model.Trace{}
 	s.lastFlush = now
+	s.expireSignatureMap()
 	s.mu.Unlock()
 
 	// Ensure the hard limit the dumb way
@@ -73,6 +85,18 @@ func (s *SignatureSampler) Flush() []model.Trace {
 	}
 
 	return samples
+}
+
+// expireSignatureMap expire data from lastTSBySignature to limit the memory footprint
+// Corollary: it also limits the max size of the map to: tpsMax * expireAfter entries
+func (s *SignatureSampler) expireSignatureMap() {
+	ageCutoff := float64(time.Now().UnixNano())/1e9 - signatureExpiration
+
+	for signature, ts := range s.lastTSBySignature {
+		if ts < ageCutoff {
+			delete(s.lastTSBySignature, signature)
+		}
+	}
 }
 
 // AddTrace samples a trace then keep it until the next flush
@@ -109,13 +133,6 @@ func (s *SignatureSampler) GetScore(signature Signature) float64 {
 	// Add some jitter
 	return timeScore * (1 + s.jitter*(1-2*rand.Float64()))
 }
-
-// GetTimeScore function constants to give it the shape we want
-const (
-	logMultiplier = 10
-	// logRescaler   = 5 * 1 / math.Log(1+logMultiplier)
-	logRescaler = 11.989476363991853
-)
 
 // GetTimeScore gives a score based on the square root of the last time this signature was seen.
 // Current implementation and constant give a score of:
