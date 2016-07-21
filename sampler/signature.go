@@ -11,10 +11,7 @@ import (
 	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/raclette/model"
-	"github.com/DataDog/raclette/statsd"
 )
-
-var statsdSignatureTags = []string{"sampler:signature"}
 
 const (
 	// GetTimeScore function constants to give it the shape we want
@@ -113,13 +110,6 @@ func (s *SignatureSampler) AddTrace(trace model.Trace) {
 	}
 
 	s.mu.Unlock()
-
-	statsd.Client.Count("trace_agent.sampler.trace.total", 1, statsdSignatureTags, 1)
-	statsd.Client.Count("trace_agent.sampler.span.total", int64(len(trace)), statsdSignatureTags, 1)
-	if sampled {
-		statsd.Client.Count("trace_agent.sampler.trace.kept", 1, statsdSignatureTags, 1)
-		statsd.Client.Count("trace_agent.sampler.span.kept", int64(len(trace)), statsdSignatureTags, 1)
-	}
 
 	log.Debugf("trace_id:%v signature:%v score:%v sampled:%v", trace[0].TraceID, signature, score, sampled)
 }
