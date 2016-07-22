@@ -49,8 +49,8 @@ func (s *Sampler) Run() {
 			execTime := time.Since(startTime)
 			statsd.Client.Gauge("trace_agent.sampler.sample_duration", execTime.Seconds(), statsdTags, 1)
 
-			statsd.Client.Count("trace_agent.sampler.trace.total", int64(len(traces)), statsdTags, 1)
-			statsd.Client.Count("trace_agent.sampler.trace.kept", int64(s.traceCount), statsdTags, 1)
+			statsd.Client.Count("trace_agent.sampler.trace.kept", int64(len(traces)), statsdTags, 1)
+			statsd.Client.Count("trace_agent.sampler.trace.total", int64(s.traceCount), statsdTags, 1)
 			log.Debugf("flushed %d sampled traces out of %v", len(traces), s.traceCount)
 
 			s.traceCount = 0
