@@ -16,7 +16,7 @@ import (
 const (
 	// GetTimeScore function constants to give it the shape we want
 	logMultiplier = 10
-	logRescaler   = 11.989476363991853 // = 5 * 1 / math.Log(1+logMultiplier)
+	logRescaler   = 2.0851619571212314 // = 5 * 1 / math.Log(1+logMultiplier)
 
 	// Expire signature when too old. Be sure that it is compatible with GetTimeScore.
 	signatureExpiration = 15 * 60 // 15 minutes
