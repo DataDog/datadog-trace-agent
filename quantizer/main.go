@@ -20,6 +20,7 @@ const (
 
 var nonUniformSpacesRegexp = regexp.MustCompile("\\s+")
 
+// QuantizeFunction is a function which will return an updated span with a quantized resource
 type QuantizeFunction func(model.Span) model.Span
 
 var spanTypeToQuantizer = map[string]QuantizeFunction{
@@ -105,10 +106,10 @@ func compactAllSpacesWithoutRegexp(t string) string {
 	rStart := 0
 	rEnd := n - offset
 	if isWhitespace(r[rEnd-1]) {
-		rEnd -= 1
+		rEnd--
 	}
 	if isWhitespace(r[rStart]) {
-		rStart += 1
+		rStart++
 	}
 
 	return string(r[rStart:rEnd])
@@ -145,10 +146,10 @@ func compactWhitespaces(t string) string {
 	rStart := 0
 	rEnd := n - offset
 	if isWhitespace(r[rEnd-1]) {
-		rEnd -= 1
+		rEnd--
 	}
 	if isWhitespace(r[rStart]) {
-		rStart += 1
+		rStart++
 	}
 
 	return string(r[rStart:rEnd])

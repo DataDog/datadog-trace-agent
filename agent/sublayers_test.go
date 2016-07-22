@@ -89,21 +89,96 @@ func TestSublayerNested(t *testing.T) {
 	}
 
 	expected := map[string]model.Count{
-		"_sublayers.duration.by_service|service:mcnulty,sublayer_service:master-db": model.Count{"_sublayers.duration.by_service|service:mcnulty,sublayer_service:master-db", "_sublayers.duration.by_service", model.NewTagSetFromString("service:mcnulty,sublayer_service:master-db"), 199999000},
-		"_sublayers.duration.by_service|service:mcnulty,sublayer_service:mcnulty":   model.Count{"_sublayers.duration.by_service|service:mcnulty,sublayer_service:mcnulty", "_sublayers.duration.by_service", model.NewTagSetFromString("service:mcnulty,sublayer_service:mcnulty"), 1000000000 - 199999000 - 500000},
-		"_sublayers.duration.by_service|service:mcnulty,sublayer_service:redis":     model.Count{"_sublayers.duration.by_service|service:mcnulty,sublayer_service:redis", "_sublayers.duration.by_service", model.NewTagSetFromString("service:mcnulty,sublayer_service:redis"), 500000},
-		"_sublayers.duration.by_type|service:mcnulty,sublayer_type:redis":           model.Count{"_sublayers.duration.by_type|service:mcnulty,sublayer_type:redis", "_sublayers.duration.by_type", model.NewTagSetFromString("service:mcnulty,sublayer_type:redis"), 500000},
-		"_sublayers.duration.by_type|service:mcnulty,sublayer_type:sql":             model.Count{"_sublayers.duration.by_type|service:mcnulty,sublayer_type:sql", "_sublayers.duration.by_type", model.NewTagSetFromString("service:mcnulty,sublayer_type:sql"), 200000000},
-		"_sublayers.duration.by_type|service:mcnulty,sublayer_type:web":             model.Count{"_sublayers.duration.by_type|service:mcnulty,sublayer_type:web", "_sublayers.duration.by_type", model.NewTagSetFromString("service:mcnulty,sublayer_type:web"), 1000000000 - 200000000 - 500000},
-		"duration|service:master-db":                                                model.Count{"duration|service:master-db", model.DURATION, model.NewTagSetFromString("service:master-db"), 199999000},
-		"duration|service:mcnulty":                                                  model.Count{"duration|service:mcnulty", model.DURATION, model.NewTagSetFromString("service:mcnulty"), 1000000000 + 200000000 + 700000},
-		"duration|service:redis":                                                    model.Count{"duration|service:redis", model.DURATION, model.NewTagSetFromString("service:redis"), 500000},
-		"errors|service:master-db":                                                  model.Count{"errors|service:master-db", model.ERRORS, model.NewTagSetFromString("service:master-db"), 0},
-		"errors|service:mcnulty":                                                    model.Count{"errors|service:mcnulty", model.ERRORS, model.NewTagSetFromString("service:mcnulty"), 0},
-		"errors|service:redis":                                                      model.Count{"errors|service:redis", model.ERRORS, model.NewTagSetFromString("service:redis"), 0},
-		"hits|service:master-db":                                                    model.Count{"hits|service:master-db", model.HITS, model.NewTagSetFromString("service:master-db"), 1},
-		"hits|service:mcnulty":                                                      model.Count{"hits|service:mcnulty", model.HITS, model.NewTagSetFromString("service:mcnulty"), 3},
-		"hits|service:redis":                                                        model.Count{"hits|service:redis", model.HITS, model.NewTagSetFromString("service:redis"), 1},
+		"_sublayers.duration.by_service|service:mcnulty,sublayer_service:master-db": model.Count{
+			Key:    "_sublayers.duration.by_service|service:mcnulty,sublayer_service:master-db",
+			Name:   "_sublayers.duration.by_service",
+			TagSet: model.NewTagSetFromString("service:mcnulty,sublayer_service:master-db"),
+			Value:  199999000,
+		},
+		"_sublayers.duration.by_service|service:mcnulty,sublayer_service:mcnulty": model.Count{
+			Key:    "_sublayers.duration.by_service|service:mcnulty,sublayer_service:mcnulty",
+			Name:   "_sublayers.duration.by_service",
+			TagSet: model.NewTagSetFromString("service:mcnulty,sublayer_service:mcnulty"),
+			Value:  1000000000 - 199999000 - 500000,
+		},
+		"_sublayers.duration.by_service|service:mcnulty,sublayer_service:redis": model.Count{
+			Key:    "_sublayers.duration.by_service|service:mcnulty,sublayer_service:redis",
+			Name:   "_sublayers.duration.by_service",
+			TagSet: model.NewTagSetFromString("service:mcnulty,sublayer_service:redis"),
+			Value:  500000,
+		},
+		"_sublayers.duration.by_type|service:mcnulty,sublayer_type:redis": model.Count{
+			Key:    "_sublayers.duration.by_type|service:mcnulty,sublayer_type:redis",
+			Name:   "_sublayers.duration.by_type",
+			TagSet: model.NewTagSetFromString("service:mcnulty,sublayer_type:redis"),
+			Value:  500000,
+		},
+		"_sublayers.duration.by_type|service:mcnulty,sublayer_type:sql": model.Count{
+			Key:    "_sublayers.duration.by_type|service:mcnulty,sublayer_type:sql",
+			Name:   "_sublayers.duration.by_type",
+			TagSet: model.NewTagSetFromString("service:mcnulty,sublayer_type:sql"),
+			Value:  200000000,
+		},
+		"_sublayers.duration.by_type|service:mcnulty,sublayer_type:web": model.Count{
+			Key:    "_sublayers.duration.by_type|service:mcnulty,sublayer_type:web",
+			Name:   "_sublayers.duration.by_type",
+			TagSet: model.NewTagSetFromString("service:mcnulty,sublayer_type:web"),
+			Value:  1000000000 - 200000000 - 500000,
+		},
+		"duration|service:master-db": model.Count{
+			Key:    "duration|service:master-db",
+			Name:   model.DURATION,
+			TagSet: model.NewTagSetFromString("service:master-db"),
+			Value:  199999000,
+		},
+		"duration|service:mcnulty": model.Count{
+			Key:    "duration|service:mcnulty",
+			Name:   model.DURATION,
+			TagSet: model.NewTagSetFromString("service:mcnulty"),
+			Value:  1000000000 + 200000000 + 700000,
+		},
+		"duration|service:redis": model.Count{
+			Key:    "duration|service:redis",
+			Name:   model.DURATION,
+			TagSet: model.NewTagSetFromString("service:redis"),
+			Value:  500000,
+		},
+		"errors|service:master-db": model.Count{
+			Key:    "errors|service:master-db",
+			Name:   model.ERRORS,
+			TagSet: model.NewTagSetFromString("service:master-db"),
+			Value:  0,
+		},
+		"errors|service:mcnulty": model.Count{
+			Key:    "errors|service:mcnulty",
+			Name:   model.ERRORS,
+			TagSet: model.NewTagSetFromString("service:mcnulty"),
+			Value:  0,
+		},
+		"errors|service:redis": model.Count{
+			Key:    "errors|service:redis",
+			Name:   model.ERRORS,
+			TagSet: model.NewTagSetFromString("service:redis"),
+			Value:  0,
+		},
+		"hits|service:master-db": model.Count{
+			Key:    "hits|service:master-db",
+			Name:   model.HITS,
+			TagSet: model.NewTagSetFromString("service:master-db"),
+			Value:  1,
+		},
+		"hits|service:mcnulty": model.Count{
+			Key:    "hits|service:mcnulty",
+			Name:   model.HITS,
+			TagSet: model.NewTagSetFromString("service:mcnulty"),
+			Value:  3,
+		},
+		"hits|service:redis": model.Count{
+			Key:    "hits|service:redis",
+			Name:   model.HITS,
+			TagSet: model.NewTagSetFromString("service:redis"),
+			Value:  1,
+		},
 	}
 
 	assert.Equal(len(expected), len(stats[0].Counts), "got %v", stats[0].Counts)

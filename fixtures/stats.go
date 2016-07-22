@@ -15,6 +15,7 @@ func TestStatsBucket() model.StatsBucket {
 	return sb
 }
 
+// StatsBucketWithSpans returns a stats bucket populated with spans stats
 func StatsBucketWithSpans(s []model.Span) model.StatsBucket {
 	sb := model.NewStatsBucket(0, 1e9, time.Microsecond)
 	for _, s := range s {
@@ -33,6 +34,7 @@ func RandomStatsBucket(n int) model.StatsBucket {
 	return StatsBucketWithSpans(spans)
 }
 
+// TestDistroValues is a pre-defined list of values
 var TestDistroValues = []int64{
 	49873, 81744, 46545, 43680, 7535, 33334, 93009, 23777, 33471, 68629,
 	94601, 83827, 3556, 15913, 84957, 368, 71879, 73687, 55039, 89704,
@@ -136,6 +138,7 @@ var TestDistroValues = []int64{
 	10327, 63265, 48904, 79260, 26562, 11528, 97745, 78918, 94479, 19453,
 }
 
+// TestDistribution returns a distribution with pre-defined values
 func TestDistribution() model.Distribution {
 	tgs := model.NewTagsFromString("service:X,name:Y,host:Z")
 	d := model.NewDistribution("duration", "duration|service:X,name:Y,host:Z", tgs)

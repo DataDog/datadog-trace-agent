@@ -29,8 +29,14 @@ type AgentConfig struct {
 	ExtraAggregators  []string
 	LatencyResolution time.Duration
 
-	// Sampler
+	// Sampler configuration
+	// Quantile sampler
 	SamplerQuantiles []float64
+	// Signature sampler
+	SamplerTheta  float64
+	SamplerJitter float64
+	SamplerSMin   float64
+	SamplerTPSMax float64
 
 	// Grapher
 	Topology       bool // enable topology graph collection
@@ -92,6 +98,11 @@ func NewDefaultAgentConfig() *AgentConfig {
 		LatencyResolution: time.Millisecond,
 
 		SamplerQuantiles: []float64{0.10, 0.50, 0.90, 1},
+
+		SamplerSMin:   5,
+		SamplerTheta:  60, // 1 min
+		SamplerJitter: 0.1,
+		SamplerTPSMax: 100,
 
 		Topology:       false,
 		TracePortsList: []string{},
@@ -167,6 +178,16 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 			quantiles[index] = value
 		}
 		c.SamplerQuantiles = quantiles
+	}
+
+	if v, e := conf.GetInt("trace.sampler", "score_threshold"); e == nil {
+		c.SamplerSMin = float64(v)
+	}
+	if v, e := conf.GetInt("trace.sampler", "trace_period"); e == nil {
+		c.SamplerTheta = float64(v)
+	}
+	if v, e := conf.GetInt("trace.sampler", "score_jitter"); e == nil {
+		c.SamplerJitter = float64(v)
 	}
 
 	if tracePortsList, e := conf.GetStrArray("trace.grapher", "port_whitelist", ","); e == nil {

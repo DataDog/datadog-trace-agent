@@ -1,7 +1,11 @@
 
 def go_build(program, opts={})
+  default_cmd = "go build -a"
+  if ENV["INCREMENTAL_BUILD"] then
+    default_cmd = "go build -i"
+  end
   opts = {
-    :cmd => "go build -a"
+    :cmd => default_cmd
   }.merge(opts)
 
   dd = 'main'
@@ -9,28 +13,25 @@ def go_build(program, opts={})
   branch = `git rev-parse --abbrev-ref HEAD`.strip
   date = `date`.strip
   goversion = `go version`.strip
-  agentversion = ENV["TRACE_AGENT_VERSION"] || "0.99.0"
-
-  ldflags = "-X #{dd}.BuildDate '#{date}' -X #{dd}.GitCommit '#{commit}' -X #{dd}.GitBranch '#{branch}' -X #{dd}.GoVersion '#{goversion}' -X #{dd}.Version '#{agentversion}'"
+  ldflags = {
+    "#{dd}.BuildDate" => "#{date}",
+    "#{dd}.GitCommit" => "#{commit}",
+    "#{dd}.GitBranch" => "#{branch}",
+    "#{dd}.GoVersion" => "#{goversion}",
+  }.map do |k,v|
+    if goversion.include?("1.4")
+      "-X #{k} '#{v}'"
+    else
+      "-X '#{k}=#{v}'"
+    end
+  end.join ' '
 
   cmd = opts[:cmd]
   sh "#{cmd} -ldflags \"#{ldflags}\" #{program}"
 end
 
-def go_errcheck(path_or_paths)
-  paths = path_or_paths.is_a?(String) ? [path_or_paths] : path_or_paths
-  # errcheck with some sane ignores
-  # don't bother checking these
-  ignores = [
-    "github.com/cihub/seelog:.*",
-    "github.com/DataDog/datadog-go/statsd:Count|Gauge|Histogram"
-  ]
-
-  sh "errcheck -ignore \"#{ignores.join(',')}\" #{paths.join(" ")}"
-end
 
 def go_lint(path)
-
   out = `golint #{path}/*.go`
   errors = out.split("\n")
   puts "#{errors.length} linting issues found"
