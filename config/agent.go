@@ -101,7 +101,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 
 		SamplerSMin:   5,
 		SamplerTheta:  60, // 1 min
-		SamplerJitter: 0.2,
+		SamplerJitter: 0.1,
 		SamplerTPSMax: 100,
 
 		Topology:       false,
