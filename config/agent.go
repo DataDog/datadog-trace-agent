@@ -35,10 +35,6 @@ type AgentConfig struct {
 	SamplerSMin   float64
 	SamplerTPSMax float64
 
-	// Grapher
-	Topology       bool // enable topology graph collection
-	TracePortsList []string
-
 	// Receiver
 	ConnectionLimit int // for rate-limiting, how many unique connections to allow in a lease period (30s)
 
@@ -98,9 +94,6 @@ func NewDefaultAgentConfig() *AgentConfig {
 		SamplerTheta:  60, // 1 min
 		SamplerJitter: 0.1,
 		SamplerTPSMax: 100,
-
-		Topology:       false,
-		TracePortsList: []string{},
 
 		ConnectionLimit: 2000,
 
@@ -171,11 +164,6 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 	}
 	if v, e := conf.GetInt("trace.sampler", "score_jitter"); e == nil {
 		c.SamplerJitter = float64(v)
-	}
-
-	if tracePortsList, e := conf.GetStrArray("trace.grapher", "port_whitelist", ","); e == nil {
-		log.Debugf("Tracing ports : %s", tracePortsList)
-		c.TracePortsList = tracePortsList
 	}
 
 	if v, e := conf.GetInt("trace.receiver", "connection_limit"); e == nil {
