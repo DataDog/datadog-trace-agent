@@ -9,5 +9,6 @@ stop on runlevel[016]
 respawn limit 10 5
 
 setuid dd-agent
+expect daemon
 
-exec /opt/datadog-agent/bin/trace-agent >> /var/log/datadog/trace-agent.log 2>&1
+exec start-stop-daemon --start --quiet --oknodo --background --make-pidfile --pidfile /opt/datadog-agent/run/dd-trace-agent.pid --chuid dd-agent --startas /bin/bash -- -c "exec /opt/datadog-agent/bin/trace-agent >> /var/log/datadog/trace-agent.log 2>&1"
