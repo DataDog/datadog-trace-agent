@@ -30,9 +30,6 @@ type AgentConfig struct {
 	LatencyResolution time.Duration
 
 	// Sampler configuration
-	// Quantile sampler
-	SamplerQuantiles []float64
-	// Signature sampler
 	SamplerTheta  float64
 	SamplerJitter float64
 	SamplerSMin   float64
@@ -96,8 +93,6 @@ func NewDefaultAgentConfig() *AgentConfig {
 		OldestSpanCutoff:  time.Duration(60 * time.Second).Nanoseconds(),
 		ExtraAggregators:  []string{},
 		LatencyResolution: time.Millisecond,
-
-		SamplerQuantiles: []float64{0.10, 0.50, 0.90, 1},
 
 		SamplerSMin:   5,
 		SamplerTheta:  60, // 1 min
@@ -166,18 +161,6 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 		case "nanosecond":
 			c.LatencyResolution = time.Nanosecond
 		}
-	}
-
-	if v, e := conf.GetStrArray("trace.sampler", "quantiles", ","); e == nil {
-		quantiles := make([]float64, len(v))
-		for index, q := range v {
-			value, err := strconv.ParseFloat(q, 64)
-			if err != nil {
-				return nil, err
-			}
-			quantiles[index] = value
-		}
-		c.SamplerQuantiles = quantiles
 	}
 
 	if v, e := conf.GetInt("trace.sampler", "score_threshold"); e == nil {

@@ -34,8 +34,6 @@ func TestMergeConfig(t *testing.T) {
 		OldestSpanCutoff: time.Duration(30 * time.Second).Nanoseconds(),
 		ExtraAggregators: []string{},
 
-		SamplerQuantiles: []float64{0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 1},
-
 		Topology:       false,
 		TracePortsList: []string{},
 
