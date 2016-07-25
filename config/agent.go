@@ -142,14 +142,17 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 		log.Debug("No aggregator configuration, using defaults")
 	}
 
-	if v, e := conf.GetInt("trace.sampler", "score_threshold"); e == nil {
-		c.SamplerSMin = float64(v)
+	if v, e := conf.GetFloat("trace.sampler", "score_threshold"); e == nil {
+		c.SamplerSMin = v
 	}
-	if v, e := conf.GetInt("trace.sampler", "trace_period"); e == nil {
-		c.SamplerTheta = float64(v)
+	if v, e := conf.GetFloat("trace.sampler", "trace_period"); e == nil {
+		c.SamplerTheta = v
 	}
-	if v, e := conf.GetInt("trace.sampler", "score_jitter"); e == nil {
-		c.SamplerJitter = float64(v)
+	if v, e := conf.GetFloat("trace.sampler", "score_jitter"); e == nil {
+		log.Info(e)
+		log.Info(v)
+		c.SamplerJitter = v
+	}
 	}
 
 	if v, e := conf.GetInt("trace.receiver", "connection_limit"); e == nil {

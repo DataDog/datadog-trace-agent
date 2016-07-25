@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/stretchr/testify/assert"
+	"strings"
 	"time"
 
 	"gopkg.in/ini.v1"
@@ -38,8 +39,41 @@ func TestMergeConfig(t *testing.T) {
 		StatsdPort: 8125,
 	}
 
-	ddAgentConf, _ := ini.Load([]byte("[Main]\n\nhostname: thing\napi_key: apikey_2"))
+	ddAgentConf, _ := ini.Load([]byte("[Main]\n\nhostname=thing\napi_key=apikey_12"))
 	mergeConfig(&agentConfig, ddAgentConf)
-	assert.Equal(agentConfig.HostName, "thing")
-	assert.Equal(agentConfig.APIKey, "apikey_2")
+	assert.Equal("thing", agentConfig.HostName)
+	assert.Equal("apikey_12", agentConfig.APIKey)
+}
+
+func TestConfigLoadAndMerge(t *testing.T) {
+	assert := assert.New(t)
+
+	defaultConfig := NewDefaultAgentConfig()
+
+	configIni, _ := ini.Load([]byte(strings.Join([]string{
+		"[trace.config]",
+		"hostname = thing",
+		"[trace.api]",
+		"api_key = pommedapi",
+		"[trace.concentrator]",
+		"extra_aggregators=resource,error",
+		"[trace.sampler]",
+		"score_jitter=0.33",
+	}, "\n")))
+
+	configFile := &File{instance: configIni, Path: "whatever"}
+
+	agentConfig, _ := NewAgentConfig(configFile)
+
+	// Properly loaded attributes
+	assert.Equal("thing", agentConfig.HostName)
+	assert.Equal("pommedapi", agentConfig.APIKey)
+	assert.Equal([]string{"resource", "error"}, agentConfig.ExtraAggregators)
+	assert.Equal(0.33, agentConfig.SamplerJitter)
+
+	// Check some defaults
+	assert.Equal(defaultConfig.BucketInterval, agentConfig.BucketInterval)
+	assert.Equal(defaultConfig.OldestSpanCutoff, agentConfig.OldestSpanCutoff)
+	assert.Equal(defaultConfig.SamplerTPSMax, agentConfig.SamplerTPSMax)
+	assert.Equal(defaultConfig.StatsdHost, agentConfig.StatsdHost)
 }

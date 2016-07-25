@@ -66,6 +66,16 @@ func (c *File) GetInt(section, name string) (int, error) {
 	return value, nil
 }
 
+// GetFloat gets an float value from section/name, or an error if it is missing
+// or cannot be converted to an float.
+func (c *File) GetFloat(section, name string) (float64, error) {
+	value, err := c.instance.Section(section).Key(name).Float64()
+	if err != nil {
+		return 0, fmt.Errorf("missing `%s` value in [%s] section", name, section)
+	}
+	return value, nil
+}
+
 // GetStrArray returns the value split across `sep` into an array of strings.
 func (c *File) GetStrArray(section, name, sep string) ([]string, error) {
 	if exists := c.instance.Section(section).HasKey(name); !exists {
