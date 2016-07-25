@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/DataDog/raclette/quantile"
 )
@@ -96,8 +95,6 @@ type StatsBucket struct {
 	Start    int64 // timestamp of start in our format
 	Duration int64 // duration of a bucket in nanoseconds
 
-	DistroResolution time.Duration // TODO: Remove me, we don't use it anymore
-
 	// stats indexed by keys
 	Counts        map[string]Count        // All the true counts we keep
 	Distributions map[string]Distribution // All the true distribution we keep to answer quantile queries
@@ -107,17 +104,16 @@ type StatsBucket struct {
 }
 
 // NewStatsBucket opens a new bucket for time ts and initializes it properly
-func NewStatsBucket(ts, d int64, res time.Duration) StatsBucket {
+func NewStatsBucket(ts, d int64) StatsBucket {
 	counts := make(map[string]Count)
 	distros := make(map[string]Distribution)
 
 	// The only non-initialized value is the Duration which should be set by whoever closes that bucket
 	return StatsBucket{
-		Start:            ts,
-		Duration:         d,
-		Counts:           counts,
-		Distributions:    distros,
-		DistroResolution: res,
+		Start:         ts,
+		Duration:      d,
+		Counts:        counts,
+		Distributions: distros,
 	}
 }
 

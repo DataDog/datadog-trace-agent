@@ -2,7 +2,6 @@ package config
 
 import (
 	"os"
-	"strconv"
 	"time"
 
 	"gopkg.in/ini.v1"
@@ -24,23 +23,15 @@ type AgentConfig struct {
 	APIFlushTraces bool
 
 	// Concentrator
-	BucketInterval    time.Duration // the size of our pre-aggregation per bucket
-	OldestSpanCutoff  int64         // maximum time we wait before discarding straggling spans, in ns
-	ExtraAggregators  []string
-	LatencyResolution time.Duration
+	BucketInterval   time.Duration // the size of our pre-aggregation per bucket
+	OldestSpanCutoff int64         // maximum time we wait before discarding straggling spans, in ns
+	ExtraAggregators []string
 
 	// Sampler configuration
-	// Quantile sampler
-	SamplerQuantiles []float64
-	// Signature sampler
-	SamplerTheta  float64
-	SamplerJitter float64
-	SamplerSMin   float64
-	SamplerTPSMax float64
-
-	// Grapher
-	Topology       bool // enable topology graph collection
-	TracePortsList []string
+	ScoreThreshold  float64
+	SignaturePeriod time.Duration
+	ScoreJitter     float64
+	TPSMax          float64
 
 	// Receiver
 	ConnectionLimit int // for rate-limiting, how many unique connections to allow in a lease period (30s)
@@ -92,20 +83,14 @@ func NewDefaultAgentConfig() *AgentConfig {
 		APIEnabled:     true,
 		APIFlushTraces: true,
 
-		BucketInterval:    time.Duration(10) * time.Second,
-		OldestSpanCutoff:  time.Duration(60 * time.Second).Nanoseconds(),
-		ExtraAggregators:  []string{},
-		LatencyResolution: time.Millisecond,
+		BucketInterval:   time.Duration(10) * time.Second,
+		OldestSpanCutoff: time.Duration(60 * time.Second).Nanoseconds(),
+		ExtraAggregators: []string{},
 
-		SamplerQuantiles: []float64{0.10, 0.50, 0.90, 1},
-
-		SamplerSMin:   5,
-		SamplerTheta:  60, // 1 min
-		SamplerJitter: 0.1,
-		SamplerTPSMax: 100,
-
-		Topology:       false,
-		TracePortsList: []string{},
+		ScoreThreshold:  5,
+		SignaturePeriod: time.Minute,
+		ScoreJitter:     0.1,
+		TPSMax:          100,
 
 		ConnectionLimit: 2000,
 
@@ -157,42 +142,17 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 		log.Debug("No aggregator configuration, using defaults")
 	}
 
-	if v, e := conf.Get("trace.concentrator", "latency_res"); e == nil {
-		switch v {
-		case "millisecond":
-			c.LatencyResolution = time.Millisecond
-		case "microsecond":
-			c.LatencyResolution = time.Microsecond
-		case "nanosecond":
-			c.LatencyResolution = time.Nanosecond
-		}
+	if v, e := conf.GetFloat("trace.sampler", "score_threshold"); e == nil {
+		c.ScoreThreshold = v
 	}
-
-	if v, e := conf.GetStrArray("trace.sampler", "quantiles", ","); e == nil {
-		quantiles := make([]float64, len(v))
-		for index, q := range v {
-			value, err := strconv.ParseFloat(q, 64)
-			if err != nil {
-				return nil, err
-			}
-			quantiles[index] = value
-		}
-		c.SamplerQuantiles = quantiles
+	if v, e := conf.GetFloat("trace.sampler", "trace_period"); e == nil {
+		c.SignaturePeriod = time.Duration(int(v * 1e9))
 	}
-
-	if v, e := conf.GetInt("trace.sampler", "score_threshold"); e == nil {
-		c.SamplerSMin = float64(v)
+	if v, e := conf.GetFloat("trace.sampler", "score_jitter"); e == nil {
+		c.ScoreJitter = v
 	}
-	if v, e := conf.GetInt("trace.sampler", "trace_period"); e == nil {
-		c.SamplerTheta = float64(v)
-	}
-	if v, e := conf.GetInt("trace.sampler", "score_jitter"); e == nil {
-		c.SamplerJitter = float64(v)
-	}
-
-	if tracePortsList, e := conf.GetStrArray("trace.grapher", "port_whitelist", ","); e == nil {
-		log.Debugf("Tracing ports : %s", tracePortsList)
-		c.TracePortsList = tracePortsList
+	if v, e := conf.GetFloat("trace.sampler", "max_tps"); e == nil {
+		c.TPSMax = v
 	}
 
 	if v, e := conf.GetInt("trace.receiver", "connection_limit"); e == nil {

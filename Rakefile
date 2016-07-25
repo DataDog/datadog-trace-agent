@@ -34,7 +34,9 @@ task :install do
 end
 
 desc "Test Raclette agent"
-task :test do go_test("./agent") end
+task :test do
+  PACKAGES.each { |pkg| go_test(pkg) }
+end
 
 desc "Run Raclette agent"
 task :run do

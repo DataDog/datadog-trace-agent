@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
@@ -14,7 +15,7 @@ func getTestSampler() *SignatureSampler {
 	// Disable debug logs in these tests
 	config.NewLoggerLevel(false)
 
-	sampler := NewSignatureSampler(5, 60, 0, 100)
+	sampler := NewSignatureSampler(5, time.Minute, 0, 100)
 
 	return sampler
 }
