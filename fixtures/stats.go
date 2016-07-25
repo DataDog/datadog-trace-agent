@@ -1,8 +1,6 @@
 package fixtures
 
 import (
-	"time"
-
 	"github.com/DataDog/raclette/model"
 )
 
