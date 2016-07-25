@@ -153,6 +153,8 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 		log.Info(v)
 		c.SamplerJitter = v
 	}
+	if v, e := conf.GetFloat("trace.sampler", "max_tps"); e == nil {
+		c.SamplerTPSMax = v
 	}
 
 	if v, e := conf.GetInt("trace.receiver", "connection_limit"); e == nil {
