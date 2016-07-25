@@ -45,22 +45,8 @@ def go_vet(path)
   sh "go vet #{path}"
 end
 
-def go_test(path, opts={})
-  opts = {
-    :v => false,
-    :include => "raclette"
-  }.merge(opts)
-
-  paths = [path]
-  if opts[:include]
-    deps = `go list -f '{{ join .Deps "\\n"}}' #{path} | sort | uniq`.split("\n").select do |p|
-      p.include? opts[:include]
-    end
-    paths = paths.concat(deps)
-  end
-
-  v = opts[:v] ? "-v" : ""
-  sh "go test #{v} #{paths.join(' ')}"
+def go_test(path)
+  sh "go test #{path}"
 end
 
 # return the dependencies of all the packages who start with the root path

@@ -11,12 +11,14 @@ func TestRandomSpan(t *testing.T) {
 
 	for i := 0; i < 1000; i++ {
 		s := RandomSpan()
-		assert.Nil(s.Normalize())
+		err := s.Normalize()
+		assert.Nil(err)
 	}
 }
 
 func TestTestSpan(t *testing.T) {
 	assert := assert.New(t)
 	ts := TestSpan()
-	assert.Nil(ts.Normalize())
+	err := ts.Normalize()
+	assert.NotNil(err)
 }
