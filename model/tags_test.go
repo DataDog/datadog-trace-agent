@@ -3,7 +3,6 @@ package model
 import (
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -84,7 +83,7 @@ func TestFilterTags(t *testing.T) {
 }
 
 func TestAggrString(t *testing.T) {
-	sb := NewStatsBucket(0, 1e9, time.Millisecond)
+	sb := NewStatsBucket(0, 1e9)
 
 	assert := assert.New(t)
 	span := Span{Service: "thing", Name: "other", Resource: "yo"}

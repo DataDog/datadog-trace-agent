@@ -21,7 +21,7 @@ var testSpans = []Span{
 func TestStatsBucketDefault(t *testing.T) {
 	assert := assert.New(t)
 
-	sb := NewStatsBucket(0, 1e9, time.Millisecond)
+	sb := NewStatsBucket(0, 1e9)
 
 	// No custom aggregators only the defaults
 	aggr := []string{}
@@ -66,7 +66,7 @@ func TestStatsBucketDefault(t *testing.T) {
 func TestStatsBucketExtraAggregators(t *testing.T) {
 	assert := assert.New(t)
 
-	sb := NewStatsBucket(0, 1e9, time.Millisecond)
+	sb := NewStatsBucket(0, 1e9)
 
 	// one custom aggregator
 	aggr := []string{"version"}
@@ -134,7 +134,7 @@ func TestTsRounding(t *testing.T) {
 }
 
 func BenchmarkHandleSpan(b *testing.B) {
-	sb := NewStatsBucket(0, 1e9, time.Millisecond)
+	sb := NewStatsBucket(0, 1e9)
 	aggr := []string{}
 	for i := 0; i < b.N; i++ {
 		for _, s := range testSpans {
@@ -146,7 +146,7 @@ func BenchmarkHandleSpan(b *testing.B) {
 
 func BenchmarkGetAggregateString(b *testing.B) {
 	aggr := []string{}
-	sb := NewStatsBucket(0, 1e9, time.Millisecond)
+	sb := NewStatsBucket(0, 1e9)
 	for i := 0; i < b.N; i++ {
 		for _, s := range testSpans {
 			getAggregateGrain(s, aggr, &sb.keyBuf)
