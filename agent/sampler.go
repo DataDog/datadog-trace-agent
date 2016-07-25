@@ -34,7 +34,7 @@ func NewSampler(in chan model.Trace, conf *config.AgentConfig) *Sampler {
 		in:         in,
 		out:        make(chan []model.Trace),
 		traceCount: 0,
-		se:         sampler.NewSignatureSampler(conf.SamplerSMin, conf.SamplerTheta, conf.SamplerJitter, conf.SamplerTPSMax),
+		se:         sampler.NewSignatureSampler(conf.ScoreThreshold, conf.SignaturePeriod, conf.ScoreJitter, conf.TPSMax),
 	}
 }
 

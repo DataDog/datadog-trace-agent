@@ -69,11 +69,11 @@ func TestConfigLoadAndMerge(t *testing.T) {
 	assert.Equal("thing", agentConfig.HostName)
 	assert.Equal("pommedapi", agentConfig.APIKey)
 	assert.Equal([]string{"resource", "error"}, agentConfig.ExtraAggregators)
-	assert.Equal(0.33, agentConfig.SamplerJitter)
+	assert.Equal(0.33, agentConfig.ScoreJitter)
 
 	// Check some defaults
 	assert.Equal(defaultConfig.BucketInterval, agentConfig.BucketInterval)
 	assert.Equal(defaultConfig.OldestSpanCutoff, agentConfig.OldestSpanCutoff)
-	assert.Equal(defaultConfig.SamplerTPSMax, agentConfig.SamplerTPSMax)
+	assert.Equal(defaultConfig.TPSMax, agentConfig.TPSMax)
 	assert.Equal(defaultConfig.StatsdHost, agentConfig.StatsdHost)
 }

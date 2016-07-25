@@ -28,10 +28,10 @@ type AgentConfig struct {
 	ExtraAggregators []string
 
 	// Sampler configuration
-	SamplerSMin   float64
-	SamplerTheta  time.Duration
-	SamplerJitter float64
-	SamplerTPSMax float64
+	ScoreThreshold  float64
+	SignaturePeriod time.Duration
+	ScoreJitter     float64
+	TPSMax          float64
 
 	// Receiver
 	ConnectionLimit int // for rate-limiting, how many unique connections to allow in a lease period (30s)
@@ -87,10 +87,10 @@ func NewDefaultAgentConfig() *AgentConfig {
 		OldestSpanCutoff: time.Duration(60 * time.Second).Nanoseconds(),
 		ExtraAggregators: []string{},
 
-		SamplerSMin:   5,
-		SamplerTheta:  time.Minute,
-		SamplerJitter: 0.1,
-		SamplerTPSMax: 100,
+		ScoreThreshold:  5,
+		SignaturePeriod: time.Minute,
+		ScoreJitter:     0.1,
+		TPSMax:          100,
 
 		ConnectionLimit: 2000,
 
@@ -143,16 +143,16 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 	}
 
 	if v, e := conf.GetFloat("trace.sampler", "score_threshold"); e == nil {
-		c.SamplerSMin = v
+		c.ScoreThreshold = v
 	}
 	if v, e := conf.GetFloat("trace.sampler", "trace_period"); e == nil {
-		c.SamplerTheta = time.Duration(int(v * 1e9))
+		c.SignaturePeriod = time.Duration(int(v * 1e9))
 	}
 	if v, e := conf.GetFloat("trace.sampler", "score_jitter"); e == nil {
-		c.SamplerJitter = v
+		c.ScoreJitter = v
 	}
 	if v, e := conf.GetFloat("trace.sampler", "max_tps"); e == nil {
-		c.SamplerTPSMax = v
+		c.TPSMax = v
 	}
 
 	if v, e := conf.GetInt("trace.receiver", "connection_limit"); e == nil {

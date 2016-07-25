@@ -37,23 +37,23 @@ type SignatureSampler struct {
 	mu sync.Mutex
 
 	// Scoring configuration
-	sMin   float64       // Score required to be sampled, sample when score is over sMin
-	theta  time.Duration // Typical last-seen duration after which we want to sample a trace
-	jitter float64       // Multiplicative random coefficient (0 to 1)
-	tpsMax float64       // Hard-limit on the number of traces per second
+	scoreThreshold  float64       // Score required to be sampled, sample when score is over scoreThreshold
+	signaturePeriod time.Duration // Typical last-seen duration after which we want to sample a trace
+	scoreJitter     float64       // Multiplicative random coefficient (0 to 1)
+	tpsMax          float64       // Hard-limit on the number of traces per second
 }
 
 // NewSignatureSampler creates a new SignatureSampler, ready to ingest traces
-func NewSignatureSampler(sMin float64, theta time.Duration, jitter float64, tpsMax float64) *SignatureSampler {
+func NewSignatureSampler(scoreThreshold float64, signaturePeriod time.Duration, scoreJitter float64, tpsMax float64) *SignatureSampler {
 	return &SignatureSampler{
 		lastTSBySignature: map[Signature]time.Time{},
 		sampledTraces:     []model.Trace{},
 		lastFlush:         time.Now(),
 
-		sMin:   sMin,
-		theta:  theta,
-		jitter: jitter,
-		tpsMax: tpsMax,
+		scoreThreshold:  scoreThreshold,
+		signaturePeriod: signaturePeriod,
+		scoreJitter:     scoreJitter,
+		tpsMax:          tpsMax,
 	}
 }
 
@@ -98,7 +98,7 @@ func (s *SignatureSampler) AddTrace(trace model.Trace) {
 	s.mu.Lock()
 
 	score := s.GetScore(signature)
-	sampled := score > s.sMin
+	sampled := score > s.scoreThreshold
 	if sampled {
 		s.sampledTraces = append(s.sampledTraces, trace)
 		s.lastTSBySignature[signature] = time.Now()
@@ -116,7 +116,7 @@ func (s *SignatureSampler) GetScore(signature Signature) float64 {
 	timeScore := s.GetTimeScore(signature)
 
 	// Add some jitter
-	return timeScore * (1 + s.jitter*(1-2*rand.Float64()))
+	return timeScore * (1 + s.scoreJitter*(1-2*rand.Float64()))
 }
 
 // GetTimeScore gives a score based on the square root of the last time this signature was seen.
@@ -144,7 +144,7 @@ func (s *SignatureSampler) GetTimeScore(signature Signature) float64 {
 		return 0
 	}
 
-	return math.Min(logRescaler*math.Log(1+logMultiplier*float64(delta/s.theta)), 10)
+	return math.Min(logRescaler*math.Log(1+logMultiplier*float64(delta/s.signaturePeriod)), 10)
 }
 
 // ComputeSignature generates a signature of a trace
