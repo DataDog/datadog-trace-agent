@@ -28,9 +28,9 @@ type AgentConfig struct {
 	ExtraAggregators []string
 
 	// Sampler configuration
-	SamplerTheta  float64
-	SamplerJitter float64
 	SamplerSMin   float64
+	SamplerTheta  time.Duration
+	SamplerJitter float64
 	SamplerTPSMax float64
 
 	// Receiver
@@ -88,7 +88,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 		ExtraAggregators: []string{},
 
 		SamplerSMin:   5,
-		SamplerTheta:  60, // 1 min
+		SamplerTheta:  time.Minute,
 		SamplerJitter: 0.1,
 		SamplerTPSMax: 100,
 
@@ -146,11 +146,9 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 		c.SamplerSMin = v
 	}
 	if v, e := conf.GetFloat("trace.sampler", "trace_period"); e == nil {
-		c.SamplerTheta = v
+		c.SamplerTheta = time.Duration(int(v * 1e9))
 	}
 	if v, e := conf.GetFloat("trace.sampler", "score_jitter"); e == nil {
-		log.Info(e)
-		log.Info(v)
 		c.SamplerJitter = v
 	}
 	if v, e := conf.GetFloat("trace.sampler", "max_tps"); e == nil {

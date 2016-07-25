@@ -19,9 +19,7 @@ const (
 	logRescaler   = 2.0851619571212314 // = 5 * 1 / math.Log(1+logMultiplier)
 
 	// Expire signature when too old. Be sure that it is compatible with GetTimeScore.
-	signatureExpiration = 15 * 60 // 15 minutes
-	// Frequency of expiration
-	expirationPeriod = 60 // 1 minute
+	signatureExpiration = 15 * time.Minute
 )
 
 // Signature is a simple representation of trace, used to identify simlar traces
@@ -29,31 +27,28 @@ type Signature uint64
 
 // SignatureSampler samples by identifying traces with a signature then score it
 type SignatureSampler struct {
-	// Last time we sampled a given signature (epoch in seconds)
-	lastTSBySignature map[Signature]float64
+	// Last time we sampled a given signature
+	lastTSBySignature map[Signature]time.Time
 	// Traces sampled kept until the next flush
 	sampledTraces []model.Trace
 	// Time of the last flush
-	lastFlush float64
+	lastFlush time.Time
 	// Lock to protect our 2 maps
 	mu sync.Mutex
 
 	// Scoring configuration
-	sMin   float64 // Score required to be sampled, sample when score is over sMin
-	theta  float64 // Typical last-seen duration (in s) after which we want to sample a trace
-	jitter float64 // Multiplicative random coefficient (0 to 1)
-	tpsMax float64 // Hard-limit on the number of traces per second
+	sMin   float64       // Score required to be sampled, sample when score is over sMin
+	theta  time.Duration // Typical last-seen duration after which we want to sample a trace
+	jitter float64       // Multiplicative random coefficient (0 to 1)
+	tpsMax float64       // Hard-limit on the number of traces per second
 }
 
 // NewSignatureSampler creates a new SignatureSampler, ready to ingest traces
-func NewSignatureSampler(sMin, theta, jitter, tpsMax float64) *SignatureSampler {
-	// TODO: have a go-routine expiring old signatures from lastTSBySignature
-	// TODO: have a max on the size of lastTSBySignature
-
+func NewSignatureSampler(sMin float64, theta time.Duration, jitter float64, tpsMax float64) *SignatureSampler {
 	return &SignatureSampler{
-		lastTSBySignature: map[Signature]float64{},
+		lastTSBySignature: map[Signature]time.Time{},
 		sampledTraces:     []model.Trace{},
-		lastFlush:         float64(time.Now().UnixNano()) / 1e9,
+		lastFlush:         time.Now(),
 
 		sMin:   sMin,
 		theta:  theta,
@@ -64,9 +59,9 @@ func NewSignatureSampler(sMin, theta, jitter, tpsMax float64) *SignatureSampler 
 
 // Flush returns representative spans based on GetSamples and reset its internal memory
 func (s *SignatureSampler) Flush() []model.Trace {
-	now := float64(time.Now().UnixNano()) / 1e9
-	sampledDuration := now - s.lastFlush
-	hardLimit := int(s.tpsMax * math.Ceil(sampledDuration))
+	now := time.Now()
+	sampledDuration := now.Sub(s.lastFlush)
+	hardLimit := int(s.tpsMax * math.Ceil(sampledDuration.Seconds()))
 
 	s.mu.Lock()
 	samples := s.sampledTraces
@@ -87,10 +82,10 @@ func (s *SignatureSampler) Flush() []model.Trace {
 // expireSignatureMap expire data from lastTSBySignature to limit the memory footprint
 // Corollary: it also limits the max size of the map to: tpsMax * expireAfter entries
 func (s *SignatureSampler) expireSignatureMap() {
-	ageCutoff := float64(time.Now().UnixNano())/1e9 - signatureExpiration
+	tsCutoff := time.Now().Add(-signatureExpiration)
 
 	for signature, ts := range s.lastTSBySignature {
-		if ts < ageCutoff {
+		if ts.Before(tsCutoff) {
 			delete(s.lastTSBySignature, signature)
 		}
 	}
@@ -106,7 +101,7 @@ func (s *SignatureSampler) AddTrace(trace model.Trace) {
 	sampled := score > s.sMin
 	if sampled {
 		s.sampledTraces = append(s.sampledTraces, trace)
-		s.lastTSBySignature[signature] = float64(time.Now().UnixNano()) / 1e9
+		s.lastTSBySignature[signature] = time.Now()
 	}
 
 	s.mu.Unlock()
@@ -143,13 +138,13 @@ func (s *SignatureSampler) GetTimeScore(signature Signature) float64 {
 	if !seen {
 		return 10
 	}
-	delta := float64(time.Now().UnixNano())/1e9 - ts
+	delta := time.Now().Sub(ts)
 
 	if delta <= 0 {
 		return 0
 	}
 
-	return math.Min(logRescaler*math.Log(1+logMultiplier*delta/s.theta), 10)
+	return math.Min(logRescaler*math.Log(1+logMultiplier*float64(delta/s.theta)), 10)
 }
 
 // ComputeSignature generates a signature of a trace
