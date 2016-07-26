@@ -2,6 +2,7 @@
 
 set -e
 
+echo "Running dd-trace-agent post-install with arguments: $@ ..."
 case "$1" in
     configure)
         echo "Registering service dd-trace-agent"
@@ -22,6 +23,5 @@ esac
 # dh_installinit handles the configure phase for sysvinit systems
 
 #DEBHELPER#
-
-echo "Running dd-trace-agent post-installation. arguments: $@ ... done"
+echo "Post-install done"
 exit 0
