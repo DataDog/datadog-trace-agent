@@ -15,6 +15,7 @@ case "$1" in
         if command -v start > /dev/null 2>&1; then
             stop dd-trace-agent || true
             start dd-trace-agent || true
+            echo "Post-install done"
             exit 0
         fi
         ;;
