@@ -4,6 +4,6 @@ Build-Depends: debhelper( >= 9), rake( >= 0.9), git( >= 1.7)
 Maintainer: dev@datadoghq.com <dev@datadoghq.com>
 
 Package: dd-trace-agent
-Recommends: datadog-agent ( >= 1:5.8.0-1)
+Depends: datadog-agent ( >= 1:5.8.0-1)
 Architecture: any
 Description: (TODO) A tracing agent
