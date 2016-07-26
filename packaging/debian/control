@@ -1,9 +1,9 @@
 Source: dd-trace-agent
 # Note go not listed under Build-Depends because of eccentricities with its deb repo. it must be installed manually in a prior build step
 Build-Depends: debhelper( >= 9), rake( >= 0.9), git( >= 1.7)
-Maintainer: dev@datadoghq.com <dev@datadoghq.com>
+Maintainer: Datadog, Inc <package@datadoghq.com>
 
 Package: dd-trace-agent
 Depends: datadog-agent ( >= 1:5.8.0-1)
 Architecture: any
-Description: (TODO) A tracing agent
+Description: An agent for aggregating and submitting traces to Datadog (www.datadoghq.com)
