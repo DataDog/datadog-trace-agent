@@ -1,5 +1,5 @@
-dd-trace-agent (0:0.1.0) UNRELEASED; urgency=medium
+dd-trace-agent (0.99.0) UNRELEASED; urgency=medium
 
-  * Fake entry.
+  * Introduce dd-trace-agent package.
 
- -- Data Dog <dev@datadoghq.com>  Thu, 12 May 2016 14:32:02 +0200
+ -- Datadog, Inc <package@datadoghq.com>  Thu, 12 May 2016 14:32:02 +0200
