@@ -5,7 +5,7 @@
 
 set passphrase $env(RPM_SIGNING_PASSPHRASE)
 
-spawn rpm --addsign ../../RPMS/x86_64/*.rpm
+spawn rpm --addsign /go/src/github.com/DataDog/raclette/RPMS/x86_64/*.rpm
 expect -exact "Enter pass phrase: "
 send -- "$passphrase\r"
 expect eof
