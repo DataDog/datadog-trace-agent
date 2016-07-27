@@ -1,0 +1,12 @@
+#!/usr/bin/expect -f
+#
+# rpmsign-batch.expect : expect powered rpm signing command
+#
+
+set passphrase $env(RPM_SIGNING_PASSPHRASE)
+set rpmfile [exec find /go/src/github.com/DataDog/raclette -name *.rpm -type f]
+
+spawn rpm --addsign $rpmfile
+expect -exact "Enter pass phrase: "
+send -- "$passphrase\r"
+expect eof
