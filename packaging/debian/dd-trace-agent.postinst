@@ -13,8 +13,10 @@ case "$1" in
 
         echo "Starting service dd-trace-agent"
         if command -v start > /dev/null 2>&1; then
-            stop dd-trace-agent || true
-            start dd-trace-agent || true
+            set +e
+            stop dd-trace-agent
+            start dd-trace-agent
+            set -e
             echo "Post-install done"
             exit 0
         fi
