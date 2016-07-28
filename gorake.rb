@@ -13,11 +13,14 @@ def go_build(program, opts={})
   branch = `git rev-parse --abbrev-ref HEAD`.strip
   date = `date`.strip
   goversion = `go version`.strip
+  agentversion = ENV["TRACE_AGENT_VERSION"] || "0.99.0"
+
   ldflags = {
     "#{dd}.BuildDate" => "#{date}",
     "#{dd}.GitCommit" => "#{commit}",
     "#{dd}.GitBranch" => "#{branch}",
     "#{dd}.GoVersion" => "#{goversion}",
+    "#{dd}.Version" => "#{agentversion}",
   }.map do |k,v|
     if goversion.include?("1.4")
       "-X #{k} '#{v}'"
