@@ -9,7 +9,6 @@ License: BSD
 Summary: A tracing agent crafted with <3 from Datadog
 Buildroot: /go/src/github.com/DataDog/raclette
 Packager: Datadog <dev@datadoghq.com>
-%{?systemd_requires}
 BuildRequires: systemd
 
 %description
