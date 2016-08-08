@@ -209,3 +209,10 @@ func TestNormalizeTypeTooLong(t *testing.T) {
 	s.Normalize()
 	assert.NotNil(t, s.Normalize())
 }
+
+func TestNormalizeServiceTag(t *testing.T) {
+	s := Span(testSpan)
+	s.Service = "retargeting(api-Staging "
+	s.Normalize()
+	assert.Equal(t, "retargeting_api-staging", s.Service)
+}
