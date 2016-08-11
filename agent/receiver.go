@@ -152,17 +152,17 @@ func (l *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, r *http
 	for _, t := range traces {
 		var toRemove []int
 		var id uint64
-		for i, s := range t {
+		for i := range t {
 			// we should drop "traces" that are not actually traces where several
 			// trace IDs are reported. (probably a bug in the client)
-			if i != 0 && s.TraceID != id {
+			if i != 0 && t[i].TraceID != id {
 				toRemove = make([]int, len(t)) // FIXME[leo]: non-needed alloc
 			}
-			id = s.TraceID
+			id = t[i].TraceID
 
-			err := s.Normalize()
+			err := t[i].Normalize()
 			if err != nil {
-				log.Errorf("dropping span %v, could not normalize: %v", s, err)
+				log.Errorf("dropping span %v, could not normalize: %v", t[i], err)
 				toRemove = append(toRemove, i)
 			}
 		}
