@@ -221,6 +221,8 @@ func FilterTags(tags, groups []string) []string {
 	return out
 }
 
+// NormalizeTag applies some normalization to ensure the tags match the
+// backend requirements
 // taken from dd-go.model.NormalizeTag
 func NormalizeTag(tag string) string {
 	// unless you just throw out unicode, this is already as fast as it gets
