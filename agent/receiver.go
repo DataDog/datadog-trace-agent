@@ -21,6 +21,12 @@ const (
 	v02
 )
 
+func httpHandleWithVersion(v APIVersion, f func(APIVersion, http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		f(v, w, r)
+	}
+}
+
 // receiverStats tracks statistics about incoming payloads
 type receiverStats struct {
 	Errors         int64
@@ -56,11 +62,6 @@ func NewHTTPReceiver(connLimit int) *HTTPReceiver {
 
 // Run starts doing the HTTP server and is ready to receive traces
 func (l *HTTPReceiver) Run() {
-	httpHandleWithVersion := func(v APIVersion, f func(APIVersion, http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
-		return func(w http.ResponseWriter, r *http.Request) {
-			f(v, w, r)
-		}
-	}
 
 	// legacy collector API
 	http.HandleFunc("/spans", httpHandleWithVersion(v01, l.handleTraces))
