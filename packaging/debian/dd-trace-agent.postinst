@@ -3,26 +3,6 @@
 set -e
 
 echo "Running dd-trace-agent post-install with arguments: $@ ..."
-case "$1" in
-    configure)
-        echo "Registering service dd-trace-agent"
-        if command -v initctl > /dev/null 2>&1; then
-            # use upstart if available
-            initctl reload-configuration
-        fi
-
-        echo "Starting service dd-trace-agent"
-        if command -v start > /dev/null 2>&1; then
-            set +e
-            stop dd-trace-agent
-            start dd-trace-agent
-            set -e
-            echo "Post-install done"
-            exit 0
-        fi
-        ;;
-esac
-
 # dh_installinit handles the configure phase for sysvinit systems
 
 #DEBHELPER#
