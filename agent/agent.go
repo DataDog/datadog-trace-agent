@@ -29,7 +29,7 @@ type Agent struct {
 func NewAgent(conf *config.AgentConfig) *Agent {
 	exit := make(chan struct{})
 
-	r := NewHTTPReceiver(conf.ConnectionLimit)
+	r := NewHTTPReceiver(conf)
 	st := NewSublayerTagger(r.traces)
 	q := NewQuantizer(st.out)
 

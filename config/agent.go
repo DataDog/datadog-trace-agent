@@ -34,6 +34,7 @@ type AgentConfig struct {
 	TPSMax          float64
 
 	// Receiver
+	ReceiverPort    int
 	ConnectionLimit int // for rate-limiting, how many unique connections to allow in a lease period (30s)
 
 	// internal telemetry
@@ -92,6 +93,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 		ScoreJitter:     0.1,
 		TPSMax:          100,
 
+		ReceiverPort:    7777,
 		ConnectionLimit: 2000,
 
 		StatsdHost: "localhost",
@@ -153,6 +155,10 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 	}
 	if v, e := conf.GetFloat("trace.sampler", "max_tps"); e == nil {
 		c.TPSMax = v
+	}
+
+	if v, e := conf.GetInt("trace.receiver", "receiver_port"); e == nil {
+		c.ReceiverPort = v
 	}
 
 	if v, e := conf.GetInt("trace.receiver", "connection_limit"); e == nil {

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -15,8 +16,11 @@ import (
 func TestReceiverTraces(t *testing.T) {
 	assert := assert.New(t)
 
+	// get the default configuration
+	defaultConfig := config.NewDefaultAgentConfig()
+
 	// receiver just here so that we can attach the handler
-	r := NewHTTPReceiver(10)
+	r := NewHTTPReceiver(defaultConfig)
 	server := httptest.NewServer(
 		http.HandlerFunc(httpHandleWithVersion(v02, r.handleTraces)),
 	)
