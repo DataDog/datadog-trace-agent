@@ -87,18 +87,10 @@ func (a *Agent) runFlusher() {
 			go func() {
 				defer wg.Done()
 				traces := <-a.Sampler.out
-				if a.Config.APIFlushTraces {
-					p.Traces = traces
-				} else {
-					// try to avoid allocs
-					p.Spans = make([]model.Span, 0, len(traces)*10)
-					for _, t := range traces {
-						p.Spans = append(p.Spans, t...)
-					}
-				}
+				p.Traces = traces
 			}()
 			wg.Wait()
-			log.Debugf("tock - all routines flushed (%d stats, %d/%d spans/traces)", len(p.Stats), len(p.Spans), len(p.Traces))
+			log.Debugf("tock - all routines flushed (%d stats, %d traces)", len(p.Stats), len(p.Traces))
 
 			if !p.IsEmpty() {
 				a.Writer.in <- p
