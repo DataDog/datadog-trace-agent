@@ -77,6 +77,16 @@ func (s *Span) Normalize() error {
 		return errors.New("span.normalize: empty `SpanID`")
 	}
 
+	// ParentID, TraceID and SpanID set in the client could be the same
+	// Supporting the ParentID == TraceID == SpanID for the root span, is compliant
+	// with the Zipkin implementation. Furthermore, as described in the PR
+	// https://github.com/openzipkin/zipkin/pull/851 the constraint that the
+	// root span's ``trace id = span id`` has been removed
+	if s.ParentID == s.TraceID && s.ParentID == s.SpanID {
+		s.ParentID = 0
+		log.Debugf("span.normalize: `ParentID`, `TraceID` and `SpanID` are the same; `ParentID` set to 0: %s", s.TraceID)
+	}
+
 	// Start & Duration as nanoseconds timestamps
 	// if s.Start is very little, less than year 2000 probably a unit issue so discard
 	// (or it is "le bug de l'an 2000")
