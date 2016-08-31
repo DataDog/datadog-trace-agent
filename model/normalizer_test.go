@@ -216,3 +216,16 @@ func TestNormalizeServiceTag(t *testing.T) {
 	s.Normalize()
 	assert.Equal(t, "retargeting_api-staging", s.Service)
 }
+
+func TestNormalizeInequalityRootSpan(t *testing.T) {
+	s := Span(testSpan)
+	s.ParentID = 42
+	s.TraceID = 42
+	s.SpanID = 42
+	beforeTraceID := s.TraceID
+	beforeSpanID := s.SpanID
+	s.Normalize()
+	assert.Equal(t, uint64(0), s.ParentID)
+	assert.Equal(t, beforeTraceID, s.TraceID)
+	assert.Equal(t, beforeSpanID, s.SpanID)
+}

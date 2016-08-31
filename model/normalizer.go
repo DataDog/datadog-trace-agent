@@ -77,6 +77,13 @@ func (s *Span) Normalize() error {
 		return errors.New("span.normalize: empty `SpanID`")
 	}
 
+	// ParentID, TraceID and SpanID set in the client could be the same
+	// we should support this format, allowing ParentID == TraceID == SpanID for the root span
+	if s.ParentID == s.TraceID && s.ParentID == s.SpanID {
+		s.ParentID = 0
+		log.Debugf("span.normalize: `ParentID`, `TraceID` and `SpanID` are the same; `ParentID` set to 0: %s", s.TraceID)
+	}
+
 	// Start & Duration as nanoseconds timestamps
 	// if s.Start is very little, less than year 2000 probably a unit issue so discard
 	// (or it is "le bug de l'an 2000")
