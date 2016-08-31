@@ -217,7 +217,7 @@ func TestNormalizeServiceTag(t *testing.T) {
 	assert.Equal(t, "retargeting_api-staging", s.Service)
 }
 
-func TestNormalizeInequalityRootSpan(t *testing.T) {
+func TestSpecialZipkinRootSpan(t *testing.T) {
 	s := Span(testSpan)
 	s.ParentID = 42
 	s.TraceID = 42
