@@ -271,7 +271,7 @@ func TestSpan() model.Span {
 		Service:  "django",
 		Name:     "django.controller",
 		SpanID:   42,
-		Start:    1448466874000,
+		Start:    1472732573337575936,
 		TraceID:  424242,
 		Meta: map[string]string{
 			"user": "leo",

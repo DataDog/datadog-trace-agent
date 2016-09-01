@@ -20,5 +20,5 @@ func TestTestSpan(t *testing.T) {
 	assert := assert.New(t)
 	ts := TestSpan()
 	err := ts.Normalize()
-	assert.NotNil(err)
+	assert.Nil(err)
 }
