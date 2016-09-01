@@ -17,10 +17,9 @@ type AgentConfig struct {
 	HostName string
 
 	// API
-	APIEndpoint    string
-	APIKey         string
-	APIEnabled     bool
-	APIFlushTraces bool
+	APIEndpoint string
+	APIKey      string
+	APIEnabled  bool
 
 	// Concentrator
 	BucketInterval   time.Duration // the size of our pre-aggregation per bucket
@@ -78,11 +77,10 @@ func NewDefaultAgentConfig() *AgentConfig {
 		hostname = ""
 	}
 	ac := &AgentConfig{
-		HostName:       hostname,
-		APIEndpoint:    "https://trace.agent.datadoghq.com/api/v0.1",
-		APIKey:         "",
-		APIEnabled:     true,
-		APIFlushTraces: true,
+		HostName:    hostname,
+		APIEndpoint: "https://trace.agent.datadoghq.com/api/v0.1",
+		APIKey:      "",
+		APIEnabled:  true,
 
 		BucketInterval:   time.Duration(10) * time.Second,
 		OldestSpanCutoff: time.Duration(60 * time.Second).Nanoseconds(),
@@ -124,10 +122,6 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 
 	if v, _ := conf.Get("trace.api", "endpoint"); v != "" {
 		c.APIEndpoint = v
-	}
-
-	if v, e := conf.Get("trace.api", "flush_traces"); e == nil && v == "false" {
-		c.APIFlushTraces = false
 	}
 
 	if v, e := conf.GetInt("trace.concentrator", "bucket_size_seconds"); e == nil {
