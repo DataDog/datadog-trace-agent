@@ -79,7 +79,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 	}
 	ac := &AgentConfig{
 		HostName:       hostname,
-		APIEndpoint:    "https://trace.datadoghq.com/api/v0.1",
+		APIEndpoint:    "https://trace.agent.datadoghq.com/api/v0.1",
 		APIKey:         "",
 		APIEnabled:     true,
 		APIFlushTraces: true,
