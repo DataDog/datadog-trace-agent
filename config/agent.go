@@ -1,7 +1,9 @@
 package config
 
 import (
+	"errors"
 	"os"
+	"strings"
 	"time"
 
 	"gopkg.in/ini.v1"
@@ -17,9 +19,9 @@ type AgentConfig struct {
 	HostName string
 
 	// API
-	APIEndpoint string
-	APIKey      string
-	APIEnabled  bool
+	APIEndpoints []string
+	APIKeys      []string
+	APIEnabled   bool
 
 	// Concentrator
 	BucketInterval   time.Duration // the size of our pre-aggregation per bucket
@@ -55,8 +57,8 @@ func mergeConfig(c *AgentConfig, f *ini.File) {
 		log.Info("Failed to parse hostname from dd-agent config")
 	}
 
-	if v := m.Key("api_key").MustString(""); v != "" {
-		c.APIKey = v
+	if v := m.Key("api_key").Strings(","); len(v) != 0 {
+		c.APIKeys = v
 	} else {
 		log.Info("Failed to parse api_key from dd-agent config")
 	}
@@ -77,10 +79,10 @@ func NewDefaultAgentConfig() *AgentConfig {
 		hostname = ""
 	}
 	ac := &AgentConfig{
-		HostName:    hostname,
-		APIEndpoint: "https://trace.agent.datadoghq.com/api/v0.1",
-		APIKey:      "",
-		APIEnabled:  true,
+		HostName:     hostname,
+		APIEndpoints: []string{"https://trace.agent.datadoghq.com/api/v0.1"},
+		APIKeys:      []string{""},
+		APIEnabled:   true,
 
 		BucketInterval:   time.Duration(10) * time.Second,
 		OldestSpanCutoff: time.Duration(60 * time.Second).Nanoseconds(),
@@ -117,11 +119,23 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 	}
 
 	if v, _ := conf.Get("trace.api", "api_key"); v != "" {
-		c.APIKey = v
+		vals := strings.Split(v, ",")
+		for i := range vals {
+			vals[i] = strings.TrimSpace(vals[i])
+		}
+		c.APIKeys = vals
 	}
 
 	if v, _ := conf.Get("trace.api", "endpoint"); v != "" {
-		c.APIEndpoint = v
+		vals := strings.Split(v, ",")
+		for i := range vals {
+			vals[i] = strings.TrimSpace(vals[i])
+		}
+		c.APIEndpoints = vals
+	}
+
+	if len(c.APIKeys) != len(c.APIEndpoints) {
+		return c, errors.New("every API key needs to have an explicit endpoint associated")
 	}
 
 	if v, e := conf.GetInt("trace.concentrator", "bucket_size_seconds"); e == nil {

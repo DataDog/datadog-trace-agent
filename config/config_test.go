@@ -1,12 +1,14 @@
 package config
 
 import (
-	"github.com/stretchr/testify/assert"
 	"strings"
 	"time"
 
-	"gopkg.in/ini.v1"
+	"github.com/stretchr/testify/assert"
+
 	"testing"
+
+	"gopkg.in/ini.v1"
 )
 
 func TestGetStrArray(t *testing.T) {
@@ -28,7 +30,7 @@ func TestMergeConfig(t *testing.T) {
 		HostName: "hostname",
 
 		APIEndpoint: "http://localhost:8012/api/v0.1",
-		APIKey:      "",
+		APIKeys:     []string{""},
 		APIEnabled:  true,
 
 		BucketInterval:   time.Duration(5) * time.Second,
@@ -42,9 +44,17 @@ func TestMergeConfig(t *testing.T) {
 	ddAgentConf, _ := ini.Load([]byte("[Main]\n\nhostname=thing\napi_key=apikey_12"))
 	mergeConfig(&agentConfig, ddAgentConf)
 	assert.Equal("thing", agentConfig.HostName)
-	assert.Equal("apikey_12", agentConfig.APIKey)
+	assert.Equal([]string{"apikey_12"}, agentConfig.APIKeys)
 }
 
+func TestDDAgentMultiAPIKeys(t *testing.T) {
+	assert := assert.New(t)
+	agentConfig := NewDefaultAgentConfig()
+
+	ddAgentConf, _ := ini.Load([]byte("[Main]\n\napi_key=foo, bar "))
+	mergeConfig(agentConfig, ddAgentConf)
+	assert.Equal([]string{"foo", "bar"}, agentConfig.APIKeys)
+}
 func TestConfigLoadAndMerge(t *testing.T) {
 	assert := assert.New(t)
 
@@ -67,7 +77,7 @@ func TestConfigLoadAndMerge(t *testing.T) {
 
 	// Properly loaded attributes
 	assert.Equal("thing", agentConfig.HostName)
-	assert.Equal("pommedapi", agentConfig.APIKey)
+	assert.Equal([]string{"pommedapi"}, agentConfig.APIKeys)
 	assert.Equal([]string{"resource", "error"}, agentConfig.ExtraAggregators)
 	assert.Equal(0.33, agentConfig.ScoreJitter)
 

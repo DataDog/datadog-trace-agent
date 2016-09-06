@@ -1,74 +1,67 @@
 package main
 
 import (
-	"bytes"
-	"compress/gzip"
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"sync"
-	"time"
-
 	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
-	"github.com/DataDog/raclette/statsd"
 )
 
-// Writer implements a Writer and writes to the Datadog API bucketed stats & spans
+// Writer is the last chain of trace-agent which takes the
+// pre-processed data from channels and tentatively output them
+// to a given endpoint.
 type Writer struct {
-	endpoint BucketEndpoint // config, where we're writing the data
+	endpoint AgentEndpoint // where the data will end
 
-	in         chan model.AgentPayload     // data input, payloads of concentrated spans/stats
-	inServices chan model.ServicesMetadata // the metadata we receive form the client to be stored in the backend
+	// input data
+	inPayloads chan model.AgentPayload     // main payloads for processed traces/stats
+	inServices chan model.ServicesMetadata // secondary services metadata
 
-	mu              sync.Mutex             // mutex on data above
-	payloadsToWrite []model.AgentPayload   // buffers to write to the API and currently written to from upstream
-	svcs            model.ServicesMetadata // the current up-to-date services
-	svcsVer         int64                  // the current version of services
-	svcsFlushed     int64                  // the last flushed version of services
+	payloadBuffer []model.AgentPayload   // buffered of payloads ready to send
+	serviceBuffer model.ServicesMetadata // services are merged into this map continuously
 
 	exit chan struct{}
 }
 
 // NewWriter returns a new Writer
-func NewWriter(conf *config.AgentConfig, inServices chan model.ServicesMetadata) *Writer {
-	var endpoint BucketEndpoint
+func NewWriter(conf *config.AgentConfig) *Writer {
+	var endpoint AgentEndpoint
+
 	if conf.APIEnabled {
-		endpoint = NewAPIEndpoint(conf.APIEndpoint, conf.APIKey, conf.HostName)
+		endpoint = NewAPIEndpoint(conf.APIEndpoints, conf.APIKeys)
 	} else {
-		log.Info("API interface is disabled, use NullEndpoint instead")
+		log.Info("API interface is disabled, flushing to /dev/null instead")
 		endpoint = NullEndpoint{}
 	}
 
 	return &Writer{
-		endpoint:   endpoint,
-		in:         make(chan model.AgentPayload),
-		inServices: inServices,
-		svcs:       make(model.ServicesMetadata),
-		exit:       make(chan struct{}),
+		endpoint: endpoint,
+
+		// small buffer to not block in case we're flushing
+		inPayloads: make(chan model.AgentPayload, 1),
+
+		payloadBuffer: make([]model.AgentPayload, 0, 5),
+		serviceBuffer: make(model.ServicesMetadata),
+
+		exit: make(chan struct{}),
 	}
 }
 
-// Run starts the writer ready to output traces to the Datadog API
+// Run starts the writer and starts writing what comes through the
+// input channel.
+// NOTE: this currently happens sequentially, but it would not be too
+// hard to mutex and parallelize. Not sure it's needed though.
 func (w *Writer) Run() {
 	for {
 		select {
-		case p := <-w.in:
-			log.Debug("new payload received, triggering flush")
-			w.mu.Lock()
-			w.payloadsToWrite = append(w.payloadsToWrite, p)
-			w.mu.Unlock()
+		case p := <-w.inPayloads:
+			w.payloadBuffer = append(w.payloadBuffer, p)
 			w.Flush()
-			w.FlushServices()
 		case sm := <-w.inServices:
-			w.mu.Lock()
-			w.svcs.Update(sm)
-			w.svcsVer++
-			w.mu.Unlock()
+			w.serviceBuffer.Update(sm)
+			w.FlushServices()
 		case <-w.exit:
-			log.Info("trying to flush all remaining data")
+			log.Info("exiting, trying to flush all remaining data")
 			w.Flush()
 			return
 		}
@@ -77,159 +70,16 @@ func (w *Writer) Run() {
 
 // FlushServices initiate a flush of the services to the services endpoint
 func (w *Writer) FlushServices() {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	if w.svcsFlushed == w.svcsVer {
-		return
-	}
-
-	err := w.endpoint.WriteServices(w.svcs)
-	if err != nil {
-		log.Errorf("could not flush services: %v", err)
-	}
-
-	w.svcsFlushed = w.svcsVer
+	w.endpoint.WriteServices(w.serviceBuffer)
 }
 
 // Flush actually writes the data in the API
 func (w *Writer) Flush() {
-	// TODO[leo], do we want this to be async?
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	// number of successfully flushed buckets
-	flushed := 0
-	total := len(w.payloadsToWrite)
-	if total == 0 {
-		return
+	// TODO[leo]: batch payloads in same API key
+	for _, p := range w.payloadBuffer {
+		w.endpoint.Write(p)
 	}
-
-	// FIXME: this is not ideal we might want to batch this into a single http call
-	for _, p := range w.payloadsToWrite {
-		err := w.endpoint.Write(p)
-		if err != nil {
-			log.Errorf("could not flush payload: %s", err)
-			break
-		}
-		flushed++
-	}
-
 	// regardless if the http post was was success or not. We don't want to buffer
-	//  data in case of api outage
-	w.payloadsToWrite = nil
-
-	if flushed != total {
-		log.Infof("successfully flushed %d payloads to the API but remains %d to flush", flushed, total-flushed)
-	}
-}
-
-// BucketEndpoint is a place where we can write payloads
-type BucketEndpoint interface {
-	Write(b model.AgentPayload) error
-	WriteServices(s model.ServicesMetadata) error
-}
-
-// APIEndpoint is the api we write to.
-type APIEndpoint struct {
-	hostname string
-	apiKey   string
-	url      string
-}
-
-// NewAPIEndpoint creates an endpoint writing to the given url and apiKey
-func NewAPIEndpoint(url string, apiKey string, hostname string) APIEndpoint {
-	return APIEndpoint{hostname: hostname, apiKey: apiKey, url: url}
-}
-
-// Write writes the bucket to the API collector endpoint
-func (a APIEndpoint) Write(payload model.AgentPayload) error {
-	startFlush := time.Now()
-	payload.HostName = a.hostname
-
-	var body bytes.Buffer
-	gz := gzip.NewWriter(&body)
-	err := json.NewEncoder(gz).Encode(payload)
-	if err != nil {
-		return err
-	}
-	gz.Close()
-	payloadLen := body.Len()
-
-	req, err := http.NewRequest("POST", a.url+"/collector", &body)
-	if err != nil {
-		return err
-	}
-
-	queryParams := req.URL.Query()
-	queryParams.Add("api_key", a.apiKey)
-	req.URL.RawQuery = queryParams.Encode()
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Content-Encoding", "gzip")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode/100 != 2 {
-		return fmt.Errorf("backend responded with %d %s", resp.StatusCode, resp.Status)
-	}
-
-	flushTime := time.Since(startFlush)
-	log.Infof("flushed payload to the API, time:%s, size:%d", flushTime, payloadLen)
-	statsd.Client.Gauge("trace_agent.writer.flush_duration", flushTime.Seconds(), nil, 1)
-	statsd.Client.Count("trace_agent.writer.payload_bytes", int64(body.Len()), nil, 1)
-
-	return nil
-}
-
-// WriteServices writes services to the services endpoint
-func (a APIEndpoint) WriteServices(s model.ServicesMetadata) error {
-	jsonStr, err := json.Marshal(s)
-	if err != nil {
-		return err
-	}
-
-	req, err := http.NewRequest("POST", a.url+"/services", bytes.NewBuffer(jsonStr))
-	if err != nil {
-		return err
-	}
-
-	queryParams := req.URL.Query()
-	queryParams.Add("api_key", a.apiKey)
-	req.URL.RawQuery = queryParams.Encode()
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode/100 != 2 {
-		return fmt.Errorf("backend responded with %d %s", resp.StatusCode, resp.Status)
-	}
-
-	log.Infof("flushed %d services to the API", len(s))
-
-	return nil
-}
-
-// NullEndpoint is a place where bucket go the void
-type NullEndpoint struct{}
-
-// Write drops the bucket on the floor
-func (ne NullEndpoint) Write(p model.AgentPayload) error {
-	log.Debug("Null endpoint is dropping bucket")
-	return nil
-}
-
-// WriteServices NOOP
-func (ne NullEndpoint) WriteServices(s model.ServicesMetadata) error {
-	log.Debug("Null endpoint dropping services info: %v", s)
-	return nil
+	// data in case of api outage. See also endpoint.Write() comment.
+	w.payloadBuffer = nil
 }

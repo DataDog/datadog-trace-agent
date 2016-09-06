@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -9,67 +8,142 @@ import (
 	"time"
 
 	"github.com/DataDog/raclette/config"
+	"github.com/DataDog/raclette/fixtures"
 	"github.com/DataDog/raclette/model"
+	"github.com/stretchr/testify/assert"
 )
 
-func NewTestWriter() *Writer {
-	conf := config.NewDefaultAgentConfig()
-	conf.APIKey = "9d6e1075bb75e28ea6e720a4561f6b6d"
-	conf.APIEndpoint = "http://localhost:8080"
-
-	return NewWriter(conf, make(chan model.ServicesMetadata))
+type dataFromAPI struct {
+	urlPath   string
+	urlParams map[string][]string
+	header    http.Header
+	body      string
 }
 
-func getTestStatsBuckets() []model.StatsBucket {
-	now := model.Now()
-	bucketSize := time.Duration(5 * time.Second).Nanoseconds()
-	sb := model.NewStatsBucket(now, bucketSize)
+func TestWriterServices(t *testing.T) {
+	assert := assert.New(t)
+	// where we'll receive data
+	data := make(chan dataFromAPI, 1)
 
-	testSpans := []model.Span{
-		model.Span{TraceID: 0, SpanID: 1},
-		model.Span{TraceID: 1, SpanID: 2},
-	}
-	for _, s := range testSpans {
-		sb.HandleSpan(s, []string{})
-	}
+	// make a real HTTP endpoint so we can test that too
+	testAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			t.Logf("http test server problem when reading, %v", err)
+			return
+		}
+		defer r.Body.Close()
 
-	return []model.StatsBucket{sb}
-}
-
-// Testing the real logic of the writer
-func TestWriterFlush(t *testing.T) {
-	// Create a fake API for the writer
-	receivedData := make(chan struct{}, 1)
-	testAPI := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		b, _ := ioutil.ReadAll(r.Body)
-		fmt.Println(string(b))
-		receivedData <- struct{}{}
+		data <- dataFromAPI{
+			urlPath:   r.URL.Path,
+			urlParams: r.URL.Query(),
+			header:    r.Header,
+			body:      string(body),
+		}
 		w.WriteHeader(200)
 	}))
-	defer testAPI.Close()
-	testAPI.Start()
 
-	// Start our writer with the test API
+	defer testAPI.Close()
+
 	conf := config.NewDefaultAgentConfig()
-	conf.APIKey = "9d6e1075bb75e28ea6e720a4561f6b6d"
-	conf.APIEndpoint = testAPI.URL + "/api/v0.1"
-	w := NewWriter(conf, make(chan model.ServicesMetadata))
+	conf.APIEndpoints = []string{testAPI.URL}
+	conf.APIKeys = []string{"xxxxxxx"}
+
+	w := NewWriter(conf)
 	go w.Run()
 
-	// light the fire by sending a bucket
-	w.in <- model.AgentPayload{Stats: getTestStatsBuckets()}
-
-	// Reflush, manually! synchronous
-	w.Flush()
-	timeout := make(chan struct{}, 1)
-	go func() {
-		time.Sleep(time.Second)
-		timeout <- struct{}{}
-	}()
-
-	select {
-	case <-timeout:
-		t.Fatal("did not receive http payload in time")
-	case <-receivedData:
+	// send services
+	services := model.ServicesMetadata{
+		"mcnulty": map[string]string{
+			"app_type": "web",
+		},
 	}
+
+	w.inServices = make(chan model.ServicesMetadata)
+	w.inServices <- services
+
+receivingLoop:
+	for {
+		select {
+		case received := <-data:
+			assert.Equal("/services", received.urlPath)
+			assert.Equal(map[string][]string{
+				"api_key": []string{"xxxxxxx"},
+			}, received.urlParams)
+			assert.Equal("application/json", received.header.Get("Content-Type"))
+			assert.Equal("", received.header.Get("Content-Encoding"))
+			assert.Equal(`{"mcnulty":{"app_type":"web"}}`, received.body)
+			break receivingLoop
+		case <-time.After(time.Second):
+			t.Fatal("did not receive service data in time")
+		}
+	}
+}
+
+func TestWriterPayload(t *testing.T) {
+	assert := assert.New(t)
+	// where we'll receive data
+	data := make(chan dataFromAPI, 1)
+
+	// make a real HTTP endpoint so we can test that too
+	testAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			t.Logf("http test server problem when reading, %v", err)
+			return
+		}
+		defer r.Body.Close()
+
+		data <- dataFromAPI{
+			urlPath:   r.URL.Path,
+			urlParams: r.URL.Query(),
+			header:    r.Header,
+			body:      string(body),
+		}
+		w.WriteHeader(200)
+	}))
+
+	// buggy server
+	testAPI2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(400)
+	}))
+
+	defer testAPI.Close()
+	defer testAPI2.Close()
+
+	conf := config.NewDefaultAgentConfig()
+	conf.APIEndpoints = []string{testAPI.URL, testAPI2.URL}
+	conf.APIKeys = []string{"xxxxxxx", "yyyyyyyy"}
+
+	w := NewWriter(conf)
+	go w.Run()
+
+	p := model.AgentPayload{
+		HostName: "test.host",
+		Traces:   []model.Trace{model.Trace{fixtures.TestSpan()}},
+		Stats:    []model.StatsBucket{fixtures.TestStatsBucket()},
+	}
+
+	w.inPayloads <- p
+
+receivingLoop:
+	for {
+		select {
+		case received := <-data:
+			assert.Equal("/api/v0.1/collector", received.urlPath)
+			assert.Equal(map[string][]string{
+				"api_key": []string{"xxxxxxx"},
+			}, received.urlParams)
+			assert.Equal("application/json", received.header.Get("Content-Type"))
+			assert.Equal("gzip", received.header.Get("Content-Encoding"))
+			// do not assert the body yet
+			break receivingLoop
+		case <-time.After(time.Second):
+			t.Fatal("did not receive service data in time")
+		}
+	}
+	time.Sleep(10 * time.Millisecond)
+
+	// we should just have ignored the 400 error on the other backend
+	assert.Len(w.payloadBuffer, 0)
 }
