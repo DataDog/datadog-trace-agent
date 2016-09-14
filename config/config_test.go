@@ -29,9 +29,9 @@ func TestMergeConfig(t *testing.T) {
 	agentConfig := AgentConfig{
 		HostName: "hostname",
 
-		APIEndpoint: "http://localhost:8012/api/v0.1",
-		APIKeys:     []string{""},
-		APIEnabled:  true,
+		APIEndpoints: []string{"http://localhost:8012/api/v0.1"},
+		APIKeys:      []string{""},
+		APIEnabled:   true,
 
 		BucketInterval:   time.Duration(5) * time.Second,
 		OldestSpanCutoff: time.Duration(30 * time.Second).Nanoseconds(),
