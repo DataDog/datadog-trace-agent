@@ -10,3 +10,5 @@ spawn rpm --addsign $rpmfile
 expect -exact "Enter pass phrase: "
 send -- "$passphrase\r"
 expect eof
+catch wait result
+exit [lindex $result 3]
