@@ -134,6 +134,17 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 		c.APIEndpoints = vals
 	}
 
+	// Check for env overrides
+	// this is set in the docker container
+	if v := os.Getenv("API_KEY"); v != "" {
+		log.Info("overriding API key from env API_KEY value")
+		vals := strings.Split(v, ",")
+		for i := range vals {
+			vals[i] = strings.TrimSpace(vals[i])
+		}
+		c.APIKeys = vals
+	}
+
 	if len(c.APIKeys) != len(c.APIEndpoints) {
 		return c, errors.New("every API key needs to have an explicit endpoint associated")
 	}
