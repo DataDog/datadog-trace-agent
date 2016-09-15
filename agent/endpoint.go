@@ -81,7 +81,7 @@ func (a APIEndpoint) Write(p model.AgentPayload) {
 		defer resp.Body.Close()
 
 		if resp.StatusCode/100 != 2 {
-			log.Errorf("request to %s responded with %d %s", url, resp.StatusCode, resp.Status)
+			log.Errorf("request to %s responded with %s", url, resp.Status)
 			continue
 		}
 
@@ -130,7 +130,7 @@ func (a APIEndpoint) WriteServices(s model.ServicesMetadata) {
 		defer resp.Body.Close()
 
 		if resp.StatusCode/100 != 2 {
-			log.Errorf("request to %s responded with %d %s", url, resp.StatusCode, resp.Status)
+			log.Errorf("request to %s responded with %s", url, resp.Status)
 			continue
 		}
 
