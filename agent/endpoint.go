@@ -87,7 +87,15 @@ func (a APIEndpoint) Write(p model.AgentPayload) {
 
 		flushTime := time.Since(startFlush)
 		log.Infof("flushed payload to the API, time:%s, size:%d", flushTime, len(data))
-		statsd.Client.Gauge("trace_agent.writer.flush_duration", flushTime.Seconds(), nil, 1)
+		truncKey := a.apiKeys[i]
+		if len(truncKey) > 5 {
+			truncKey = truncKey[0:5]
+		}
+		tags := []string{
+			fmt.Sprintf("url:%s", a.urls[i]),
+			fmt.Sprintf("apikey:%s", truncKey),
+		}
+		statsd.Client.Gauge("trace_agent.writer.flush_duration", flushTime.Seconds(), tags, 1)
 	}
 }
 
