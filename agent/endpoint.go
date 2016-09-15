@@ -121,7 +121,6 @@ func (a APIEndpoint) WriteServices(s model.ServicesMetadata) {
 		queryParams.Add("api_key", a.apiKeys[i])
 		req.URL.RawQuery = queryParams.Encode()
 		req.Header.Set("Content-Type", "application/json")
-		fmt.Println(req.Header)
 
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
