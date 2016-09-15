@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -103,14 +102,14 @@ func (a APIEndpoint) Write(p model.AgentPayload) {
 // This function very loosely logs and returns if any error happens.
 // See comment above.
 func (a APIEndpoint) WriteServices(s model.ServicesMetadata) {
-	data, err := json.Marshal(s)
+	data, err := model.EncodeServicesPayload(s)
 	if err != nil {
 		log.Errorf("encoding issue: %v", err)
 		return
 	}
 
 	for i := range a.urls {
-		url := fmt.Sprintf("%s/services", a.urls[i])
+		url := a.urls[i] + model.ServicesPayloadAPIPath()
 		req, err := http.NewRequest("POST", url, bytes.NewBuffer(data))
 		if err != nil {
 			log.Errorf("could not create request for endpoint %s: %v", url, err)
@@ -120,7 +119,7 @@ func (a APIEndpoint) WriteServices(s model.ServicesMetadata) {
 		queryParams := req.URL.Query()
 		queryParams.Add("api_key", a.apiKeys[i])
 		req.URL.RawQuery = queryParams.Encode()
-		req.Header.Set("Content-Type", "application/json")
+		model.SetServicesPayloadHeaders(req.Header)
 
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {

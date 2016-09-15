@@ -39,7 +39,7 @@ var (
 )
 
 // EncodeAgentPayload will return a slice of bytes representing the
-// payload (according to GlobalAgentPayloadVersion
+// payload (according to GlobalAgentPayloadVersion)
 func EncodeAgentPayload(p AgentPayload) ([]byte, error) {
 	var b bytes.Buffer
 	var err error
