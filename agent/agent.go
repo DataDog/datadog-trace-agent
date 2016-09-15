@@ -37,7 +37,8 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 	c := NewConcentrator(traceChans[0], conf)
 	s := NewSampler(traceChans[1], conf)
 
-	w := NewWriter(conf, r.services)
+	w := NewWriter(conf)
+	w.inServices = r.services
 
 	return &Agent{
 		Config:         conf,
@@ -78,7 +79,9 @@ func (a *Agent) runFlusher() {
 
 			// Collect and merge partial flushs
 			var wg sync.WaitGroup
-			p := model.AgentPayload{}
+			p := model.AgentPayload{
+				HostName: a.Config.HostName,
+			}
 			wg.Add(2)
 			go func() {
 				defer wg.Done()
@@ -93,7 +96,7 @@ func (a *Agent) runFlusher() {
 			log.Debugf("tock - all routines flushed (%d stats, %d traces)", len(p.Stats), len(p.Traces))
 
 			if !p.IsEmpty() {
-				a.Writer.in <- p
+				a.Writer.inPayloads <- p
 			} else {
 				log.Debug("flush produced an empty payload, skipping")
 			}
