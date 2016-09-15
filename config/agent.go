@@ -29,10 +29,6 @@ type AgentConfig struct {
 	ExtraAggregators []string
 
 	// Sampler configuration
-	ScoreThreshold  float64
-	SignaturePeriod time.Duration
-	ScoreJitter     float64
-	TPSMax          float64
 
 	// Receiver
 	ReceiverPort    int
@@ -87,11 +83,6 @@ func NewDefaultAgentConfig() *AgentConfig {
 		BucketInterval:   time.Duration(10) * time.Second,
 		OldestSpanCutoff: time.Duration(60 * time.Second).Nanoseconds(),
 		ExtraAggregators: []string{},
-
-		ScoreThreshold:  5,
-		SignaturePeriod: time.Minute,
-		ScoreJitter:     0.1,
-		TPSMax:          100,
 
 		ReceiverPort:    7777,
 		ConnectionLimit: 2000,
@@ -161,19 +152,6 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 		c.ExtraAggregators = v
 	} else {
 		log.Debug("No aggregator configuration, using defaults")
-	}
-
-	if v, e := conf.GetFloat("trace.sampler", "score_threshold"); e == nil {
-		c.ScoreThreshold = v
-	}
-	if v, e := conf.GetFloat("trace.sampler", "trace_period"); e == nil {
-		c.SignaturePeriod = time.Duration(int(v * 1e9))
-	}
-	if v, e := conf.GetFloat("trace.sampler", "score_jitter"); e == nil {
-		c.ScoreJitter = v
-	}
-	if v, e := conf.GetFloat("trace.sampler", "max_tps"); e == nil {
-		c.TPSMax = v
 	}
 
 	if v, e := conf.GetInt("trace.receiver", "receiver_port"); e == nil {
