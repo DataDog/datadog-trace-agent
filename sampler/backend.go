@@ -12,10 +12,13 @@ type Backend struct {
 	scores map[Signature]float64
 
 	// Every decayPeriod, decay the score
+	// Low value is reactive, but forget quicker
 	decayPeriod time.Duration
 	// At every decay tick, how much we reduce/divide the score
+	// Low value is reactive, but forget quicker
 	decayFactor float64
-	// The count is represented by score / countScaleFactor where countScaleFactor = (decayFactor / decayFactor - 1)
+	// Factor to apply to move from the score to the representing number of traces per second. By definition of the
+	// decay formula: countScaleFactor = (decayFactor / (decayFactor - 1)) * decayPeriod
 	countScaleFactor float64
 
 	exit chan bool
@@ -23,12 +26,15 @@ type Backend struct {
 
 // NewBackend returns an initialized Backend
 func NewBackend(decayPeriod time.Duration) *Backend {
+	// With this factor, any past trace counts for less than 50% after 6*decayPeriod and >1% after 39*decayPeriod
+	// We can keep it hardcoded, having `decayPeriod` configurable should be enough
+	decayFactor := 1.125 // 9/8
+
 	return &Backend{
-		scores:      make(map[Signature]float64),
-		decayPeriod: decayPeriod,
-		// With this factor, any past trace counts for less than 50% after 6*decayPeriod and >1% after 39*decayPeriod
-		decayFactor:      1.125, // 9/8
-		countScaleFactor: 9,
+		scores:           make(map[Signature]float64),
+		decayPeriod:      decayPeriod,
+		decayFactor:      decayFactor,
+		countScaleFactor: (decayFactor / (decayFactor - 1)) * float64(decayPeriod/time.Second),
 		exit:             make(chan bool),
 	}
 }
@@ -56,6 +62,7 @@ func (b *Backend) CountSignature(signature Signature) {
 }
 
 // GetSignatureScore returns the score (representing the rolling count) of a signature
+// GetSignatureScore returns the score (representing the rolling count as traces per sconde) of a signature
 func (b *Backend) GetSignatureScore(signature Signature) float64 {
 	return b.scores[signature] / b.countScaleFactor
 }
@@ -68,7 +75,6 @@ func (b *Backend) DecayScore() {
 			b.scores[sig] /= b.decayFactor
 		} else {
 			// When the score is too small, we can optimize by simply dropping the entry
-			// TODO: this threshold should be function of the backend configuration
 			delete(b.scores, sig)
 		}
 	}

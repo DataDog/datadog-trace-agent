@@ -10,6 +10,7 @@
 package sampler
 
 import (
+	"math"
 	"time"
 
 	raclette "github.com/DataDog/raclette/model"
@@ -29,11 +30,11 @@ type Sampler struct {
 	extraRate float64
 
 	// Sample any signature with a score lower than `scoreSamplingOffset`
-	// It is basically the number of traces over `samplerPeriod` after which we start sampling
+	// It is basically the number of similar traces per second after which we start sampling
 	signatureScoreOffset float64
 	// Logarithm slope for the scoring function
 	signatureScoreSlope float64
-	// scoreSamplingCoefficient = math.Pow(scoreSamplingSlope, math.Log10(scoreSamplingOffset))
+	// signatureScoreCoefficient = math.Pow(signatureScoreSlope, math.Log10(scoreSamplingOffset))
 	signatureScoreCoefficient float64
 }
 
@@ -41,13 +42,16 @@ type Sampler struct {
 func NewSampler(extraRate float64) *Sampler {
 	decayPeriod := 30 * time.Second
 
+	signatureScoreOffset := float64(10)
+	signatureScoreSlope := float64(3)
+
 	return &Sampler{
 		backend:   NewBackend(decayPeriod),
 		extraRate: extraRate,
 
-		signatureScoreOffset:      float64(100),
-		signatureScoreSlope:       float64(3),
-		signatureScoreCoefficient: 9,
+		signatureScoreOffset:      signatureScoreOffset,
+		signatureScoreSlope:       signatureScoreSlope,
+		signatureScoreCoefficient: math.Pow(signatureScoreSlope, math.Log10(signatureScoreOffset)),
 	}
 }
 

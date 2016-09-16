@@ -9,7 +9,9 @@ import (
 )
 
 func getTestBackend() *Backend {
-	return NewBackend(1 * time.Second)
+	decayPeriod := 5 * time.Second
+
+	return NewBackend(decayPeriod)
 }
 
 func randomSignature() Signature {
@@ -29,22 +31,23 @@ func TestBasicNewBackend(t *testing.T) {
 }
 
 func TestCountScoreConvergence(t *testing.T) {
-	// With a constant input flow of tracesPerTick, the backend score should converge to tracesPerTick
+	// With a constant input flow of tracesPerPeriod, the backend score should converge to tracesPerPeriod
 	backend := getTestBackend()
 
 	sign := randomSignature()
 
 	ticks := 50
-	tracesPerTick := 1000
+	tracesPerPeriod := 1000
+	period := backend.decayPeriod
 
 	for tick := 0; tick < ticks; tick++ {
 		backend.DecayScore()
-		for i := 0; i < tracesPerTick; i++ {
+		for i := 0; i < tracesPerPeriod; i++ {
 			backend.CountSignature(sign)
 		}
 	}
 
-	assert.InEpsilon(t, backend.GetSignatureScore(sign), tracesPerTick, 0.01)
+	assert.InEpsilon(t, backend.GetSignatureScore(sign), float64(tracesPerPeriod)/float64(period/time.Second), 0.01)
 }
 
 func TestCountScoreOblivion(t *testing.T) {
