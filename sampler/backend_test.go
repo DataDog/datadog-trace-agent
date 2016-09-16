@@ -3,9 +3,14 @@ package sampler
 import (
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func getTestBackend() *Backend {
+	return NewBackend(1 * time.Second)
+}
 
 func randomSignature() Signature {
 	return Signature(rand.Int63())
@@ -14,7 +19,7 @@ func randomSignature() Signature {
 func TestBasicNewBackend(t *testing.T) {
 	assert := assert.New(t)
 
-	backend := NewBackend()
+	backend := getTestBackend()
 
 	sign := randomSignature()
 	backend.CountSignature(sign)
@@ -25,7 +30,7 @@ func TestBasicNewBackend(t *testing.T) {
 
 func TestCountScoreConvergence(t *testing.T) {
 	// With a constant input flow of tracesPerTick, the backend score should converge to tracesPerTick
-	backend := NewBackend()
+	backend := getTestBackend()
 
 	sign := randomSignature()
 
@@ -45,7 +50,7 @@ func TestCountScoreConvergence(t *testing.T) {
 func TestCountScoreOblivion(t *testing.T) {
 	// After some time, past traces shouldn't impact the score
 	assert := assert.New(t)
-	backend := NewBackend()
+	backend := getTestBackend()
 
 	sign := randomSignature()
 
