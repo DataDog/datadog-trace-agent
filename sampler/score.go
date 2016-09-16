@@ -29,16 +29,16 @@ func SampleByRate(traceID uint64, sampleRate float64) bool {
 	return true
 }
 
-// GetSampleRate gives the sample rate to apply to any signature
+// GetSignatureSampleRate gives the sample rate to apply to any signature
 // For now, only based on count score
-func (s *Sampler) GetSampleRate(signature Signature) float64 {
+func (s *Sampler) GetSignatureSampleRate(signature Signature) float64 {
 	score := s.GetCountScore(signature)
 
 	if score > 1 {
 		score = float64(1)
 	}
 
-	return s.extraRate * score
+	return score
 }
 
 // GetCountScore scores any signature based on its recent throughput

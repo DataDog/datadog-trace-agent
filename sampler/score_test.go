@@ -35,23 +35,3 @@ func TestSampleRateManyTraces(t *testing.T) {
 		assert.InEpsilon(sampled, times*rate, 0.01)
 	}
 }
-
-func TestExtraSampleRate(t *testing.T) {
-	assert := assert.New(t)
-
-	sampler := getTestSampler()
-	sign := randomSignature()
-
-	// Feed the sampler with a signature so that it has a < 1 sample rate
-	for i := 0; i < int(1e6); i++ {
-		sampler.backend.CountSignature(sign)
-	}
-
-	sRate := sampler.GetSampleRate(sign)
-
-	// Then turn on the extra sample rate, then ensure it affects both existing and new signatures
-	sampler.extraRate = 0.5
-
-	assert.Equal(sampler.GetSampleRate(randomSignature()), 0.5)
-	assert.Equal(sampler.GetSampleRate(sign), 0.5*sRate)
-}

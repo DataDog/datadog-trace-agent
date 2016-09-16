@@ -11,11 +11,11 @@ import (
 // Signature is a simple representation of trace, used to identify simlar traces
 type Signature uint64
 
-// ComputeSignature generates a signature of a trace
+// ComputeSignatureWithRoot generates the signature of a trace knowing its root
 // Signature based on the hash of (service, name, resource, is_error) for the root, plus the set of
 // (service, name, is_error) of each span.
-func ComputeSignature(trace model.Trace) Signature {
-	rootHash := computeRootHash(*GetRoot(trace))
+func ComputeSignatureWithRoot(trace model.Trace, root *model.Span) Signature {
+	rootHash := computeRootHash(*root)
 	spanHashes := make([]spanHash, len(trace))
 
 	for i := range trace {
@@ -37,6 +37,13 @@ func ComputeSignature(trace model.Trace) Signature {
 	return Signature(traceHash)
 }
 
+// ComputeSignature is the same as ComputeSignatureWithRoot, except that it finds the root itself
+func ComputeSignature(trace model.Trace) Signature {
+	root := GetRoot(trace)
+
+	return ComputeSignatureWithRoot(trace, root)
+}
+
 func computeSpanHash(span model.Span) spanHash {
 	h := fnv.New32a()
 	h.Write([]byte(span.Service))
@@ -56,7 +63,7 @@ func computeRootHash(span model.Span) spanHash {
 	return spanHash(h.Sum32())
 }
 
-// GetRoot extract the root span from a trace
+// GetRoot extracts the root span from a trace
 func GetRoot(trace model.Trace) *model.Span {
 	// That should be caught beforehand
 	if len(trace) == 0 {

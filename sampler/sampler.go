@@ -13,6 +13,11 @@ import (
 	raclette "github.com/DataDog/raclette/model"
 )
 
+const (
+	// Metric key holding the sample rate
+	SampleRateMetricKey = "_sample_rate"
+)
+
 // Sampler is the main component of the sampling logic
 type Sampler struct {
 	// Storage of the state of the sampler
@@ -40,20 +45,53 @@ func (s *Sampler) Stop() {
 	s.backend.Stop()
 }
 
-// Sample tells if the given trace is a sample which has to be kept
+// Sample counts an incoming trace and tells if it is a sample which has to be kept
 func (s *Sampler) Sample(trace raclette.Trace) bool {
 	// Sanity check, just in case one trace is empty
 	if len(trace) == 0 {
 		return false
 	}
 
-	signature := ComputeSignature(trace)
+	// We need the root in multiple steps of the sampling, so let's extract here
+	// TODO: update raclette.Trace to contain a reference to the root, and don't give it as further function argument
+	root := GetRoot(trace)
+	signature := ComputeSignatureWithRoot(trace, root)
 
+	// Update sampler state by counting this trace
 	s.backend.CountSignature(signature)
-	sampleRate := s.GetSampleRate(signature)
 
-	// We should introduce pre-sampling trace-level normalization to be sure that's valid
-	traceID := trace[0].TraceID
+	sampleRate := s.GetSampleRate(trace, root, signature)
+
+	SetTraceSampleRate(root, sampleRate)
+
+	traceID := root.TraceID
 
 	return SampleByRate(traceID, sampleRate)
+}
+
+// GetSampleRate returns the sample rate to apply to a trace, combining all possible mechanisms
+func (s *Sampler) GetSampleRate(trace raclette.Trace, root *raclette.Span, signature Signature) float64 {
+	sampleRate := s.GetSignatureSampleRate(signature) * GetTraceSampleRate(root) * s.extraRate
+
+	return sampleRate
+}
+
+// GetTraceSampleRate gets the sample rate the sample rate applied earlier in the pipeline
+func GetTraceSampleRate(root *raclette.Span) float64 {
+	if rate, ok := root.Metrics[SampleRateMetricKey]; ok {
+		return rate
+	}
+
+	return 1.0
+}
+
+// SetTraceSampleRate sets the currently applied sample rate in the trace data to allow chained up sampling
+func SetTraceSampleRate(root *raclette.Span, sampleRate float64) {
+	if root.Metrics == nil {
+		root.Metrics = make(map[string]float64)
+	}
+	if _, ok := root.Metrics[SampleRateMetricKey]; !ok {
+		root.Metrics[SampleRateMetricKey] = 1.0
+	}
+	root.Metrics[SampleRateMetricKey] = sampleRate
 }
