@@ -14,9 +14,9 @@ func getTestSampler() *Sampler {
 	// Disable debug logs in these tests
 	config.NewLoggerLevel(false)
 
-	sampler := NewSampler()
+	extraRate := 1.0
 
-	return sampler
+	return NewSampler(extraRate)
 }
 
 func TestSamplerLoop(t *testing.T) {
@@ -60,6 +60,6 @@ func BenchmarkSampler(b *testing.B) {
 			model.Span{TraceID: 1, SpanID: 4, ParentID: 1, Start: 500000000, Duration: 500000, Service: "redis", Type: "redis"},
 			model.Span{TraceID: 1, SpanID: 5, ParentID: 1, Start: 700000000, Duration: 700000, Service: "mcnulty", Type: ""},
 		}
-		sampler.IsSample(tr)
+		sampler.Sample(tr)
 	}
 }

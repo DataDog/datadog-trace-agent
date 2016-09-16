@@ -15,13 +15,18 @@ import (
 
 // Sampler is the main component of the sampling logic
 type Sampler struct {
+	// Storage of the state of the sampler
 	backend *Backend
+
+	// Extra sampling rate to combine to the existing sampling
+	extraRate float64
 }
 
 // NewSampler returns an initialized Sampler
-func NewSampler() *Sampler {
+func NewSampler(extraRate float64) *Sampler {
 	return &Sampler{
-		backend: NewBackend(),
+		backend:   NewBackend(),
+		extraRate: extraRate,
 	}
 }
 
@@ -35,8 +40,8 @@ func (s *Sampler) Stop() {
 	s.backend.Stop()
 }
 
-// IsSample tells if the given trace is a sample which has to be kept
-func (s *Sampler) IsSample(trace raclette.Trace) bool {
+// Sample tells if the given trace is a sample which has to be kept
+func (s *Sampler) Sample(trace raclette.Trace) bool {
 	// Sanity check, just in case one trace is empty
 	if len(trace) == 0 {
 		return false

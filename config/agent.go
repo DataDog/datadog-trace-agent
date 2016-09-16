@@ -29,6 +29,7 @@ type AgentConfig struct {
 	ExtraAggregators []string
 
 	// Sampler configuration
+	ExtraSampleRate float64
 
 	// Receiver
 	ReceiverPort    int
@@ -83,6 +84,8 @@ func NewDefaultAgentConfig() *AgentConfig {
 		BucketInterval:   time.Duration(10) * time.Second,
 		OldestSpanCutoff: time.Duration(60 * time.Second).Nanoseconds(),
 		ExtraAggregators: []string{},
+
+		ExtraSampleRate: 1.0,
 
 		ReceiverPort:    7777,
 		ConnectionLimit: 2000,
@@ -152,6 +155,10 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 		c.ExtraAggregators = v
 	} else {
 		log.Debug("No aggregator configuration, using defaults")
+	}
+
+	if v, e := conf.GetFloat("trace.sampler", "extra_sample_rate"); e == nil {
+		c.ExtraSampleRate = v
 	}
 
 	if v, e := conf.GetInt("trace.receiver", "receiver_port"); e == nil {

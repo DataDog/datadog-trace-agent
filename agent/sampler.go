@@ -29,7 +29,7 @@ type Sampler struct {
 type SamplerEngine interface {
 	Run()
 	Stop()
-	IsSample(t model.Trace) bool
+	Sample(t model.Trace) bool
 }
 
 // NewSampler creates a new empty sampler ready to be started
@@ -39,7 +39,7 @@ func NewSampler(in chan model.Trace, conf *config.AgentConfig) *Sampler {
 		out:           make(chan []model.Trace),
 		sampledTraces: []model.Trace{},
 		traceCount:    0,
-		se:            sampler.NewSampler(),
+		se:            sampler.NewSampler(conf.ExtraSampleRate),
 	}
 }
 
@@ -70,7 +70,7 @@ func (s *Sampler) Run() {
 
 // AddTrace samples a trace then keep it until the next flush
 func (s *Sampler) AddTrace(trace model.Trace) {
-	if s.se.IsSample(trace) {
+	if s.se.Sample(trace) {
 		s.mu.Lock()
 		s.sampledTraces = append(s.sampledTraces, trace)
 		s.mu.Unlock()

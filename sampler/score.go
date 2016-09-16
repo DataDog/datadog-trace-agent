@@ -35,10 +35,10 @@ func (s *Sampler) GetSampleRate(signature Signature) float64 {
 	score := s.GetCountScore(signature)
 
 	if score > 1 {
-		return float64(1)
+		score = float64(1)
 	}
 
-	return score
+	return s.extraRate * score
 }
 
 // GetCountScore scores any signature based on its recent throughput
