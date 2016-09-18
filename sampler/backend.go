@@ -12,13 +12,15 @@ type Backend struct {
 	scores map[Signature]float64
 
 	// Every decayPeriod, decay the score
-	// Low value is reactive, but forget quicker
+	// Lower value is more reactive, but forget quicker
 	decayPeriod time.Duration
 	// At every decay tick, how much we reduce/divide the score
-	// Low value is reactive, but forget quicker
+	// Lower value is more reactive, but forget quicker
 	decayFactor float64
-	// Factor to apply to move from the score to the representing number of traces per second. By definition of the
-	// decay formula: countScaleFactor = (decayFactor / (decayFactor - 1)) * decayPeriod
+	// Factor to apply to move from the score to the representing number of traces per second.
+	// By definition of the decay formula: countScaleFactor = (decayFactor / (decayFactor - 1)) * decayPeriod
+	// It also represents by how much a spike is "smoothed" (if we instantly receive N times the same signature,
+	// its immediate count will be increased by N / countScaleFactor)
 	countScaleFactor float64
 
 	exit chan bool
@@ -27,7 +29,7 @@ type Backend struct {
 // NewBackend returns an initialized Backend
 func NewBackend(decayPeriod time.Duration) *Backend {
 	// With this factor, any past trace counts for less than 50% after 6*decayPeriod and >1% after 39*decayPeriod
-	// We can keep it hardcoded, having `decayPeriod` configurable should be enough
+	// We can keep it hardcoded, but having `decayPeriod` configurable should be enough?
 	decayFactor := 1.125 // 9/8
 
 	return &Backend{

@@ -7,6 +7,10 @@
 // We increment it for each incoming trace then we periodically divide the score by two every X seconds.
 // Right after the division, the score is an approximation of the number of received signatures over X seconds.
 // It is different from the scoring in the Agent.
+//
+// Since the sampling can happen at different levels (client, agent, server) or depending on different rules,
+// we have to track the sample rate applied at previous steps. This way, sampling twice at 50% can result in an
+// effective 25% sampling. The rate is stored as a metric in the trace root.
 package sampler
 
 import (
@@ -42,7 +46,7 @@ type Sampler struct {
 func NewSampler(extraRate float64) *Sampler {
 	decayPeriod := 30 * time.Second
 
-	signatureScoreOffset := float64(10)
+	signatureScoreOffset := float64(5)
 	signatureScoreSlope := float64(3)
 
 	return &Sampler{
@@ -67,7 +71,7 @@ func (s *Sampler) Stop() {
 
 // Sample counts an incoming trace and tells if it is a sample which has to be kept
 func (s *Sampler) Sample(trace raclette.Trace) bool {
-	// Sanity check, just in case one trace is empty
+	// Extra safety, just in case one trace is empty
 	if len(trace) == 0 {
 		return false
 	}

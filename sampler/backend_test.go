@@ -70,9 +70,9 @@ func TestCountScoreOblivion(t *testing.T) {
 
 	// Second phase: we stop receiving this signature
 
-	// How long to wait until score is >50% the spike score (TODO: make it function of the config)
+	// How long to wait until score is >50% the initial score (TODO: make it function of the config)
 	halfLifeTicks := 6
-	// How long to wait until score is >1% the spike score
+	// How long to wait until score is >1% the initial score
 	oblivionTicks := 40
 
 	for tick := 0; tick < halfLifeTicks; tick++ {
