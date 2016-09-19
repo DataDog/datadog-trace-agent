@@ -33,7 +33,7 @@ const (
 // Sampler is the main component of the sampling logic
 type Sampler struct {
 	// Storage of the state of the sampler
-	backend *Backend
+	Backend *Backend
 
 	// Extra sampling rate to combine to the existing sampling
 	extraRate float64
@@ -56,7 +56,7 @@ func NewSampler(extraRate float64, maxTPS float64) *Sampler {
 	signatureScoreSlope := defaultSignatureScoreSlope
 
 	return &Sampler{
-		backend:   NewBackend(decayPeriod),
+		Backend:   NewBackend(decayPeriod),
 		extraRate: extraRate,
 		maxTPS:    maxTPS,
 
@@ -68,12 +68,12 @@ func NewSampler(extraRate float64, maxTPS float64) *Sampler {
 
 // Run runs and block on the Sampler main loop
 func (s *Sampler) Run() {
-	s.backend.Run()
+	s.Backend.Run()
 }
 
 // Stop stops the main Run loop
 func (s *Sampler) Stop() {
-	s.backend.Stop()
+	s.Backend.Stop()
 }
 
 // Sample counts an incoming trace and tells if it is a sample which has to be kept
@@ -89,7 +89,7 @@ func (s *Sampler) Sample(trace raclette.Trace) bool {
 	signature := ComputeSignatureWithRoot(trace, root)
 
 	// Update sampler state by counting this trace
-	s.backend.CountSignature(signature)
+	s.Backend.CountSignature(signature)
 
 	sampleRate := s.GetSampleRate(trace, root, signature)
 
@@ -98,7 +98,7 @@ func (s *Sampler) Sample(trace raclette.Trace) bool {
 	if sampled {
 		// Count the trace to allow us to check for the maxTPS limit.
 		// It has to happen before the maxTPS sampling.
-		s.backend.CountSample()
+		s.Backend.CountSample()
 
 		// Check for the maxTPS limit, and if we require an extra sampling.
 		// No need to check if we already decided not to keep the trace.
@@ -124,7 +124,7 @@ func (s *Sampler) GetMaxTPSSampleRate() float64 {
 	maxTPSrate := 1.0
 	if s.maxTPS > 0 {
 		// Overestimate the real score with the high limit of the backend bias.
-		currentTPS := s.backend.GetSampledScore() * s.backend.decayFactor
+		currentTPS := s.Backend.GetSampledScore() * s.Backend.decayFactor
 		if currentTPS > s.maxTPS {
 			maxTPSrate = s.maxTPS / currentTPS
 		}

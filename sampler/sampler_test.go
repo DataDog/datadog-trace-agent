@@ -85,7 +85,7 @@ func TestMaxTPS(t *testing.T) {
 	periods := 50
 
 	s.maxTPS = maxTPS
-	periodSeconds := s.backend.decayPeriod.Seconds()
+	periodSeconds := s.Backend.decayPeriod.Seconds()
 	tracesPerPeriod := tps * periodSeconds
 	// Set signature score offset high enough not to kick in during the test.
 	s.signatureScoreOffset = 2 * tps
@@ -94,7 +94,7 @@ func TestMaxTPS(t *testing.T) {
 	sampledCount := 0
 
 	for period := 0; period < initPeriods+periods; period++ {
-		s.backend.DecayScore()
+		s.Backend.DecayScore()
 		for i := 0; i < int(tracesPerPeriod); i++ {
 			trace, _ := getTestTrace()
 			sampled := s.Sample(trace)
@@ -106,7 +106,7 @@ func TestMaxTPS(t *testing.T) {
 	}
 
 	// Check that the sampled score pre-maxTPS is equals to the incoming number of traces per second
-	assert.InEpsilon(tps, s.backend.GetSampledScore(), 0.01)
+	assert.InEpsilon(tps, s.Backend.GetSampledScore(), 0.01)
 
 	// We should have kept less traces per second than maxTPS
 	assert.True(s.maxTPS >= float64(sampledCount)/(float64(periods)*periodSeconds))
@@ -115,7 +115,7 @@ func TestMaxTPS(t *testing.T) {
 	// Check for 1% epsilon, but the precision also depends on the backend imprecision (error factor = decayFactor).
 	// Combine error rates with L1-norm instead of L2-norm by laziness, still good enough for tests.
 	assert.InEpsilon(s.maxTPS, float64(sampledCount)/(float64(periods)*periodSeconds),
-		0.01+s.backend.decayFactor-1)
+		0.01+s.Backend.decayFactor-1)
 }
 
 func TestSamplerChainedSampling(t *testing.T) {
