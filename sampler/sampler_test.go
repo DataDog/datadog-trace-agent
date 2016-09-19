@@ -43,13 +43,11 @@ func TestSamplerLoop(t *testing.T) {
 
 	s.Stop()
 
-	for {
-		select {
-		case <-exit:
-			return
-		case <-time.After(time.Second * 1):
-			assert.Fail(t, "Sampler took more than 1 second to close")
-		}
+	select {
+	case <-exit:
+		return
+	case <-time.After(time.Second * 1):
+		assert.Fail(t, "Sampler took more than 1 second to close")
 	}
 }
 
