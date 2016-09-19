@@ -27,7 +27,7 @@ func (s *Sampler) GetSignatureSampleRate(signature Signature) float64 {
 	score := s.GetCountScore(signature)
 
 	if score > 1 {
-		score = float64(1)
+		score = 1.0
 	}
 
 	return score

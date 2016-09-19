@@ -27,7 +27,7 @@ type Backend struct {
 	// its immediate count will be increased by N / countScaleFactor.
 	countScaleFactor float64
 
-	exit chan bool
+	exit chan struct{}
 }
 
 // NewBackend returns an initialized Backend
@@ -42,15 +42,16 @@ func NewBackend(decayPeriod time.Duration) *Backend {
 		decayPeriod:      decayPeriod,
 		decayFactor:      decayFactor,
 		countScaleFactor: (decayFactor / (decayFactor - 1)) * decayPeriod.Seconds(),
-		exit:             make(chan bool),
+		exit:             make(chan struct{}),
 	}
 }
 
 // Run runs and block on the Sampler main loop
 func (b *Backend) Run() {
+	t := time.NewTicker(b.decayPeriod)
 	for {
 		select {
-		case <-time.Tick(b.decayPeriod):
+		case <-t.C:
 			b.DecayScore()
 		case <-b.exit:
 			return

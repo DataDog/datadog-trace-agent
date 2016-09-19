@@ -16,7 +16,7 @@ type Signature uint64
 // (service, name, is_error) of each span.
 func ComputeSignatureWithRoot(trace model.Trace, root *model.Span) Signature {
 	rootHash := computeRootHash(*root)
-	spanHashes := make([]spanHash, len(trace))
+	spanHashes := make([]spanHash, 0, len(trace))
 
 	for i := range trace {
 		spanHashes = append(spanHashes, computeSpanHash(trace[i]))
