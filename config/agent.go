@@ -30,6 +30,7 @@ type AgentConfig struct {
 
 	// Sampler configuration
 	ExtraSampleRate float64
+	MaxTPS          float64
 
 	// Receiver
 	ReceiverPort    int
@@ -86,6 +87,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 		ExtraAggregators: []string{},
 
 		ExtraSampleRate: 1.0,
+		MaxTPS:          10,
 
 		ReceiverPort:    7777,
 		ConnectionLimit: 2000,
@@ -159,6 +161,9 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 
 	if v, e := conf.GetFloat("trace.sampler", "extra_sample_rate"); e == nil {
 		c.ExtraSampleRate = v
+	}
+	if v, e := conf.GetFloat("trace.sampler", "max_traces_per_second"); e == nil {
+		c.MaxTPS = v
 	}
 
 	if v, e := conf.GetInt("trace.receiver", "receiver_port"); e == nil {

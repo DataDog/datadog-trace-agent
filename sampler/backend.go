@@ -4,12 +4,16 @@ import (
 	"time"
 )
 
-// Backend storing any state required to run the sampling algorithms
-// The current algorithms only rely on counters of recent signatures, which we implement
-// with simple counters with polynomial decay
+// Backend storing any state required to run the sampling algorithms.
+//
+// Current implementation is only based on counters with polynomial decay.
+// Its bias with steady counts is 1 * decayFactor.
+// The stored scores represent approximation of the real count values (with a countScaleFactor factor).
 type Backend struct {
 	// Score per signature
 	scores map[Signature]float64
+	// Score of sampled traces
+	sampledScore float64
 
 	// Every decayPeriod, decay the score
 	// Lower value is more reactive, but forget quicker
@@ -19,8 +23,8 @@ type Backend struct {
 	decayFactor float64
 	// Factor to apply to move from the score to the representing number of traces per second.
 	// By definition of the decay formula: countScaleFactor = (decayFactor / (decayFactor - 1)) * decayPeriod
-	// It also represents by how much a spike is "smoothed" (if we instantly receive N times the same signature,
-	// its immediate count will be increased by N / countScaleFactor)
+	// It also represents by how much a spike is smoothed: if we instantly receive N times the same signature,
+	// its immediate count will be increased by N / countScaleFactor.
 	countScaleFactor float64
 
 	exit chan bool
@@ -34,9 +38,10 @@ func NewBackend(decayPeriod time.Duration) *Backend {
 
 	return &Backend{
 		scores:           make(map[Signature]float64),
+		sampledScore:     0,
 		decayPeriod:      decayPeriod,
 		decayFactor:      decayFactor,
-		countScaleFactor: (decayFactor / (decayFactor - 1)) * float64(decayPeriod/time.Second),
+		countScaleFactor: (decayFactor / (decayFactor - 1)) * decayPeriod.Seconds(),
 		exit:             make(chan bool),
 	}
 }
@@ -63,10 +68,20 @@ func (b *Backend) CountSignature(signature Signature) {
 	b.scores[signature]++
 }
 
-// GetSignatureScore returns the score (representing the rolling count) of a signature
-// GetSignatureScore returns the score (representing the rolling count as traces per sconde) of a signature
+// CountSample counts a trace sampled by the sampler
+func (b *Backend) CountSample() {
+	b.sampledScore++
+}
+
+// GetSignatureScore returns the score of a signature.
+// It is normalized to represent a number of signatures per second.
 func (b *Backend) GetSignatureScore(signature Signature) float64 {
 	return b.scores[signature] / b.countScaleFactor
+}
+
+// GetSampledScore returns the global score of all sampled traces.
+func (b *Backend) GetSampledScore() float64 {
+	return b.sampledScore / b.countScaleFactor
 }
 
 // DecayScore applies the decay to the rolling counters
@@ -80,4 +95,5 @@ func (b *Backend) DecayScore() {
 			delete(b.scores, sig)
 		}
 	}
+	b.sampledScore /= b.decayFactor
 }

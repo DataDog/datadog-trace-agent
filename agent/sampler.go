@@ -39,7 +39,7 @@ func NewSampler(in chan model.Trace, conf *config.AgentConfig) *Sampler {
 		out:           make(chan []model.Trace),
 		sampledTraces: []model.Trace{},
 		traceCount:    0,
-		se:            sampler.NewSampler(conf.ExtraSampleRate),
+		se:            sampler.NewSampler(conf.ExtraSampleRate, conf.MaxTPS),
 	}
 }
 

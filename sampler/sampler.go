@@ -21,8 +21,13 @@ import (
 )
 
 const (
-	// Metric key holding the sample rate
+	// SampleRateMetricKey is the metric key holding the sample rate
 	SampleRateMetricKey = "_sample_rate"
+
+	// Sampler parameters not (yet?) configurable
+	defaultDecayPeriod          = 30 * time.Second
+	defaultSignatureScoreOffset = float64(5)
+	defaultSignatureScoreSlope  = float64(3)
 )
 
 // Sampler is the main component of the sampling logic
@@ -32,8 +37,10 @@ type Sampler struct {
 
 	// Extra sampling rate to combine to the existing sampling
 	extraRate float64
+	// Maximum limit to the total number of traces per second to sample
+	maxTPS float64
 
-	// Sample any signature with a score lower than `scoreSamplingOffset`
+	// Sample any signature with a score lower than scoreSamplingOffset
 	// It is basically the number of similar traces per second after which we start sampling
 	signatureScoreOffset float64
 	// Logarithm slope for the scoring function
@@ -43,15 +50,15 @@ type Sampler struct {
 }
 
 // NewSampler returns an initialized Sampler
-func NewSampler(extraRate float64) *Sampler {
-	decayPeriod := 30 * time.Second
-
-	signatureScoreOffset := float64(5)
-	signatureScoreSlope := float64(3)
+func NewSampler(extraRate float64, maxTPS float64) *Sampler {
+	decayPeriod := defaultDecayPeriod
+	signatureScoreOffset := defaultSignatureScoreOffset
+	signatureScoreSlope := defaultSignatureScoreSlope
 
 	return &Sampler{
 		backend:   NewBackend(decayPeriod),
 		extraRate: extraRate,
+		maxTPS:    maxTPS,
 
 		signatureScoreOffset:      signatureScoreOffset,
 		signatureScoreSlope:       signatureScoreSlope,
@@ -86,22 +93,60 @@ func (s *Sampler) Sample(trace raclette.Trace) bool {
 
 	sampleRate := s.GetSampleRate(trace, root, signature)
 
-	SetTraceSampleRate(root, sampleRate)
+	sampled := ApplySampleRate(root, sampleRate)
 
-	traceID := root.TraceID
+	if sampled {
+		// Count the trace to allow us to check for the maxTPS limit.
+		// It has to happen before the maxTPS sampling.
+		s.backend.CountSample()
 
-	return SampleByRate(traceID, sampleRate)
+		// Check for the maxTPS limit, and if we require an extra sampling.
+		// No need to check if we already decided not to keep the trace.
+		maxTPSrate := s.GetMaxTPSSampleRate()
+		if maxTPSrate < 1 {
+			sampled = ApplySampleRate(root, maxTPSrate)
+		}
+	}
+
+	return sampled
 }
 
-// GetSampleRate returns the sample rate to apply to a trace, combining all possible mechanisms
+// GetSampleRate returns the sample rate to apply to a trace.
 func (s *Sampler) GetSampleRate(trace raclette.Trace, root *raclette.Span, signature Signature) float64 {
-	sampleRate := s.GetSignatureSampleRate(signature) * GetTraceSampleRate(root) * s.extraRate
+	sampleRate := s.GetSignatureSampleRate(signature) * s.extraRate
 
 	return sampleRate
 }
 
-// GetTraceSampleRate gets the sample rate the sample rate applied earlier in the pipeline
-func GetTraceSampleRate(root *raclette.Span) float64 {
+// GetMaxTPSSampleRate returns an extra sample rate to apply if we are above maxTPS.
+func (s *Sampler) GetMaxTPSSampleRate() float64 {
+	// When above maxTPS, apply an additional sample rate to statistically respect the limit
+	maxTPSrate := 1.0
+	if s.maxTPS > 0 {
+		// Overestimate the real score with the high limit of the backend bias.
+		currentTPS := s.backend.GetSampledScore() * s.backend.decayFactor
+		if currentTPS > s.maxTPS {
+			maxTPSrate = s.maxTPS / currentTPS
+		}
+	}
+
+	return maxTPSrate
+}
+
+// ApplySampleRate applies a sample rate over a trace root, returning if the trace should be sampled or not.
+// It takes into account any previous sampling.
+func ApplySampleRate(root *raclette.Span, sampleRate float64) bool {
+	initialRate := GetTraceAppliedSampleRate(root)
+	newRate := initialRate * sampleRate
+	SetTraceAppliedSampleRate(root, newRate)
+
+	traceID := root.TraceID
+
+	return SampleByRate(traceID, newRate)
+}
+
+// GetTraceAppliedSampleRate gets the sample rate the sample rate applied earlier in the pipeline.
+func GetTraceAppliedSampleRate(root *raclette.Span) float64 {
 	if rate, ok := root.Metrics[SampleRateMetricKey]; ok {
 		return rate
 	}
@@ -109,8 +154,8 @@ func GetTraceSampleRate(root *raclette.Span) float64 {
 	return 1.0
 }
 
-// SetTraceSampleRate sets the currently applied sample rate in the trace data to allow chained up sampling
-func SetTraceSampleRate(root *raclette.Span, sampleRate float64) {
+// SetTraceAppliedSampleRate sets the currently applied sample rate in the trace data to allow chained up sampling.
+func SetTraceAppliedSampleRate(root *raclette.Span, sampleRate float64) {
 	if root.Metrics == nil {
 		root.Metrics = make(map[string]float64)
 	}

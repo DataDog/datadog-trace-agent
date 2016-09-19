@@ -31,23 +31,26 @@ func TestBasicNewBackend(t *testing.T) {
 }
 
 func TestCountScoreConvergence(t *testing.T) {
-	// With a constant input flow of tracesPerPeriod, the backend score should converge to tracesPerPeriod
+	// With a constant number of tracesPerPeriod, the backend score should converge to tracesPerPeriod
+	// Test the convergence of both signature and total sampled counters
 	backend := getTestBackend()
 
 	sign := randomSignature()
 
-	ticks := 50
+	periods := 50
 	tracesPerPeriod := 1000
 	period := backend.decayPeriod
 
-	for tick := 0; tick < ticks; tick++ {
+	for period := 0; period < periods; period++ {
 		backend.DecayScore()
 		for i := 0; i < tracesPerPeriod; i++ {
 			backend.CountSignature(sign)
+			backend.CountSample()
 		}
 	}
 
-	assert.InEpsilon(t, backend.GetSignatureScore(sign), float64(tracesPerPeriod)/float64(period/time.Second), 0.01)
+	assert.InEpsilon(t, backend.GetSignatureScore(sign), float64(tracesPerPeriod)/period.Seconds(), 0.01)
+	assert.InEpsilon(t, backend.GetSampledScore(), float64(tracesPerPeriod)/period.Seconds(), 0.01)
 }
 
 func TestCountScoreOblivion(t *testing.T) {
@@ -57,13 +60,13 @@ func TestCountScoreOblivion(t *testing.T) {
 
 	sign := randomSignature()
 
-	// Number of tracesPerTick in the initial phase
-	tracesPerTick := 1000
+	// Number of tracesPerPeriod in the initial phase
+	tracesPerPeriod := 1000
 	ticks := 50
 
-	for tick := 0; tick < ticks; tick++ {
+	for period := 0; period < ticks; period++ {
 		backend.DecayScore()
-		for i := 0; i < tracesPerTick; i++ {
+		for i := 0; i < tracesPerPeriod; i++ {
 			backend.CountSignature(sign)
 		}
 	}
@@ -71,19 +74,19 @@ func TestCountScoreOblivion(t *testing.T) {
 	// Second phase: we stop receiving this signature
 
 	// How long to wait until score is >50% the initial score (TODO: make it function of the config)
-	halfLifeTicks := 6
+	halfLifePeriods := 6
 	// How long to wait until score is >1% the initial score
-	oblivionTicks := 40
+	oblivionPeriods := 40
 
-	for tick := 0; tick < halfLifeTicks; tick++ {
+	for period := 0; period < halfLifePeriods; period++ {
 		backend.DecayScore()
 	}
 
-	assert.True(backend.GetSignatureScore(sign) < 0.5*float64(tracesPerTick))
+	assert.True(backend.GetSignatureScore(sign) < 0.5*float64(tracesPerPeriod))
 
-	for tick := 0; tick < oblivionTicks-halfLifeTicks; tick++ {
+	for period := 0; period < oblivionPeriods-halfLifePeriods; period++ {
 		backend.DecayScore()
 	}
 
-	assert.True(backend.GetSignatureScore(sign) < 0.01*float64(tracesPerTick))
+	assert.True(backend.GetSignatureScore(sign) < 0.01*float64(tracesPerPeriod))
 }
