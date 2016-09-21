@@ -66,6 +66,16 @@ func NewSampler(extraRate float64, maxTPS float64) *Sampler {
 	}
 }
 
+// UpdateExtraRate updates the extra sample rate
+func (s *Sampler) UpdateExtraRate(extraRate float64) {
+	s.extraRate = extraRate
+}
+
+// UpdateMaxTPS updates the max TPS limit
+func (s *Sampler) UpdateMaxTPS(maxTPS float64) {
+	s.maxTPS = maxTPS
+}
+
 // Run runs and block on the Sampler main loop
 func (s *Sampler) Run() {
 	s.Backend.Run()
