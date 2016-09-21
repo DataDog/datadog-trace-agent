@@ -16,10 +16,10 @@ type Backend struct {
 	sampledScore float64
 
 	// Every decayPeriod, decay the score
-	// Lower value is more reactive, but forget quicker
+	// Lower value is more reactive, but forgets quicker
 	decayPeriod time.Duration
 	// At every decay tick, how much we reduce/divide the score
-	// Lower value is more reactive, but forget quicker
+	// Lower value is more reactive, but forgets quicker
 	decayFactor float64
 	// Factor to apply to move from the score to the representing number of traces per second.
 	// By definition of the decay formula: countScaleFactor = (decayFactor / (decayFactor - 1)) * decayPeriod
@@ -49,6 +49,8 @@ func NewBackend(decayPeriod time.Duration) *Backend {
 // Run runs and block on the Sampler main loop
 func (b *Backend) Run() {
 	t := time.NewTicker(b.decayPeriod)
+	defer t.Stop()
+
 	for {
 		select {
 		case <-t.C:

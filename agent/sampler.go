@@ -22,7 +22,7 @@ type Sampler struct {
 	// statistics
 	traceCount int
 
-	se SamplerEngine
+	samplerEngine SamplerEngine
 }
 
 // SamplerEngine cares about telling if a trace is a proper sample or not
@@ -39,21 +39,19 @@ func NewSampler(in chan model.Trace, conf *config.AgentConfig) *Sampler {
 		out:           make(chan []model.Trace),
 		sampledTraces: []model.Trace{},
 		traceCount:    0,
-		se:            sampler.NewSampler(conf.ExtraSampleRate, conf.MaxTPS),
+		samplerEngine: sampler.NewSampler(conf.ExtraSampleRate, conf.MaxTPS),
 	}
 }
 
 // Run starts sampling traces
 func (s *Sampler) Run() {
-	statsdTags := []string{"sampler:signature"}
-
-	go s.se.Run()
+	go s.samplerEngine.Run()
 
 	for trace := range s.in {
 		if len(trace) == 1 && trace[0].IsFlushMarker() {
 			traces := s.Flush()
-			statsd.Client.Count("trace_agent.sampler.trace.kept", int64(len(traces)), statsdTags, 1)
-			statsd.Client.Count("trace_agent.sampler.trace.total", int64(s.traceCount), statsdTags, 1)
+			statsd.Client.Count("trace_agent.sampler.trace.kept", int64(len(traces)), nil, 1)
+			statsd.Client.Count("trace_agent.sampler.trace.total", int64(s.traceCount), nil, 1)
 			log.Debugf("flushed %d sampled traces out of %v", len(traces), s.traceCount)
 
 			s.traceCount = 0
@@ -65,12 +63,12 @@ func (s *Sampler) Run() {
 	}
 
 	close(s.out)
-	s.se.Stop()
+	s.samplerEngine.Stop()
 }
 
 // AddTrace samples a trace then keep it until the next flush
 func (s *Sampler) AddTrace(trace model.Trace) {
-	if s.se.Sample(trace) {
+	if s.samplerEngine.Sample(trace) {
 		s.mu.Lock()
 		s.sampledTraces = append(s.sampledTraces, trace)
 		s.mu.Unlock()
