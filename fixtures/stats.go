@@ -138,7 +138,7 @@ var TestDistroValues = []int64{
 
 // TestDistribution returns a distribution with pre-defined values
 func TestDistribution() model.Distribution {
-	tgs := model.NewTagsFromString("service:X,name:Y,host:Z")
+	tgs := model.NewTagSetFromString("service:X,name:Y,host:Z")
 	d := model.NewDistribution("duration", "duration|service:X,name:Y,host:Z", tgs)
 	for i, v := range TestDistroValues {
 		d.Add(float64(v), uint64(i))

@@ -49,12 +49,6 @@ func NewTagSetFromString(raw string) TagSet {
 	return tags
 }
 
-// NewTagsFromString is deprecated
-func NewTagsFromString(r string) TagSet {
-	// FIXME[matt] kill me
-	return NewTagSetFromString(r)
-}
-
 // TagKey returns a unique key from the string given and the tagset, useful to index stuff on tagsets
 func (t TagSet) TagKey(m string) string {
 	tagStrings := make([]string, len(t))
