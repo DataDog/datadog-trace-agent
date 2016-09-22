@@ -44,6 +44,9 @@ func IsTraceSpecific(tag string) bool {
 // WithPrefix("bar", WithPrefix("bar", foo))
 // is the same as WithPrefix("bar", foo).
 func WithPrefix(prefix, tag string) string {
+	if prefix == "name" || prefix == "trace.name" {
+		return "trace.name"
+	}
 	return fmt.Sprintf("%s%s%s", prefix, Sep, WithoutPrefix(prefix, tag))
 }
 
@@ -54,6 +57,9 @@ func WithPrefix(prefix, tag string) string {
 // WithoutPrefix("bar", WithoutPrefix("bar", foo))
 // is the same as ToTrace("bar", foo).
 func WithoutPrefix(prefix, tag string) string {
+	if prefix == "name" || prefix == "trace.name" {
+		return "name"
+	}
 	e := strings.Split(tag, Sep)
 	var i int
 	for i = 0; e[i] == prefix; i++ {
