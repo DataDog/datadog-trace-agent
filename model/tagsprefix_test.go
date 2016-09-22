@@ -20,3 +20,15 @@ func TestWithoutTracePrefix(t *testing.T) {
 		assert.Equal(t, v[1], WithoutTracePrefix(v[0]))
 	}
 }
+
+func BenchmarkIsTraceSpecific(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_ = IsTraceSpecific("foo")
+	}
+}
+
+func BenchmarkWithTracePrefix(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_ = WithTracePrefix("bar")
+	}
+}
