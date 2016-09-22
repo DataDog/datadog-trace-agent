@@ -22,6 +22,20 @@ func WithoutTracePrefix(tag string) string {
 	return WithoutPrefix(TracePrefix, tag)
 }
 
+// IsTraceSpecific returns true if this is a trace-specific tag
+// and therefore should be escaped.
+func IsTraceSpecific(tag string) bool {
+	// For now, only consider "name" should be rewritten as "trace.name"
+	// In the long run, it might be interesting to also wrap
+	// "resource" and "service" but this is a big change at once,
+	// so 1st step: name only.
+	// if tag == "name" || tag == "resource" || tag == "service" {
+	if tag == "name" {
+		return true
+	}
+	return false
+}
+
 // WithPrefix returns a tag name prefixed so that there's no
 // collision with other, custom tags.
 // Eg "name" -> "trace.name".
