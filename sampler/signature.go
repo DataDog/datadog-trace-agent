@@ -2,157 +2,21 @@ package sampler
 
 import (
 	"hash/fnv"
-	"math"
-	"math/rand"
 	"sort"
-	"sync"
-	"time"
-
-	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/raclette/model"
-)
-
-const (
-	// GetTimeScore function constants to give it the shape we want
-	logMultiplier = 10
-	logRescaler   = 2.0851619571212314 // = 5 * 1 / math.Log(1+logMultiplier)
-
-	// Expire signature when too old. Be sure that it is compatible with GetTimeScore.
-	signatureExpiration = 15 * time.Minute
+	log "github.com/cihub/seelog"
 )
 
 // Signature is a simple representation of trace, used to identify simlar traces
 type Signature uint64
 
-// SignatureSampler samples by identifying traces with a signature then score it
-type SignatureSampler struct {
-	// Last time we sampled a given signature
-	lastTSBySignature map[Signature]time.Time
-	// Traces sampled kept until the next flush
-	sampledTraces []model.Trace
-	// Time of the last flush
-	lastFlush time.Time
-	// Lock to protect our 2 maps
-	mu sync.Mutex
-
-	// Scoring configuration
-	scoreThreshold  float64       // Score required to be sampled, sample when score is over scoreThreshold
-	signaturePeriod time.Duration // Typical last-seen duration after which we want to sample a trace
-	scoreJitter     float64       // Multiplicative random coefficient (0 to 1)
-	tpsMax          float64       // Hard-limit on the number of traces per second
-}
-
-// NewSignatureSampler creates a new SignatureSampler, ready to ingest traces
-func NewSignatureSampler(scoreThreshold float64, signaturePeriod time.Duration, scoreJitter float64, tpsMax float64) *SignatureSampler {
-	return &SignatureSampler{
-		lastTSBySignature: map[Signature]time.Time{},
-		sampledTraces:     []model.Trace{},
-		lastFlush:         time.Now(),
-
-		scoreThreshold:  scoreThreshold,
-		signaturePeriod: signaturePeriod,
-		scoreJitter:     scoreJitter,
-		tpsMax:          tpsMax,
-	}
-}
-
-// Flush returns representative spans based on GetSamples and reset its internal memory
-func (s *SignatureSampler) Flush() []model.Trace {
-	now := time.Now()
-	sampledDuration := now.Sub(s.lastFlush)
-	hardLimit := int(s.tpsMax * math.Ceil(sampledDuration.Seconds()))
-
-	s.mu.Lock()
-	samples := s.sampledTraces
-	s.sampledTraces = []model.Trace{}
-	s.lastFlush = now
-	s.expireSignatureMap()
-	s.mu.Unlock()
-
-	// Ensure the hard limit the dumb way
-	if len(samples) > hardLimit {
-		log.Warnf("truncate set of sampled traces (from %v to %v), you should reduce sampler sensitivity", len(samples), hardLimit)
-		return samples[:hardLimit]
-	}
-
-	return samples
-}
-
-// expireSignatureMap expire data from lastTSBySignature to limit the memory footprint
-// Corollary: it also limits the max size of the map to: tpsMax * expireAfter entries
-func (s *SignatureSampler) expireSignatureMap() {
-	tsCutoff := time.Now().Add(-signatureExpiration)
-
-	for signature, ts := range s.lastTSBySignature {
-		if ts.Before(tsCutoff) {
-			delete(s.lastTSBySignature, signature)
-		}
-	}
-}
-
-// AddTrace samples a trace then keep it until the next flush
-func (s *SignatureSampler) AddTrace(trace model.Trace) {
-	signature := ComputeSignature(trace)
-
-	s.mu.Lock()
-
-	score := s.GetScore(signature)
-	sampled := score > s.scoreThreshold
-	if sampled {
-		s.sampledTraces = append(s.sampledTraces, trace)
-		s.lastTSBySignature[signature] = time.Now()
-	}
-
-	s.mu.Unlock()
-
-	log.Debugf("trace_id:%v signature:%v score:%v sampled:%v", trace[0].TraceID, signature, score, sampled)
-}
-
-// GetScore gives a score to a trace reflecting how strong we want to sample it
-// Current implementation only cares about the last time a similar trace was seen + some randomness
-// Score is from 0 to 10.
-func (s *SignatureSampler) GetScore(signature Signature) float64 {
-	timeScore := s.GetTimeScore(signature)
-
-	// Add some jitter
-	return timeScore * (1 + s.scoreJitter*(1-2*rand.Float64()))
-}
-
-// GetTimeScore gives a score based on the square root of the last time this signature was seen.
-// Current implementation and constant give a score of:
-// | Δ/θ | Score |
-// | --- | ----- |
-// |  0  |    0  |
-// |.02  |  .35  |
-// | .2  |  2.3  |
-// | .5  |  3.7  |
-// |  1  |    5  |
-// |  2  |  6.3  |
-// |  5  |  8.2  |
-// | 10  |  9.6  |
-// | 12+ |   10  |
-// | --- | ----- |
-func (s *SignatureSampler) GetTimeScore(signature Signature) float64 {
-	ts, seen := s.lastTSBySignature[signature]
-	if !seen {
-		return 10
-	}
-	delta := time.Now().Sub(ts)
-
-	if delta <= 0 {
-		return 0
-	}
-
-	return math.Min(logRescaler*math.Log(1+logMultiplier*float64(delta/s.signaturePeriod)), 10)
-}
-
-// ComputeSignature generates a signature of a trace
+// ComputeSignatureWithRoot generates the signature of a trace knowing its root
 // Signature based on the hash of (service, name, resource, is_error) for the root, plus the set of
 // (service, name, is_error) of each span.
-func ComputeSignature(trace model.Trace) Signature {
-	rootHash := computeRootHash(getRoot(trace))
-	spanHashes := make([]spanHash, len(trace))
+func ComputeSignatureWithRoot(trace model.Trace, root *model.Span) Signature {
+	rootHash := computeRootHash(*root)
+	spanHashes := make([]spanHash, 0, len(trace))
 
 	for i := range trace {
 		spanHashes = append(spanHashes, computeSpanHash(trace[i]))
@@ -171,6 +35,13 @@ func ComputeSignature(trace model.Trace) Signature {
 	}
 
 	return Signature(traceHash)
+}
+
+// ComputeSignature is the same as ComputeSignatureWithRoot, except that it finds the root itself
+func ComputeSignature(trace model.Trace) Signature {
+	root := GetRoot(trace)
+
+	return ComputeSignatureWithRoot(trace, root)
 }
 
 func computeSpanHash(span model.Span) spanHash {
@@ -192,16 +63,44 @@ func computeRootHash(span model.Span) spanHash {
 	return spanHash(h.Sum32())
 }
 
-// getRoot extract the root span from a trace
-func getRoot(trace model.Trace) model.Span {
-	// This current implementation is not 100% reliable, and would be wrong if we receive a sub-trace with its local
-	// root not being at the end
+// GetRoot extracts the root span from a trace
+func GetRoot(trace model.Trace) *model.Span {
+	// That should be caught beforehand
+	if len(trace) == 0 {
+		return nil
+	}
+	// General case: go over all spans and check for one which matching parent
+	parentIDToChild := map[uint64]*model.Span{}
+
 	for i := range trace {
-		if trace[len(trace)-1-i].ParentID == 0 {
-			return trace[len(trace)-1-i]
+		// Common case optimization: check for span with ParentID == 0, starting from the end,
+		// since some clients report the root last
+		j := len(trace) - 1 - i
+		if trace[j].ParentID == 0 {
+			return &trace[j]
+		}
+		parentIDToChild[trace[j].ParentID] = &trace[j]
+	}
+
+	for i := range trace {
+		if _, ok := parentIDToChild[trace[i].SpanID]; ok {
+			delete(parentIDToChild, trace[i].SpanID)
 		}
 	}
-	return trace[len(trace)-1]
+
+	// Here, if the trace is valid, we should have len(parentIDToChild) == 1
+	if len(parentIDToChild) != 1 {
+		log.Errorf("Didn't reliably find the root span for traceID:%v", trace[0].TraceID)
+	}
+
+	// Have a safe bahavior if that's not the case
+	// Pick the first span without its parent
+	for parentID := range parentIDToChild {
+		return parentIDToChild[parentID]
+	}
+
+	// Gracefully fail with the last span of the trace
+	return &trace[len(trace)-1]
 }
 
 // spanHash is the type of the hashes used during the computation of a signature

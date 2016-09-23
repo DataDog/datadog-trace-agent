@@ -1,7 +1,7 @@
 package main
 
 import (
-	"time"
+	"sync"
 
 	log "github.com/cihub/seelog"
 
@@ -16,50 +16,71 @@ type Sampler struct {
 	in  chan model.Trace
 	out chan []model.Trace
 
+	sampledTraces []model.Trace
+	mu            sync.Mutex
+
 	// statistics
 	traceCount int
 
-	se SamplerEngine
+	samplerEngine SamplerEngine
 }
 
-// SamplerEngine cares about ingesting spans and stats to return a sampled payload
+// SamplerEngine cares about telling if a trace is a proper sample or not
 type SamplerEngine interface {
-	AddTrace(t model.Trace)
-	Flush() []model.Trace
+	Run()
+	Stop()
+	Sample(t model.Trace) bool
 }
 
 // NewSampler creates a new empty sampler ready to be started
 func NewSampler(in chan model.Trace, conf *config.AgentConfig) *Sampler {
 	return &Sampler{
-		in:         in,
-		out:        make(chan []model.Trace),
-		traceCount: 0,
-		se:         sampler.NewSignatureSampler(conf.ScoreThreshold, conf.SignaturePeriod, conf.ScoreJitter, conf.TPSMax),
+		in:            in,
+		out:           make(chan []model.Trace),
+		sampledTraces: []model.Trace{},
+		traceCount:    0,
+		samplerEngine: sampler.NewSampler(conf.ExtraSampleRate, conf.MaxTPS),
 	}
 }
 
 // Run starts sampling traces
 func (s *Sampler) Run() {
-	statsdTags := []string{"sampler:signature"}
+	go s.samplerEngine.Run()
 
 	for trace := range s.in {
 		if len(trace) == 1 && trace[0].IsFlushMarker() {
-			startTime := time.Now()
-			traces := s.se.Flush()
-			execTime := time.Since(startTime)
-			statsd.Client.Gauge("trace_agent.sampler.sample_duration", execTime.Seconds(), statsdTags, 1)
-
-			statsd.Client.Count("trace_agent.sampler.trace.kept", int64(len(traces)), statsdTags, 1)
-			statsd.Client.Count("trace_agent.sampler.trace.total", int64(s.traceCount), statsdTags, 1)
+			traces := s.Flush()
+			statsd.Client.Count("trace_agent.sampler.trace.kept", int64(len(traces)), nil, 1)
+			statsd.Client.Count("trace_agent.sampler.trace.total", int64(s.traceCount), nil, 1)
 			log.Debugf("flushed %d sampled traces out of %v", len(traces), s.traceCount)
 
 			s.traceCount = 0
 			s.out <- traces
 		} else {
-			s.se.AddTrace(trace)
+			s.AddTrace(trace)
 			s.traceCount++
 		}
 	}
 
 	close(s.out)
+	s.samplerEngine.Stop()
+}
+
+// AddTrace samples a trace then keep it until the next flush
+func (s *Sampler) AddTrace(trace model.Trace) {
+	if s.samplerEngine.Sample(trace) {
+		s.mu.Lock()
+		s.sampledTraces = append(s.sampledTraces, trace)
+		s.mu.Unlock()
+	}
+}
+
+// Flush returns representative spans based on GetSamples and reset its internal memory
+func (s *Sampler) Flush() []model.Trace {
+	s.mu.Lock()
+	samples := s.sampledTraces
+	s.sampledTraces = []model.Trace{}
+	s.mu.Unlock()
+
+	return samples
 }
