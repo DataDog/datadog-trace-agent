@@ -4,7 +4,7 @@ import (
 	"github.com/DataDog/raclette/model"
 )
 
-var defaultAggregators = []string{"service", "resource"}
+var defaultAggregators = []string{"name", "service", "resource"}
 
 // TestStatsBucket returns a fixed stats bucket to be used in unit tests
 func TestStatsBucket() model.StatsBucket {
