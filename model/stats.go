@@ -8,11 +8,13 @@ import (
 	"github.com/DataDog/raclette/quantile"
 )
 
-// Hardcoded metric names for ease of reference
+// Hardcoded measures names for ease of reference
 const (
 	HITS     string = "hits"
 	ERRORS          = "errors"
 	DURATION        = "duration"
+	// Used in aggregates to specify the name of the current trace
+	TraceName = "trace.name"
 )
 
 var (
@@ -244,7 +246,13 @@ func (sb StatsBucket) addToTagSet(s Span, aggr, traceName string, tgs TagSet) {
 }
 
 func keyAggr(m, aggr, traceName string) string {
-	return m + "|" + "tracename:" + traceName + "," + aggr
+	if traceName != "" {
+		if aggr != "" {
+			return m + "|" + TraceName + ":" + traceName + "," + aggr
+		}
+		return m + "|" + TraceName + ":" + traceName
+	}
+	return m + "|" + aggr
 }
 
 func (sb StatsBucket) addToCount(m string, v float64, aggr, traceName string, tgs TagSet) {

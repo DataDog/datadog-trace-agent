@@ -183,6 +183,7 @@ func TestSublayerNested(t *testing.T) {
 
 	assert.Equal(len(expected), len(stats[0].Counts), "got %v", stats[0].Counts)
 
+	t.Logf("stats[0].Counts: %v", stats[0].Counts)
 	for k, c := range stats[0].Counts {
 		exp, ok := expected[k]
 		assert.True(ok, "count not expected %v", c)
