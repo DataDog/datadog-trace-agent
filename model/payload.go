@@ -9,9 +9,28 @@ import (
 	"net/http"
 )
 
+// AgentPayloadVersion is the version the agent agrees to with
+// the API so that they can encode/decode the data accordingly
+type AgentPayloadVersion string
+
+const (
+	// AgentPayloadV01 is a simple json'd/gzip'd dump of the payload
+	AgentPayloadV01 AgentPayloadVersion = "v0.1"
+	// AgentPayloadV02 introduces TraceName and Measure for Stats
+	AgentPayloadV02 AgentPayloadVersion = "v0.2"
+)
+
+var (
+	// GlobalAgentPayloadVersion is a default that will be used
+	// in all the AgentPayload method. Override for special cases.
+	GlobalAgentPayloadVersion = AgentPayloadV02
+)
+
 // AgentPayload is the main payload to carry data that has been
 // pre-processed to the Datadog mothership
 type AgentPayload struct {
+	// Version is just the version of the Payload, helps migrations.
+	Version  AgentPayloadVersion
 	HostName string        `json:"hostname"` // the host name that will be resolved by the API
 	Traces   []Trace       `json:"traces"`   // the traces we sampled
 	Stats    []StatsBucket `json:"stats"`    // the statistics we pre-computed
@@ -23,21 +42,6 @@ func (p *AgentPayload) IsEmpty() bool {
 	return len(p.Stats) == 0 && len(p.Traces) == 0
 }
 
-// AgentPayloadVersion is the version the agent agrees to with
-// the API so that they can encode/decode the data accordingly
-type AgentPayloadVersion string
-
-const (
-	// AgentPayloadV01 is a simple json'd/gzip'd dump of the payload
-	AgentPayloadV01 AgentPayloadVersion = "v0.1"
-)
-
-var (
-	// GlobalAgentPayloadVersion is a default that will be used
-	// in all the AgentPayload method. Override for special cases.
-	GlobalAgentPayloadVersion = AgentPayloadV01
-)
-
 // EncodeAgentPayload will return a slice of bytes representing the
 // payload (according to GlobalAgentPayloadVersion)
 func EncodeAgentPayload(p AgentPayload) ([]byte, error) {
@@ -45,7 +49,7 @@ func EncodeAgentPayload(p AgentPayload) ([]byte, error) {
 	var err error
 
 	switch GlobalAgentPayloadVersion {
-	case AgentPayloadV01:
+	case AgentPayloadV02:
 		gz := gzip.NewWriter(&b)
 		err = json.NewEncoder(gz).Encode(p)
 		gz.Close()
