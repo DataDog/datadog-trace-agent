@@ -90,25 +90,39 @@ func TestAggrString(t *testing.T) {
 	aggregators := []string{}
 
 	aggr, tgs := getAggregateGrain(span, aggregators, &sb.keyBuf)
-	assert.Equal(aggr, "name:other,resource:yo,service:thing")
-	assert.Equal(tgs, TagSet{Tag{"name", "other"}, Tag{"resource", "yo"}, Tag{"service", "thing"}})
+	assert.Equal("resource:yo,service:thing", aggr)
+	assert.Equal(TagSet{Tag{"resource", "yo"}, Tag{"service", "thing"}}, tgs)
 
 	aggregators = []string{"version"}
 
 	span = Span{Service: "thing", Name: "other", Resource: "yo", Meta: map[string]string{"version": "1.5"}}
 	aggr, tgs = getAggregateGrain(span, aggregators, &sb.keyBuf)
-	assert.Equal(aggr, "name:other,resource:yo,service:thing,version:1.5")
-	assert.Equal(tgs, TagSet{Tag{"name", "other"}, Tag{"resource", "yo"}, Tag{"service", "thing"}, Tag{"version", "1.5"}})
+	assert.Equal("resource:yo,service:thing,version:1.5", aggr)
+	assert.Equal(TagSet{Tag{"resource", "yo"}, Tag{"service", "thing"}, Tag{"version", "1.5"}}, tgs)
 
 	// test something with special chars
 	span = Span{Service: "thing", Name: "other:brother", Resource: "yo,mec,how goes it", Meta: map[string]string{"version": "1.5"}}
 	aggr, tgs = getAggregateGrain(span, aggregators, &sb.keyBuf)
-	assert.Equal(aggr, "name:other:brother,resource:yo,mec,how goes it,service:thing,version:1.5")
-	assert.Equal(tgs, TagSet{Tag{"name", "other:brother"}, Tag{"resource", "yo,mec,how goes it"}, Tag{"service", "thing"}, Tag{"version", "1.5"}})
+	assert.Equal("resource:yo,mec,how goes it,service:thing,version:1.5", aggr)
+	assert.Equal(TagSet{Tag{"resource", "yo,mec,how goes it"}, Tag{"service", "thing"}, Tag{"version", "1.5"}}, tgs)
 
 	// test something empty
 	span = Span{TraceID: 0, SpanID: 1}
 	aggr, tgs = getAggregateGrain(span, []string{}, &sb.keyBuf)
 	assert.Equal("", aggr)
 	assert.Equal(0, len(tgs))
+}
+
+func TestUnset(t *testing.T) {
+	assert := assert.New(t)
+	ts := NewTagSetFromString("service:mcnulty,resource:template,name:magicfunc")
+	ts2 := ts.Unset("name")
+	assert.Len(ts, 3)
+	assert.Equal("mcnulty", ts.Get("service").Value)
+	assert.Equal("template", ts.Get("resource").Value)
+	assert.Equal("magicfunc", ts.Get("name").Value)
+	assert.Len(ts2, 2)
+	assert.Equal("mcnulty", ts2.Get("service").Value)
+	assert.Equal("template", ts2.Get("resource").Value)
+	assert.Equal("", ts2.Get("name").Value)
 }
