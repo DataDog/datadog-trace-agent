@@ -25,9 +25,9 @@ var (
 
 // Count represents one specific "metric" we track for a given tagset
 type Count struct {
-	Key    string `json:"key"`
-	Name   string `json:"name"`   // represents the entity we count, e.g. "hits", "errors", "time"
-	TagSet TagSet `json:"tagset"` // set of tags for which we account this Distribution
+	Key     string `json:"key"`
+	Measure string `json:"measure"` // represents the entity we count, e.g. "hits", "errors", "time"
+	TagSet  TagSet `json:"tagset"`  // set of tags for which we account this Distribution
 
 	Value float64 `json:"value"` // accumulated values
 }
@@ -35,14 +35,14 @@ type Count struct {
 // Distribution represents a true image of the spectrum of values, allowing arbitrary quantile queries
 type Distribution struct {
 	Key     string                 `json:"key"`
-	Name    string                 `json:"name"`    // represents the entity we count, e.g. "hits", "errors", "time"
+	Measure string                 `json:"measure"` // represents the entity we count, e.g. "hits", "errors", "time"
 	TagSet  TagSet                 `json:"tagset"`  // set of tags for which we account this Distribution
 	Summary *quantile.SliceSummary `json:"summary"` // actual representation of data
 }
 
 // NewCount returns a new Count for a metric and a given tag set
 func NewCount(m string, ckey string, tgs TagSet) Count {
-	return Count{Key: ckey, Name: m, TagSet: tgs, Value: 0.0}
+	return Count{Key: ckey, Measure: m, TagSet: tgs, Value: 0.0}
 }
 
 // Add adds some values to one count
@@ -66,7 +66,7 @@ func (c Count) Merge(c2 Count) Count {
 func NewDistribution(m string, ckey string, tgs TagSet) Distribution {
 	return Distribution{
 		Key:     ckey,
-		Name:    m,
+		Measure: m,
 		TagSet:  tgs,
 		Summary: quantile.NewSliceSummary(),
 	}
@@ -127,13 +127,7 @@ func getAggregateGrain(s Span, aggregators []string, keyBuf *bytes.Buffer) (stri
 	tgs := TagSet{}
 
 	// First deal with our default aggregators
-	if s.Name != "" {
-		keyBuf.WriteString("name:")
-		keyBuf.WriteString(s.Name)
-		keyBuf.WriteRune(',')
-
-		tgs = append(tgs, Tag{"name", s.Name})
-	}
+	// Note : "name" is not something we want to aggregate on, it appears
 
 	if s.Resource != "" {
 		keyBuf.WriteString("resource:")

@@ -86,15 +86,15 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	// Start with the first/older bucket
 	receivedCounts = receivedBuckets[0].Counts
 	expectedCountValByKey := map[string]int64{
-		"duration|name:query,resource:resource1,service:A1":   36,
-		"duration|name:query,resource:resource2,service:A2":   70,
-		"duration|name:query,resource:resourcefoo,service:A2": 30,
-		"errors|name:query,resource:resource1,service:A1":     1,
-		"errors|name:query,resource:resource2,service:A2":     2,
-		"errors|name:query,resource:resourcefoo,service:A2":   0,
-		"hits|name:query,resource:resource1,service:A1":       2,
-		"hits|name:query,resource:resource2,service:A2":       2,
-		"hits|name:query,resource:resourcefoo,service:A2":     1,
+		"duration|resource:resource1,service:A1":   36,
+		"duration|resource:resource2,service:A2":   70,
+		"duration|resource:resourcefoo,service:A2": 30,
+		"errors|resource:resource1,service:A1":     1,
+		"errors|resource:resource2,service:A2":     2,
+		"errors|resource:resourcefoo,service:A2":   0,
+		"hits|resource:resource1,service:A1":       2,
+		"hits|resource:resource2,service:A2":       2,
+		"hits|resource:resourcefoo,service:A2":     1,
 	}
 
 	// FIXME[leo]: assert distributions!
@@ -110,21 +110,21 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	// same for second bucket
 	receivedCounts = receivedBuckets[1].Counts
 	expectedCountValByKey = map[string]int64{
-		"duration|name:query,resource:resource1,service:A1":   12,
-		"duration|name:query,resource:resource2,service:A1":   24,
-		"duration|name:query,resource:resource1,service:A2":   40,
-		"duration|name:query,resource:resource2,service:A2":   30,
-		"duration|name:query,resource:resourcefoo,service:A2": 20,
-		"errors|name:query,resource:resource1,service:A1":     1,
-		"errors|name:query,resource:resource2,service:A1":     0,
-		"errors|name:query,resource:resource1,service:A2":     1,
-		"errors|name:query,resource:resource2,service:A2":     1,
-		"errors|name:query,resource:resourcefoo,service:A2":   0,
-		"hits|name:query,resource:resource1,service:A1":       1,
-		"hits|name:query,resource:resource2,service:A1":       1,
-		"hits|name:query,resource:resource1,service:A2":       1,
-		"hits|name:query,resource:resource2,service:A2":       1,
-		"hits|name:query,resource:resourcefoo,service:A2":     1,
+		"duration|resource:resource1,service:A1":   12,
+		"duration|resource:resource2,service:A1":   24,
+		"duration|resource:resource1,service:A2":   40,
+		"duration|resource:resource2,service:A2":   30,
+		"duration|resource:resourcefoo,service:A2": 20,
+		"errors|resource:resource1,service:A1":     1,
+		"errors|resource:resource2,service:A1":     0,
+		"errors|resource:resource1,service:A2":     1,
+		"errors|resource:resource2,service:A2":     1,
+		"errors|resource:resourcefoo,service:A2":   0,
+		"hits|resource:resource1,service:A1":       1,
+		"hits|resource:resource2,service:A1":       1,
+		"hits|resource:resource1,service:A2":       1,
+		"hits|resource:resource2,service:A2":       1,
+		"hits|resource:resourcefoo,service:A2":     1,
 	}
 
 	// verify we got all counts

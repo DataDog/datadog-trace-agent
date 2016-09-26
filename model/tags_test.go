@@ -90,21 +90,21 @@ func TestAggrString(t *testing.T) {
 	aggregators := []string{}
 
 	aggr, tgs := getAggregateGrain(span, aggregators, &sb.keyBuf)
-	assert.Equal(aggr, "name:other,resource:yo,service:thing")
-	assert.Equal(tgs, TagSet{Tag{"name", "other"}, Tag{"resource", "yo"}, Tag{"service", "thing"}})
+	assert.Equal(aggr, "resource:yo,service:thing")
+	assert.Equal(tgs, TagSet{Tag{"resource", "yo"}, Tag{"service", "thing"}})
 
 	aggregators = []string{"version"}
 
 	span = Span{Service: "thing", Name: "other", Resource: "yo", Meta: map[string]string{"version": "1.5"}}
 	aggr, tgs = getAggregateGrain(span, aggregators, &sb.keyBuf)
-	assert.Equal(aggr, "name:other,resource:yo,service:thing,version:1.5")
-	assert.Equal(tgs, TagSet{Tag{"name", "other"}, Tag{"resource", "yo"}, Tag{"service", "thing"}, Tag{"version", "1.5"}})
+	assert.Equal(aggr, "resource:yo,service:thing,version:1.5")
+	assert.Equal(tgs, TagSet{Tag{"resource", "yo"}, Tag{"service", "thing"}, Tag{"version", "1.5"}})
 
 	// test something with special chars
 	span = Span{Service: "thing", Name: "other:brother", Resource: "yo,mec,how goes it", Meta: map[string]string{"version": "1.5"}}
 	aggr, tgs = getAggregateGrain(span, aggregators, &sb.keyBuf)
-	assert.Equal(aggr, "name:other:brother,resource:yo,mec,how goes it,service:thing,version:1.5")
-	assert.Equal(tgs, TagSet{Tag{"name", "other:brother"}, Tag{"resource", "yo,mec,how goes it"}, Tag{"service", "thing"}, Tag{"version", "1.5"}})
+	assert.Equal(aggr, "resource:yo,mec,how goes it,service:thing,version:1.5")
+	assert.Equal(tgs, TagSet{Tag{"resource", "yo,mec,how goes it"}, Tag{"service", "thing"}, Tag{"version", "1.5"}})
 
 	// test something empty
 	span = Span{TraceID: 0, SpanID: 1}
