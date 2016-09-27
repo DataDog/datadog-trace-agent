@@ -160,7 +160,7 @@ func getAggregateGrain(s Span, aggregators []string, keyBuf *bytes.Buffer) (stri
 	// now add our custom ones. just go in order since the list is already sorted
 	for _, agg := range aggregators {
 		// name is handled as a 1st class field (TraceName)
-		if agg != "name" {
+		if agg != "name" && agg != TraceName {
 			if v, ok := s.Meta[agg]; ok {
 				keyBuf.WriteString(agg)
 				keyBuf.WriteRune(':')
