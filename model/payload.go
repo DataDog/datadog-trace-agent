@@ -23,7 +23,7 @@ const (
 var (
 	// GlobalAgentPayloadVersion is a default that will be used
 	// in all the AgentPayload method. Override for special cases.
-	GlobalAgentPayloadVersion = AgentPayloadV02
+	GlobalAgentPayloadVersion = AgentPayloadV01
 )
 
 // AgentPayload is the main payload to carry data that has been
@@ -49,7 +49,7 @@ func EncodeAgentPayload(p AgentPayload) ([]byte, error) {
 	var err error
 
 	switch GlobalAgentPayloadVersion {
-	case AgentPayloadV02:
+	case AgentPayloadV01:
 		gz := gzip.NewWriter(&b)
 		err = json.NewEncoder(gz).Encode(p)
 		gz.Close()
