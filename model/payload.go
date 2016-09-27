@@ -30,7 +30,7 @@ var (
 // pre-processed to the Datadog mothership
 type AgentPayload struct {
 	// Version is just the version of the Payload, helps migrations.
-	Version  AgentPayloadVersion
+	Version  AgentPayloadVersion `json:"version"`
 	HostName string        `json:"hostname"` // the host name that will be resolved by the API
 	Traces   []Trace       `json:"traces"`   // the traces we sampled
 	Stats    []StatsBucket `json:"stats"`    // the statistics we pre-computed
