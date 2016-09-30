@@ -10,7 +10,7 @@ apt-get install -y git
 
 raclettepath=/go/src/github.com/DataDog/raclette/packaging
 
-url=https://storage.googleapis.com/golang/go1.6.2.linux-amd64.tar.gz
+url=https://storage.googleapis.com/golang/go1.7.1.linux-amd64.tar.gz
 out=go.tar.gz
 curl -XGET $url -o $out
 mkdir -p /usr/local/
