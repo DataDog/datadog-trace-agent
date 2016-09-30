@@ -8,7 +8,7 @@ RUN apt-get update && \
 RUN curl -sL -o /gimme https://raw.githubusercontent.com/travis-ci/gimme/master/gimme && \
     chmod +x /gimme
 
-RUN echo "#!/bin/sh \n $(/gimme 1.6.2) && cd /go/src/github.com/DataDog/raclette/packaging && dpkg-buildpackage -us -uc -b" >> /build.sh
+RUN echo "#!/bin/sh \n $(/gimme 1.7.1) && cd /go/src/github.com/DataDog/raclette/packaging && dpkg-buildpackage -us -uc -b" >> /build.sh
 RUN chmod +x /build.sh
 
 VOLUME ["/go/src/github.com/DataDog/raclette"]

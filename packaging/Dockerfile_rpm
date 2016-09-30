@@ -5,7 +5,7 @@ RUN gem install rake
 RUN curl -sL -o /gimme https://raw.githubusercontent.com/travis-ci/gimme/master/gimme && \
     chmod +x /gimme
 
-RUN echo "$(/gimme 1.6.2) && cd /go/src/github.com/DataDog/raclette/packaging/rpm && gpg --import ./RPM-SIGNING-KEY.private; rpmbuild -bb raclette.spec && ./rpm-sign" >> /build.sh
+RUN echo "$(/gimme 1.7.1) && cd /go/src/github.com/DataDog/raclette/packaging/rpm && gpg --import ./RPM-SIGNING-KEY.private; rpmbuild -bb raclette.spec && ./rpm-sign" >> /build.sh
 RUN chmod +x /build.sh
 
 ADD rpm/.rpmmacros /root/.rpmmacros
