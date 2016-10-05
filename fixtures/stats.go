@@ -4,7 +4,7 @@ import (
 	"github.com/DataDog/raclette/model"
 )
 
-var defaultAggregators = []string{"service", "name", "resource"}
+var defaultAggregators = []string{"name", "service", "resource"}
 
 // TestStatsBucket returns a fixed stats bucket to be used in unit tests
 func TestStatsBucket() model.StatsBucket {
@@ -138,8 +138,8 @@ var TestDistroValues = []int64{
 
 // TestDistribution returns a distribution with pre-defined values
 func TestDistribution() model.Distribution {
-	tgs := model.NewTagSetFromString("service:X,name:Y,host:Z")
-	d := model.NewDistribution("duration", "duration|service:X,name:Y,host:Z", tgs)
+	tgs := model.NewTagSetFromString("service:X,host:Z")
+	d := model.NewDistribution("duration", "duration|service:X,host:Z", "Y", tgs)
 	for i, v := range TestDistroValues {
 		d.Add(float64(v), uint64(i))
 	}

@@ -8,11 +8,13 @@ import (
 	"github.com/DataDog/raclette/quantile"
 )
 
-// Hardcoded metric names for ease of reference
+// Hardcoded measures names for ease of reference
 const (
 	HITS     string = "hits"
 	ERRORS          = "errors"
 	DURATION        = "duration"
+	// Used in aggregates to specify the name of the current trace
+	TraceName = "trace.name"
 )
 
 var (
@@ -25,24 +27,33 @@ var (
 
 // Count represents one specific "metric" we track for a given tagset
 type Count struct {
-	Key    string `json:"key"`
-	Name   string `json:"name"`   // represents the entity we count, e.g. "hits", "errors", "time"
-	TagSet TagSet `json:"tagset"` // set of tags for which we account this Distribution
+	Key       string `json:"key"`
+	TraceName string `json:"tracename"` // the name of the trace/spans we count (was a member of TagSet)
+	Measure   string `json:"measure"`   // represents the entity we count, e.g. "hits", "errors", "time" (was Name)
+	TagSet    TagSet `json:"tagset"`    // set of tags for which we account this Distribution
 
 	Value float64 `json:"value"` // accumulated values
 }
 
 // Distribution represents a true image of the spectrum of values, allowing arbitrary quantile queries
 type Distribution struct {
-	Key     string                 `json:"key"`
-	Name    string                 `json:"name"`    // represents the entity we count, e.g. "hits", "errors", "time"
-	TagSet  TagSet                 `json:"tagset"`  // set of tags for which we account this Distribution
+	Key       string `json:"key"`
+	TraceName string `json:"tracename"` // the name of the trace/spans we count (was a member of TagSet)
+	Measure   string `json:"measure"`   // represents the entity we count, e.g. "hits", "errors", "time"
+	TagSet    TagSet `json:"tagset"`    // set of tags for which we account this Distribution
+
 	Summary *quantile.SliceSummary `json:"summary"` // actual representation of data
 }
 
 // NewCount returns a new Count for a metric and a given tag set
-func NewCount(m string, ckey string, tgs TagSet) Count {
-	return Count{Key: ckey, Name: m, TagSet: tgs, Value: 0.0}
+func NewCount(m string, ckey, traceName string, tgs TagSet) Count {
+	return Count{
+		Key:       ckey,
+		TraceName: traceName,
+		Measure:   m,
+		TagSet:    tgs,
+		Value:     0.0,
+	}
 }
 
 // Add adds some values to one count
@@ -63,12 +74,13 @@ func (c Count) Merge(c2 Count) Count {
 }
 
 // NewDistribution returns a new Distribution for a metric and a given tag set
-func NewDistribution(m string, ckey string, tgs TagSet) Distribution {
+func NewDistribution(m string, ckey, traceName string, tgs TagSet) Distribution {
 	return Distribution{
-		Key:     ckey,
-		Name:    m,
-		TagSet:  tgs,
-		Summary: quantile.NewSliceSummary(),
+		Key:       ckey,
+		TraceName: traceName,
+		Measure:   m,
+		TagSet:    tgs,
+		Summary:   quantile.NewSliceSummary(),
 	}
 }
 
@@ -127,13 +139,7 @@ func getAggregateGrain(s Span, aggregators []string, keyBuf *bytes.Buffer) (stri
 	tgs := TagSet{}
 
 	// First deal with our default aggregators
-	if s.Name != "" {
-		keyBuf.WriteString("name:")
-		keyBuf.WriteString(s.Name)
-		keyBuf.WriteRune(',')
-
-		tgs = append(tgs, Tag{"name", s.Name})
-	}
+	// Note : "name" is not something we want to aggregate on, it appears
 
 	if s.Resource != "" {
 		keyBuf.WriteString("resource:")
@@ -153,13 +159,16 @@ func getAggregateGrain(s Span, aggregators []string, keyBuf *bytes.Buffer) (stri
 
 	// now add our custom ones. just go in order since the list is already sorted
 	for _, agg := range aggregators {
-		if v, ok := s.Meta[agg]; ok {
-			keyBuf.WriteString(agg)
-			keyBuf.WriteRune(':')
-			keyBuf.WriteString(v)
-			keyBuf.WriteRune(',')
+		// name is handled as a 1st class field (TraceName)
+		if agg != "name" && agg != TraceName {
+			if v, ok := s.Meta[agg]; ok {
+				keyBuf.WriteString(agg)
+				keyBuf.WriteRune(':')
+				keyBuf.WriteString(v)
+				keyBuf.WriteRune(',')
 
-			tgs = append(tgs, Tag{agg, v})
+				tgs = append(tgs, Tag{agg, v})
+			}
 		}
 	}
 
@@ -176,7 +185,7 @@ func getAggregateGrain(s Span, aggregators []string, keyBuf *bytes.Buffer) (stri
 // HandleSpan adds the span to this bucket stats, aggregated with the finest grain matching given aggregators
 func (sb *StatsBucket) HandleSpan(s Span, aggregators []string) {
 	aggrString, tgs := getAggregateGrain(s, aggregators, &sb.keyBuf)
-	sb.addToTagSet(s, aggrString, tgs)
+	sb.addToTagSet(s, aggrString, s.Name, tgs)
 }
 
 func parseSublayerTags(m string) string {
@@ -209,18 +218,18 @@ func getSublayerGrain(sublayer string, aggr string, tgs TagSet) (string, TagSet)
 	return aggrKey, slTags
 }
 
-func (sb StatsBucket) addToTagSet(s Span, aggr string, tgs TagSet) {
+func (sb StatsBucket) addToTagSet(s Span, aggr, traceName string, tgs TagSet) {
 	// HITS
-	sb.addToCount(HITS, 1, aggr, tgs)
+	sb.addToCount(HITS, 1, aggr, traceName, tgs)
 	// FIXME: this does not really make sense actually
 	// ERRORS
 	if s.Error != 0 {
-		sb.addToCount(ERRORS, 1, aggr, tgs)
+		sb.addToCount(ERRORS, 1, aggr, traceName, tgs)
 	} else {
-		sb.addToCount(ERRORS, 0, aggr, tgs)
+		sb.addToCount(ERRORS, 0, aggr, traceName, tgs)
 	}
 	// DURATION
-	sb.addToCount(DURATION, float64(s.Duration), aggr, tgs)
+	sb.addToCount(DURATION, float64(s.Duration), aggr, traceName, tgs)
 
 	// TODO add for s.Metrics ability to define arbitrary counts and distros, check some config?
 	for m, v := range s.Metrics {
@@ -229,31 +238,41 @@ func (sb StatsBucket) addToTagSet(s Span, aggr string, tgs TagSet) {
 		if sublayerTag != "" {
 			aggrKey, slTags := getSublayerGrain(sublayerTag, aggr, tgs)
 			// only extract _sublayers.duration.by_service
-			sb.addToCount(m[:len(m)-len(sublayerTag)-1], v, aggrKey, slTags)
+			sb.addToCount(m[:len(m)-len(sublayerTag)-1], v, aggrKey, traceName, slTags)
 		}
 
 	}
 
 	// alter resolution of duration distro
 	trundur := nsTimestampToFloat(s.Duration)
-	sb.addToDistribution(DURATION, trundur, s.SpanID, aggr, tgs)
+	sb.addToDistribution(DURATION, trundur, s.SpanID, aggr, traceName, tgs)
 }
 
-func (sb StatsBucket) addToCount(m string, v float64, aggr string, tgs TagSet) {
-	ckey := m + "|" + aggr
+func keyAggr(m, aggr, traceName string) string {
+	if traceName != "" {
+		if aggr != "" {
+			return m + "|" + TraceName + ":" + traceName + "," + aggr
+		}
+		return m + "|" + TraceName + ":" + traceName
+	}
+	return m + "|" + aggr
+}
+
+func (sb StatsBucket) addToCount(m string, v float64, aggr, traceName string, tgs TagSet) {
+	ckey := keyAggr(m, aggr, traceName)
 
 	if _, ok := sb.Counts[ckey]; !ok {
-		sb.Counts[ckey] = NewCount(m, ckey, tgs)
+		sb.Counts[ckey] = NewCount(m, ckey, traceName, tgs)
 	}
 
 	sb.Counts[ckey] = sb.Counts[ckey].Add(v)
 }
 
-func (sb StatsBucket) addToDistribution(m string, v float64, sampleID uint64, aggr string, tgs TagSet) {
-	ckey := m + "|" + aggr
+func (sb StatsBucket) addToDistribution(m string, v float64, sampleID uint64, aggr, traceName string, tgs TagSet) {
+	ckey := keyAggr(m, aggr, traceName)
 
 	if _, ok := sb.Distributions[ckey]; !ok {
-		sb.Distributions[ckey] = NewDistribution(m, ckey, tgs)
+		sb.Distributions[ckey] = NewDistribution(m, ckey, traceName, tgs)
 	}
 
 	sb.Distributions[ckey].Add(v, sampleID)
