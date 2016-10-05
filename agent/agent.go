@@ -33,9 +33,9 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 	st := NewSublayerTagger(r.traces)
 	q := NewQuantizer(st.out)
 
-	traceChans := traceFanOut(q.out, 2)
-	c := NewConcentrator(traceChans[0], conf)
-	s := NewSampler(traceChans[1], conf)
+	cChan, sChan := chanTPipe(q.out)
+	c := NewConcentrator(cChan, conf)
+	s := NewSampler(sChan, conf)
 
 	w := NewWriter(conf)
 	w.inServices = r.services
@@ -118,19 +118,36 @@ func (a *Agent) Stop() {
 	close(a.Writer.exit)
 }
 
-// traceFanOut redistributes incoming traces to multiple components by returning multiple channels
-func traceFanOut(in chan model.Trace, n int) []chan model.Trace {
-	outChans := make([]chan model.Trace, 0, n)
-	for i := 0; i < n; i++ {
-		outChans = append(outChans, make(chan model.Trace))
-	}
+// chanTPipe redistributes incoming traces to multiple components by returning multiple channels
+func chanTPipe(fromQuantizer chan model.Trace) (chan model.Trace, chan model.Trace) {
+	toConcentrator := make(chan model.Trace)
+	toSampler := make(chan model.Trace)
+
 	go func() {
-		for t := range in {
-			for _, outc := range outChans {
-				outc <- t
+		for t := range fromQuantizer {
+			t2 := make(model.Trace, len(t))
+			copy(t2, t)
+
+			for i := range t2 {
+				if t2[i].Metrics == nil {
+					continue
+				}
+
+				// this hack is needed because Metrics are read by the concentrator
+				// (data from the sublayer tagger) and by the sampler which also writes
+				// data to it. This avoids concurrent read/write map clashes.
+				t2[i].Metrics = make(map[string]float64)
+				for k, v := range t[i].Metrics {
+					s2 := t2[i]
+					s2.Metrics[k] = v
+					t2[i] = s2
+				}
 			}
+
+			toConcentrator <- t
+			toSampler <- t2
 		}
 	}()
 
-	return outChans
+	return toConcentrator, toSampler
 }
