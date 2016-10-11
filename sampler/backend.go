@@ -1,6 +1,7 @@
 package sampler
 
 import (
+	"sync"
 	"time"
 )
 
@@ -14,6 +15,7 @@ type Backend struct {
 	scores map[Signature]float64
 	// Score of sampled traces
 	sampledScore float64
+	mu           sync.Mutex
 
 	// Every decayPeriod, decay the score
 	// Lower value is more reactive, but forgets quicker
@@ -68,27 +70,38 @@ func (b *Backend) Stop() {
 
 // CountSignature counts an incoming signature
 func (b *Backend) CountSignature(signature Signature) {
+	b.mu.Lock()
 	b.scores[signature]++
+	b.mu.Unlock()
 }
 
 // CountSample counts a trace sampled by the sampler
 func (b *Backend) CountSample() {
+	b.mu.Lock()
 	b.sampledScore++
+	b.mu.Unlock()
 }
 
 // GetSignatureScore returns the score of a signature.
 // It is normalized to represent a number of signatures per second.
 func (b *Backend) GetSignatureScore(signature Signature) float64 {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	return b.scores[signature] / b.countScaleFactor
 }
 
 // GetSampledScore returns the global score of all sampled traces.
 func (b *Backend) GetSampledScore() float64 {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	return b.sampledScore / b.countScaleFactor
 }
 
 // DecayScore applies the decay to the rolling counters
 func (b *Backend) DecayScore() {
+	b.mu.Lock()
 	for sig := range b.scores {
 		score := b.scores[sig]
 		if score > 2 {
@@ -99,4 +112,5 @@ func (b *Backend) DecayScore() {
 		}
 	}
 	b.sampledScore /= b.decayFactor
+	b.mu.Unlock()
 }
