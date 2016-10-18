@@ -24,8 +24,10 @@ type AgentConfig struct {
 	APIEnabled   bool
 
 	// Concentrator
-	BucketInterval   time.Duration // the size of our pre-aggregation per bucket
-	OldestSpanCutoff int64         // maximum time we wait before discarding straggling spans, in ns
+	BucketInterval time.Duration // the size of our pre-aggregation per bucket
+	// OldestSpanCutoff is the maximum time we wait before discarding straggling spans, in ns.
+	// A span is considered too old when its end time is before now, minus this value.
+	OldestSpanCutoff int64
 	ExtraAggregators []string
 
 	// Sampler configuration
@@ -83,7 +85,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 		APIEnabled:   true,
 
 		BucketInterval:   time.Duration(10) * time.Second,
-		OldestSpanCutoff: time.Duration(60 * time.Second).Nanoseconds(),
+		OldestSpanCutoff: time.Duration(time.Minute).Nanoseconds(),
 		ExtraAggregators: []string{},
 
 		ExtraSampleRate: 1.0,

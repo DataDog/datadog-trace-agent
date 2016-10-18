@@ -54,3 +54,8 @@ func (s *Span) IsFlushMarker() bool {
 func NewFlushMarker() Span {
 	return Span{Type: flushMarkerType}
 }
+
+// End returns the end time of the span.
+func (s *Span) End() int64 {
+	return s.Start + s.Duration
+}

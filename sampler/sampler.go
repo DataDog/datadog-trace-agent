@@ -95,7 +95,7 @@ func (s *Sampler) Sample(trace raclette.Trace) bool {
 
 	// We need the root in multiple steps of the sampling, so let's extract here
 	// TODO: update raclette.Trace to contain a reference to the root, and don't give it as further function argument
-	root := GetRoot(trace)
+	root := trace.GetRoot()
 	signature := ComputeSignatureWithRoot(trace, root)
 
 	// Update sampler state by counting this trace

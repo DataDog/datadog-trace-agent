@@ -13,6 +13,7 @@ import (
 type Agent struct {
 	Receiver       *HTTPReceiver
 	SublayerTagger *SublayerTagger
+	CutoffFilter   *CutoffFilter
 	Quantizer      *Quantizer
 	Concentrator   *Concentrator
 	Sampler        *Sampler
@@ -31,7 +32,8 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 
 	r := NewHTTPReceiver(conf)
 	st := NewSublayerTagger(r.traces)
-	q := NewQuantizer(st.out)
+	cf := NewCutoffFilter(st.out, conf)
+	q := NewQuantizer(cf.out)
 
 	cChan, sChan := chanTPipe(q.out)
 	c := NewConcentrator(cChan, conf)
@@ -44,6 +46,7 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 		Config:         conf,
 		Receiver:       r,
 		SublayerTagger: st,
+		CutoffFilter:   cf,
 		Quantizer:      q,
 		Concentrator:   c,
 		Sampler:        s,
@@ -60,6 +63,7 @@ func (a *Agent) Run() {
 	go a.Sampler.Run()
 	go a.Concentrator.Run()
 	go a.Quantizer.Run()
+	go a.CutoffFilter.Run()
 	go a.SublayerTagger.Run()
 	go a.Receiver.Run()
 
