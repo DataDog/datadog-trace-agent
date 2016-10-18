@@ -47,6 +47,19 @@ func TestTagMerge(t *testing.T) {
 
 }
 
+func TestSplitTag(t *testing.T) {
+	k, v := SplitTag("k:v:w")
+	assert.Equal(t, k, "k")
+	assert.Equal(t, v, "v:w")
+}
+
+func TestTagColon(t *testing.T) {
+	ts := NewTagSetFromString("a:1:2:3,url:http://localhost:1234/")
+	t.Logf("ts: %v", ts)
+	assert.Equal(t, "1:2:3", ts.Get("a").Value)
+	assert.Equal(t, "http://localhost:1234/", ts.Get("url").Value)
+}
+
 func TestFilterTags(t *testing.T) {
 	assert := assert.New(t)
 
