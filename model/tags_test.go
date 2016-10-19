@@ -47,6 +47,19 @@ func TestTagMerge(t *testing.T) {
 
 }
 
+func TestSplitTag(t *testing.T) {
+	k, v := SplitTag("k:v:w")
+	assert.Equal(t, k, "k")
+	assert.Equal(t, v, "v:w")
+}
+
+func TestTagColon(t *testing.T) {
+	ts := NewTagSetFromString("a:1:2:3,url:http://localhost:1234/")
+	t.Logf("ts: %v", ts)
+	assert.Equal(t, "1:2:3", ts.Get("a").Value)
+	assert.Equal(t, "http://localhost:1234/", ts.Get("url").Value)
+}
+
 func TestFilterTags(t *testing.T) {
 	assert := assert.New(t)
 
@@ -90,25 +103,39 @@ func TestAggrString(t *testing.T) {
 	aggregators := []string{}
 
 	aggr, tgs := getAggregateGrain(span, aggregators, &sb.keyBuf)
-	assert.Equal(aggr, "name:other,resource:yo,service:thing")
-	assert.Equal(tgs, TagSet{Tag{"name", "other"}, Tag{"resource", "yo"}, Tag{"service", "thing"}})
+	assert.Equal("resource:yo,service:thing", aggr)
+	assert.Equal(TagSet{Tag{"resource", "yo"}, Tag{"service", "thing"}}, tgs)
 
 	aggregators = []string{"version"}
 
 	span = Span{Service: "thing", Name: "other", Resource: "yo", Meta: map[string]string{"version": "1.5"}}
 	aggr, tgs = getAggregateGrain(span, aggregators, &sb.keyBuf)
-	assert.Equal(aggr, "name:other,resource:yo,service:thing,version:1.5")
-	assert.Equal(tgs, TagSet{Tag{"name", "other"}, Tag{"resource", "yo"}, Tag{"service", "thing"}, Tag{"version", "1.5"}})
+	assert.Equal("resource:yo,service:thing,version:1.5", aggr)
+	assert.Equal(TagSet{Tag{"resource", "yo"}, Tag{"service", "thing"}, Tag{"version", "1.5"}}, tgs)
 
 	// test something with special chars
 	span = Span{Service: "thing", Name: "other:brother", Resource: "yo,mec,how goes it", Meta: map[string]string{"version": "1.5"}}
 	aggr, tgs = getAggregateGrain(span, aggregators, &sb.keyBuf)
-	assert.Equal(aggr, "name:other:brother,resource:yo,mec,how goes it,service:thing,version:1.5")
-	assert.Equal(tgs, TagSet{Tag{"name", "other:brother"}, Tag{"resource", "yo,mec,how goes it"}, Tag{"service", "thing"}, Tag{"version", "1.5"}})
+	assert.Equal("resource:yo,mec,how goes it,service:thing,version:1.5", aggr)
+	assert.Equal(TagSet{Tag{"resource", "yo,mec,how goes it"}, Tag{"service", "thing"}, Tag{"version", "1.5"}}, tgs)
 
 	// test something empty
 	span = Span{TraceID: 0, SpanID: 1}
 	aggr, tgs = getAggregateGrain(span, []string{}, &sb.keyBuf)
 	assert.Equal("", aggr)
 	assert.Equal(0, len(tgs))
+}
+
+func TestUnset(t *testing.T) {
+	assert := assert.New(t)
+	ts := NewTagSetFromString("service:mcnulty,resource:template,name:magicfunc")
+	ts2 := ts.Unset("name")
+	assert.Len(ts, 3)
+	assert.Equal("mcnulty", ts.Get("service").Value)
+	assert.Equal("template", ts.Get("resource").Value)
+	assert.Equal("magicfunc", ts.Get("name").Value)
+	assert.Len(ts2, 2)
+	assert.Equal("mcnulty", ts2.Get("service").Value)
+	assert.Equal("template", ts2.Get("resource").Value)
+	assert.Equal("", ts2.Get("name").Value)
 }

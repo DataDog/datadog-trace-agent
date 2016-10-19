@@ -83,6 +83,23 @@ func (t TagSet) Get(name string) Tag {
 	return Tag{}
 }
 
+// Unset returns a new tagset without a given value
+func (t TagSet) Unset(name string) TagSet {
+	var j int
+	var t2 TagSet
+	for i, tag := range t {
+		if tag.Name == name {
+			j = i + 1
+			break
+		}
+		t2 = append(t2, tag)
+	}
+	for i := j; i < len(t); i++ {
+		t2 = append(t2, t[i])
+	}
+	return t2
+}
+
 // Match returns a new tag set with only the tags matching the given groups.
 func (t TagSet) Match(groups []string) TagSet {
 	if len(groups) == 0 {

@@ -12,9 +12,6 @@ import (
 	"github.com/DataDog/raclette/statsd"
 )
 
-// DefaultAggregators are the finest grain we aggregate to by default
-var DefaultAggregators = []string{"service", "name", "resource"}
-
 // Concentrator produces time bucketed statistics from a stream of raw traces.
 // https://en.wikipedia.org/wiki/Knelson_concentrator
 // Gets an imperial shitton of traces, and outputs pre-computed data structures
