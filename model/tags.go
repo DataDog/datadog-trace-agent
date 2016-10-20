@@ -59,9 +59,14 @@ func (t TagSet) TagKey(m string) string {
 	return fmt.Sprintf("%s|%s", m, strings.Join(tagStrings, ","))
 }
 
-func (t TagSet) Len() int           { return len(t) }
-func (t TagSet) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
-func (t TagSet) Less(i, j int) bool { return t[i].Name < t[j].Name || t[i].Value < t[j].Value }
+func (t TagSet) Len() int      { return len(t) }
+func (t TagSet) Swap(i, j int) { t[i], t[j] = t[j], t[i] }
+func (t TagSet) Less(i, j int) bool {
+	if t[i].Name == t[j].Name {
+		return t[i].Value < t[j].Value
+	}
+	return t[i].Name < t[j].Name
+}
 
 // Key returns a string representing a new set of tags.
 func (t TagSet) Key() string {

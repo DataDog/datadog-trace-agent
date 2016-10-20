@@ -27,6 +27,14 @@ func TestSort(t *testing.T) {
 	t2 := NewTagSetFromString("a:1,a:2,a:3")
 	sort.Sort(t1)
 	assert.Equal(t, t1, t2)
+
+	// trick: service<name but mcnulty<query (traps a bug if we consider
+	// that "if not name1 < name2 then compare value1 and value2")
+	t1 = NewTagSetFromString("mymetadata:cool,service:mcnulty,name:query")
+	t2 = NewTagSetFromString("mymetadata:cool,name:query,service:mcnulty")
+	sort.Sort(t1)
+	sort.Sort(t2)
+	assert.Equal(t, t1, t2)
 }
 
 func TestTagMerge(t *testing.T) {
