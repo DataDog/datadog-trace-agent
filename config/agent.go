@@ -17,7 +17,8 @@ import (
 // the Agent components, with 100% safe and reliable values.
 type AgentConfig struct {
 	// Global
-	HostName string
+	HostName   string
+	DefaultEnv string // the traces will default to this environmen
 
 	// API
 	APIEndpoints []string
@@ -63,6 +64,15 @@ func mergeConfig(c *AgentConfig, f *ini.File) {
 		c.APIKeys = v
 	} else {
 		log.Info("Failed to parse api_key from dd-agent config")
+	}
+
+	if v := m.Key("tags").Strings(","); len(v) != 0 {
+		for _, tag := range v {
+			if strings.HasPrefix("env:", tag) {
+				split := strings.SplitN(tag, ":", 2)
+				c.DefaultEnv = split[1]
+			}
+		}
 	}
 
 	if v := m.Key("bind_host").MustString(""); v != "" {
@@ -125,6 +135,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 	}
 	ac := &AgentConfig{
 		HostName:     hostname,
+		DefaultEnv:   "default",
 		APIEndpoints: []string{"https://trace.agent.datadoghq.com"},
 		APIKeys:      []string{},
 		APIEnabled:   true,
@@ -163,6 +174,10 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 	// Allow overrides of previously set config without erroring
 	if v, _ := conf.Get("trace.config", "hostname"); v != "" {
 		c.HostName = v
+	}
+
+	if v, _ := conf.Get("trace.config", "env"); v != "" {
+		c.DefaultEnv = v
 	}
 
 	if v, _ := conf.Get("trace.api", "api_key"); v != "" {

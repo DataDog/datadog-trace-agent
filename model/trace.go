@@ -8,6 +8,20 @@ import (
 // Trace is a collection of spans with the same trace ID
 type Trace []Span
 
+// GetEnv returns the meta value for the "env" key for
+// the first trace it finds or an empty string
+func (t Trace) GetEnv() string {
+	// exit this on first success
+	for _, s := range t {
+		for k, v := range s.Meta {
+			if k == "env" {
+				return v
+			}
+		}
+	}
+	return ""
+}
+
 // NewTraceFlushMarker returns a trace with a single span as flush marker
 func NewTraceFlushMarker() Trace {
 	return []Span{NewFlushMarker()}

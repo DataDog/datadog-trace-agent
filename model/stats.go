@@ -135,7 +135,7 @@ func NewStatsBucket(ts, d int64) StatsBucket {
 }
 
 // getAggregateString , given a list of aggregators, returns a unique string representation for a spans's aggregate group, and a TagSet of constituent tags
-func getAggregateGrain(s Span, aggregators []string, keyBuf *bytes.Buffer) (string, TagSet) {
+func getAggregateGrain(s Span, env string, aggregators []string, keyBuf *bytes.Buffer) (string, TagSet) {
 	// aggregator strings are formatted like name:x,resource:r,service:y,a:some,b:custom,c:aggs
 	// where custom aggregators (a,b,c) are appended to the main string in alphanum order
 
@@ -144,6 +144,11 @@ func getAggregateGrain(s Span, aggregators []string, keyBuf *bytes.Buffer) (stri
 	tgs := TagSet{}
 
 	// First deal with our default aggregators
+	// env, never empty
+	keyBuf.WriteString("env:")
+	keyBuf.WriteString(env)
+	keyBuf.WriteRune(',')
+	tgs = append(tgs, Tag{"env", env})
 
 	// As it's hardcoded, trace.resource could avoid future conflicts.
 	if s.Resource != "" {
@@ -190,8 +195,8 @@ func getAggregateGrain(s Span, aggregators []string, keyBuf *bytes.Buffer) (stri
 }
 
 // HandleSpan adds the span to this bucket stats, aggregated with the finest grain matching given aggregators
-func (sb *StatsBucket) HandleSpan(s Span, aggregators []string) {
-	aggrString, tgs := getAggregateGrain(s, aggregators, &sb.keyBuf)
+func (sb *StatsBucket) HandleSpan(s Span, env string, aggregators []string) {
+	aggrString, tgs := getAggregateGrain(s, env, aggregators, &sb.keyBuf)
 	sb.addToTagSet(s, aggrString, tgs)
 }
 
@@ -213,7 +218,6 @@ func parseSublayerTags(m string) string {
 	}
 
 	return ""
-
 }
 
 // getSublayerGrain collapses a sublayer tag into an existing aggregate string and tagset
@@ -247,7 +251,6 @@ func (sb StatsBucket) addToTagSet(s Span, aggr string, tgs TagSet) {
 			// only extract _sublayers.duration.by_service
 			sb.addToCount(m[:len(m)-len(sublayerTag)-1], v, aggrKey, s.Name, slTags)
 		}
-
 	}
 
 	// alter resolution of duration distro

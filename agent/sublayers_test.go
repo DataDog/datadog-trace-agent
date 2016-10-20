@@ -96,94 +96,94 @@ func TestSublayerNested(t *testing.T) {
 	}
 
 	expected := map[string]model.Count{
-		"|_sublayers.duration.by_service|service:mcnulty,sublayer_service:master-db": model.Count{
-			Key:     "|_sublayers.duration.by_service|service:mcnulty,sublayer_service:master-db",
+		"|_sublayers.duration.by_service|env:default,service:mcnulty,sublayer_service:master-db": model.Count{
+			Key:     "|_sublayers.duration.by_service|env:default,service:mcnulty,sublayer_service:master-db",
 			Measure: "_sublayers.duration.by_service",
-			TagSet:  model.NewTagSetFromString("service:mcnulty,sublayer_service:master-db"),
+			TagSet:  model.NewTagSetFromString("env:default,service:mcnulty,sublayer_service:master-db"),
 			Value:   199999000,
 		},
-		"|_sublayers.duration.by_service|service:mcnulty,sublayer_service:mcnulty": model.Count{
-			Key:     "|_sublayers.duration.by_service|service:mcnulty,sublayer_service:mcnulty",
+		"|_sublayers.duration.by_service|env:default,service:mcnulty,sublayer_service:mcnulty": model.Count{
+			Key:     "|_sublayers.duration.by_service|env:default,service:mcnulty,sublayer_service:mcnulty",
 			Measure: "_sublayers.duration.by_service",
-			TagSet:  model.NewTagSetFromString("service:mcnulty,sublayer_service:mcnulty"),
+			TagSet:  model.NewTagSetFromString("env:default,service:mcnulty,sublayer_service:mcnulty"),
 			Value:   1000000000 - 199999000 - 500000,
 		},
-		"|_sublayers.duration.by_service|service:mcnulty,sublayer_service:redis": model.Count{
-			Key:     "|_sublayers.duration.by_service|service:mcnulty,sublayer_service:redis",
+		"|_sublayers.duration.by_service|env:default,service:mcnulty,sublayer_service:redis": model.Count{
+			Key:     "|_sublayers.duration.by_service|env:default,service:mcnulty,sublayer_service:redis",
 			Measure: "_sublayers.duration.by_service",
-			TagSet:  model.NewTagSetFromString("service:mcnulty,sublayer_service:redis"),
+			TagSet:  model.NewTagSetFromString("env:default,service:mcnulty,sublayer_service:redis"),
 			Value:   500000,
 		},
-		"|_sublayers.duration.by_type|service:mcnulty,sublayer_type:redis": model.Count{
-			Key:     "|_sublayers.duration.by_type|service:mcnulty,sublayer_type:redis",
+		"|_sublayers.duration.by_type|env:default,service:mcnulty,sublayer_type:redis": model.Count{
+			Key:     "|_sublayers.duration.by_type|env:default,service:mcnulty,sublayer_type:redis",
 			Measure: "_sublayers.duration.by_type",
-			TagSet:  model.NewTagSetFromString("service:mcnulty,sublayer_type:redis"),
+			TagSet:  model.NewTagSetFromString("env:default,service:mcnulty,sublayer_type:redis"),
 			Value:   500000,
 		},
-		"|_sublayers.duration.by_type|service:mcnulty,sublayer_type:sql": model.Count{
-			Key:     "|_sublayers.duration.by_type|service:mcnulty,sublayer_type:sql",
+		"|_sublayers.duration.by_type|env:default,service:mcnulty,sublayer_type:sql": model.Count{
+			Key:     "|_sublayers.duration.by_type|env:default,service:mcnulty,sublayer_type:sql",
 			Measure: "_sublayers.duration.by_type",
-			TagSet:  model.NewTagSetFromString("service:mcnulty,sublayer_type:sql"),
+			TagSet:  model.NewTagSetFromString("env:default,service:mcnulty,sublayer_type:sql"),
 			Value:   200000000,
 		},
-		"|_sublayers.duration.by_type|service:mcnulty,sublayer_type:web": model.Count{
-			Key:     "|_sublayers.duration.by_type|service:mcnulty,sublayer_type:web",
+		"|_sublayers.duration.by_type|env:default,service:mcnulty,sublayer_type:web": model.Count{
+			Key:     "|_sublayers.duration.by_type|env:default,service:mcnulty,sublayer_type:web",
 			Measure: "_sublayers.duration.by_type",
-			TagSet:  model.NewTagSetFromString("service:mcnulty,sublayer_type:web"),
+			TagSet:  model.NewTagSetFromString("env:default,service:mcnulty,sublayer_type:web"),
 			Value:   1000000000 - 200000000 - 500000,
 		},
-		"|duration|service:master-db": model.Count{
-			Key:     "|duration|service:master-db",
+		"|duration|env:default,service:master-db": model.Count{
+			Key:     "|duration|env:default,service:master-db",
 			Measure: model.DURATION,
-			TagSet:  model.NewTagSetFromString("service:master-db"),
+			TagSet:  model.NewTagSetFromString("env:default,service:master-db"),
 			Value:   199999000,
 		},
-		"|duration|service:mcnulty": model.Count{
-			Key:     "|duration|service:mcnulty",
+		"|duration|env:default,service:mcnulty": model.Count{
+			Key:     "|duration|env:default,service:mcnulty",
 			Measure: model.DURATION,
-			TagSet:  model.NewTagSetFromString("service:mcnulty"),
+			TagSet:  model.NewTagSetFromString("env:default,service:mcnulty"),
 			Value:   1000000000 + 200000000 + 700000,
 		},
-		"|duration|service:redis": model.Count{
-			Key:     "|duration|service:redis",
+		"|duration|env:default,service:redis": model.Count{
+			Key:     "|duration|env:default,service:redis",
 			Measure: model.DURATION,
-			TagSet:  model.NewTagSetFromString("service:redis"),
+			TagSet:  model.NewTagSetFromString("env:default,service:redis"),
 			Value:   500000,
 		},
-		"|errors|service:master-db": model.Count{
-			Key:     "|errors|service:master-db",
+		"|errors|env:default,service:master-db": model.Count{
+			Key:     "|errors|env:default,service:master-db",
 			Measure: model.ERRORS,
-			TagSet:  model.NewTagSetFromString("service:master-db"),
+			TagSet:  model.NewTagSetFromString("env:default,service:master-db"),
 			Value:   0,
 		},
-		"|errors|service:mcnulty": model.Count{
-			Key:     "|errors|service:mcnulty",
+		"|errors|env:default,service:mcnulty": model.Count{
+			Key:     "|errors|env:default,service:mcnulty",
 			Measure: model.ERRORS,
-			TagSet:  model.NewTagSetFromString("service:mcnulty"),
+			TagSet:  model.NewTagSetFromString("env:default,service:mcnulty"),
 			Value:   0,
 		},
-		"|errors|service:redis": model.Count{
-			Key:     "|errors|service:redis",
+		"|errors|env:default,service:redis": model.Count{
+			Key:     "|errors|env:default,service:redis",
 			Measure: model.ERRORS,
-			TagSet:  model.NewTagSetFromString("service:redis"),
+			TagSet:  model.NewTagSetFromString("env:default,service:redis"),
 			Value:   0,
 		},
-		"|hits|service:master-db": model.Count{
-			Key:     "|hits|service:master-db",
+		"|hits|env:default,service:master-db": model.Count{
+			Key:     "|hits|env:default,service:master-db",
 			Measure: model.HITS,
-			TagSet:  model.NewTagSetFromString("service:master-db"),
+			TagSet:  model.NewTagSetFromString("env:default,service:master-db"),
 			Value:   1,
 		},
-		"|hits|service:mcnulty": model.Count{
-			Key:     "|hits|service:mcnulty",
+		"|hits|env:default,service:mcnulty": model.Count{
+			Key:     "|hits|env:default,service:mcnulty",
 			Measure: model.HITS,
-			TagSet:  model.NewTagSetFromString("service:mcnulty"),
+			TagSet:  model.NewTagSetFromString("env:default,service:mcnulty"),
 			Value:   3,
 		},
-		"|hits|service:redis": model.Count{
-			Key:     "|hits|service:redis",
+		"|hits|env:default,service:redis": model.Count{
+			Key:     "|hits|env:default,service:redis",
 			Measure: model.HITS,
-			TagSet:  model.NewTagSetFromString("service:redis"),
+			TagSet:  model.NewTagSetFromString("env:default,service:redis"),
 			Value:   1,
 		},
 	}
