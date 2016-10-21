@@ -1,6 +1,7 @@
 package fixtures
 
 import (
+	"encoding/json"
 	"github.com/DataDog/raclette/model"
 )
 
@@ -10,7 +11,22 @@ var defaultAggregators = []string{"service", "resource"}
 func TestStatsBucket() model.StatsBucket {
 	sb := model.NewStatsBucket(0, 1e9)
 	sb.HandleSpan(TestSpan(), defaultAggregators)
-	return sb
+
+	// marshalling then unmarshalling data to:
+	// 1) make a deep copy which prevents unexpected side effects with
+	//    Counts and Distributions sharing the same TagSets
+	// 2) do thing closer to what they are, for real, in production
+	//    code as indeed, stats buckets are (un)marshalled
+	js, err := json.Marshal(sb)
+	if err != nil {
+		return model.NewStatsBucket(0, 1e9)
+	}
+	var sb2 model.StatsBucket
+	err = json.Unmarshal(js, &sb2)
+	if err != nil {
+		return model.NewStatsBucket(0, 1e9)
+	}
+	return sb2
 }
 
 // StatsBucketWithSpans returns a stats bucket populated with spans stats
