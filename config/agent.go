@@ -9,6 +9,7 @@ import (
 
 	"gopkg.in/ini.v1"
 
+	"github.com/DataDog/raclette/model"
 	log "github.com/cihub/seelog"
 )
 
@@ -67,10 +68,10 @@ func mergeConfig(c *AgentConfig, f *ini.File) {
 	}
 
 	if v := m.Key("tags").Strings(","); len(v) != 0 {
-		for _, tag := range v {
-			if strings.HasPrefix("env:", tag) {
-				split := strings.SplitN(tag, ":", 2)
-				c.DefaultEnv = split[1]
+		for _, t := range v {
+			if strings.HasPrefix("env:", t) {
+				tag := model.NewTagFromString(t)
+				c.DefaultEnv = tag.Value
 			}
 		}
 	}
