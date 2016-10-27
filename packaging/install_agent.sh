@@ -29,19 +29,6 @@ solve your problem.\n\033[0m\n"
 }
 trap on_error ERR
 
-if [ -n "$DD_HOSTNAME" ]; then
-    dd_hostname=$DD_HOSTNAME
-fi
-
-if [ -n "$DD_API_KEY" ]; then
-    apikey=$DD_API_KEY
-fi
-
-if [ ! $apikey ]; then
-    printf "\033[31mAPI key not available in DD_API_KEY environment variable.\033[0m\n"
-    exit 1;
-fi
-
 # OS/Distro Detection
 # Try lsb_release, fallback with /etc/issue then uname command
 KNOWN_DISTRIBUTION="(Debian|Ubuntu|RedHat|CentOS|openSUSE|Amazon|Arista)"
