@@ -5,7 +5,6 @@ import (
 	"sort"
 
 	"github.com/DataDog/raclette/model"
-	log "github.com/cihub/seelog"
 )
 
 // Signature is a simple representation of trace, used to identify simlar traces
@@ -39,7 +38,7 @@ func ComputeSignatureWithRoot(trace model.Trace, root *model.Span) Signature {
 
 // ComputeSignature is the same as ComputeSignatureWithRoot, except that it finds the root itself
 func ComputeSignature(trace model.Trace) Signature {
-	root := GetRoot(trace)
+	root := trace.GetRoot()
 
 	return ComputeSignatureWithRoot(trace, root)
 }
@@ -61,46 +60,6 @@ func computeRootHash(span model.Span) spanHash {
 	h.Write([]byte{byte(span.Error)})
 
 	return spanHash(h.Sum32())
-}
-
-// GetRoot extracts the root span from a trace
-func GetRoot(trace model.Trace) *model.Span {
-	// That should be caught beforehand
-	if len(trace) == 0 {
-		return nil
-	}
-	// General case: go over all spans and check for one which matching parent
-	parentIDToChild := map[uint64]*model.Span{}
-
-	for i := range trace {
-		// Common case optimization: check for span with ParentID == 0, starting from the end,
-		// since some clients report the root last
-		j := len(trace) - 1 - i
-		if trace[j].ParentID == 0 {
-			return &trace[j]
-		}
-		parentIDToChild[trace[j].ParentID] = &trace[j]
-	}
-
-	for i := range trace {
-		if _, ok := parentIDToChild[trace[i].SpanID]; ok {
-			delete(parentIDToChild, trace[i].SpanID)
-		}
-	}
-
-	// Here, if the trace is valid, we should have len(parentIDToChild) == 1
-	if len(parentIDToChild) != 1 {
-		log.Errorf("Didn't reliably find the root span for traceID:%v", trace[0].TraceID)
-	}
-
-	// Have a safe bahavior if that's not the case
-	// Pick the first span without its parent
-	for parentID := range parentIDToChild {
-		return parentIDToChild[parentID]
-	}
-
-	// Gracefully fail with the last span of the trace
-	return &trace[len(trace)-1]
 }
 
 // spanHash is the type of the hashes used during the computation of a signature

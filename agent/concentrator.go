@@ -58,21 +58,26 @@ func (c *Concentrator) Run() {
 	close(c.out)
 }
 
+func (c *Concentrator) roundToBucket(ts int64) int64 {
+	return ts - ts%c.conf.BucketInterval.Nanoseconds()
+}
+
 // HandleNewSpan adds to the current bucket the pointed span
 func (c *Concentrator) HandleNewSpan(s model.Span) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	// TODO[leo]: replace by adding the span to the bucket of its end time
-	bucketTs := s.Start - s.Start%c.conf.BucketInterval.Nanoseconds()
-
-	// TODO[leo]: when the above todo is completed just cut off the very old crap
-	// here
-	if model.Now()-bucketTs > c.conf.OldestSpanCutoff {
+	// base our timestamp calculation on the span end, and not on its beginning,
+	// else we would filter all spans that are older than OldestSpanCutoff (say, 1min)
+	end := s.End()
+	now := model.Now()
+	if now > end+c.conf.OldestSpanCutoff {
+		log.Debugf("span was blocked because it is too old cutoff=%d now=%d end=%d: %v", c.conf.OldestSpanCutoff/1e9, now/1e9, end/1e9, s)
 		statsd.Client.Count("trace_agent.concentrator.late_span", 1, nil, 1)
-		return fmt.Errorf("rejecting late span, late by %ds", (model.Now()-bucketTs)/1e9)
+		return fmt.Errorf("rejecting late span, late by %ds", (now-end)/1e9)
 	}
 
+	bucketTs := c.roundToBucket(end)
 	b, ok := c.buckets[bucketTs]
 	if !ok {
 		b = model.NewStatsBucket(
@@ -80,6 +85,8 @@ func (c *Concentrator) HandleNewSpan(s model.Span) error {
 		)
 		c.buckets[bucketTs] = b
 	}
+
+	log.Debugf("span was accepted because it is recent enough cutoff=%d now=%d end=%d: %v", c.conf.OldestSpanCutoff/1e9, now/1e9, end/1e9, s)
 
 	b.HandleSpan(s, c.conf.ExtraAggregators)
 	return nil
@@ -96,7 +103,7 @@ func sortInts64(a []int64)              { sort.Sort(Int64Slice(a)) }
 // Flush deletes and returns complete statistic buckets
 func (c *Concentrator) Flush() []model.StatsBucket {
 	now := model.Now()
-	lastBucketTs := now - now%c.conf.BucketInterval.Nanoseconds()
+	lastBucketTs := c.roundToBucket(now)
 	sb := []model.StatsBucket{}
 	keys := []int64{}
 
@@ -109,11 +116,10 @@ func (c *Concentrator) Flush() []model.StatsBucket {
 	}
 	sortInts64(keys)
 
-	for i := range keys {
-		ts := keys[i]
+	for _, ts := range keys {
 		bucket := c.buckets[ts]
 		// flush & expire old buckets that cannot be hit anymore
-		if ts < now-c.conf.OldestSpanCutoff && ts != lastBucketTs {
+		if ts < now-c.conf.OldestSpanCutoff && ts < lastBucketTs {
 			log.Debugf("concentrator, bucket:%d is clear and flushed", ts)
 			for _, d := range bucket.Distributions {
 				statsd.Client.Histogram("trace_agent.distribution.len", float64(d.Summary.N), nil, 1)

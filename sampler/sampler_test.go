@@ -122,7 +122,7 @@ func TestSamplerChainedSampling(t *testing.T) {
 
 	trace, _ := getTestTrace()
 
-	root := GetRoot(trace)
+	root := trace.GetRoot()
 
 	// Received trace already got sampled
 	SetTraceAppliedSampleRate(root, 0.8)
@@ -134,7 +134,7 @@ func TestSamplerChainedSampling(t *testing.T) {
 	assert.Equal(0.4, GetTraceAppliedSampleRate(root))
 
 	// Check the sample rate isn't lost by reference
-	rootAgain := GetRoot(trace)
+	rootAgain := trace.GetRoot()
 	assert.Equal(0.4, GetTraceAppliedSampleRate(rootAgain))
 }
 

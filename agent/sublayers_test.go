@@ -69,6 +69,13 @@ func TestSublayerNested(t *testing.T) {
 	go c.Run()
 
 	c.in <- result
+
+	// Here we need to "yield a timeslice" to give a chance to
+	// the above c.Run() to run and be processed, else we'd end up
+	// setting timeouts to small values even before we started
+	// to execute it. This results in refused spans, and flaky tests.
+	time.Sleep(10 * time.Millisecond)
+
 	c.conf.BucketInterval = time.Nanosecond
 	c.conf.OldestSpanCutoff = time.Nanosecond.Nanoseconds()
 

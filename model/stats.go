@@ -56,7 +56,7 @@ func NewCount(m, ckey, name string, tgs TagSet) Count {
 		Key:     ckey,
 		Name:    name,
 		Measure: m,
-		TagSet:  tgs,
+		TagSet:  tgs, // note: by doing this, tgs is a ref shared by all objects created with the same arg
 		Value:   0.0,
 	}
 }
@@ -84,7 +84,7 @@ func NewDistribution(m, ckey, name string, tgs TagSet) Distribution {
 		Key:     ckey,
 		Name:    name,
 		Measure: m,
-		TagSet:  tgs,
+		TagSet:  tgs, // note: by doing this, tgs is a ref shared by all objects created with the same arg
 		Summary: quantile.NewSliceSummary(),
 	}
 }

@@ -1,6 +1,9 @@
 package model
 
-import "errors"
+import (
+	"errors"
+	log "github.com/cihub/seelog"
+)
 
 // Trace is a collection of spans with the same trace ID
 type Trace []Span
@@ -79,4 +82,44 @@ func (tl *TraceLevelIterator) NextLevel() error {
 	tl.visited = make(map[uint64]struct{})
 
 	return nil
+}
+
+// GetRoot extracts the root span from a trace
+func (t Trace) GetRoot() *Span {
+	// That should be caught beforehand
+	if len(t) == 0 {
+		return nil
+	}
+	// General case: go over all spans and check for one which matching parent
+	parentIDToChild := map[uint64]*Span{}
+
+	for i := range t {
+		// Common case optimization: check for span with ParentID == 0, starting from the end,
+		// since some clients report the root last
+		j := len(t) - 1 - i
+		if t[j].ParentID == 0 {
+			return &t[j]
+		}
+		parentIDToChild[t[j].ParentID] = &t[j]
+	}
+
+	for i := range t {
+		if _, ok := parentIDToChild[t[i].SpanID]; ok {
+			delete(parentIDToChild, t[i].SpanID)
+		}
+	}
+
+	// Here, if the trace is valid, we should have len(parentIDToChild) == 1
+	if len(parentIDToChild) != 1 {
+		log.Errorf("Didn't reliably find the root span for traceID:%v", t[0].TraceID)
+	}
+
+	// Have a safe bahavior if that's not the case
+	// Pick the first span without its parent
+	for parentID := range parentIDToChild {
+		return parentIDToChild[parentID]
+	}
+
+	// Gracefully fail with the last span of the trace
+	return &t[len(t)-1]
 }
