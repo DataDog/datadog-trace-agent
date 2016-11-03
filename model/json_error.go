@@ -60,9 +60,8 @@ func tagInputWithOffset(r io.ReadSeeker, offset int64) []byte {
 	resp.WriteString("    ")
 	resp.Write(errbuf.Bytes())
 	resp.WriteRune('\n')
-	resp.WriteString("    ")
 	// pad to output a ---^ at the error
-	errpos := offset - start - 4
+	errpos := offset - start
 	for i := int64(0); i < errpos; i++ {
 		resp.WriteRune(' ')
 	}

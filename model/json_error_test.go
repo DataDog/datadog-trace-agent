@@ -16,6 +16,22 @@ func testHumanReadableJSONError(s []byte, x interface{}) (string, error) {
 	return prettyerr, err
 }
 
+func TestJSONSyntaxErrorFirstOffset(t *testing.T) {
+	assert := assert.New(t)
+	var x interface{}
+
+	s := []byte(`test": "this is a JSON string", "next": "that has a syntax error",,}`)
+	prettyerr, err := testHumanReadableJSONError(s, x)
+
+	assert.NotNil(err)
+	exp := `json syntax error at offset:2
+error located at marker ---^:
+    test": "this is a JSON string", "next": "that has a syntax error",,}
+  ---^`
+
+	assert.Equal(exp, prettyerr, "expected:\n%s\ngot:\n%s\n", exp, string(prettyerr))
+}
+
 func TestJSONSyntaxError(t *testing.T) {
 	assert := assert.New(t)
 	var x interface{}
