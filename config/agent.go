@@ -35,6 +35,7 @@ type AgentConfig struct {
 	MaxTPS          float64
 
 	// Receiver
+	ReceiverHost    string
 	ReceiverPort    int
 	ConnectionLimit int // for rate-limiting, how many unique connections to allow in a lease period (30s)
 
@@ -91,6 +92,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 		ExtraSampleRate: 1.0,
 		MaxTPS:          10,
 
+		ReceiverHost:    "0.0.0.0",
 		ReceiverPort:    7777,
 		ConnectionLimit: 2000,
 

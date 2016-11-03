@@ -78,8 +78,8 @@ func (l *HTTPReceiver) Run() {
 	http.HandleFunc("/v0.2/traces", httpHandleWithVersion(v02, l.handleTraces))
 	http.HandleFunc("/v0.2/services", httpHandleWithVersion(v02, l.handleServices))
 
-	addr := fmt.Sprintf(":%d", l.conf.ReceiverPort)
-	log.Infof("listening for traces at http://localhost%s/", addr)
+	addr := fmt.Sprintf("%s:%d", l.conf.ReceiverHost, l.conf.ReceiverPort)
+	log.Infof("listening for traces at http://%s/", addr)
 
 	tcpL, err := net.Listen("tcp", addr)
 	if err != nil {
