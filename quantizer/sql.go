@@ -21,9 +21,11 @@ var cqlListVariablesRegex = regexp.MustCompile(`%s(([,\s]|%s)+%s\s*|)`) // (%s, 
 
 // QuantizeSQL generates resource for SQL spans
 func QuantizeSQL(span model.Span) model.Span {
+	// Trim spaces and ending special chars
 	query := span.Resource
 
 	resource := strings.TrimSpace(query)
+	resource = strings.TrimSuffix(resource, ";")
 
 	if resource == "" {
 		span.Resource = resource
