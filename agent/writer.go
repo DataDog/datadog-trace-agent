@@ -1,6 +1,8 @@
 package main
 
 import (
+	"sync/atomic"
+
 	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/raclette/config"
@@ -19,6 +21,8 @@ type Writer struct {
 
 	payloadBuffer []model.AgentPayload   // buffered of payloads ready to send
 	serviceBuffer model.ServicesMetadata // services are merged into this map continuously
+
+	payloadBufferLen int32 // used for async debugging, not always exact
 
 	exit chan struct{}
 }
@@ -67,6 +71,7 @@ func (w *Writer) Run() {
 			w.Flush()
 			return
 		}
+		atomic.StoreInt32(&w.payloadBufferLen, int32(len(w.payloadBuffer)))
 	}
 }
 
@@ -84,4 +89,8 @@ func (w *Writer) Flush() {
 	// regardless if the http post was was success or not. We don't want to buffer
 	// data in case of api outage. See also endpoint.Write() comment.
 	w.payloadBuffer = nil
+}
+
+func (w *Writer) getPayloadBufferLen() int32 {
+	return atomic.LoadInt32(&w.payloadBufferLen)
 }
