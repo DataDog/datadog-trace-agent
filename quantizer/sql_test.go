@@ -75,9 +75,8 @@ func TestSQLQuantizer(t *testing.T) {
 			"SELECT articles.* FROM articles WHERE (articles.created_at BETWEEN ? AND ?)",
 		},
 		{
-			// TODO[manu]: this query should be resolved with ?
 			"SELECT articles.* FROM articles WHERE (articles.published != true)",
-			"SELECT articles.* FROM articles WHERE (articles.published != true)",
+			"SELECT articles.* FROM articles WHERE (articles.published != ?)",
 		},
 		{
 			"SELECT articles.* FROM articles WHERE (title = 'guides.rubyonrails.org')",
@@ -100,9 +99,8 @@ func TestSQLQuantizer(t *testing.T) {
 			"SELECT articles.* FROM articles WHERE articles.id IN (?)",
 		},
 		{
-			// TODO[manu]: this query should be resolved with ?
 			"SELECT * FROM clients WHERE (clients.first_name = 'Andy') LIMIT 1 BEGIN INSERT INTO clients (created_at, first_name, locked, orders_count, updated_at) VALUES ('2011-08-30 05:22:57', 'Andy', 1, NULL, '2011-08-30 05:22:57') COMMIT",
-			"SELECT * FROM clients WHERE (clients.first_name = ?) LIMIT ? BEGIN INSERT INTO clients (created_at, first_name, locked, orders_count, updated_at) VALUES (?, NULL, ?) COMMIT",
+			"SELECT * FROM clients WHERE (clients.first_name = ?) LIMIT ? BEGIN INSERT INTO clients (created_at, first_name, locked, orders_count, updated_at) VALUES (?) COMMIT",
 		},
 	}
 
