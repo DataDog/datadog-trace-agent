@@ -9,6 +9,10 @@ import (
 
 const padding = 50
 
+// HumanReadableJSONError takes a generic reader that can seek
+// (being passed to the JSON decoder) and the error that comes out
+// of the unmarshalling and tries to return a human readable error
+// that prints part of the offending payload.
 func HumanReadableJSONError(r io.ReadSeeker, err error) string {
 	var prettyerr bytes.Buffer
 	switch err.(type) {
