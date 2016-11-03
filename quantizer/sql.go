@@ -11,7 +11,7 @@ import (
 
 const sqlVariableReplacement = "?"
 
-var sqlVariablesRegexp = regexp.MustCompile("('[^']+')|([0-9]+)")
+var sqlVariablesRegexp = regexp.MustCompile("('[^']+')|([\\$]*[0-9]+)")
 var sqlalchemyVariablesRegexp = regexp.MustCompile("%\\(.+?\\)s")
 var sqlListVariablesRegexp = regexp.MustCompile("\\?[\\? ,]+\\?")
 var sqlCommentsRegexp = regexp.MustCompile("--[^\n]*")
