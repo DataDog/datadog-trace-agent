@@ -32,6 +32,14 @@ func TestSQLQuantizer(t *testing.T) {
 			"select * from users where id = ?",
 		},
 		{
+			"SELECT host, status FROM ec2_status WHERE org_id = 42",
+			"SELECT host, status FROM ec2_status WHERE org_id = ?",
+		},
+		{
+			"SELECT host, status FROM ec2_status WHERE org_id=42",
+			"SELECT host, status FROM ec2_status WHERE org_id=?",
+		},
+		{
 			"-- get user \n--\n select * \n   from users \n    where\n       id = 214325346",
 			"select * from users where id = ?",
 		},
