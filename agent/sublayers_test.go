@@ -9,7 +9,13 @@ import (
 )
 
 func TestSublayerNested(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping sublayer nested test in Short mode.")
+	}
+
 	assert := assert.New(t)
+
+	waitBucket(t, testBucketInterval)
 
 	// real trace
 	now := time.Now().UnixNano()
@@ -63,24 +69,19 @@ func TestSublayerNested(t *testing.T) {
 
 	// pass that trace into the concentrator and assert sublayer counts
 	c := NewTestConcentrator()
-	c.conf.BucketInterval = time.Minute
-	c.conf.OldestSpanCutoff = time.Minute.Nanoseconds()
+	c.conf.BucketInterval = testBucketInterval
+	c.conf.OldestSpanCutoff = c.conf.BucketInterval.Nanoseconds()
 
 	go c.Run()
 
 	c.in <- result
 
-	// Here we need to "yield a timeslice" to give a chance to
-	// the above c.Run() to run and be processed, else we'd end up
-	// setting timeouts to small values even before we started
-	// to execute it. This results in refused spans, and flaky tests.
-	time.Sleep(10 * time.Millisecond)
-
-	c.conf.BucketInterval = time.Nanosecond
-	c.conf.OldestSpanCutoff = time.Nanosecond.Nanoseconds()
+	time.Sleep(c.conf.BucketInterval)
 
 	// now flush the concentrator
 	c.in <- model.NewTraceFlushMarker()
+
+	time.Sleep(3 * c.conf.BucketInterval)
 
 	ctimeout := make(chan struct{}, 1)
 	go func() {
