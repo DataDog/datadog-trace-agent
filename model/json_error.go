@@ -15,21 +15,19 @@ const padding = 50
 // that prints part of the offending payload.
 func HumanReadableJSONError(r io.ReadSeeker, err error) string {
 	var prettyerr bytes.Buffer
-	switch err.(type) {
+	switch err := err.(type) {
 	case *json.SyntaxError:
-		serr := err.(*json.SyntaxError)
-		prettyerr.WriteString(fmt.Sprintf("json syntax error at offset:%d\n", serr.Offset))
-		prettyerr.Write(tagInputWithOffset(r, serr.Offset))
+		prettyerr.WriteString(fmt.Sprintf("json syntax error at offset:%d\n", err.Offset))
+		prettyerr.Write(tagInputWithOffset(r, err.Offset))
 	case *json.UnmarshalTypeError:
-		serr := err.(*json.UnmarshalTypeError)
 		prettyerr.WriteString(
 			fmt.Sprintf("was expecting type %s and got type %s at offset:%d\n",
-				serr.Type,
-				serr.Value,
-				serr.Offset,
+				err.Type,
+				err.Value,
+				err.Offset,
 			),
 		)
-		prettyerr.Write(tagInputWithOffset(r, serr.Offset))
+		prettyerr.Write(tagInputWithOffset(r, err.Offset))
 	default:
 		return err.Error()
 	}
@@ -46,7 +44,7 @@ func tagInputWithOffset(r io.ReadSeeker, offset int64) []byte {
 	}
 	var errbuf bytes.Buffer
 	r.Seek(start, io.SeekStart)
-	n, err := io.CopyN(&errbuf, r, 2*padding)
+	_, err := io.CopyN(&errbuf, r, 2*padding)
 	if err != nil && err != io.EOF {
 		return nil
 	}
