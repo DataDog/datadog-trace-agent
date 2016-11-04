@@ -48,9 +48,6 @@ func tagInputWithOffset(r io.ReadSeeker, offset int64) []byte {
 	r.Seek(start, io.SeekStart)
 	n, err := io.CopyN(&errbuf, r, 2*padding)
 	if err != nil && err != io.EOF {
-		fmt.Println(err)
-		fmt.Println(n)
-		fmt.Println(offset)
 		return nil
 	}
 
