@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"sync/atomic"
@@ -113,9 +115,23 @@ func HTTPOK(w http.ResponseWriter, tags []string) {
 
 // handleTraces knows how to handle a bunch of traces
 func (l *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, r *http.Request) {
-	var traces []model.Trace
-	dec := json.NewDecoder(r.Body)
+	// we need an io.ReadSeeker if we want to be able to display
+	// error feedback to the user, otherwise r.Body is trash
+	// once it's been decoded
+	if r.Body == nil {
+		return
+	}
 
+	defer r.Body.Close()
+	bodyBytes, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return
+	}
+	bodyBuffer := bytes.NewReader(bodyBytes)
+
+	dec := json.NewDecoder(bodyBuffer)
+
+	var traces []model.Trace
 	mTags := []string{"handler:traces", fmt.Sprintf("v:%d", v)}
 
 	switch v {
@@ -124,6 +140,7 @@ func (l *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, r *http
 		var spans []model.Span
 		err := dec.Decode(&spans)
 		if err != nil {
+			log.Error(model.HumanReadableJSONError(bodyBuffer, err))
 			HTTPErrorAndLog(w, 500, "decoding-error", err, mTags)
 			return
 		}
@@ -139,6 +156,7 @@ func (l *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, r *http
 	case v02:
 		err := dec.Decode(&traces)
 		if err != nil {
+			log.Error(model.HumanReadableJSONError(bodyBuffer, err))
 			HTTPErrorAndLog(w, 500, "decoding-error", err, mTags)
 			return
 		}
@@ -196,13 +214,27 @@ func (l *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, r *http
 
 // handleServices handle a request with a list of several services
 func (l *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, r *http.Request) {
-	mTags := []string{"handler:services"}
+	// we need an io.ReadSeeker if we want to be able to display
+	// error feedback to the user, otherwise r.Body is trash
+	// once it's been decoded
+	if r.Body == nil {
+		return
+	}
 
-	dec := json.NewDecoder(r.Body)
-	var servicesMeta model.ServicesMetadata
-
-	err := dec.Decode(&servicesMeta)
+	defer r.Body.Close()
+	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
+		return
+	}
+	bodyBuffer := bytes.NewReader(bodyBytes)
+
+	dec := json.NewDecoder(bodyBuffer)
+
+	mTags := []string{"handler:services"}
+	var servicesMeta model.ServicesMetadata
+	err = dec.Decode(&servicesMeta)
+	if err != nil {
+		log.Error(model.HumanReadableJSONError(bodyBuffer, err))
 		HTTPErrorAndLog(w, 500, "decoding-error", err, mTags)
 		return
 	}
