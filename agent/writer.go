@@ -58,8 +58,10 @@ func (w *Writer) Run() {
 			w.payloadBuffer = append(w.payloadBuffer, p)
 			w.Flush()
 		case sm := <-w.inServices:
-			w.serviceBuffer.Update(sm)
-			w.FlushServices()
+			updated := w.serviceBuffer.Update(sm)
+			if updated {
+				w.FlushServices()
+			}
 		case <-w.exit:
 			log.Info("exiting, trying to flush all remaining data")
 			w.Flush()
