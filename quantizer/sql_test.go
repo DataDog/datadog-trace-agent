@@ -23,6 +23,33 @@ type sqlTestCase struct {
 	expected string
 }
 
+func TestSQLResourceQuery(t *testing.T) {
+	assert := assert.New(t)
+	span := model.Span{
+		Resource: "SELECT * FROM users WHERE id = 42",
+		Type:     "sql",
+		Meta: map[string]string{
+			"sql.query": "SELECT * FROM users WHERE id = 42",
+		},
+	}
+
+	spanQ := Quantize(span)
+	assert.Equal("SELECT * FROM users WHERE id = ?", spanQ.Resource)
+	assert.Equal("SELECT * FROM users WHERE id = 42", spanQ.Meta["sql.query"])
+}
+
+func TestSQLResourceWithoutQuery(t *testing.T) {
+	assert := assert.New(t)
+	span := model.Span{
+		Resource: "SELECT * FROM users WHERE id = 42",
+		Type:     "sql",
+	}
+
+	spanQ := Quantize(span)
+	assert.Equal("SELECT * FROM users WHERE id = ?", spanQ.Resource)
+	assert.Equal("SELECT * FROM users WHERE id = ?", spanQ.Meta["sql.query"])
+}
+
 func TestSQLQuantizer(t *testing.T) {
 	assert := assert.New(t)
 
