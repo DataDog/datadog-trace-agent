@@ -136,7 +136,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 		ExtraSampleRate: 1.0,
 		MaxTPS:          10,
 
-		ReceiverHost:    "0.0.0.0",
+		ReceiverHost:    "localhost",
 		ReceiverPort:    7777,
 		ConnectionLimit: 2000,
 
