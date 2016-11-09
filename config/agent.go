@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -73,6 +74,49 @@ func mergeConfig(c *AgentConfig, f *ini.File) {
 	}
 }
 
+// mergeEnv applies overrides from the environment variables to the
+// trace agent configuration
+func mergeEnv(c *AgentConfig) {
+	if v := os.Getenv("DATADOG_HOSTNAME"); v != "" {
+		c.HostName = v
+	}
+
+	if v := os.Getenv("DATADOG_API_KEY"); v != "" {
+		log.Info("overriding API key from env API_KEY value")
+		vals := strings.Split(v, ",")
+		for i := range vals {
+			vals[i] = strings.TrimSpace(vals[i])
+		}
+		c.APIKeys = vals
+	}
+
+	if v := os.Getenv("DATADOG_RECEIVER_HOST"); v != "" {
+		c.ReceiverHost = v
+	}
+
+	if v := os.Getenv("DATADOG_RECEIVER_PORT"); v != "" {
+		port, err := strconv.Atoi(v)
+		if err != nil {
+			log.Info("Failed to parse DATADOG_RECEIVER_PORT: it should be a port number")
+		} else {
+			c.ReceiverPort = port
+		}
+	}
+
+	if v := os.Getenv("DATADOG_BIND_HOST"); v != "" {
+		c.StatsdHost = v
+	}
+
+	if v := os.Getenv("DATADOG_DOGSTATSD_PORT"); v != "" {
+		port, err := strconv.Atoi(v)
+		if err != nil {
+			log.Info("Failed to parse DATADOG_DOGSTATSD_PORT: it should be a port number")
+		} else {
+			c.StatsdPort = port
+		}
+	}
+}
+
 // NewDefaultAgentConfig returns a configuration with the default values
 func NewDefaultAgentConfig() *AgentConfig {
 	hostname, err := os.Hostname()
@@ -92,7 +136,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 		ExtraSampleRate: 1.0,
 		MaxTPS:          10,
 
-		ReceiverHost:    "0.0.0.0",
+		ReceiverHost:    "localhost",
 		ReceiverPort:    7777,
 		ConnectionLimit: 2000,
 
@@ -105,6 +149,9 @@ func NewDefaultAgentConfig() *AgentConfig {
 		log.Debug("Found dd-agent config file, applying overrides")
 		mergeConfig(ac, dd)
 	}
+
+	// environment variables have precedence among defaults and config files
+	mergeEnv(ac)
 
 	return ac
 }
@@ -132,17 +179,6 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 			vals[i] = strings.TrimSpace(vals[i])
 		}
 		c.APIEndpoints = vals
-	}
-
-	// Check for env overrides
-	// this is set in the docker container
-	if v := os.Getenv("API_KEY"); v != "" {
-		log.Info("overriding API key from env API_KEY value")
-		vals := strings.Split(v, ",")
-		for i := range vals {
-			vals[i] = strings.TrimSpace(vals[i])
-		}
-		c.APIKeys = vals
 	}
 
 	if len(c.APIKeys) != len(c.APIEndpoints) {
