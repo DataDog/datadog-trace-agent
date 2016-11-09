@@ -1,17 +1,17 @@
 FROM debian:latest
 
 RUN apt-get update && \
-    apt-get install -y rake && \
-    apt-get install -y debhelper && \
-    apt-get install -y git
+    apt-get install --no-install-recommends -qq -y build-essential debhelper git gnupg rake curl devscripts rubygems ruby-dev zlib1g-dev libxml2-dev
+RUN gem install deb-s3
 
-RUN curl -sL -o /gimme https://raw.githubusercontent.com/travis-ci/gimme/master/gimme && \
-    chmod +x /gimme
+RUN curl -sL -o /usr/local/bin/gimme https://raw.githubusercontent.com/travis-ci/gimme/master/gimme && \
+    chmod +x /usr/local/bin/gimme
 
-RUN echo "#!/bin/sh \n $(/gimme 1.7.1) && cd /go/src/github.com/DataDog/raclette/packaging && dpkg-buildpackage -us -uc -b" >> /build.sh
-RUN chmod +x /build.sh
-
-VOLUME ["/go/src/github.com/DataDog/raclette"]
 ENV GOPATH=/go
 ENV PATH=/go/bin:$PATH
-ENTRYPOINT ["/build.sh"]
+RUN gimme 1.7.1
+RUN eval $(gimme 1.7.1) && go get github.com/robfig/glock
+
+
+VOLUME ["/go/src/github.com/DataDog/raclette"]
+ENTRYPOINT ["/go/src/github.com/DataDog/raclette/packaging/release_deb.sh"]
