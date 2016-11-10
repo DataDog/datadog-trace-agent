@@ -1,6 +1,6 @@
 #!/usr/bin/make -f
 
-DISTRIBUTION = $(shell lsb_release -sr)
+DISTRIBUTION = $(DISTRO)
 TRACE_AGENT_VERSION ?= 0.99.0
 PACKAGEVERSION = $(TRACE_AGENT_VERSION)-0~$(DISTRIBUTION)0
 TARBALL = dd-trace-agent-$(VERSION).tar.gz
@@ -19,6 +19,3 @@ override_dh_auto_install:
 	mkdir -p debian/dd-trace-agent/opt/datadog-agent/bin
 	mkdir -p debian/dd-trace-agent/var/log/datadog
 	mv ../trace-agent debian/dd-trace-agent/opt/datadog-agent/bin
-
-override_dh_gencontrol:
-	dh_gencontrol -- -v$(PACKAGEVERSION)
