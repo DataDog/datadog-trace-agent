@@ -11,8 +11,7 @@ import (
 
 const sqlVariableReplacement = "?"
 
-var sqlVariablesRegexp = regexp.MustCompile("('[^']+')|([\\$]*\\b[0-9]+\\b)")
-var sqlLiteralsRegexp = regexp.MustCompile("\\b(?i:true|false|null)\\b")
+var sqlVariablesRegexp = regexp.MustCompile("('[^']+')|([0-9]+)")
 var sqlalchemyVariablesRegexp = regexp.MustCompile("%\\(.+?\\)s")
 var sqlListVariablesRegexp = regexp.MustCompile("\\?[\\? ,]+\\?")
 var sqlCommentsRegexp = regexp.MustCompile("--[^\n]*")
@@ -22,11 +21,9 @@ var cqlListVariablesRegex = regexp.MustCompile(`%s(([,\s]|%s)+%s\s*|)`) // (%s, 
 
 // QuantizeSQL generates resource for SQL spans
 func QuantizeSQL(span model.Span) model.Span {
-	// Trim spaces and ending special chars
 	query := span.Resource
 
 	resource := strings.TrimSpace(query)
-	resource = strings.TrimSuffix(resource, ";")
 
 	if resource == "" {
 		span.Resource = resource
@@ -37,7 +34,6 @@ func QuantizeSQL(span model.Span) model.Span {
 
 	// Remove variables
 	resource = sqlVariablesRegexp.ReplaceAllString(resource, sqlVariableReplacement)
-	resource = sqlLiteralsRegexp.ReplaceAllString(resource, sqlVariableReplacement)
 	resource = sqlalchemyVariablesRegexp.ReplaceAllString(resource, sqlVariableReplacement)
 
 	// Deal with list of variables of arbitrary size
