@@ -9,10 +9,7 @@ import (
 	"github.com/DataDog/raclette/model"
 )
 
-const (
-	sqlVariableReplacement = "?"
-	sqlQueryTag            = "sql.query"
-)
+const sqlVariableReplacement = "?"
 
 var sqlVariablesRegexp = regexp.MustCompile("('[^']+')|([\\$]*\\b[0-9]+\\b)")
 var sqlLiteralsRegexp = regexp.MustCompile("\\b(?i:true|false|null)\\b")
@@ -23,61 +20,39 @@ var sqlCommentsRegexp = regexp.MustCompile("--[^\n]*")
 // CQL encodes query params with %s
 var cqlListVariablesRegex = regexp.MustCompile(`%s(([,\s]|%s)+%s\s*|)`) // (%s, %s, %s, %s)
 
-// QuantizeSQL generates resource and sql.query meta for SQL spans
+// QuantizeSQL generates resource for SQL spans
 func QuantizeSQL(span model.Span) model.Span {
 	// Trim spaces and ending special chars
 	query := span.Resource
 
-	// remove special characters to get a clean query
-	query = strings.TrimSpace(query)
-	query = strings.TrimSuffix(query, ";")
+	resource := strings.TrimSpace(query)
+	resource = strings.TrimSuffix(resource, ";")
 
-	if query == "" {
-		span.Resource = query
+	if resource == "" {
+		span.Resource = resource
 		return span
 	}
 
 	log.Debugf("Quantize SQL command, generate resource from the query, SpanID: %d", span.SpanID)
-	resource := quantize(query)
-	span.Resource = resource
 
-	// set the sql.query tag if and only if it's not already set by users. If a users set
-	// this value, we send that value AS IS to the backend. If the value is not set, we
-	// try to obfuscate users parameters so that sensitive data are not sent in the backend.
-	// TODO: the current implementation is a rough approximation that assumes
-	// obfuscation == quantization. This is not true in real environments because we're
-	// removing data that could be interesting for users.
-	if span.Meta != nil && span.Meta[sqlQueryTag] != "" {
-		return span
-	}
-
-	if span.Meta == nil {
-		span.Meta = make(map[string]string)
-	}
-
-	span.Meta[sqlQueryTag] = resource
-
-	return span
-}
-
-// quantize returns a quantized string for the given query
-func quantize(query string) string {
 	// Remove variables
-	query = sqlVariablesRegexp.ReplaceAllString(query, sqlVariableReplacement)
-	query = sqlLiteralsRegexp.ReplaceAllString(query, sqlVariableReplacement)
-	query = sqlalchemyVariablesRegexp.ReplaceAllString(query, sqlVariableReplacement)
+	resource = sqlVariablesRegexp.ReplaceAllString(resource, sqlVariableReplacement)
+	resource = sqlLiteralsRegexp.ReplaceAllString(resource, sqlVariableReplacement)
+	resource = sqlalchemyVariablesRegexp.ReplaceAllString(resource, sqlVariableReplacement)
 
 	// Deal with list of variables of arbitrary size
-	query = sqlListVariablesRegexp.ReplaceAllString(query, sqlVariableReplacement)
+	resource = sqlListVariablesRegexp.ReplaceAllString(resource, sqlVariableReplacement)
 
 	// Remove comments
-	query = sqlCommentsRegexp.ReplaceAllString(query, "")
+	resource = sqlCommentsRegexp.ReplaceAllString(resource, "")
 
 	// Uniform spacing
-	query = compactAllSpaces(query)
+	resource = compactAllSpaces(resource)
 
 	// Replace parenthesized variable lists (%s, %s, %s, %s)
-	query = cqlListVariablesRegex.ReplaceAllString(query, sqlVariableReplacement)
+	resource = cqlListVariablesRegex.ReplaceAllString(resource, sqlVariableReplacement)
 
-	return query
+	span.Resource = resource
+
+	return span
 }
