@@ -18,7 +18,7 @@ var sqlVariablesRegexp = regexp.MustCompile("('[^']+')|([\\$]*\\b[0-9]+\\b)")
 var sqlLiteralsRegexp = regexp.MustCompile("\\b(?i:true|false|null)\\b")
 var sqlalchemyVariablesRegexp = regexp.MustCompile("%\\(.+?\\)s")
 var sqlListVariablesRegexp = regexp.MustCompile("\\?[\\? ,]+\\?")
-var sqlCommentsRegexp = regexp.MustCompile("--[^\n]*")
+var sqlCommentsRegexp = regexp.MustCompile("(--[^\n]*)|(/\\*(.|\n)*?\\*/)")
 
 // CQL encodes query params with %s
 var cqlListVariablesRegex = regexp.MustCompile(`%s(([,\s]|%s)+%s\s*|)`) // (%s, %s, %s, %s)
