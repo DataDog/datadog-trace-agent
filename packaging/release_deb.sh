@@ -1,4 +1,4 @@
-#!/bin/bash -ex
+#!/bin/bash -e
 
 # Expects gimme to be installed
 eval "$(gimme 1.7.1)"
