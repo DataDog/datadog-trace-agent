@@ -75,6 +75,13 @@ func TestSQLQuantizer(t *testing.T) {
 			"SELECT * FROM `host` WHERE `id` IN (?)",
 		},
 		{
+			`SELECT * FROM host WHERE id IN (42, 43) /*
+			multiline comment with parameters,
+			host:localhost,url:controller#home,id:FF005:00CAA
+			*/`,
+			"SELECT * FROM host WHERE id IN (?)",
+		},
+		{
 			"UPDATE user_dash_pref SET json_prefs = %(json_prefs)s, modified = '2015-08-27 22:10:32.492912' WHERE user_id = %(user_id)s AND url = %(url)s",
 			"UPDATE user_dash_pref SET json_prefs = ?, modified = ? WHERE user_id = ? AND url = ?"},
 		{
