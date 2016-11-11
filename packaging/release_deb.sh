@@ -27,7 +27,7 @@ fi
 
 
 # make sure we're not uploading a dupe
-if deb-s3 list -b apt-trace.datad0g.com -c $DISTRO -m main --arch amd64 | grep $TRACE_AGENT_VERSION; then
+if deb-s3 list -b apt-trace.datad0g.com -m main --arch amd64 | grep $TRACE_AGENT_VERSION; then
     echo "Duplicate version detected, exiting"
     exit 1
 fi
