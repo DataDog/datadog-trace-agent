@@ -1,7 +1,7 @@
 FROM debian:latest
 
 RUN apt-get update && \
-    apt-get install --no-install-recommends -qq -y build-essential debhelper git gnupg rake curl devscripts rubygems ruby-dev zlib1g-dev libxml2-dev
+    apt-get install --no-install-recommends -qq -y build-essential debhelper git gnupg rake curl devscripts rubygems ruby-dev zlib1g-dev libxml2-dev wget
 RUN gem install deb-s3
 
 RUN curl -sL -o /usr/local/bin/gimme https://raw.githubusercontent.com/travis-ci/gimme/master/gimme && \

@@ -27,10 +27,13 @@ fi
 
 
 # make sure we're not uploading a dupe
-if deb-s3 list -b apt-trace.datad0g.com -m main --arch amd64 | grep $TRACE_AGENT_VERSION; then
+set +e
+wget --spider ${APT_BASE_PATH}/dd-trace-agent_${TRACE_AGENT_VERSION}_amd64.deb
+if [ $? -eq 0 ]; then
     echo "Duplicate version detected, exiting"
     exit 1
 fi
+set -e
 
 DEBFILE=`find ../ -type f -name '*.deb'`
 echo $INPUT_GPG_PASSPHRASE | deb-s3 upload --bucket apt-trace.datad0g.com -c $DISTRO -m main --arch amd64 --sign=$SIGN_KEY_ID --gpg_options="--passphrase-fd 0 --no-tty" $DEBFILE --preserve-versions
