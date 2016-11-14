@@ -8,7 +8,7 @@ import (
 
 var defaultAggregators = []string{"service", "resource"}
 
-const defaultEnv = "default"
+const defaultEnv = "none"
 
 // TestStatsBucket returns a fixed stats bucket to be used in unit tests
 func TestStatsBucket() model.StatsBucket {

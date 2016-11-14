@@ -19,7 +19,7 @@ import (
 type AgentConfig struct {
 	// Global
 	HostName   string
-	DefaultEnv string // the traces will default to this environmen
+	DefaultEnv string // the traces will default to this environment
 
 	// API
 	APIEndpoints []string
