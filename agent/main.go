@@ -5,15 +5,17 @@ import (
 	"flag"
 	"fmt"
 	"math/rand"
-	_ "net/http/pprof" // register debugger
 	"os"
 	"os/signal"
+	"runtime/pprof"
 	"syscall"
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	log "github.com/cihub/seelog"
+
+	_ "net/http/pprof"
 )
 
 // handleSignal closes a channel to exit cleanly from routines
@@ -72,12 +74,27 @@ func versionString() string {
 
 // main is the entrypoint of our code
 func main() {
+	// command-line arguments
 	flag.StringVar(&opts.ddConfigFile, "ddconfig", "/etc/dd-agent/datadog.conf", "Classic agent config file location")
 	// FIXME: merge all APM configuration into dd-agent/datadog.conf and deprecate the below flag
 	flag.StringVar(&opts.configFile, "config", "/etc/datadog/trace-agent.ini", "Trace agent ini config file.")
 	flag.BoolVar(&opts.debug, "debug", false, "Turn on debug mode")
 	flag.BoolVar(&opts.version, "version", false, "Show version information and exit")
+
+	// profiling arguments
+	cpuprofile := flag.String("cpuprofile", "", "write cpu profile to file")
 	flag.Parse()
+
+	// start CPU profiling
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Critical(err)
+		}
+		pprof.StartCPUProfile(f)
+		log.Info("CPU profiling started...")
+		defer pprof.StopCPUProfile()
+	}
 
 	if opts.version {
 		fmt.Print(versionString())
