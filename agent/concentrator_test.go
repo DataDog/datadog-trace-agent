@@ -10,6 +10,23 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const testBucketInterval = 2 * time.Second
+
+// wait to be aligned on a time bucket, while this is not 100% bullet-proof
+// it really maximizes the chances we are at the beginning of a bucket and
+// all the test spans fill this one, instead of spreading on the next one.
+func waitBucket(t *testing.T, interval time.Duration) {
+	ticker := time.NewTicker(interval / 1000)
+	for {
+		select {
+		case now := <-ticker.C:
+			if delta := now.UnixNano() % interval.Nanoseconds(); delta < interval.Nanoseconds()/1000 {
+				return
+			}
+		}
+	}
+}
+
 func NewTestConcentrator() *Concentrator {
 	conf := config.NewDefaultAgentConfig()
 	conf.BucketInterval = time.Duration(1) * time.Second
@@ -43,13 +60,20 @@ func testSpan(c *Concentrator, spanID uint64, duration, offset int64, service, r
 }
 
 func TestConcentratorStatsCounts(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping concentratror stats test in Short mode.")
+	}
+
 	assert := assert.New(t)
+
+	waitBucket(t, testBucketInterval)
 
 	c := NewTestConcentrator()
 	defer close(c.in)
 
 	// accept all the spans by hacking the cutoff
-	c.conf.OldestSpanCutoff = time.Minute.Nanoseconds()
+	c.conf.BucketInterval = testBucketInterval
+	c.conf.OldestSpanCutoff = 2 * c.conf.BucketInterval.Nanoseconds()
 
 	bucketInterval := c.conf.BucketInterval
 	now := model.Now()
@@ -74,12 +98,11 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	// insert the spans
 	c.in <- testSpans
 
-	// Restore the correct cutoff after being sure we processed all the spans
-	time.Sleep(10 * time.Millisecond)
-	c.conf.OldestSpanCutoff = time.Second.Nanoseconds()
+	time.Sleep(bucketInterval)
 
 	// Triggers the flush
 	c.in <- model.NewTraceFlushMarker()
+	time.Sleep(5 * bucketInterval)
 
 	// Get the stats from the flush
 	stats := <-c.out
@@ -88,7 +111,9 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	c.in <- model.Trace{testSpan(c, 101, 1, 1, "A1", "resource1", 0)}
 	c.in <- model.Trace{testSpan(c, 102, 1, 2, "A1", "resource1", 0)}
 
-	if !assert.Equal(len(stats), 2, "We should get exactly 2 StatsBucket") {
+	time.Sleep(2 * bucketInterval)
+
+	if !assert.Equal(2, len(stats), "We should get exactly 2 StatsBucket") {
 		t.FailNow()
 	}
 

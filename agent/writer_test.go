@@ -50,6 +50,8 @@ func TestWriterServices(t *testing.T) {
 	conf.APIKeys = []string{"xxxxxxx"}
 
 	w := NewWriter(conf)
+	w.inServices = make(chan model.ServicesMetadata)
+
 	go w.Run()
 
 	// send services
@@ -59,7 +61,6 @@ func TestWriterServices(t *testing.T) {
 		},
 	}
 
-	w.inServices = make(chan model.ServicesMetadata)
 	w.inServices <- services
 
 receivingLoop:
@@ -142,8 +143,8 @@ receivingLoop:
 			t.Fatal("did not receive service data in time")
 		}
 	}
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	// we should just have ignored the 400 error on the other backend
-	assert.Len(w.payloadBuffer, 0)
+	assert.Equal(w.getPayloadBufferLen(), 0)
 }
