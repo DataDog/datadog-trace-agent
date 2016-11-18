@@ -9,7 +9,6 @@ import (
 
 	"gopkg.in/ini.v1"
 
-	"github.com/DataDog/raclette/model"
 	log "github.com/cihub/seelog"
 )
 
@@ -65,15 +64,6 @@ func mergeConfig(c *AgentConfig, f *ini.File) {
 		c.APIKeys = v
 	} else {
 		log.Info("Failed to parse api_key from dd-agent config")
-	}
-
-	if v := m.Key("tags").Strings(","); len(v) != 0 {
-		for _, t := range v {
-			if strings.HasPrefix("env:", t) {
-				tag := model.NewTagFromString(t)
-				c.DefaultEnv = tag.Value
-			}
-		}
 	}
 
 	if v := m.Key("bind_host").MustString(""); v != "" {
