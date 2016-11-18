@@ -85,6 +85,7 @@ func (a *Agent) runFlusher() {
 			var wg sync.WaitGroup
 			p := model.AgentPayload{
 				HostName: a.Config.HostName,
+				Env:      a.Config.DefaultEnv,
 			}
 			wg.Add(2)
 			go func() {

@@ -13,6 +13,7 @@ import (
 // pre-processed to the Datadog mothership
 type AgentPayload struct {
 	HostName string        `json:"hostname"` // the host name that will be resolved by the API
+	Env      string        `json:"env"`      // the default environment this agent uses
 	Traces   []Trace       `json:"traces"`   // the traces we sampled
 	Stats    []StatsBucket `json:"stats"`    // the statistics we pre-computed
 }
