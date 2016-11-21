@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,6 +12,8 @@ import (
 	"github.com/DataDog/raclette/config"
 	"github.com/DataDog/raclette/model"
 	"github.com/stretchr/testify/assert"
+	"github.com/ugorji/go/codec"
+	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
 func TestReceiverTraces(t *testing.T) {
@@ -63,5 +66,99 @@ func TestReceiverTraces(t *testing.T) {
 		assert.Equal("NOT touched because it is going to be hashed", span.Resource)
 	default:
 		t.Fatalf("no data received")
+	}
+}
+
+func BenchmarkDecoderJSON(b *testing.B) {
+	// preparing the environment
+	simpleTrace, _ := ioutil.ReadFile("../simple_trace.json")
+	complexTrace, _ := ioutil.ReadFile("../complex_trace.json")
+	benchmarks := []struct {
+		name string
+		file []byte
+	}{
+		{"JSON simple trace", simpleTrace},
+		{"JSON complex trace", complexTrace},
+	}
+
+	// benchmark
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			b.ResetTimer()
+			b.ReportAllocs()
+			for n := 0; n < b.N; n++ {
+				var spans []model.Span
+				bodyBuffer := bytes.NewReader(bm.file)
+				decoder := json.NewDecoder(bodyBuffer)
+
+				err := decoder.Decode(&spans)
+				if err != nil {
+					b.Fatalf("Cannot decode the given stream: %s", err)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkDecoderUgorji(b *testing.B) {
+	// preparing the environment
+	var mh codec.MsgpackHandle
+	simpleTrace, _ := ioutil.ReadFile("../simple_trace.msgpack")
+	complexTrace, _ := ioutil.ReadFile("../complex_trace.msgpack")
+	benchmarks := []struct {
+		name string
+		file []byte
+	}{
+		{"MessagePack simple trace", simpleTrace},
+		{"MessagePack complex trace", complexTrace},
+	}
+
+	// benchmark
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			b.ResetTimer()
+			b.ReportAllocs()
+			for n := 0; n < b.N; n++ {
+				var spans []model.Span
+				bodyBuffer := bytes.NewReader(bm.file)
+				decoder := codec.NewDecoder(bodyBuffer, &mh)
+
+				err := decoder.Decode(&spans)
+				if err != nil {
+					b.Fatalf("Cannot decode the given stream: %s", err)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkDecoderVmihailenco(b *testing.B) {
+	// preparing the environment
+	simpleTrace, _ := ioutil.ReadFile("../simple_trace.msgpack")
+	complexTrace, _ := ioutil.ReadFile("../complex_trace.msgpack")
+	benchmarks := []struct {
+		name string
+		file []byte
+	}{
+		{"MessagePack simple trace", simpleTrace},
+		{"MessagePack complex trace", complexTrace},
+	}
+
+	// benchmark
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			b.ResetTimer()
+			b.ReportAllocs()
+			for n := 0; n < b.N; n++ {
+				var spans []model.Span
+				bodyBuffer := bytes.NewReader(bm.file)
+				decoder := msgpack.NewDecoder(bodyBuffer)
+
+				err := decoder.Decode(&spans)
+				if err != nil {
+					b.Fatalf("Cannot decode the given stream: %s", err)
+				}
+			}
+		})
 	}
 }

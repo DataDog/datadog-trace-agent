@@ -9,20 +9,20 @@ import (
 type Span struct {
 	// Mandatory
 	// Service & Name together determine what software we are measuring
-	Service  string `json:"service"`  // the software running (e.g. pylons)
-	Name     string `json:"name"`     // the metric name aka. the thing we're measuring (e.g. pylons.render OR psycopg2.query)
-	Resource string `json:"resource"` // the natural key of what we measure (/index OR SELECT * FROM a WHERE id = ?)
-	TraceID  uint64 `json:"trace_id"` // ID that all spans in the same trace share
-	SpanID   uint64 `json:"span_id"`  // unique ID given to any span
-	Start    int64  `json:"start"`    // nanosecond epoch of span start
-	Duration int64  `json:"duration"` // in nanoseconds
-	Error    int32  `json:"error"`    // error status of the span, 0 == OK
+	Service  string `json:"service" msgpack:"service"`   // the software running (e.g. pylons)
+	Name     string `json:"name" msgpack:"name"`         // the metric name aka. the thing we're measuring (e.g. pylons.render OR psycopg2.query)
+	Resource string `json:"resource" msgpack:"resource"` // the natural key of what we measure (/index OR SELECT * FROM a WHERE id = ?)
+	TraceID  uint64 `json:"trace_id" msgpack:"trace_id"` // ID that all spans in the same trace share
+	SpanID   uint64 `json:"span_id" msgpack:"span_id"`   // unique ID given to any span
+	Start    int64  `json:"start" msgpack:"start"`       // nanosecond epoch of span start
+	Duration int64  `json:"duration" msgpack:"duration"` // in nanoseconds
+	Error    int32  `json:"error" msgpack:"error"`       // error status of the span, 0 == OK
 
 	// Optional
-	Meta     map[string]string  `json:"meta"`      // arbitrary tags/metadata
-	Metrics  map[string]float64 `json:"metrics"`   // arbitrary metrics
-	ParentID uint64             `json:"parent_id"` // span ID of the span in which this one was created
-	Type     string             `json:"type"`      // protocol associated with the span
+	Meta     map[string]string  `json:"meta" msgpack:"meta"`           // arbitrary tags/metadata
+	Metrics  map[string]float64 `json:"metrics"`                       // arbitrary metrics
+	ParentID uint64             `json:"parent_id" msgpack:"parent_id"` // span ID of the span in which this one was created
+	Type     string             `json:"type" msgpack:"type"`           // protocol associated with the span
 }
 
 // String formats a Span struct to be displayed as a string
