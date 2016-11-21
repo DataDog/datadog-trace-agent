@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/ini.v1"
-
 	log "github.com/cihub/seelog"
 )
 
@@ -111,27 +109,39 @@ func NewDefaultAgentConfig() *AgentConfig {
 		StatsdPort: 8125,
 	}
 
-	// Check the classic agent's config for overrides
-	if dd, _ := ini.Load("/etc/dd-agent/datadog.conf"); dd != nil {
-		log.Debug("Found dd-agent config file, applying overrides")
-		mergeConfig(ac, dd)
-	}
-
-	// environment variables have precedence among defaults and config files
-	mergeEnv(ac)
-
 	return ac
 }
 
-// NewAgentConfig creates the AgentConfig from the standard config. It handles all the cases.
+// NewAgentConfig creates the AgentConfig from the standard config
 func NewAgentConfig(conf *File) (*AgentConfig, error) {
 	c := NewDefaultAgentConfig()
 
-	// Allow overrides of previously set config without erroring
-	if v, _ := conf.Get("trace.config", "hostname"); v != "" {
-		c.HostName = v
+	// Inherit all relevant config from dd-agent
+	m, err := conf.GetSection("Main")
+	if err == nil {
+		if v := m.Key("hostname").MustString(""); v != "" {
+			c.HostName = v
+		} else {
+			log.Info("Failed to parse hostname from dd-agent config")
+		}
+
+		if v := m.Key("api_key").Strings(","); len(v) != 0 {
+			c.APIKeys = v
+		} else {
+			log.Info("Failed to parse api_key from dd-agent config")
+		}
+
+		if v := m.Key("bind_host").MustString(""); v != "" {
+			c.StatsdHost = v
+			c.ReceiverHost = v
+		}
+
+		if v := m.Key("dogstatsd_port").MustInt(-1); v != -1 {
+			c.StatsdPort = v
+		}
 	}
 
+	// When available inherit APM specific config
 	if v, _ := conf.Get("trace.api", "api_key"); v != "" {
 		vals := strings.Split(v, ",")
 		for i := range vals {
@@ -150,6 +160,10 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 
 	if len(c.APIKeys) != len(c.APIEndpoints) {
 		return c, errors.New("every API key needs to have an explicit endpoint associated")
+	}
+
+	if v, e := conf.GetInt("trace.concentrator", "bucket_size_seconds"); e == nil {
+		c.BucketInterval = time.Duration(v) * time.Second
 	}
 
 	if v, e := conf.GetInt("trace.concentrator", "bucket_size_seconds"); e == nil {
@@ -181,5 +195,7 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 		c.ConnectionLimit = v
 	}
 
+	// environment variables have precedence among defaults and the config file
+	mergeEnv(c)
 	return c, nil
 }
