@@ -45,43 +45,13 @@ type AgentConfig struct {
 	StatsdPort int
 }
 
-// mergeConfig applies overrides from the dd-agent config to the
-// trace agent
-func mergeConfig(c *AgentConfig, f *ini.File) {
-	m, err := f.GetSection("Main")
-	if err != nil {
-		return
-	}
-
-	if v := m.Key("hostname").MustString(""); v != "" {
-		c.HostName = v
-	} else {
-		log.Info("Failed to parse hostname from dd-agent config")
-	}
-
-	if v := m.Key("api_key").Strings(","); len(v) != 0 {
-		c.APIKeys = v
-	} else {
-		log.Info("Failed to parse api_key from dd-agent config")
-	}
-
-	if v := m.Key("bind_host").MustString(""); v != "" {
-		c.StatsdHost = v
-	}
-
-	if v := m.Key("dogstatsd_port").MustInt(-1); v != -1 {
-		c.StatsdPort = v
-	}
-}
-
-// mergeEnv applies overrides from the environment variables to the
-// trace agent configuration
+// mergeEnv applies overrides from environment variables to the trace agent configuration
 func mergeEnv(c *AgentConfig) {
-	if v := os.Getenv("DATADOG_HOSTNAME"); v != "" {
+	if v := os.Getenv("DD_HOSTNAME"); v != "" {
 		c.HostName = v
 	}
 
-	if v := os.Getenv("DATADOG_API_KEY"); v != "" {
+	if v := os.Getenv("DD_API_KEY"); v != "" {
 		log.Info("overriding API key from env API_KEY value")
 		vals := strings.Split(v, ",")
 		for i := range vals {
@@ -90,27 +60,24 @@ func mergeEnv(c *AgentConfig) {
 		c.APIKeys = vals
 	}
 
-	if v := os.Getenv("DATADOG_RECEIVER_HOST"); v != "" {
-		c.ReceiverHost = v
-	}
-
-	if v := os.Getenv("DATADOG_RECEIVER_PORT"); v != "" {
+	if v := os.Getenv("DD_RECEIVER_PORT"); v != "" {
 		port, err := strconv.Atoi(v)
 		if err != nil {
-			log.Info("Failed to parse DATADOG_RECEIVER_PORT: it should be a port number")
+			log.Info("Failed to parse DD_RECEIVER_PORT: it should be a port number")
 		} else {
 			c.ReceiverPort = port
 		}
 	}
 
-	if v := os.Getenv("DATADOG_BIND_HOST"); v != "" {
+	if v := os.Getenv("DD_BIND_HOST"); v != "" {
 		c.StatsdHost = v
+		c.ReceiverHost = v
 	}
 
-	if v := os.Getenv("DATADOG_DOGSTATSD_PORT"); v != "" {
+	if v := os.Getenv("DD_DOGSTATSD_PORT"); v != "" {
 		port, err := strconv.Atoi(v)
 		if err != nil {
-			log.Info("Failed to parse DATADOG_DOGSTATSD_PORT: it should be a port number")
+			log.Info("Failed to parse DD_DOGSTATSD_PORT: it should be a port number")
 		} else {
 			c.StatsdPort = port
 		}
