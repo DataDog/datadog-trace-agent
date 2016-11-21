@@ -10,4 +10,6 @@ RUN echo "deb http://apt-trace.datad0g.com.s3.amazonaws.com/ stable main" > /etc
 
 EXPOSE 7777/tcp
 
+COPY ./agent/trace-agent.ini /etc/datadog/trace-agent.ini
+
 ENTRYPOINT ["/opt/datadog-agent/bin/trace-agent"]
