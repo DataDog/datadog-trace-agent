@@ -14,10 +14,16 @@ import (
 	"github.com/DataDog/raclette/model"
 	"github.com/DataDog/raclette/statsd"
 	log "github.com/cihub/seelog"
+	"github.com/ugorji/go/codec"
 )
 
 // APIVersion is a dumb way to version our collector handlers
 type APIVersion int
+
+// Decoder is the common interface that all decoders should honor
+type Decoder interface {
+	Decode(v interface{}) error
+}
 
 const (
 	v01 APIVersion = iota
@@ -129,7 +135,19 @@ func (l *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, r *http
 	}
 	bodyBuffer := bytes.NewReader(bodyBytes)
 
-	dec := json.NewDecoder(bodyBuffer)
+	// select the right Decoder based on the given content-type header
+	contentType := r.Header.Get("Content-Type")
+	var dec Decoder
+	switch contentType {
+	case "application/msgpack":
+		log.Debug("received 'application/msgpack': using msgpack Decoder")
+		var mh codec.MsgpackHandle
+		dec = codec.NewDecoder(bodyBuffer, &mh)
+	default:
+		log.Debug("received default content-type: using JSON Decoder")
+		// if the client doesn't use a specific decoder, fallback to JSON
+		dec = json.NewDecoder(bodyBuffer)
+	}
 
 	var traces []model.Trace
 	mTags := []string{"handler:traces", fmt.Sprintf("v:%d", v)}
