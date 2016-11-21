@@ -182,3 +182,42 @@ func TestReceiverTracesMsgpack(t *testing.T) {
 		t.Fatalf("no data received")
 	}
 }
+
+func BenchmarkDecoderJSON(b *testing.B) {
+	assert := assert.New(b)
+	traces := getTestTrace(150, 66)
+
+	// json payload
+	payload, err := json.Marshal(traces)
+	assert.Nil(err)
+
+	// benchmark
+	b.ResetTimer()
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		var spans []model.Trace
+		decoder := json.NewDecoder(bytes.NewReader(payload))
+		_ = decoder.Decode(&spans)
+	}
+}
+
+func BenchmarkDecoderMsgpack(b *testing.B) {
+	assert := assert.New(b)
+	traces := getTestTrace(150, 66)
+
+	// msgpack payload
+	var payload []byte
+	var mh codec.MsgpackHandle
+	enc := codec.NewEncoderBytes(&payload, &mh)
+	err := enc.Encode(traces)
+	assert.Nil(err)
+
+	// benchmark
+	b.ResetTimer()
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		var spans []model.Trace
+		decoder := codec.NewDecoder(bytes.NewReader(payload), &mh)
+		_ = decoder.Decode(&spans)
+	}
+}
