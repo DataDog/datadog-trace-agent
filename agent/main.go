@@ -31,9 +31,10 @@ func handleSignal(exit chan struct{}) {
 
 // opts are the command-line options
 var opts struct {
-	configFile string
-	debug      bool
-	version    bool
+	ddConfigFile string
+	configFile   string
+	debug        bool
+	version      bool
 }
 
 // version info sourced from build flags
@@ -70,7 +71,9 @@ func versionString() string {
 
 // main is the entrypoint of our code
 func main() {
-	flag.StringVar(&opts.configFile, "config", "/etc/datadog/trace-agent.ini", "Trace agent ini config file.")
+	flag.StringVar(&opts.ddConfigFile, "ddconfig", "/etc/dd-agent/datadog.conf", "Classic agent config file location")
+	// FIXME: merge all APM configuration into dd-agent/datadog.conf and deprecate the below flag
+	flag.StringVar(&opts.configFile, "config", "", "Trace agent ini config file.")
 	flag.BoolVar(&opts.debug, "debug", false, "Turn on debug mode")
 	flag.BoolVar(&opts.version, "version", false, "Show version information and exit")
 	flag.Parse()
@@ -84,9 +87,13 @@ func main() {
 	var conf *config.File
 	var agentConf *config.AgentConfig
 
-	conf, err := config.New(opts.configFile)
+	conf, err := config.New(opts.ddConfigFile)
+	if opts.configFile != "" {
+		// FIXME: merge all APM configuration into dd-agent/datadog.conf and deprecate this path
+		conf, err = config.New(opts.configFile)
+	}
+
 	if err != nil {
-		fmt.Println("Failed to load config file. Using defaults")
 		agentConf = config.NewDefaultAgentConfig()
 	} else {
 		agentConf, err = config.NewAgentConfig(conf)
