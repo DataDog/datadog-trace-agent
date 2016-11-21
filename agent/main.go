@@ -73,7 +73,7 @@ func versionString() string {
 func main() {
 	flag.StringVar(&opts.ddConfigFile, "ddconfig", "/etc/dd-agent/datadog.conf", "Classic agent config file location")
 	// FIXME: merge all APM configuration into dd-agent/datadog.conf and deprecate the below flag
-	flag.StringVar(&opts.configFile, "config", "", "Trace agent ini config file.")
+	flag.StringVar(&opts.configFile, "config", "/etc/datadog/trace-agent.ini", "Trace agent ini config file.")
 	flag.BoolVar(&opts.debug, "debug", false, "Turn on debug mode")
 	flag.BoolVar(&opts.version, "version", false, "Show version information and exit")
 	flag.Parse()
@@ -84,22 +84,16 @@ func main() {
 	}
 
 	// Instantiate the config
-	var conf *config.File
 	var agentConf *config.AgentConfig
 
-	conf, err := config.New(opts.ddConfigFile)
-	if opts.configFile != "" {
-		// FIXME: merge all APM configuration into dd-agent/datadog.conf and deprecate this path
-		conf, err = config.New(opts.configFile)
-	}
+	// tolerate errors in reading the config files. some setups will use only environment variables
+	// which is OK
+	legacyConf, _ := config.New(opts.configFile)
+	conf, _ := config.New(opts.ddConfigFile)
 
+	agentConf, err := config.NewAgentConfig(conf, legacyConf)
 	if err != nil {
-		agentConf = config.NewDefaultAgentConfig()
-	} else {
-		agentConf, err = config.NewAgentConfig(conf)
-		if err != nil {
-			panic(err)
-		}
+		panic(err)
 	}
 
 	// Initialize logging

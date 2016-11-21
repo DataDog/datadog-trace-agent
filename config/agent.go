@@ -113,7 +113,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 }
 
 // NewAgentConfig creates the AgentConfig from the standard config
-func NewAgentConfig(conf *File) (*AgentConfig, error) {
+func NewAgentConfig(conf *File, legacyConf *File) (*AgentConfig, error) {
 	c := NewDefaultAgentConfig()
 
 	// Inherit all relevant config from dd-agent
@@ -142,6 +142,11 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 	}
 
 	// When available inherit APM specific config
+	if legacyConf != nil {
+		// try to use the legacy config file passed via `-configfile`
+		conf = legacyConf
+	}
+
 	if v, _ := conf.Get("trace.api", "api_key"); v != "" {
 		vals := strings.Split(v, ",")
 		for i := range vals {
@@ -156,10 +161,6 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 			vals[i] = strings.TrimSpace(vals[i])
 		}
 		c.APIEndpoints = vals
-	}
-
-	if len(c.APIKeys) != len(c.APIEndpoints) {
-		return c, errors.New("every API key needs to have an explicit endpoint associated")
 	}
 
 	if v, e := conf.GetInt("trace.concentrator", "bucket_size_seconds"); e == nil {
@@ -197,5 +198,10 @@ func NewAgentConfig(conf *File) (*AgentConfig, error) {
 
 	// environment variables have precedence among defaults and the config file
 	mergeEnv(c)
+
+	// check for api-endpoint parity after all possible overrides have been applied
+	if len(c.APIKeys) != len(c.APIEndpoints) {
+		return c, errors.New("every API key needs to have an explicit endpoint associated")
+	}
 	return c, nil
 }
