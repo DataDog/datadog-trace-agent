@@ -1,14 +1,14 @@
 The trace-agent sources configuration from the following locations, in order of precedence (low to high):
 
-1. `-ddconfigfile` (default: `/etc/dd-agent/datadog.conf`)
-2. `-configfile` (DEPRECATED and UNDOCUMENTED) (default: `/etc/datadog/trace-agent.ini`)
+1. `-ddconfig` (default: `/etc/dd-agent/datadog.conf`)
+2. `-config` (DEPRECATED and UNDOCUMENTED) (default: `/etc/datadog/trace-agent.ini`)
 3. Environment variables: See full list below
 
 
 Configuration specified in #3 will override configuration specified in #2 which in turn will override configuration specified in #1
 
 ## Classic configuration values, and how the trace-agent treats them
-In the file pointed to by `-ddconfigfile`
+In the file pointed to by `-ddconfig`
 
 ```
 [Main]
@@ -34,7 +34,7 @@ log_level = INFO
 ```
 
 ## APM-specific configuration values
-In the file pointed to by `-ddconfigfile`
+In the file pointed to by `-ddconfig`
 
 ```
 ###################################################
