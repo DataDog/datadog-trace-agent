@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -23,6 +24,20 @@ type APIVersion int
 // Decoder is the common interface that all decoders should honor
 type Decoder interface {
 	Decode(v interface{}) error
+}
+
+func initDecoder(contentType string, bodyBuffer io.Reader) Decoder {
+	// select the right Decoder based on the given content-type header
+	switch contentType {
+	case "application/msgpack":
+		log.Debug("received 'application/msgpack': using msgpack Decoder")
+		var mh codec.MsgpackHandle
+		return codec.NewDecoder(bodyBuffer, &mh)
+	default:
+		log.Debug("received default content-type: using JSON Decoder")
+		// if the client doesn't use a specific decoder, fallback to JSON
+		return json.NewDecoder(bodyBuffer)
+	}
 }
 
 const (
@@ -137,17 +152,7 @@ func (l *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, r *http
 
 	// select the right Decoder based on the given content-type header
 	contentType := r.Header.Get("Content-Type")
-	var dec Decoder
-	switch contentType {
-	case "application/msgpack":
-		log.Debug("received 'application/msgpack': using msgpack Decoder")
-		var mh codec.MsgpackHandle
-		dec = codec.NewDecoder(bodyBuffer, &mh)
-	default:
-		log.Debug("received default content-type: using JSON Decoder")
-		// if the client doesn't use a specific decoder, fallback to JSON
-		dec = json.NewDecoder(bodyBuffer)
-	}
+	dec := initDecoder(contentType, bodyBuffer)
 
 	var traces []model.Trace
 	mTags := []string{"handler:traces", fmt.Sprintf("v:%d", v)}
@@ -246,7 +251,9 @@ func (l *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, r *ht
 	}
 	bodyBuffer := bytes.NewReader(bodyBytes)
 
-	dec := json.NewDecoder(bodyBuffer)
+	// select the right Decoder based on the given content-type header
+	contentType := r.Header.Get("Content-Type")
+	dec := initDecoder(contentType, bodyBuffer)
 
 	mTags := []string{"handler:services"}
 	var servicesMeta model.ServicesMetadata

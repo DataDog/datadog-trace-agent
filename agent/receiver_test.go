@@ -49,11 +49,8 @@ func getTestTrace(traceN, size int) []model.Trace {
 func TestReceiverTraces(t *testing.T) {
 	assert := assert.New(t)
 
-	// get the default configuration
-	defaultConfig := config.NewDefaultAgentConfig()
-
-	// receiver just here so that we can attach the handler
-	r := NewHTTPReceiver(defaultConfig)
+	// start testing server
+	r := NewHTTPReceiver(config.NewDefaultAgentConfig())
 	server := httptest.NewServer(
 		http.HandlerFunc(httpHandleWithVersion(v02, r.handleTraces)),
 	)
@@ -93,11 +90,8 @@ func TestReceiverTraces(t *testing.T) {
 func TestReceiverTracesJSON(t *testing.T) {
 	assert := assert.New(t)
 
-	// get the default configuration
-	defaultConfig := config.NewDefaultAgentConfig()
-
-	// receiver just here so that we can attach the handler
-	r := NewHTTPReceiver(defaultConfig)
+	// start testing server
+	r := NewHTTPReceiver(config.NewDefaultAgentConfig())
 	server := httptest.NewServer(
 		http.HandlerFunc(httpHandleWithVersion(v02, r.handleTraces)),
 	)
@@ -139,17 +133,14 @@ func TestReceiverTracesMsgpack(t *testing.T) {
 	assert := assert.New(t)
 	var mh codec.MsgpackHandle
 
-	// get the default configuration
-	defaultConfig := config.NewDefaultAgentConfig()
-
-	// receiver just here so that we can attach the handler
-	r := NewHTTPReceiver(defaultConfig)
+	// start testing server
+	r := NewHTTPReceiver(config.NewDefaultAgentConfig())
 	server := httptest.NewServer(
 		http.HandlerFunc(httpHandleWithVersion(v02, r.handleTraces)),
 	)
 	defer server.Close()
 
-	// send traces to that endpoint using the JSON content-type
+	// send traces to that endpoint using the msgpack content-type
 	traces := getTestTrace(1, 1)
 	var data []byte
 	enc := codec.NewEncoderBytes(&data, &mh)
@@ -178,6 +169,106 @@ func TestReceiverTracesMsgpack(t *testing.T) {
 		assert.Equal("NOT touched because it is going to be hashed", span.Resource)
 		assert.Equal("192.168.0.1", span.Meta["http.host"])
 		assert.Equal(41.99, span.Metrics["http.monitor"])
+	default:
+		t.Fatalf("no data received")
+	}
+}
+
+func TestReceiverServiceJSON(t *testing.T) {
+	assert := assert.New(t)
+
+	// start testing server
+	r := NewHTTPReceiver(config.NewDefaultAgentConfig())
+	server := httptest.NewServer(
+		http.HandlerFunc(httpHandleWithVersion(v02, r.handleServices)),
+	)
+	defer server.Close()
+
+	// send service to that endpoint using the JSON content-type
+	services := model.ServicesMetadata{
+		"backend": map[string]string{
+			"app":      "django",
+			"app_type": "web",
+		},
+		"database": map[string]string{
+			"app":      "postgres",
+			"app_type": "db",
+		},
+	}
+
+	data, err := json.Marshal(services)
+	assert.Nil(err)
+	req, err := http.NewRequest("POST", server.URL, bytes.NewBuffer(data))
+	assert.Nil(err)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Nil(err)
+	assert.Equal(200, resp.StatusCode)
+
+	defer resp.Body.Close()
+
+	// now we should be able to read the trace data
+	select {
+	case rt := <-r.services:
+		assert.Len(rt, 2)
+		assert.Equal(rt["backend"]["app"], "django")
+		assert.Equal(rt["backend"]["app_type"], "web")
+		assert.Equal(rt["database"]["app"], "postgres")
+		assert.Equal(rt["database"]["app_type"], "db")
+	default:
+		t.Fatalf("no data received")
+	}
+}
+
+func TestReceiverServiceMsgpack(t *testing.T) {
+	assert := assert.New(t)
+	var mh codec.MsgpackHandle
+
+	// start testing server
+	r := NewHTTPReceiver(config.NewDefaultAgentConfig())
+	server := httptest.NewServer(
+		http.HandlerFunc(httpHandleWithVersion(v02, r.handleServices)),
+	)
+	defer server.Close()
+
+	// send service to that endpoint using the msgpack content-type
+	services := model.ServicesMetadata{
+		"backend": map[string]string{
+			"app":      "django",
+			"app_type": "web",
+		},
+		"database": map[string]string{
+			"app":      "postgres",
+			"app_type": "db",
+		},
+	}
+
+	// send traces to that endpoint using the Msgpack content-type
+	var data []byte
+	enc := codec.NewEncoderBytes(&data, &mh)
+	err := enc.Encode(services)
+	assert.Nil(err)
+	req, err := http.NewRequest("POST", server.URL, bytes.NewBuffer(data))
+	assert.Nil(err)
+	req.Header.Set("Content-Type", "application/msgpack")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Nil(err)
+	assert.Equal(200, resp.StatusCode)
+
+	defer resp.Body.Close()
+
+	// now we should be able to read the trace data
+	select {
+	case rt := <-r.services:
+		assert.Len(rt, 2)
+		assert.Equal(rt["backend"]["app"], "django")
+		assert.Equal(rt["backend"]["app_type"], "web")
+		assert.Equal(rt["database"]["app"], "postgres")
+		assert.Equal(rt["database"]["app_type"], "db")
 	default:
 		t.Fatalf("no data received")
 	}
