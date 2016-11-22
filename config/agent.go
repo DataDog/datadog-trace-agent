@@ -83,6 +83,10 @@ func mergeEnv(c *AgentConfig) {
 			c.StatsdPort = port
 		}
 	}
+
+	if v := os.Getenv("DD_LOG_LEVEL"); v != "" {
+		c.LogLevel = v
+	}
 }
 
 // NewDefaultAgentConfig returns a configuration with the default values

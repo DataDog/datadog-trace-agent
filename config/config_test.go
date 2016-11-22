@@ -33,18 +33,30 @@ func TestDefaultConfig(t *testing.T) {
 
 	assert.Equal(agentConfig.StatsdHost, "localhost")
 	assert.Equal(agentConfig.StatsdPort, 8125)
+
+	assert.Equal(agentConfig.LogLevel, "INFO")
 }
 
 func TestOnlyDDAgentConfig(t *testing.T) {
 	assert := assert.New(t)
 
-	// absent an override by legacy config, dd-agent config does the right thing
-	ddAgentConf, _ := ini.Load([]byte("[Main]\n\nhostname=thing\napi_key=apikey_12"))
+	// absent an override by legacy config, reading from dd-agent config should do the right thing
+	ddAgentConf, _ := ini.Load([]byte(strings.Join([]string{
+		"[Main]",
+		"hostname = thing",
+		"api_key = apikey_12",
+		"bind_host = 0.0.0.0",
+		"dogstatsd_port = 28125",
+		"log_level = DEBUG",
+	}, "\n")))
 	configFile := &File{instance: ddAgentConf, Path: "whatever"}
 	agentConfig, _ := NewAgentConfig(configFile, nil)
 
 	assert.Equal("thing", agentConfig.HostName)
 	assert.Equal([]string{"apikey_12"}, agentConfig.APIKeys)
+	assert.Equal("0.0.0.0", agentConfig.ReceiverHost)
+	assert.Equal(28125, agentConfig.StatsdPort)
+	assert.Equal("DEBUG", agentConfig.LogLevel)
 }
 
 func TestDDAgentMultiAPIKeys(t *testing.T) {
