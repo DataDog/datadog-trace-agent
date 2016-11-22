@@ -41,6 +41,9 @@ type AgentConfig struct {
 	// internal telemetry
 	StatsdHost string
 	StatsdPort int
+
+	// logging
+	LogLevel string
 }
 
 // mergeEnv applies overrides from environment variables to the trace agent configuration
@@ -107,6 +110,8 @@ func NewDefaultAgentConfig() *AgentConfig {
 
 		StatsdHost: "localhost",
 		StatsdPort: 8125,
+
+		LogLevel: "INFO",
 	}
 
 	return ac
@@ -138,6 +143,9 @@ func NewAgentConfig(conf *File, legacyConf *File) (*AgentConfig, error) {
 
 		if v := m.Key("dogstatsd_port").MustInt(-1); v != -1 {
 			c.StatsdPort = v
+		}
+		if v := m.Key("log_level").MustString(""); v != "" {
+			c.LogLevel = v
 		}
 	}
 

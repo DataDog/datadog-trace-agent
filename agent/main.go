@@ -8,6 +8,7 @@ import (
 	_ "net/http/pprof" // register debugger
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -97,7 +98,8 @@ func main() {
 	}
 
 	// Initialize logging
-	err = config.NewLoggerLevel(opts.debug)
+	debugLogging := opts.debug || strings.EqualFold(agentConf.LogLevel, "debug")
+	err = config.NewLoggerLevel(debugLogging)
 	if err != nil {
 		panic(fmt.Errorf("error with logger: %v", err))
 	}
