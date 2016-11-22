@@ -34,6 +34,10 @@ type APIEndpoint struct {
 // of URLs (such as https://trace.agent.datadoghq.com) and API
 // keys.
 func NewAPIEndpoint(urls, apiKeys []string) APIEndpoint {
+	if len(apiKeys) == 0 {
+		panic(fmt.Errorf("No API key"))
+	}
+
 	if len(urls) != len(apiKeys) {
 		panic(fmt.Errorf("APIEndpoint should be initialized with same number of url/api keys"))
 	}
