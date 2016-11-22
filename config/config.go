@@ -85,3 +85,8 @@ func (c *File) GetStrArray(section, name, sep string) ([]string, error) {
 	value := c.instance.Section(section).Key(name).String()
 	return strings.Split(value, sep), nil
 }
+
+// GetSection is a convenience method to return an entire section of ini config
+func (c *File) GetSection(key string) (*ini.Section, error) {
+	return c.instance.GetSection(key)
+}

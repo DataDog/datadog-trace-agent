@@ -8,6 +8,7 @@ import (
 	_ "net/http/pprof" // register debugger
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -31,9 +32,10 @@ func handleSignal(exit chan struct{}) {
 
 // opts are the command-line options
 var opts struct {
-	configFile string
-	debug      bool
-	version    bool
+	ddConfigFile string
+	configFile   string
+	debug        bool
+	version      bool
 }
 
 // version info sourced from build flags
@@ -70,6 +72,8 @@ func versionString() string {
 
 // main is the entrypoint of our code
 func main() {
+	flag.StringVar(&opts.ddConfigFile, "ddconfig", "/etc/dd-agent/datadog.conf", "Classic agent config file location")
+	// FIXME: merge all APM configuration into dd-agent/datadog.conf and deprecate the below flag
 	flag.StringVar(&opts.configFile, "config", "/etc/datadog/trace-agent.ini", "Trace agent ini config file.")
 	flag.BoolVar(&opts.debug, "debug", false, "Turn on debug mode")
 	flag.BoolVar(&opts.version, "version", false, "Show version information and exit")
@@ -81,22 +85,21 @@ func main() {
 	}
 
 	// Instantiate the config
-	var conf *config.File
 	var agentConf *config.AgentConfig
 
-	conf, err := config.New(opts.configFile)
+	// tolerate errors in reading the config files. some setups will use only environment variables
+	// which is OK
+	legacyConf, _ := config.New(opts.configFile)
+	conf, _ := config.New(opts.ddConfigFile)
+
+	agentConf, err := config.NewAgentConfig(conf, legacyConf)
 	if err != nil {
-		fmt.Println("Failed to load config file. Using defaults")
-		agentConf = config.NewDefaultAgentConfig()
-	} else {
-		agentConf, err = config.NewAgentConfig(conf)
-		if err != nil {
-			panic(err)
-		}
+		panic(err)
 	}
 
 	// Initialize logging
-	err = config.NewLoggerLevel(opts.debug)
+	debugLogging := opts.debug || strings.EqualFold(agentConf.LogLevel, "debug")
+	err = config.NewLoggerLevel(debugLogging)
 	if err != nil {
 		panic(fmt.Errorf("error with logger: %v", err))
 	}
