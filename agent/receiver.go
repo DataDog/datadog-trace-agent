@@ -168,6 +168,7 @@ func (l *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, r *http
 	// drop invalid spans
 
 	var stotal, sdropped, ttotal, tdropped int
+Traces:
 	for _, t := range traces {
 		var toRemove []int
 		var id uint64
@@ -175,7 +176,11 @@ func (l *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, r *http
 			// we should drop "traces" that are not actually traces where several
 			// trace IDs are reported. (probably a bug in the client)
 			if i != 0 && t[i].TraceID != id {
-				toRemove = make([]int, len(t)) // FIXME[leo]: non-needed alloc
+				log.Errorf("dropping trace %v, trace ID mismatch (%d/%d)", t, t[i].TraceID, id)
+				stotal += len(t)
+				sdropped += len(t)
+				tdropped++
+				continue Traces
 			}
 			id = t[i].TraceID
 
@@ -192,7 +197,7 @@ func (l *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, r *http
 		// empty traces or we remove everything
 		if len(toRemove) == len(t) {
 			tdropped++
-			continue
+			continue Traces
 		}
 
 		for _, idx := range toRemove {
