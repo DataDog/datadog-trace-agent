@@ -86,13 +86,13 @@ func main() {
 
 	// Instantiate the config
 	var agentConf *config.AgentConfig
+	var err error
 
 	// tolerate errors in reading the config files. some setups will use only environment variables
 	// which is OK
 	legacyConf, _ := config.New(opts.configFile)
 	conf, _ := config.New(opts.ddConfigFile)
-
-	agentConf, err := config.NewAgentConfig(conf, legacyConf)
+	agentConf, err = config.NewAgentConfig(conf, legacyConf)
 	if err != nil {
 		panic(err)
 	}

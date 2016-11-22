@@ -8,6 +8,7 @@ import (
 	"time"
 
 	log "github.com/cihub/seelog"
+	"gopkg.in/ini.v1"
 )
 
 // AgentConfig handles the interpretation of the configuration (with default
@@ -124,9 +125,15 @@ func NewDefaultAgentConfig() *AgentConfig {
 // NewAgentConfig creates the AgentConfig from the standard config
 func NewAgentConfig(conf *File, legacyConf *File) (*AgentConfig, error) {
 	c := NewDefaultAgentConfig()
+	var m *ini.Section
+	var err error
+
+	if conf == nil {
+		goto APM_CONF
+	}
 
 	// Inherit all relevant config from dd-agent
-	m, err := conf.GetSection("Main")
+	m, err = conf.GetSection("Main")
 	if err == nil {
 		if v := m.Key("hostname").MustString(""); v != "" {
 			c.HostName = v
@@ -153,10 +160,15 @@ func NewAgentConfig(conf *File, legacyConf *File) (*AgentConfig, error) {
 		}
 	}
 
+APM_CONF:
 	// When available inherit APM specific config
 	if legacyConf != nil {
 		// try to use the legacy config file passed via `-configfile`
 		conf = legacyConf
+	}
+
+	if conf == nil {
+		goto ENV_CONF
 	}
 
 	if v, _ := conf.Get("trace.api", "api_key"); v != "" {
@@ -208,10 +220,15 @@ func NewAgentConfig(conf *File, legacyConf *File) (*AgentConfig, error) {
 		c.ConnectionLimit = v
 	}
 
+ENV_CONF:
 	// environment variables have precedence among defaults and the config file
 	mergeEnv(c)
 
 	// check for api-endpoint parity after all possible overrides have been applied
+	if len(c.APIKeys) == 0 {
+		return c, errors.New("You must specify an API Key, either via a configuration file or the DD_API_KEY env var.")
+	}
+
 	if len(c.APIKeys) != len(c.APIEndpoints) {
 		return c, errors.New("every API key needs to have an explicit endpoint associated")
 	}

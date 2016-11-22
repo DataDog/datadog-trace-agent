@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"strings"
 
 	"github.com/stretchr/testify/assert"
@@ -35,6 +36,16 @@ func TestDefaultConfig(t *testing.T) {
 	assert.Equal(agentConfig.StatsdPort, 8125)
 
 	assert.Equal(agentConfig.LogLevel, "INFO")
+}
+
+func TestOnlyEnvConfig(t *testing.T) {
+	// setting an API Key should be enough to generate valid config
+	os.Setenv("DD_API_KEY", "apikey_from_env")
+
+	agentConfig, _ := NewAgentConfig(nil, nil)
+	assert.Equal(t, []string{"apikey_from_env"}, agentConfig.APIKeys)
+
+	os.Setenv("DD_API_KEY", "")
 }
 
 func TestOnlyDDAgentConfig(t *testing.T) {
