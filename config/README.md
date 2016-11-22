@@ -86,12 +86,12 @@ We allow overriding a subset of configuration values from the environment. These
 can be useful when running the agent in a Docker container or in other situations
 where env vars are preferrable to static files
 
-`DD_HOSTNAME` - overrides `[Main] hostname`
-`DD_API_KEY` - overrides `[Main] api_key`
-`DD_DOGSTATSD_PORT` - overrides `[Main] dogstatsd_port`
-`DD_BIND_HOST` - overrides `[Main] bind_host`
-`DD_LOG_LEVEL` - overrides `[Main] log_level`
-`DD_RECEIVER_PORT` - overrides `[trace.receiver] receiver_port`
+- `DD_HOSTNAME` - overrides `[Main] hostname`
+- `DD_API_KEY` - overrides `[Main] api_key`
+- `DD_DOGSTATSD_PORT` - overrides `[Main] dogstatsd_port`
+- `DD_BIND_HOST` - overrides `[Main] bind_host`
+- `DD_LOG_LEVEL` - overrides `[Main] log_level`
+- `DD_RECEIVER_PORT` - overrides `[trace.receiver] receiver_port`
 
 
 ## Logging
