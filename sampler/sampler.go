@@ -26,7 +26,7 @@ const (
 
 	// Sampler parameters not (yet?) configurable
 	defaultDecayPeriod          time.Duration = 30 * time.Second
-	defaultSignatureScoreOffset float64       = 5
+	defaultSignatureScoreOffset float64       = 1
 	defaultSignatureScoreSlope  float64       = 3
 )
 
