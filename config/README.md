@@ -1,13 +1,16 @@
-The trace-agent sources configuration from the following locations, in order of precedence (low to high):
+# Agent Configuration
 
-1. `-ddconfig` (default: `/etc/dd-agent/datadog.conf`)
-2. `-config` (DEPRECATED and UNDOCUMENTED) (default: `/etc/datadog/trace-agent.ini`)
-3. Environment variables: See full list below
+The trace-agent sources configuration from the following locations:
+
+1. The path pointed to by the `-ddconfig` command line flag (default: `/etc/dd-agent/datadog.conf`)
+2. Environment variables: See full list below
 
 
-Configuration specified in #3 will override configuration specified in #2 which in turn will override configuration specified in #1
+Configuration specified via environment variables will override configuration specified in `-ddconfig`
 
 ## Classic configuration values, and how the trace-agent treats them
+Note that changing these will also change the behavior of the `datadog-agent` running on the same host.
+
 In the file pointed to by `-ddconfig`
 
 ```
@@ -37,45 +40,21 @@ log_level = INFO
 In the file pointed to by `-ddconfig`
 
 ```
-###################################################
-# Agent concentrator - stats aggregation
-###################################################
-[trace.concentrator]
-# The size of the buckets we concentrate the spans in
-bucket_size_seconds=5
-
-# The oldest span we accept in the intake before flushing
-# and dropping late spans
-oldest_span_cutoff_seconds=30
-
-# Add another dimension to the aggregate stats grain
-# the concentrator produces, these keys will be
-# extracted as tags from the meta dict of spans
-# extra_aggregators=
-
-
-###################################################
-# Agent sampler - what spans we keep? config
-###################################################
 [trace.sampler]
 # Extra global sample rate to apply on all the traces
 # This sample rate is combined to the sample rate from the sampler logic, still promoting interesting traces
 # From 1 (no extra rate) to 0 (don't sample at all)
-# extra_sample_rate=1
+extra_sample_rate=1
 
 # Maximum number of traces per second to sample.
 # The limit is applied over an average over a few minutes ; much bigger spikes are possible.
 # Set to 0 to disable the limit.
-# max_traces_per_second=10
+max_traces_per_second=10
 
-###################################################
-# Agent receiver - receives traces from our clients
-# and queues for processing
-###################################################
 [trace.receiver]
-# the port that the Receiver should listen
+# the port that the Receiver should listen on
 receiver_port=7777
-# how many unique connections to allow during one 30 second lease period
+# how many unique client connections to allow during one 30 second lease period
 connection_limit=2000
 
 ```
@@ -96,5 +75,5 @@ where env vars are preferrable to static files
 
 ## Logging
 Unlike dd-agent, the trace-agent does not configure it's own logging and relies on the process manager
-to redirect it's output. While standard installs (`deb`, `rpm`) will log output to `/var/log/datadog/trace-agent.log`,
-any non-standard install should attempt to handle STDOUT in a sane way
+to redirect it's output. While standard installs (`apt-get`, `yum`) will log output to `/var/log/datadog/trace-agent.log`,
+any non-standard install should attempt to handle STDERR in a sane way
