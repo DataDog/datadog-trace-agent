@@ -1,5 +1,4 @@
-#!/bin/sh
-
+#!/bin/bash
 set -e
 
 echo "Running dd-trace-agent post-install with arguments: $@ ..."
@@ -10,7 +9,7 @@ case "$1" in
             # use upstart if available
             set +e
             initctl reload-configuration
-            if [[ $? -ne 0 ]] ; then
+            if [ $? != 0 ] ; then
                 echo "Skipping upstart registration as this system does not support it by default"
 		exit 0
             fi
