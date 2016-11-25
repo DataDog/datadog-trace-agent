@@ -8,7 +8,13 @@ case "$1" in
         echo "Registering service dd-trace-agent"
         if command -v initctl > /dev/null 2>&1; then
             # use upstart if available
+            set +e
             initctl reload-configuration
+            if [[ $? -ne 0 ]] ; then
+                echo "Skipping upstart registration as this system does not support it by default"
+		exit 0
+            fi
+            set -e
         fi
 
         echo "Starting service dd-trace-agent"
