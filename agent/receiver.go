@@ -43,6 +43,7 @@ func initDecoder(contentType string, bodyBuffer io.Reader) Decoder {
 const (
 	v01 APIVersion = iota
 	v02
+	v03
 )
 
 func httpHandleWithVersion(v APIVersion, f func(APIVersion, http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
@@ -99,6 +100,10 @@ func (l *HTTPReceiver) Run() {
 	http.HandleFunc("/v0.2/traces", httpHandleWithVersion(v02, l.handleTraces))
 	http.HandleFunc("/v0.2/services", httpHandleWithVersion(v02, l.handleServices))
 
+	// v0.3 collector API
+	http.HandleFunc("/v0.3/traces", httpHandleWithVersion(v03, l.handleTraces))
+	http.HandleFunc("/v0.3/services", httpHandleWithVersion(v03, l.handleServices))
+
 	addr := fmt.Sprintf("%s:%d", l.conf.ReceiverHost, l.conf.ReceiverPort)
 	log.Infof("listening for traces at http://%s/", addr)
 
@@ -148,19 +153,25 @@ func (l *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, r *http
 	if err != nil {
 		return
 	}
-	bodyBuffer := bytes.NewReader(bodyBytes)
 
-	// select the right Decoder based on the given content-type header
+	bodyBuffer := bytes.NewReader(bodyBytes)
 	contentType := r.Header.Get("Content-Type")
-	dec := initDecoder(contentType, bodyBuffer)
 
 	var traces []model.Trace
 	mTags := []string{"handler:traces", fmt.Sprintf("v:%d", v)}
 
 	switch v {
 	case v01:
+		// v01 should support only json format; raise 'Unsupported Media Type'
+		if contentType != "application/json" && contentType != "" {
+			log.Errorf("found '%s'; unsupported media type", contentType)
+			HTTPErrorAndLog(w, 415, "decoding-error", err, mTags)
+			return
+		}
+
 		// in v01 we actually get spans that we have to transform in traces
 		var spans []model.Span
+		dec := json.NewDecoder(bodyBuffer)
 		err := dec.Decode(&spans)
 		if err != nil {
 			log.Error(model.HumanReadableJSONError(bodyBuffer, err))
@@ -175,10 +186,28 @@ func (l *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, r *http
 		for _, t := range byID {
 			traces = append(traces, t)
 		}
-
 	case v02:
+		// v02 should support only json format; raise 'Unsupported Media Type'
+		if contentType != "application/json" && contentType != "" {
+			log.Error("Found %s; unsupported media type", contentType)
+			HTTPErrorAndLog(w, 415, "decoding-error", err, mTags)
+			return
+		}
+
+		dec := json.NewDecoder(bodyBuffer)
 		err := dec.Decode(&traces)
 		if err != nil {
+			log.Error(model.HumanReadableJSONError(bodyBuffer, err))
+			HTTPErrorAndLog(w, 500, "decoding-error", err, mTags)
+			return
+		}
+	case v03:
+		// select the right Decoder based on the given content-type header
+		dec := initDecoder(contentType, bodyBuffer)
+		err := dec.Decode(&traces)
+		if err != nil {
+			// TODO[manu]: provide the right error handler;
+			// this will not work for msgpack decoding
 			log.Error(model.HumanReadableJSONError(bodyBuffer, err))
 			HTTPErrorAndLog(w, 500, "decoding-error", err, mTags)
 			return
@@ -254,19 +283,40 @@ func (l *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, r *ht
 	if err != nil {
 		return
 	}
-	bodyBuffer := bytes.NewReader(bodyBytes)
 
-	// select the right Decoder based on the given content-type header
-	contentType := r.Header.Get("Content-Type")
-	dec := initDecoder(contentType, bodyBuffer)
-
-	mTags := []string{"handler:services"}
 	var servicesMeta model.ServicesMetadata
-	err = dec.Decode(&servicesMeta)
-	if err != nil {
-		log.Error(model.HumanReadableJSONError(bodyBuffer, err))
-		HTTPErrorAndLog(w, 500, "decoding-error", err, mTags)
-		return
+	bodyBuffer := bytes.NewReader(bodyBytes)
+	contentType := r.Header.Get("Content-Type")
+	mTags := []string{"handler:services"}
+
+	switch v {
+	case v01:
+		// v01 should behave like v02
+		fallthrough
+	case v02:
+		// v02 should support only json format; raise 'Unsupported Media Type'
+		if contentType != "application/json" && contentType != "" {
+			log.Error("Found %s; unsupported media type", contentType)
+			HTTPErrorAndLog(w, 415, "decoding-error", err, mTags)
+			return
+		}
+
+		dec := json.NewDecoder(bodyBuffer)
+		err = dec.Decode(&servicesMeta)
+		if err != nil {
+			log.Error(model.HumanReadableJSONError(bodyBuffer, err))
+			HTTPErrorAndLog(w, 500, "decoding-error", err, mTags)
+			return
+		}
+	case v03:
+		// select the right Decoder based on the given content-type header
+		dec := initDecoder(contentType, bodyBuffer)
+		err = dec.Decode(&servicesMeta)
+		if err != nil {
+			log.Error(model.HumanReadableJSONError(bodyBuffer, err))
+			HTTPErrorAndLog(w, 500, "decoding-error", err, mTags)
+			return
+		}
 	}
 
 	statsd.Client.Count("trace_agent.receiver.service", int64(len(servicesMeta)), nil, 1)
