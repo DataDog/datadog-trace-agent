@@ -1,24 +1,30 @@
 #!/bin/sh
-
 set -e
 
 echo "Running dd-trace-agent post-install with arguments: $@ ..."
+upstart_success=0
+
 case "$1" in
     configure)
         echo "Registering service dd-trace-agent"
         if command -v initctl > /dev/null 2>&1; then
             # use upstart if available
-            initctl reload-configuration
-        fi
-
-        echo "Starting service dd-trace-agent"
-        if command -v start > /dev/null 2>&1; then
             set +e
-            stop dd-trace-agent
-            start dd-trace-agent
+            initctl reload-configuration
+            upstart_success=$?
+            if [ "$upstart_success" -ne 0 ] ; then
+                echo "Skipping upstart registration as this system does not support it by default"
+            fi
             set -e
-            echo "Post-install done"
-            exit 0
+        fi
+        if [ "$upstart_success" -eq 0 ] ; then
+            if command -v start > /dev/null 2>&1; then
+                echo "Starting service dd-trace-agent"
+                set +e
+                stop dd-trace-agent
+                start dd-trace-agent
+                set -e
+            fi
         fi
         ;;
 esac

@@ -2,14 +2,19 @@
 
 echo "Running dd-trace-agent pre-remove with arguments $@ ..."
 if command -v stop >/dev/null 2>&1; then
+    echo "Trying to stop dd-trace-agent with upstart"
     stop dd-trace-agent || true
-elif command -v invoke-rc.d >/dev/null 2>&1; then
+fi
+
+if command -v invoke-rc.d >/dev/null 2>&1; then
+    echo "Trying to disable dd-trace-agent with invoke-rc.d"
     invoke-rc.d dd-trace-agent stop || true
 
     # Removing the service form startup (since it's not there anymore)
     update-rc.d -f dd-trace-agent disable >/dev/null 2>&1
     update-rc.d -f dd-trace-agent remove
 else
+    echo "Trying to stop dd-trace-agent with init.d"
     /etc/init.d/dd-trace-agent stop || true
 fi
 
