@@ -116,6 +116,8 @@ func TestReceiverJSONDecoder(t *testing.T) {
 		{NewHTTPReceiver(config), v03, "", getTestTrace(1, 1)},
 		{NewHTTPReceiver(config), v02, "application/json", getTestTrace(1, 1)},
 		{NewHTTPReceiver(config), v03, "application/json", getTestTrace(1, 1)},
+		{NewHTTPReceiver(config), v02, "text/json", getTestTrace(1, 1)},
+		{NewHTTPReceiver(config), v03, "text/json", getTestTrace(1, 1)},
 	}
 
 	for _, tc := range testCases {
@@ -171,6 +173,7 @@ func TestReceiverMsgpackDecoder(t *testing.T) {
 		contentType string
 		traces      []model.Trace
 	}{
+		{NewHTTPReceiver(config), v01, "application/msgpack", getTestTrace(1, 1)},
 		{NewHTTPReceiver(config), v02, "application/msgpack", getTestTrace(1, 1)},
 		{NewHTTPReceiver(config), v03, "application/msgpack", getTestTrace(1, 1)},
 	}
@@ -196,6 +199,8 @@ func TestReceiverMsgpackDecoder(t *testing.T) {
 			assert.Nil(err)
 
 			switch tc.apiVersion {
+			case v01:
+				assert.Equal(415, resp.StatusCode)
 			case v02:
 				assert.Equal(415, resp.StatusCode)
 			case v03:
@@ -239,6 +244,9 @@ func TestReceiverServiceJSONDecoder(t *testing.T) {
 		{NewHTTPReceiver(config), v01, "application/json"},
 		{NewHTTPReceiver(config), v02, "application/json"},
 		{NewHTTPReceiver(config), v03, "application/json"},
+		{NewHTTPReceiver(config), v01, "text/json"},
+		{NewHTTPReceiver(config), v02, "text/json"},
+		{NewHTTPReceiver(config), v03, "text/json"},
 	}
 
 	for _, tc := range testCases {

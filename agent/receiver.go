@@ -163,7 +163,7 @@ func (l *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, r *http
 	switch v {
 	case v01:
 		// v01 should support only json format; raise 'Unsupported Media Type'
-		if contentType != "application/json" && contentType != "" {
+		if contentType != "application/json" && contentType != "text/json" && contentType != "" {
 			log.Errorf("found '%s'; unsupported media type", contentType)
 			HTTPErrorAndLog(w, 415, "decoding-error", err, mTags)
 			return
@@ -188,7 +188,7 @@ func (l *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, r *http
 		}
 	case v02:
 		// v02 should support only json format; raise 'Unsupported Media Type'
-		if contentType != "application/json" && contentType != "" {
+		if contentType != "application/json" && contentType != "text/json" && contentType != "" {
 			log.Errorf("Found %s; unsupported media type", contentType)
 			HTTPErrorAndLog(w, 415, "decoding-error", err, mTags)
 			return
@@ -298,7 +298,7 @@ func (l *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, r *ht
 		fallthrough
 	case v02:
 		// v02 should support only json format; raise 'Unsupported Media Type'
-		if contentType != "application/json" && contentType != "" {
+		if contentType != "application/json" && contentType != "text/json" && contentType != "" {
 			log.Errorf("Found %s; unsupported media type", contentType)
 			HTTPErrorAndLog(w, 415, "decoding-error", err, mTags)
 			return
