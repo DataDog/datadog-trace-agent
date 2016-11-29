@@ -189,7 +189,7 @@ func (l *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, r *http
 	case v02:
 		// v02 should support only json format; raise 'Unsupported Media Type'
 		if contentType != "application/json" && contentType != "" {
-			log.Error("Found %s; unsupported media type", contentType)
+			log.Errorf("Found %s; unsupported media type", contentType)
 			HTTPErrorAndLog(w, 415, "decoding-error", err, mTags)
 			return
 		}
@@ -212,6 +212,9 @@ func (l *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, r *http
 			HTTPErrorAndLog(w, 500, "decoding-error", err, mTags)
 			return
 		}
+	default:
+		log.Error("This endpoint is not supported")
+		HTTPErrorAndLog(w, 500, "unsupported-endpoint", err, mTags)
 	}
 
 	HTTPOK(w, mTags)
@@ -296,7 +299,7 @@ func (l *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, r *ht
 	case v02:
 		// v02 should support only json format; raise 'Unsupported Media Type'
 		if contentType != "application/json" && contentType != "" {
-			log.Error("Found %s; unsupported media type", contentType)
+			log.Errorf("Found %s; unsupported media type", contentType)
 			HTTPErrorAndLog(w, 415, "decoding-error", err, mTags)
 			return
 		}
@@ -317,6 +320,9 @@ func (l *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, r *ht
 			HTTPErrorAndLog(w, 500, "decoding-error", err, mTags)
 			return
 		}
+	default:
+		log.Error("This endpoint is not supported")
+		HTTPErrorAndLog(w, 500, "unsupported-endpoint", err, mTags)
 	}
 
 	statsd.Client.Count("trace_agent.receiver.service", int64(len(servicesMeta)), nil, 1)

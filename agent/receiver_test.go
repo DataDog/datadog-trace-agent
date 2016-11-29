@@ -47,7 +47,7 @@ func getTestTrace(traceN, size int) []model.Trace {
 	return traces
 }
 
-func TestReceiverJSONDecoder(t *testing.T) {
+func TestLegacyReceiver(t *testing.T) {
 	// testing traces without content-type in agent endpoints, it should use JSON decoding
 	assert := assert.New(t)
 	config := config.NewDefaultAgentConfig()
@@ -55,11 +55,10 @@ func TestReceiverJSONDecoder(t *testing.T) {
 		r           *HTTPReceiver
 		apiVersion  APIVersion
 		contentType string
+		traces      model.Trace
 	}{
-		{NewHTTPReceiver(config), v02, ""},
-		{NewHTTPReceiver(config), v02, "application/json"},
-		{NewHTTPReceiver(config), v03, ""},
-		{NewHTTPReceiver(config), v03, "application/json"},
+		{NewHTTPReceiver(config), v01, "", model.Trace{getTestSpan()}},
+		{NewHTTPReceiver(config), v01, "application/json", model.Trace{getTestSpan()}},
 	}
 
 	for _, tc := range testCases {
@@ -70,8 +69,64 @@ func TestReceiverJSONDecoder(t *testing.T) {
 			)
 
 			// send traces to that endpoint without a content-type
-			traces := getTestTrace(1, 1)
-			data, err := json.Marshal(traces)
+			data, err := json.Marshal(tc.traces)
+			assert.Nil(err)
+			req, err := http.NewRequest("POST", server.URL, bytes.NewBuffer(data))
+			assert.Nil(err)
+			req.Header.Set("Content-Type", tc.contentType)
+
+			client := &http.Client{}
+			resp, err := client.Do(req)
+			assert.Nil(err)
+			assert.Equal(200, resp.StatusCode)
+
+			// now we should be able to read the trace data
+			select {
+			case rt := <-tc.r.traces:
+				assert.Len(rt, 1)
+				span := rt[0]
+				assert.Equal(uint64(42), span.TraceID)
+				assert.Equal(uint64(52), span.SpanID)
+				assert.Equal("fennel_is_amazing", span.Service)
+				assert.Equal("something_that_should_be_a_metric", span.Name)
+				assert.Equal("NOT touched because it is going to be hashed", span.Resource)
+				assert.Equal("192.168.0.1", span.Meta["http.host"])
+				assert.Equal(41.99, span.Metrics["http.monitor"])
+			default:
+				t.Fatalf("no data received")
+			}
+
+			resp.Body.Close()
+			server.Close()
+		})
+	}
+}
+
+func TestReceiverJSONDecoder(t *testing.T) {
+	// testing traces without content-type in agent endpoints, it should use JSON decoding
+	assert := assert.New(t)
+	config := config.NewDefaultAgentConfig()
+	testCases := []struct {
+		r           *HTTPReceiver
+		apiVersion  APIVersion
+		contentType string
+		traces      []model.Trace
+	}{
+		{NewHTTPReceiver(config), v02, "", getTestTrace(1, 1)},
+		{NewHTTPReceiver(config), v03, "", getTestTrace(1, 1)},
+		{NewHTTPReceiver(config), v02, "application/json", getTestTrace(1, 1)},
+		{NewHTTPReceiver(config), v03, "application/json", getTestTrace(1, 1)},
+	}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("%s with content-type %s", tc.apiVersion, tc.contentType), func(t *testing.T) {
+			// start testing server
+			server := httptest.NewServer(
+				http.HandlerFunc(httpHandleWithVersion(tc.apiVersion, tc.r.handleTraces)),
+			)
+
+			// send traces to that endpoint without a content-type
+			data, err := json.Marshal(tc.traces)
 			assert.Nil(err)
 			req, err := http.NewRequest("POST", server.URL, bytes.NewBuffer(data))
 			assert.Nil(err)
@@ -114,9 +169,10 @@ func TestReceiverMsgpackDecoder(t *testing.T) {
 		r           *HTTPReceiver
 		apiVersion  APIVersion
 		contentType string
+		traces      []model.Trace
 	}{
-		{NewHTTPReceiver(config), v02, "application/msgpack"},
-		{NewHTTPReceiver(config), v03, "application/msgpack"},
+		{NewHTTPReceiver(config), v02, "application/msgpack", getTestTrace(1, 1)},
+		{NewHTTPReceiver(config), v03, "application/msgpack", getTestTrace(1, 1)},
 	}
 
 	for _, tc := range testCases {
@@ -127,10 +183,9 @@ func TestReceiverMsgpackDecoder(t *testing.T) {
 			)
 
 			// send traces to that endpoint using the msgpack content-type
-			traces := getTestTrace(1, 1)
 			var data []byte
 			enc := codec.NewEncoderBytes(&data, &mh)
-			err := enc.Encode(traces)
+			err := enc.Encode(tc.traces)
 			assert.Nil(err)
 			req, err := http.NewRequest("POST", server.URL, bytes.NewBuffer(data))
 			assert.Nil(err)
@@ -178,9 +233,11 @@ func TestReceiverServiceJSONDecoder(t *testing.T) {
 		apiVersion  APIVersion
 		contentType string
 	}{
+		{NewHTTPReceiver(config), v01, ""},
 		{NewHTTPReceiver(config), v02, ""},
-		{NewHTTPReceiver(config), v02, "application/json"},
 		{NewHTTPReceiver(config), v03, ""},
+		{NewHTTPReceiver(config), v01, "application/json"},
+		{NewHTTPReceiver(config), v02, "application/json"},
 		{NewHTTPReceiver(config), v03, "application/json"},
 	}
 
@@ -244,6 +301,7 @@ func TestReceiverServiceMsgpackDecoder(t *testing.T) {
 		apiVersion  APIVersion
 		contentType string
 	}{
+		{NewHTTPReceiver(config), v01, "application/msgpack"},
 		{NewHTTPReceiver(config), v02, "application/msgpack"},
 		{NewHTTPReceiver(config), v03, "application/msgpack"},
 	}
@@ -281,6 +339,8 @@ func TestReceiverServiceMsgpackDecoder(t *testing.T) {
 			assert.Nil(err)
 
 			switch tc.apiVersion {
+			case v01:
+				assert.Equal(415, resp.StatusCode)
 			case v02:
 				assert.Equal(415, resp.StatusCode)
 			case v03:
