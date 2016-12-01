@@ -52,17 +52,18 @@ func TestLegacyReceiver(t *testing.T) {
 	assert := assert.New(t)
 	config := config.NewDefaultAgentConfig()
 	testCases := []struct {
+		name        string
 		r           *HTTPReceiver
 		apiVersion  APIVersion
 		contentType string
 		traces      model.Trace
 	}{
-		{NewHTTPReceiver(config), v01, "", model.Trace{getTestSpan()}},
-		{NewHTTPReceiver(config), v01, "application/json", model.Trace{getTestSpan()}},
+		{"v01 with empty content-type", NewHTTPReceiver(config), v01, "", model.Trace{getTestSpan()}},
+		{"v01 with application/json", NewHTTPReceiver(config), v01, "application/json", model.Trace{getTestSpan()}},
 	}
 
 	for _, tc := range testCases {
-		t.Run(fmt.Sprintf("%s with content-type %s", tc.apiVersion, tc.contentType), func(t *testing.T) {
+		t.Run(fmt.Sprintf(tc.name), func(t *testing.T) {
 			// start testing server
 			server := httptest.NewServer(
 				http.HandlerFunc(httpHandleWithVersion(tc.apiVersion, tc.r.handleTraces)),
@@ -107,21 +108,22 @@ func TestReceiverJSONDecoder(t *testing.T) {
 	assert := assert.New(t)
 	config := config.NewDefaultAgentConfig()
 	testCases := []struct {
+		name        string
 		r           *HTTPReceiver
 		apiVersion  APIVersion
 		contentType string
 		traces      []model.Trace
 	}{
-		{NewHTTPReceiver(config), v02, "", getTestTrace(1, 1)},
-		{NewHTTPReceiver(config), v03, "", getTestTrace(1, 1)},
-		{NewHTTPReceiver(config), v02, "application/json", getTestTrace(1, 1)},
-		{NewHTTPReceiver(config), v03, "application/json", getTestTrace(1, 1)},
-		{NewHTTPReceiver(config), v02, "text/json", getTestTrace(1, 1)},
-		{NewHTTPReceiver(config), v03, "text/json", getTestTrace(1, 1)},
+		{"v02 with empty content-type", NewHTTPReceiver(config), v02, "", getTestTrace(1, 1)},
+		{"v03 with empty content-type", NewHTTPReceiver(config), v03, "", getTestTrace(1, 1)},
+		{"v02 with application/json", NewHTTPReceiver(config), v02, "application/json", getTestTrace(1, 1)},
+		{"v03 with application/json", NewHTTPReceiver(config), v03, "application/json", getTestTrace(1, 1)},
+		{"v02 with text/json", NewHTTPReceiver(config), v02, "text/json", getTestTrace(1, 1)},
+		{"v03 with text/json", NewHTTPReceiver(config), v03, "text/json", getTestTrace(1, 1)},
 	}
 
 	for _, tc := range testCases {
-		t.Run(fmt.Sprintf("%s with content-type %s", tc.apiVersion, tc.contentType), func(t *testing.T) {
+		t.Run(fmt.Sprintf(tc.name), func(t *testing.T) {
 			// start testing server
 			server := httptest.NewServer(
 				http.HandlerFunc(httpHandleWithVersion(tc.apiVersion, tc.r.handleTraces)),
@@ -168,18 +170,19 @@ func TestReceiverMsgpackDecoder(t *testing.T) {
 	assert := assert.New(t)
 	config := config.NewDefaultAgentConfig()
 	testCases := []struct {
+		name        string
 		r           *HTTPReceiver
 		apiVersion  APIVersion
 		contentType string
 		traces      []model.Trace
 	}{
-		{NewHTTPReceiver(config), v01, "application/msgpack", getTestTrace(1, 1)},
-		{NewHTTPReceiver(config), v02, "application/msgpack", getTestTrace(1, 1)},
-		{NewHTTPReceiver(config), v03, "application/msgpack", getTestTrace(1, 1)},
+		{"v01 with application/msgpack", NewHTTPReceiver(config), v01, "application/msgpack", getTestTrace(1, 1)},
+		{"v02 with application/msgpack", NewHTTPReceiver(config), v02, "application/msgpack", getTestTrace(1, 1)},
+		{"v03 with application/msgpack", NewHTTPReceiver(config), v03, "application/msgpack", getTestTrace(1, 1)},
 	}
 
 	for _, tc := range testCases {
-		t.Run(fmt.Sprintf("%s with content-type %s", tc.apiVersion, tc.contentType), func(t *testing.T) {
+		t.Run(fmt.Sprintf(tc.name), func(t *testing.T) {
 			// start testing server
 			server := httptest.NewServer(
 				http.HandlerFunc(httpHandleWithVersion(tc.apiVersion, tc.r.handleTraces)),
@@ -234,23 +237,24 @@ func TestReceiverServiceJSONDecoder(t *testing.T) {
 	assert := assert.New(t)
 	config := config.NewDefaultAgentConfig()
 	testCases := []struct {
+		name        string
 		r           *HTTPReceiver
 		apiVersion  APIVersion
 		contentType string
 	}{
-		{NewHTTPReceiver(config), v01, ""},
-		{NewHTTPReceiver(config), v02, ""},
-		{NewHTTPReceiver(config), v03, ""},
-		{NewHTTPReceiver(config), v01, "application/json"},
-		{NewHTTPReceiver(config), v02, "application/json"},
-		{NewHTTPReceiver(config), v03, "application/json"},
-		{NewHTTPReceiver(config), v01, "text/json"},
-		{NewHTTPReceiver(config), v02, "text/json"},
-		{NewHTTPReceiver(config), v03, "text/json"},
+		{"v01 with empty content-type", NewHTTPReceiver(config), v01, ""},
+		{"v02 with empty content-type", NewHTTPReceiver(config), v02, ""},
+		{"v03 with empty content-type", NewHTTPReceiver(config), v03, ""},
+		{"v01 with application/json", NewHTTPReceiver(config), v01, "application/json"},
+		{"v02 with application/json", NewHTTPReceiver(config), v02, "application/json"},
+		{"v03 with application/json", NewHTTPReceiver(config), v03, "application/json"},
+		{"v01 with text/json", NewHTTPReceiver(config), v01, "text/json"},
+		{"v02 with text/json", NewHTTPReceiver(config), v02, "text/json"},
+		{"v03 with text/json", NewHTTPReceiver(config), v03, "text/json"},
 	}
 
 	for _, tc := range testCases {
-		t.Run(fmt.Sprintf("%s with content-type %s", tc.apiVersion, tc.contentType), func(t *testing.T) {
+		t.Run(fmt.Sprintf(tc.name), func(t *testing.T) {
 			// start testing server
 			server := httptest.NewServer(
 				http.HandlerFunc(httpHandleWithVersion(tc.apiVersion, tc.r.handleServices)),
@@ -305,17 +309,18 @@ func TestReceiverServiceMsgpackDecoder(t *testing.T) {
 	assert := assert.New(t)
 	config := config.NewDefaultAgentConfig()
 	testCases := []struct {
+		name        string
 		r           *HTTPReceiver
 		apiVersion  APIVersion
 		contentType string
 	}{
-		{NewHTTPReceiver(config), v01, "application/msgpack"},
-		{NewHTTPReceiver(config), v02, "application/msgpack"},
-		{NewHTTPReceiver(config), v03, "application/msgpack"},
+		{"v01 with application/msgpack", NewHTTPReceiver(config), v01, "application/msgpack"},
+		{"v02 with application/msgpack", NewHTTPReceiver(config), v02, "application/msgpack"},
+		{"v03 with application/msgpack", NewHTTPReceiver(config), v03, "application/msgpack"},
 	}
 
 	for _, tc := range testCases {
-		t.Run(fmt.Sprintf("%s with content-type %s", tc.apiVersion, tc.contentType), func(t *testing.T) {
+		t.Run(fmt.Sprintf(tc.name), func(t *testing.T) {
 			// start testing server
 			server := httptest.NewServer(
 				http.HandlerFunc(httpHandleWithVersion(tc.apiVersion, tc.r.handleServices)),
