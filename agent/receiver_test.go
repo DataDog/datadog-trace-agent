@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -46,231 +47,334 @@ func getTestTrace(traceN, size int) []model.Trace {
 	return traces
 }
 
-func TestReceiverTraces(t *testing.T) {
+func TestLegacyReceiver(t *testing.T) {
+	// testing traces without content-type in agent endpoints, it should use JSON decoding
 	assert := assert.New(t)
+	config := config.NewDefaultAgentConfig()
+	testCases := []struct {
+		name        string
+		r           *HTTPReceiver
+		apiVersion  APIVersion
+		contentType string
+		traces      model.Trace
+	}{
+		{"v01 with empty content-type", NewHTTPReceiver(config), v01, "", model.Trace{getTestSpan()}},
+		{"v01 with application/json", NewHTTPReceiver(config), v01, "application/json", model.Trace{getTestSpan()}},
+	}
 
-	// start testing server
-	r := NewHTTPReceiver(config.NewDefaultAgentConfig())
-	server := httptest.NewServer(
-		http.HandlerFunc(httpHandleWithVersion(v02, r.handleTraces)),
-	)
-	defer server.Close()
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf(tc.name), func(t *testing.T) {
+			// start testing server
+			server := httptest.NewServer(
+				http.HandlerFunc(httpHandleWithVersion(tc.apiVersion, tc.r.handleTraces)),
+			)
 
-	// send traces to that endpoint without a content-type
-	traces := getTestTrace(1, 1)
-	data, err := json.Marshal(traces)
-	assert.Nil(err)
-	req, err := http.NewRequest("POST", server.URL, bytes.NewBuffer(data))
-	assert.Nil(err)
+			// send traces to that endpoint without a content-type
+			data, err := json.Marshal(tc.traces)
+			assert.Nil(err)
+			req, err := http.NewRequest("POST", server.URL, bytes.NewBuffer(data))
+			assert.Nil(err)
+			req.Header.Set("Content-Type", tc.contentType)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	assert.Nil(err)
-	assert.Equal(200, resp.StatusCode)
+			client := &http.Client{}
+			resp, err := client.Do(req)
+			assert.Nil(err)
+			assert.Equal(200, resp.StatusCode)
 
-	defer resp.Body.Close()
+			// now we should be able to read the trace data
+			select {
+			case rt := <-tc.r.traces:
+				assert.Len(rt, 1)
+				span := rt[0]
+				assert.Equal(uint64(42), span.TraceID)
+				assert.Equal(uint64(52), span.SpanID)
+				assert.Equal("fennel_is_amazing", span.Service)
+				assert.Equal("something_that_should_be_a_metric", span.Name)
+				assert.Equal("NOT touched because it is going to be hashed", span.Resource)
+				assert.Equal("192.168.0.1", span.Meta["http.host"])
+				assert.Equal(41.99, span.Metrics["http.monitor"])
+			default:
+				t.Fatalf("no data received")
+			}
 
-	// now we should be able to read the trace data
-	select {
-	case rt := <-r.traces:
-		assert.Len(rt, 1)
-		span := rt[0]
-		assert.Equal(uint64(42), span.TraceID)
-		assert.Equal(uint64(52), span.SpanID)
-		assert.Equal("fennel_is_amazing", span.Service)
-		assert.Equal("something_that_should_be_a_metric", span.Name)
-		assert.Equal("NOT touched because it is going to be hashed", span.Resource)
-		assert.Equal("192.168.0.1", span.Meta["http.host"])
-		assert.Equal(41.99, span.Metrics["http.monitor"])
-	default:
-		t.Fatalf("no data received")
+			resp.Body.Close()
+			server.Close()
+		})
 	}
 }
 
-func TestReceiverTracesJSON(t *testing.T) {
+func TestReceiverJSONDecoder(t *testing.T) {
+	// testing traces without content-type in agent endpoints, it should use JSON decoding
 	assert := assert.New(t)
+	config := config.NewDefaultAgentConfig()
+	testCases := []struct {
+		name        string
+		r           *HTTPReceiver
+		apiVersion  APIVersion
+		contentType string
+		traces      []model.Trace
+	}{
+		{"v02 with empty content-type", NewHTTPReceiver(config), v02, "", getTestTrace(1, 1)},
+		{"v03 with empty content-type", NewHTTPReceiver(config), v03, "", getTestTrace(1, 1)},
+		{"v02 with application/json", NewHTTPReceiver(config), v02, "application/json", getTestTrace(1, 1)},
+		{"v03 with application/json", NewHTTPReceiver(config), v03, "application/json", getTestTrace(1, 1)},
+		{"v02 with text/json", NewHTTPReceiver(config), v02, "text/json", getTestTrace(1, 1)},
+		{"v03 with text/json", NewHTTPReceiver(config), v03, "text/json", getTestTrace(1, 1)},
+	}
 
-	// start testing server
-	r := NewHTTPReceiver(config.NewDefaultAgentConfig())
-	server := httptest.NewServer(
-		http.HandlerFunc(httpHandleWithVersion(v02, r.handleTraces)),
-	)
-	defer server.Close()
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf(tc.name), func(t *testing.T) {
+			// start testing server
+			server := httptest.NewServer(
+				http.HandlerFunc(httpHandleWithVersion(tc.apiVersion, tc.r.handleTraces)),
+			)
 
-	// send traces to that endpoint using the JSON content-type
-	traces := getTestTrace(1, 1)
-	data, err := json.Marshal(traces)
-	assert.Nil(err)
-	req, err := http.NewRequest("POST", server.URL, bytes.NewBuffer(data))
-	assert.Nil(err)
-	req.Header.Set("Content-Type", "application/json")
+			// send traces to that endpoint without a content-type
+			data, err := json.Marshal(tc.traces)
+			assert.Nil(err)
+			req, err := http.NewRequest("POST", server.URL, bytes.NewBuffer(data))
+			assert.Nil(err)
+			req.Header.Set("Content-Type", tc.contentType)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	assert.Nil(err)
-	assert.Equal(200, resp.StatusCode)
+			client := &http.Client{}
+			resp, err := client.Do(req)
+			assert.Nil(err)
+			assert.Equal(200, resp.StatusCode)
 
-	defer resp.Body.Close()
+			// now we should be able to read the trace data
+			select {
+			case rt := <-tc.r.traces:
+				assert.Len(rt, 1)
+				span := rt[0]
+				assert.Equal(uint64(42), span.TraceID)
+				assert.Equal(uint64(52), span.SpanID)
+				assert.Equal("fennel_is_amazing", span.Service)
+				assert.Equal("something_that_should_be_a_metric", span.Name)
+				assert.Equal("NOT touched because it is going to be hashed", span.Resource)
+				assert.Equal("192.168.0.1", span.Meta["http.host"])
+				assert.Equal(41.99, span.Metrics["http.monitor"])
+			default:
+				t.Fatalf("no data received")
+			}
 
-	// now we should be able to read the trace data
-	select {
-	case rt := <-r.traces:
-		assert.Len(rt, 1)
-		span := rt[0]
-		assert.Equal(uint64(42), span.TraceID)
-		assert.Equal(uint64(52), span.SpanID)
-		assert.Equal("fennel_is_amazing", span.Service)
-		assert.Equal("something_that_should_be_a_metric", span.Name)
-		assert.Equal("NOT touched because it is going to be hashed", span.Resource)
-		assert.Equal("192.168.0.1", span.Meta["http.host"])
-		assert.Equal(41.99, span.Metrics["http.monitor"])
-	default:
-		t.Fatalf("no data received")
+			resp.Body.Close()
+			server.Close()
+		})
 	}
 }
 
-func TestReceiverTracesMsgpack(t *testing.T) {
-	assert := assert.New(t)
+func TestReceiverMsgpackDecoder(t *testing.T) {
+	// testing traces without content-type in agent endpoints, it should use Msgpack decoding
+	// or it should raise a 415 Unsupported media type
 	var mh codec.MsgpackHandle
+	assert := assert.New(t)
+	config := config.NewDefaultAgentConfig()
+	testCases := []struct {
+		name        string
+		r           *HTTPReceiver
+		apiVersion  APIVersion
+		contentType string
+		traces      []model.Trace
+	}{
+		{"v01 with application/msgpack", NewHTTPReceiver(config), v01, "application/msgpack", getTestTrace(1, 1)},
+		{"v02 with application/msgpack", NewHTTPReceiver(config), v02, "application/msgpack", getTestTrace(1, 1)},
+		{"v03 with application/msgpack", NewHTTPReceiver(config), v03, "application/msgpack", getTestTrace(1, 1)},
+	}
 
-	// start testing server
-	r := NewHTTPReceiver(config.NewDefaultAgentConfig())
-	server := httptest.NewServer(
-		http.HandlerFunc(httpHandleWithVersion(v02, r.handleTraces)),
-	)
-	defer server.Close()
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf(tc.name), func(t *testing.T) {
+			// start testing server
+			server := httptest.NewServer(
+				http.HandlerFunc(httpHandleWithVersion(tc.apiVersion, tc.r.handleTraces)),
+			)
 
-	// send traces to that endpoint using the msgpack content-type
-	traces := getTestTrace(1, 1)
-	var data []byte
-	enc := codec.NewEncoderBytes(&data, &mh)
-	err := enc.Encode(traces)
-	assert.Nil(err)
-	req, err := http.NewRequest("POST", server.URL, bytes.NewBuffer(data))
-	assert.Nil(err)
-	req.Header.Set("Content-Type", "application/msgpack")
+			// send traces to that endpoint using the msgpack content-type
+			var data []byte
+			enc := codec.NewEncoderBytes(&data, &mh)
+			err := enc.Encode(tc.traces)
+			assert.Nil(err)
+			req, err := http.NewRequest("POST", server.URL, bytes.NewBuffer(data))
+			assert.Nil(err)
+			req.Header.Set("Content-Type", tc.contentType)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	assert.Nil(err)
-	assert.Equal(200, resp.StatusCode)
+			client := &http.Client{}
+			resp, err := client.Do(req)
+			assert.Nil(err)
 
-	defer resp.Body.Close()
+			switch tc.apiVersion {
+			case v01:
+				assert.Equal(415, resp.StatusCode)
+			case v02:
+				assert.Equal(415, resp.StatusCode)
+			case v03:
+				assert.Equal(200, resp.StatusCode)
 
-	// now we should be able to read the trace data
-	select {
-	case rt := <-r.traces:
-		assert.Len(rt, 1)
-		span := rt[0]
-		assert.Equal(uint64(42), span.TraceID)
-		assert.Equal(uint64(52), span.SpanID)
-		assert.Equal("fennel_is_amazing", span.Service)
-		assert.Equal("something_that_should_be_a_metric", span.Name)
-		assert.Equal("NOT touched because it is going to be hashed", span.Resource)
-		assert.Equal("192.168.0.1", span.Meta["http.host"])
-		assert.Equal(41.99, span.Metrics["http.monitor"])
-	default:
-		t.Fatalf("no data received")
+				// now we should be able to read the trace data
+				select {
+				case rt := <-tc.r.traces:
+					assert.Len(rt, 1)
+					span := rt[0]
+					assert.Equal(uint64(42), span.TraceID)
+					assert.Equal(uint64(52), span.SpanID)
+					assert.Equal("fennel_is_amazing", span.Service)
+					assert.Equal("something_that_should_be_a_metric", span.Name)
+					assert.Equal("NOT touched because it is going to be hashed", span.Resource)
+					assert.Equal("192.168.0.1", span.Meta["http.host"])
+					assert.Equal(41.99, span.Metrics["http.monitor"])
+				default:
+					t.Fatalf("no data received")
+				}
+			}
+
+			resp.Body.Close()
+			server.Close()
+		})
 	}
 }
 
-func TestReceiverServiceJSON(t *testing.T) {
+func TestReceiverServiceJSONDecoder(t *testing.T) {
+	// testing traces without content-type in agent endpoints, it should use JSON decoding
 	assert := assert.New(t)
-
-	// start testing server
-	r := NewHTTPReceiver(config.NewDefaultAgentConfig())
-	server := httptest.NewServer(
-		http.HandlerFunc(httpHandleWithVersion(v02, r.handleServices)),
-	)
-	defer server.Close()
-
-	// send service to that endpoint using the JSON content-type
-	services := model.ServicesMetadata{
-		"backend": map[string]string{
-			"app":      "django",
-			"app_type": "web",
-		},
-		"database": map[string]string{
-			"app":      "postgres",
-			"app_type": "db",
-		},
+	config := config.NewDefaultAgentConfig()
+	testCases := []struct {
+		name        string
+		r           *HTTPReceiver
+		apiVersion  APIVersion
+		contentType string
+	}{
+		{"v01 with empty content-type", NewHTTPReceiver(config), v01, ""},
+		{"v02 with empty content-type", NewHTTPReceiver(config), v02, ""},
+		{"v03 with empty content-type", NewHTTPReceiver(config), v03, ""},
+		{"v01 with application/json", NewHTTPReceiver(config), v01, "application/json"},
+		{"v02 with application/json", NewHTTPReceiver(config), v02, "application/json"},
+		{"v03 with application/json", NewHTTPReceiver(config), v03, "application/json"},
+		{"v01 with text/json", NewHTTPReceiver(config), v01, "text/json"},
+		{"v02 with text/json", NewHTTPReceiver(config), v02, "text/json"},
+		{"v03 with text/json", NewHTTPReceiver(config), v03, "text/json"},
 	}
 
-	data, err := json.Marshal(services)
-	assert.Nil(err)
-	req, err := http.NewRequest("POST", server.URL, bytes.NewBuffer(data))
-	assert.Nil(err)
-	req.Header.Set("Content-Type", "application/json")
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf(tc.name), func(t *testing.T) {
+			// start testing server
+			server := httptest.NewServer(
+				http.HandlerFunc(httpHandleWithVersion(tc.apiVersion, tc.r.handleServices)),
+			)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	assert.Nil(err)
-	assert.Equal(200, resp.StatusCode)
+			// send service to that endpoint using the JSON content-type
+			services := model.ServicesMetadata{
+				"backend": map[string]string{
+					"app":      "django",
+					"app_type": "web",
+				},
+				"database": map[string]string{
+					"app":      "postgres",
+					"app_type": "db",
+				},
+			}
 
-	defer resp.Body.Close()
+			data, err := json.Marshal(services)
+			assert.Nil(err)
+			req, err := http.NewRequest("POST", server.URL, bytes.NewBuffer(data))
+			assert.Nil(err)
+			req.Header.Set("Content-Type", tc.contentType)
 
-	// now we should be able to read the trace data
-	select {
-	case rt := <-r.services:
-		assert.Len(rt, 2)
-		assert.Equal(rt["backend"]["app"], "django")
-		assert.Equal(rt["backend"]["app_type"], "web")
-		assert.Equal(rt["database"]["app"], "postgres")
-		assert.Equal(rt["database"]["app_type"], "db")
-	default:
-		t.Fatalf("no data received")
+			client := &http.Client{}
+			resp, err := client.Do(req)
+			assert.Nil(err)
+
+			assert.Equal(200, resp.StatusCode)
+
+			// now we should be able to read the trace data
+			select {
+			case rt := <-tc.r.services:
+				assert.Len(rt, 2)
+				assert.Equal(rt["backend"]["app"], "django")
+				assert.Equal(rt["backend"]["app_type"], "web")
+				assert.Equal(rt["database"]["app"], "postgres")
+				assert.Equal(rt["database"]["app_type"], "db")
+			default:
+				t.Fatalf("no data received")
+			}
+
+			resp.Body.Close()
+			server.Close()
+		})
 	}
 }
 
-func TestReceiverServiceMsgpack(t *testing.T) {
-	assert := assert.New(t)
+func TestReceiverServiceMsgpackDecoder(t *testing.T) {
+	// testing traces without content-type in agent endpoints, it should use Msgpack decoding
+	// or it should raise a 415 Unsupported media type
 	var mh codec.MsgpackHandle
-
-	// start testing server
-	r := NewHTTPReceiver(config.NewDefaultAgentConfig())
-	server := httptest.NewServer(
-		http.HandlerFunc(httpHandleWithVersion(v02, r.handleServices)),
-	)
-	defer server.Close()
-
-	// send service to that endpoint using the msgpack content-type
-	services := model.ServicesMetadata{
-		"backend": map[string]string{
-			"app":      "django",
-			"app_type": "web",
-		},
-		"database": map[string]string{
-			"app":      "postgres",
-			"app_type": "db",
-		},
+	assert := assert.New(t)
+	config := config.NewDefaultAgentConfig()
+	testCases := []struct {
+		name        string
+		r           *HTTPReceiver
+		apiVersion  APIVersion
+		contentType string
+	}{
+		{"v01 with application/msgpack", NewHTTPReceiver(config), v01, "application/msgpack"},
+		{"v02 with application/msgpack", NewHTTPReceiver(config), v02, "application/msgpack"},
+		{"v03 with application/msgpack", NewHTTPReceiver(config), v03, "application/msgpack"},
 	}
 
-	// send traces to that endpoint using the Msgpack content-type
-	var data []byte
-	enc := codec.NewEncoderBytes(&data, &mh)
-	err := enc.Encode(services)
-	assert.Nil(err)
-	req, err := http.NewRequest("POST", server.URL, bytes.NewBuffer(data))
-	assert.Nil(err)
-	req.Header.Set("Content-Type", "application/msgpack")
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf(tc.name), func(t *testing.T) {
+			// start testing server
+			server := httptest.NewServer(
+				http.HandlerFunc(httpHandleWithVersion(tc.apiVersion, tc.r.handleServices)),
+			)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	assert.Nil(err)
-	assert.Equal(200, resp.StatusCode)
+			// send service to that endpoint using the JSON content-type
+			services := model.ServicesMetadata{
+				"backend": map[string]string{
+					"app":      "django",
+					"app_type": "web",
+				},
+				"database": map[string]string{
+					"app":      "postgres",
+					"app_type": "db",
+				},
+			}
 
-	defer resp.Body.Close()
+			// send traces to that endpoint using the Msgpack content-type
+			var data []byte
+			enc := codec.NewEncoderBytes(&data, &mh)
+			err := enc.Encode(services)
+			assert.Nil(err)
+			req, err := http.NewRequest("POST", server.URL, bytes.NewBuffer(data))
+			assert.Nil(err)
+			req.Header.Set("Content-Type", tc.contentType)
 
-	// now we should be able to read the trace data
-	select {
-	case rt := <-r.services:
-		assert.Len(rt, 2)
-		assert.Equal(rt["backend"]["app"], "django")
-		assert.Equal(rt["backend"]["app_type"], "web")
-		assert.Equal(rt["database"]["app"], "postgres")
-		assert.Equal(rt["database"]["app_type"], "db")
-	default:
-		t.Fatalf("no data received")
+			client := &http.Client{}
+			resp, err := client.Do(req)
+			assert.Nil(err)
+
+			switch tc.apiVersion {
+			case v01:
+				assert.Equal(415, resp.StatusCode)
+			case v02:
+				assert.Equal(415, resp.StatusCode)
+			case v03:
+				assert.Equal(200, resp.StatusCode)
+
+				// now we should be able to read the trace data
+				select {
+				case rt := <-tc.r.services:
+					assert.Len(rt, 2)
+					assert.Equal(rt["backend"]["app"], "django")
+					assert.Equal(rt["backend"]["app_type"], "web")
+					assert.Equal(rt["database"]["app"], "postgres")
+					assert.Equal(rt["database"]["app_type"], "db")
+				default:
+					t.Fatalf("no data received")
+				}
+			}
+
+			resp.Body.Close()
+			server.Close()
+		})
 	}
 }
 
