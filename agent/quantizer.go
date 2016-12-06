@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/DataDog/raclette/model"
-	"github.com/DataDog/raclette/quantizer"
+	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/quantizer"
 )
 
 // Quantizer generates meaningul resource for spans

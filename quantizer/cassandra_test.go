@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/DataDog/raclette/model"
+	"github.com/DataDog/datadog-trace-agent/model"
 )
 
 func CassSpan(query string) model.Span {

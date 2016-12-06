@@ -13,5 +13,5 @@ RUN gimme 1.7.1
 RUN eval $(gimme 1.7.1) && go get github.com/robfig/glock
 
 
-VOLUME ["/go/src/github.com/DataDog/raclette"]
-ENTRYPOINT ["/go/src/github.com/DataDog/raclette/packaging/release_deb.sh"]
+VOLUME ["/go/src/github.com/DataDog/datadog-trace-agent"]
+ENTRYPOINT ["/go/src/github.com/DataDog/datadog-trace-agent/packaging/release_deb.sh"]

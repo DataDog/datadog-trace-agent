@@ -7,7 +7,7 @@ end
 
 desc 'Restore from glockfile'
 task :restore => [:bootstrap] do
-  sh 'glock sync github.com/DataDog/raclette'
+  sh 'glock sync github.com/DataDog/datadog-trace-agent'
 end
 
 PACKAGES = %w(
@@ -23,22 +23,22 @@ PACKAGES = %w(
 
 task :default => [:ci]
 
-desc "Build Raclette agent"
+desc "Build Datadog Trace agent"
 task :build do
-  go_build("github.com/DataDog/raclette/agent", :cmd => "go build -a -o trace-agent")
+  go_build("github.com/DataDog/datadog-trace-agent/agent", :cmd => "go build -a -o trace-agent")
 end
 
-desc "Install Raclette agent"
+desc "Install Datadog Trace agent"
 task :install do
-  go_build("github.com/DataDog/raclette/agent", :cmd=>"go build -i -o $GOPATH/bin/trace-agent")
+  go_build("github.com/DataDog/datadog-trace-agent/agent", :cmd=>"go build -i -o $GOPATH/bin/trace-agent")
 end
 
-desc "Test Raclette agent"
+desc "Test Datadog Trace agent"
 task :test do
   PACKAGES.each { |pkg| go_test(pkg) }
 end
 
-desc "Run Raclette agent"
+desc "Run Datadog Trace agent"
 task :run do
   sh "./trace-agent -debug -config ./agent/trace-agent.ini"
 end
@@ -70,9 +70,9 @@ task :fmt do
 end
 
 # FIXME: add :test in the list
-desc "Raclette agent CI script (fmt, vet, etc)"
+desc "Datadog Trace agent CI script (fmt, vet, etc)"
 task :ci => [:restore, :fmt, :vet, :lint, :test, :build]
 
 task :err do
-  sh "errcheck github.com/DataDog/raclette"
+  sh "errcheck github.com/DataDog/datadog-trace-agent"
 end

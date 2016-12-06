@@ -5,11 +5,11 @@ RUN gem install rake
 RUN curl -sL -o /gimme https://raw.githubusercontent.com/travis-ci/gimme/master/gimme && \
     chmod +x /gimme
 
-RUN echo "$(/gimme 1.7.1) && cd /go/src/github.com/DataDog/raclette/packaging/rpm && gpg --import ./RPM-SIGNING-KEY.private; rpmbuild -bb raclette.spec && ./rpm-sign" >> /build.sh
+RUN echo "$(/gimme 1.7.1) && cd /go/src/github.com/DataDog/datadog-trace-agent/packaging/rpm && gpg --import ./RPM-SIGNING-KEY.private; rpmbuild -bb agent.spec && ./rpm-sign" >> /build.sh
 RUN chmod +x /build.sh
 
 ADD rpm/.rpmmacros /root/.rpmmacros
-VOLUME ["/go/src/github.com/DataDog/raclette"]
+VOLUME ["/go/src/github.com/DataDog/datadog-trace-agent"]
 
 ENV GOPATH=/go
 ENV PATH=/go/bin:$PATH

@@ -6,7 +6,7 @@ import (
 
 	log "github.com/cihub/seelog"
 
-	"github.com/DataDog/raclette/model"
+	"github.com/DataDog/datadog-trace-agent/model"
 )
 
 const (

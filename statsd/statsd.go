@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/DataDog/datadog-go/statsd"
-	"github.com/DataDog/raclette/config"
+	"github.com/DataDog/datadog-trace-agent/config"
 )
 
 // Client is a global Statsd client. When a client is configured via Configure,

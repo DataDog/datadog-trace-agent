@@ -7,9 +7,9 @@ export DEBFULLNAME="Datadog, Inc"
 export DEBEMAIL="package@datadoghq.com"
 
 # Soup-to-nuts build script for the agent deb
-# Run on a Docker base ubuntu image with the source tree mounted at /go/src/github.com/DataDog/raclette
-raclettepath=/go/src/github.com/DataDog/raclette/packaging
-cd $raclettepath
+# Run on a Docker base ubuntu image with the source tree mounted at /go/src/github.com/DataDog/datadog-trace-agent
+agentpath=/go/src/github.com/DataDog/datadog-trace-agent/packaging
+cd $agentpath
 
 
 # increment the version number to what we want

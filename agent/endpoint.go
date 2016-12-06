@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/DataDog/raclette/model"
-	"github.com/DataDog/raclette/statsd"
+	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/statsd"
 	log "github.com/cihub/seelog"
 )
 

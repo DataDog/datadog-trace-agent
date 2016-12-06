@@ -3,7 +3,7 @@ package quantizer
 import (
 	"strings"
 
-	"github.com/DataDog/raclette/model"
+	"github.com/DataDog/datadog-trace-agent/model"
 )
 
 // Redis commands consisting in 2 words
