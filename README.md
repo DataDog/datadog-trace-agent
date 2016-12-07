@@ -5,9 +5,11 @@ An agent that collects traces from various sources, normalizes and pre-processes
 ## Development
 
 Pre-requisites:
- - `go` 1.7+
- - `rake`
+- `go` 1.7+
+- `rake`
 
+
+Hacking:
 - Sync your Go dependencies with `rake restore`. This uses [glock](https://github.com/robfig/glock) to sync all deps listed in the [GLOCKFILE](GLOCKFILE)
 - Run `rake build` to build the `trace-agent` binary from current source
 - Or run `rake install` to install `trace-agent` to your $GOPATH

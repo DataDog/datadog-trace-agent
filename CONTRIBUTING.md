@@ -17,11 +17,11 @@ prefer leaving a comment there to opening a new issue.
 In order to ease/speed up our review, here are some items you can check/improve when submitting your PR:
 
 - [ ] have a [proper commit history](#commits) (we advise you to rebase if needed).
-- [ ] write [tests](tests/README.md) for the code you wrote.
-- [ ] preferably make sure that all [tests pass locally](tests/README.md).
+- [ ] write tests for the code you wrote.
+- [ ] preferably make sure that all tests pass locally
 - [ ] summarize your PR with a good title and a message describing your changes, cross-referencing any related bugs/PRs.
 
-Your Pull Request **must** always pass the CircleCI tests before being merged, if you think the error is not due to your changes, you can have a talk with us at https://dd.slack.com/messages/trace-help
+Your Pull Request **must** always pass the CircleCI tests before being merged. If you think the error is not due to your changes, you can have a talk with us at https://dd.slack.com/messages/trace-help
 
 ## Commits
 
@@ -37,7 +37,3 @@ E.g.
 - config: respect DD_LOG_LEVEL env var
 - agent: explicit message when no API key is given
 - quantizer: add test for multiline queries
-
-## Tests
-
-Please refer to this [document](tests/README.md).
