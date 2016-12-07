@@ -42,13 +42,20 @@ func NewConcentrator(in chan model.Trace, conf *config.AgentConfig) *Concentrato
 // Run starts doing some concentrating work
 func (c *Concentrator) Run() {
 	for t := range c.in {
+		// flush on this signal sent upstream
 		if len(t) == 1 && t[0].IsFlushMarker() {
 			c.out <- c.Flush()
 			continue
 		}
 
+		// extract the env from the trace if any
+		env := t.GetEnv()
+		if env == "" {
+			env = c.conf.DefaultEnv
+		}
+
 		for _, s := range t {
-			err := c.HandleNewSpan(s)
+			err := c.HandleNewSpan(s, env)
 			if err != nil {
 				log.Debugf("span %v rejected by concentrator, err: %v", s, err)
 			}
@@ -63,7 +70,7 @@ func (c *Concentrator) roundToBucket(ts int64) int64 {
 }
 
 // HandleNewSpan adds to the current bucket the pointed span
-func (c *Concentrator) HandleNewSpan(s model.Span) error {
+func (c *Concentrator) HandleNewSpan(s model.Span, env string) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -88,7 +95,7 @@ func (c *Concentrator) HandleNewSpan(s model.Span) error {
 
 	log.Debugf("span was accepted because it is recent enough cutoff=%d now=%d end=%d: %v", c.conf.OldestSpanCutoff/1e9, now/1e9, end/1e9, s)
 
-	b.HandleSpan(s, c.conf.ExtraAggregators)
+	b.HandleSpan(s, env, c.conf.ExtraAggregators)
 	return nil
 }
 

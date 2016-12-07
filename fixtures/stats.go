@@ -2,15 +2,18 @@ package fixtures
 
 import (
 	"encoding/json"
+
 	"github.com/DataDog/raclette/model"
 )
 
 var defaultAggregators = []string{"service", "resource"}
 
+const defaultEnv = "none"
+
 // TestStatsBucket returns a fixed stats bucket to be used in unit tests
 func TestStatsBucket() model.StatsBucket {
 	sb := model.NewStatsBucket(0, 1e9)
-	sb.HandleSpan(TestSpan(), defaultAggregators)
+	sb.HandleSpan(TestSpan(), defaultEnv, defaultAggregators)
 
 	// marshalling then unmarshalling data to:
 	// 1) make a deep copy which prevents unexpected side effects with
@@ -33,7 +36,7 @@ func TestStatsBucket() model.StatsBucket {
 func StatsBucketWithSpans(s []model.Span) model.StatsBucket {
 	sb := model.NewStatsBucket(0, 1e9)
 	for _, s := range s {
-		sb.HandleSpan(s, defaultAggregators)
+		sb.HandleSpan(s, defaultEnv, defaultAggregators)
 	}
 	return sb
 }
