@@ -23,7 +23,7 @@ Hacking:
 
 See our [contributing guidelines](CONTRIBUTING.md)
 
-More detailed information about agent configuration, terminology and architecture can be found in our [wiki](https://github.com/DataDog/raclette/wiki)
+More detailed information about agent configuration, terminology and architecture can be found in our [wiki](https://github.com/DataDog/datadog-trace-agent/wiki)
 
 
 
