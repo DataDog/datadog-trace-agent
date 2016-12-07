@@ -128,15 +128,15 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	// Start with the first/older bucket
 	receivedCounts = receivedBuckets[0].Counts
 	expectedCountValByKey := map[string]int64{
-		"query|duration|resource:resource1,service:A1":   36,
-		"query|duration|resource:resource2,service:A2":   300000000040,
-		"query|duration|resource:resourcefoo,service:A2": 30,
-		"query|errors|resource:resource1,service:A1":     1,
-		"query|errors|resource:resource2,service:A2":     2,
-		"query|errors|resource:resourcefoo,service:A2":   0,
-		"query|hits|resource:resource1,service:A1":       2,
-		"query|hits|resource:resource2,service:A2":       2,
-		"query|hits|resource:resourcefoo,service:A2":     1,
+		"query|duration|env:none,resource:resource1,service:A1":   36,
+		"query|duration|env:none,resource:resource2,service:A2":   300000000040,
+		"query|duration|env:none,resource:resourcefoo,service:A2": 30,
+		"query|errors|env:none,resource:resource1,service:A1":     1,
+		"query|errors|env:none,resource:resource2,service:A2":     2,
+		"query|errors|env:none,resource:resourcefoo,service:A2":   0,
+		"query|hits|env:none,resource:resource1,service:A1":       2,
+		"query|hits|env:none,resource:resource2,service:A2":       2,
+		"query|hits|env:none,resource:resourcefoo,service:A2":     1,
 	}
 
 	// FIXME[leo]: assert distributions!
@@ -152,21 +152,21 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	// same for second bucket
 	receivedCounts = receivedBuckets[1].Counts
 	expectedCountValByKey = map[string]int64{
-		"query|duration|resource:resource1,service:A1":   12,
-		"query|duration|resource:resource2,service:A1":   24,
-		"query|duration|resource:resource1,service:A2":   40,
-		"query|duration|resource:resource2,service:A2":   30,
-		"query|duration|resource:resourcefoo,service:A2": 3600000000000,
-		"query|errors|resource:resource1,service:A1":     1,
-		"query|errors|resource:resource2,service:A1":     0,
-		"query|errors|resource:resource1,service:A2":     1,
-		"query|errors|resource:resource2,service:A2":     1,
-		"query|errors|resource:resourcefoo,service:A2":   0,
-		"query|hits|resource:resource1,service:A1":       1,
-		"query|hits|resource:resource2,service:A1":       1,
-		"query|hits|resource:resource1,service:A2":       1,
-		"query|hits|resource:resource2,service:A2":       1,
-		"query|hits|resource:resourcefoo,service:A2":     1,
+		"query|duration|env:none,resource:resource1,service:A1":   12,
+		"query|duration|env:none,resource:resource2,service:A1":   24,
+		"query|duration|env:none,resource:resource1,service:A2":   40,
+		"query|duration|env:none,resource:resource2,service:A2":   30,
+		"query|duration|env:none,resource:resourcefoo,service:A2": 3600000000000,
+		"query|errors|env:none,resource:resource1,service:A1":     1,
+		"query|errors|env:none,resource:resource2,service:A1":     0,
+		"query|errors|env:none,resource:resource1,service:A2":     1,
+		"query|errors|env:none,resource:resource2,service:A2":     1,
+		"query|errors|env:none,resource:resourcefoo,service:A2":   0,
+		"query|hits|env:none,resource:resource1,service:A1":       1,
+		"query|hits|env:none,resource:resource2,service:A1":       1,
+		"query|hits|env:none,resource:resource1,service:A2":       1,
+		"query|hits|env:none,resource:resource2,service:A2":       1,
+		"query|hits|env:none,resource:resourcefoo,service:A2":     1,
 	}
 
 	// verify we got all counts

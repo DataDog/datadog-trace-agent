@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const defaultEnv = "default"
+
 var testSpans = []Span{
 	Span{Service: "A", Name: "A.foo", Resource: "α", Duration: 1},
 	Span{Service: "A", Name: "A.foo", Resource: "β", Duration: 2, Error: 1},
@@ -35,33 +37,33 @@ func TestStatsBucketDefault(t *testing.T) {
 		t.Logf("s: %v", s)
 		t.Logf("sb: %v", sb)
 		//sb.HandleSpan(s, aggr)
-		aggrString, tgs := getAggregateGrain(s, aggr, &sb.keyBuf)
+		aggrString, tgs := getAggregateGrain(s, defaultEnv, aggr, &sb.keyBuf)
 		t.Logf("aggrString: %s", aggrString)
 		sb.addToTagSet(s, aggrString, tgs)
 	}
 
 	expectedCounts := map[string]int64{
-		"A.foo|duration|resource:α,service:A":     1,
-		"A.foo|duration|resource:β,service:A":     2,
-		"B.foo|duration|resource:γ,service:B":     3,
-		"B.foo|duration|resource:ε,service:B":     4,
-		"B.foo|duration|resource:ζ,service:B":     5,
-		"sql.query|duration|resource:ζ,service:B": 6,
-		"sql.query|duration|resource:δ,service:C": 15,
-		"A.foo|errors|resource:α,service:A":       0,
-		"A.foo|errors|resource:β,service:A":       1,
-		"B.foo|errors|resource:γ,service:B":       0,
-		"B.foo|errors|resource:ε,service:B":       1,
-		"B.foo|errors|resource:ζ,service:B":       0,
-		"sql.query|errors|resource:ζ,service:B":   0,
-		"sql.query|errors|resource:δ,service:C":   0,
-		"A.foo|hits|resource:α,service:A":         1,
-		"A.foo|hits|resource:β,service:A":         1,
-		"B.foo|hits|resource:γ,service:B":         1,
-		"B.foo|hits|resource:ε,service:B":         1,
-		"B.foo|hits|resource:ζ,service:B":         1,
-		"sql.query|hits|resource:ζ,service:B":     1,
-		"sql.query|hits|resource:δ,service:C":     2,
+		"A.foo|duration|env:default,resource:α,service:A":     1,
+		"A.foo|duration|env:default,resource:β,service:A":     2,
+		"B.foo|duration|env:default,resource:γ,service:B":     3,
+		"B.foo|duration|env:default,resource:ε,service:B":     4,
+		"B.foo|duration|env:default,resource:ζ,service:B":     5,
+		"sql.query|duration|env:default,resource:ζ,service:B": 6,
+		"sql.query|duration|env:default,resource:δ,service:C": 15,
+		"A.foo|errors|env:default,resource:α,service:A":       0,
+		"A.foo|errors|env:default,resource:β,service:A":       1,
+		"B.foo|errors|env:default,resource:γ,service:B":       0,
+		"B.foo|errors|env:default,resource:ε,service:B":       1,
+		"B.foo|errors|env:default,resource:ζ,service:B":       0,
+		"sql.query|errors|env:default,resource:ζ,service:B":   0,
+		"sql.query|errors|env:default,resource:δ,service:C":   0,
+		"A.foo|hits|env:default,resource:α,service:A":         1,
+		"A.foo|hits|env:default,resource:β,service:A":         1,
+		"B.foo|hits|env:default,resource:γ,service:B":         1,
+		"B.foo|hits|env:default,resource:ε,service:B":         1,
+		"B.foo|hits|env:default,resource:ζ,service:B":         1,
+		"sql.query|hits|env:default,resource:ζ,service:B":     1,
+		"sql.query|hits|env:default,resource:δ,service:C":     2,
 	}
 
 	assert.Len(sb.Counts, len(expectedCounts), "Missing counts!")
@@ -82,31 +84,31 @@ func TestStatsBucketExtraAggregators(t *testing.T) {
 	// one custom aggregator
 	aggr := []string{"version"}
 	for _, s := range testSpans {
-		sb.HandleSpan(s, aggr)
+		sb.HandleSpan(s, defaultEnv, aggr)
 	}
 
 	expectedCounts := map[string]int64{
-		"A.foo|duration|resource:α,service:A":                 1,
-		"A.foo|duration|resource:β,service:A":                 2,
-		"B.foo|duration|resource:γ,service:B":                 3,
-		"B.foo|duration|resource:ε,service:B":                 4,
-		"sql.query|duration|resource:δ,service:C":             15,
-		"A.foo|errors|resource:α,service:A":                   0,
-		"A.foo|errors|resource:β,service:A":                   1,
-		"B.foo|errors|resource:γ,service:B":                   0,
-		"B.foo|errors|resource:ε,service:B":                   1,
-		"sql.query|errors|resource:δ,service:C":               0,
-		"A.foo|hits|resource:α,service:A":                     1,
-		"A.foo|hits|resource:β,service:A":                     1,
-		"B.foo|hits|resource:γ,service:B":                     1,
-		"B.foo|hits|resource:ε,service:B":                     1,
-		"sql.query|hits|resource:δ,service:C":                 2,
-		"sql.query|errors|resource:ζ,service:B,version:1.4":   0,
-		"sql.query|hits|resource:ζ,service:B,version:1.4":     1,
-		"sql.query|duration|resource:ζ,service:B,version:1.4": 6,
-		"B.foo|errors|resource:ζ,service:B,version:1.3":       0,
-		"B.foo|duration|resource:ζ,service:B,version:1.3":     5,
-		"B.foo|hits|resource:ζ,service:B,version:1.3":         1,
+		"A.foo|duration|env:default,resource:α,service:A":                 1,
+		"A.foo|duration|env:default,resource:β,service:A":                 2,
+		"B.foo|duration|env:default,resource:γ,service:B":                 3,
+		"B.foo|duration|env:default,resource:ε,service:B":                 4,
+		"sql.query|duration|env:default,resource:δ,service:C":             15,
+		"A.foo|errors|env:default,resource:α,service:A":                   0,
+		"A.foo|errors|env:default,resource:β,service:A":                   1,
+		"B.foo|errors|env:default,resource:γ,service:B":                   0,
+		"B.foo|errors|env:default,resource:ε,service:B":                   1,
+		"sql.query|errors|env:default,resource:δ,service:C":               0,
+		"A.foo|hits|env:default,resource:α,service:A":                     1,
+		"A.foo|hits|env:default,resource:β,service:A":                     1,
+		"B.foo|hits|env:default,resource:γ,service:B":                     1,
+		"B.foo|hits|env:default,resource:ε,service:B":                     1,
+		"sql.query|hits|env:default,resource:δ,service:C":                 2,
+		"sql.query|errors|env:default,resource:ζ,service:B,version:1.4":   0,
+		"sql.query|hits|env:default,resource:ζ,service:B,version:1.4":     1,
+		"sql.query|duration|env:default,resource:ζ,service:B,version:1.4": 6,
+		"B.foo|errors|env:default,resource:ζ,service:B,version:1.3":       0,
+		"B.foo|duration|env:default,resource:ζ,service:B,version:1.3":     5,
+		"B.foo|hits|env:default,resource:ζ,service:B,version:1.3":         1,
 	}
 
 	assert.Len(sb.Counts, len(expectedCounts), "Missing counts!")
@@ -149,7 +151,7 @@ func BenchmarkHandleSpan(b *testing.B) {
 	aggr := []string{}
 	for i := 0; i < b.N; i++ {
 		for _, s := range testSpans {
-			sb.HandleSpan(s, aggr)
+			sb.HandleSpan(s, defaultEnv, aggr)
 		}
 	}
 	b.ReportAllocs()
@@ -160,7 +162,7 @@ func BenchmarkGetAggregateString(b *testing.B) {
 	sb := NewStatsBucket(0, 1e9)
 	for i := 0; i < b.N; i++ {
 		for _, s := range testSpans {
-			getAggregateGrain(s, aggr, &sb.keyBuf)
+			getAggregateGrain(s, defaultEnv, aggr, &sb.keyBuf)
 		}
 	}
 	b.ReportAllocs()

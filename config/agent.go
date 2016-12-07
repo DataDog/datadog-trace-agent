@@ -16,7 +16,8 @@ import (
 // the Agent components, with 100% safe and reliable values.
 type AgentConfig struct {
 	// Global
-	HostName string
+	HostName   string
+	DefaultEnv string // the traces will default to this environment
 
 	// API
 	APIEndpoints []string
@@ -98,6 +99,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 	}
 	ac := &AgentConfig{
 		HostName:     hostname,
+		DefaultEnv:   "none",
 		APIEndpoints: []string{"https://trace.agent.datadoghq.com"},
 		APIKeys:      []string{},
 		APIEnabled:   true,
@@ -169,6 +171,10 @@ APM_CONF:
 
 	if conf == nil {
 		goto ENV_CONF
+	}
+
+	if v, _ := conf.Get("trace.config", "env"); v != "" {
+		c.DefaultEnv = v
 	}
 
 	if v, _ := conf.Get("trace.api", "api_key"); v != "" {
