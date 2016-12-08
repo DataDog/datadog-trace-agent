@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const defaultEnv = "none"
+
 func getTestSampler() *Sampler {
 	// Disable debug logs in these tests
 	config.NewLoggerLevelCustom("INFO", "/var/log/datadog/trace-agent.log")
@@ -60,7 +62,7 @@ func TestExtraSampleRate(t *testing.T) {
 
 	// Feed the s with a signature so that it has a < 1 sample rate
 	for i := 0; i < int(1e6); i++ {
-		s.Sample(trace)
+		s.Sample(trace, root, defaultEnv)
 	}
 
 	sRate := s.GetSampleRate(trace, root, signature)
@@ -94,8 +96,8 @@ func TestMaxTPS(t *testing.T) {
 	for period := 0; period < initPeriods+periods; period++ {
 		s.Backend.DecayScore()
 		for i := 0; i < int(tracesPerPeriod); i++ {
-			trace, _ := getTestTrace()
-			sampled := s.Sample(trace)
+			trace, root := getTestTrace()
+			sampled := s.Sample(trace, root, defaultEnv)
 			// Once we got into the "supposed-to-be" stable "regime", count the samples
 			if period > initPeriods && sampled {
 				sampledCount++
@@ -130,7 +132,7 @@ func TestSamplerChainedSampling(t *testing.T) {
 
 	// Sample again with an ensured rate, rates should be combined
 	s.extraRate = 0.5
-	s.Sample(trace)
+	s.Sample(trace, root, defaultEnv)
 	assert.Equal(0.4, GetTraceAppliedSampleRate(root))
 
 	// Check the sample rate isn't lost by reference
@@ -157,6 +159,6 @@ func BenchmarkSampler(b *testing.B) {
 			model.Span{TraceID: 1, SpanID: 4, ParentID: 1, Start: 500000000, Duration: 500000, Service: "redis", Type: "redis"},
 			model.Span{TraceID: 1, SpanID: 5, ParentID: 1, Start: 700000000, Duration: 700000, Service: "mcnulty", Type: ""},
 		}
-		s.Sample(trace)
+		s.Sample(trace, &trace[0], defaultEnv)
 	}
 }

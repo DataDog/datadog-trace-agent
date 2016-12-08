@@ -87,15 +87,12 @@ func (s *Sampler) Stop() {
 }
 
 // Sample counts an incoming trace and tells if it is a sample which has to be kept
-func (s *Sampler) Sample(trace agentmodel.Trace) bool {
+func (s *Sampler) Sample(trace agentmodel.Trace, root *agentmodel.Span, env string) bool {
 	// Extra safety, just in case one trace is empty
 	if len(trace) == 0 {
 		return false
 	}
 
-	// We need the root in multiple steps of the sampling, so let's extract here
-	// TODO: update agentmodel.Trace to contain a reference to the root, and don't give it as further function argument
-	root := trace.GetRoot()
 	signature := ComputeSignatureWithRoot(trace, root)
 
 	// Update sampler state by counting this trace

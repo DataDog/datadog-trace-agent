@@ -12,7 +12,7 @@ const defaultEnv = "none"
 // TestStatsBucket returns a fixed stats bucket to be used in unit tests
 func TestStatsBucket() model.StatsBucket {
 	sb := model.NewStatsBucket(0, 1e9)
-	sb.HandleSpan(TestSpan(), defaultEnv, defaultAggregators)
+	sb.HandleSpan(TestSpan(), defaultEnv, defaultAggregators, nil)
 
 	// marshalling then unmarshalling data to:
 	// 1) make a deep copy which prevents unexpected side effects with
@@ -35,7 +35,7 @@ func TestStatsBucket() model.StatsBucket {
 func StatsBucketWithSpans(s []model.Span) model.StatsBucket {
 	sb := model.NewStatsBucket(0, 1e9)
 	for _, s := range s {
-		sb.HandleSpan(s, defaultEnv, defaultAggregators)
+		sb.HandleSpan(s, defaultEnv, defaultAggregators, nil)
 	}
 	return sb
 }

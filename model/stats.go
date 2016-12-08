@@ -3,7 +3,6 @@ package model
 import (
 	"bytes"
 	"fmt"
-	"strings"
 
 	"github.com/DataDog/datadog-trace-agent/quantile"
 )
@@ -134,99 +133,67 @@ func NewStatsBucket(ts, d int64) StatsBucket {
 	}
 }
 
-// getAggregateString , given a list of aggregators, returns a unique string representation for a spans's aggregate group, and a TagSet of constituent tags
-func getAggregateGrain(s Span, env string, aggregators []string, keyBuf *bytes.Buffer) (string, TagSet) {
-	// aggregator strings are formatted like name:x,resource:r,service:y,a:some,b:custom,c:aggs
-	// where custom aggregators (a,b,c) are appended to the main string in alphanum order
-
-	// clear the buffer
-	keyBuf.Reset()
-	tgs := TagSet{}
-
-	// First deal with our default aggregators
-	// env, never empty
-	keyBuf.WriteString("env:")
-	keyBuf.WriteString(env)
-	keyBuf.WriteRune(',')
-	tgs = append(tgs, Tag{"env", env})
-
-	// As it's hardcoded, trace.resource could avoid future conflicts.
-	if s.Resource != "" {
-		keyBuf.WriteString("resource:")
-		keyBuf.WriteString(s.Resource)
-		keyBuf.WriteRune(',')
-
-		tgs = append(tgs, Tag{"resource", s.Resource})
+func assembleGrain(b *bytes.Buffer, keys, vals []string) (string, TagSet) {
+	if len(keys) != len(vals) {
+		panic("assembleGrain diff lengths!")
 	}
 
-	// As it's hardcoded, trace.service could avoid future conflicts.
-	if s.Service != "" {
-		keyBuf.WriteString("service:")
-		keyBuf.WriteString(s.Service)
-		keyBuf.WriteRune(',')
+	b.Reset()
+	var t TagSet
 
-		tgs = append(tgs, Tag{"service", s.Service})
+	for i := range keys {
+		b.WriteString(keys[i])
+		b.WriteRune(':')
+		b.WriteString(vals[i])
+		if i != len(keys)-1 {
+			b.WriteRune(',')
+		}
+		t = append(t, Tag{keys[i], vals[i]})
 	}
 
-	// now add our custom ones. just go in order since the list is already sorted
+	return b.String(), t
+}
+
+// HandleSpan adds the span to this bucket stats, aggregated with the finest grain matching given aggregators
+func (sb *StatsBucket) HandleSpan(s Span, env string, aggregators []string, sublayers *[]SublayerValue) {
+	if env == "" {
+		panic("env should never be empty")
+	}
+
+	keys := []string{
+		"env",
+		"resource",
+		"service",
+	}
+	vals := []string{
+		env,
+		s.Resource,
+		s.Service,
+	}
+
 	for _, agg := range aggregators {
-		// Exclude all the hardcoded names we use, typically in Smelter.
-		// TODO: prefix those, so that we could both use them and avoid conflicts.
-		if agg != "resource" && agg != "service" {
+		if agg != "resource" && agg != "service" && agg != "env" {
 			if v, ok := s.Meta[agg]; ok {
-				keyBuf.WriteString(agg)
-				keyBuf.WriteRune(':')
-				keyBuf.WriteString(v)
-				keyBuf.WriteRune(',')
-
-				tgs = append(tgs, Tag{agg, v})
+				keys = append(keys, agg)
+				vals = append(vals, v)
 			}
 		}
 	}
 
-	aggrString := keyBuf.String()
-	if aggrString == "" {
-		// shouldn't ever happen if we've properly normalized the span
-		return aggrString, tgs
-	}
+	grain, tags := assembleGrain(&sb.keyBuf, keys, vals)
+	sb.addToTagSet(s, grain, tags)
 
-	// strip off trailing comma
-	return aggrString[:len(aggrString)-1], tgs
-}
+	// sublayers - special case
+	if sublayers != nil {
+		for _, sub := range *sublayers {
+			subgrain := fmt.Sprintf("%s,%s:%s", grain, sub.Tag.Name, sub.Tag.Value)
+			subtags := make(TagSet, len(tags)+1)
+			copy(subtags, tags)
+			subtags[len(tags)] = sub.Tag
 
-// HandleSpan adds the span to this bucket stats, aggregated with the finest grain matching given aggregators
-func (sb *StatsBucket) HandleSpan(s Span, env string, aggregators []string) {
-	aggrString, tgs := getAggregateGrain(s, env, aggregators, &sb.keyBuf)
-	sb.addToTagSet(s, aggrString, tgs)
-}
-
-func parseSublayerTags(m string) string {
-	// span_count is a special metric used in the UI only
-	if strings.HasPrefix(m, "_sublayers") && m != "_sublayers.span_count" {
-		// add tags for breaking down sublayers later on
-		// first skip past "_sublayers."
-		// then extract ["duration", "by_service", "sublayer_service:XXXX"] from "duration.by_service.sublayer_service:XXXX"
-		subparsed := strings.SplitN(m[11:], ".", 3)
-
-		// sanity check that this is indeed a sublayer metric
-		if !strings.HasPrefix(subparsed[1], "by_") {
-			return ""
+			sb.addToCount(sub.Metric, sub.Value, subgrain, s.Name, subtags)
 		}
-
-		// subparsed[2] should contain sublayer_service:XXXX
-		return subparsed[2]
 	}
-
-	return ""
-}
-
-// getSublayerGrain collapses a sublayer tag into an existing aggregate string and tagset
-func getSublayerGrain(sublayer string, aggr string, tgs TagSet) (string, TagSet) {
-	aggrKey := aggr + "," + sublayer
-	slTags := make(TagSet, len(tgs)+1)
-	copy(slTags, tgs)
-	slTags[len(tgs)] = NewTagFromString(sublayer)
-	return aggrKey, slTags
 }
 
 func (sb StatsBucket) addToTagSet(s Span, aggr string, tgs TagSet) {
@@ -243,15 +210,6 @@ func (sb StatsBucket) addToTagSet(s Span, aggr string, tgs TagSet) {
 	sb.addToCount(DURATION, float64(s.Duration), aggr, s.Name, tgs)
 
 	// TODO add for s.Metrics ability to define arbitrary counts and distros, check some config?
-	for m, v := range s.Metrics {
-		// produce sublayer statistics
-		sublayerTag := parseSublayerTags(m)
-		if sublayerTag != "" {
-			aggrKey, slTags := getSublayerGrain(sublayerTag, aggr, tgs)
-			// only extract _sublayers.duration.by_service
-			sb.addToCount(m[:len(m)-len(sublayerTag)-1], v, aggrKey, s.Name, slTags)
-		}
-	}
 
 	// alter resolution of duration distro
 	trundur := nsTimestampToFloat(s.Duration)

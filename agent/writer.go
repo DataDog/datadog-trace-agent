@@ -59,6 +59,9 @@ func (w *Writer) Run() {
 	for {
 		select {
 		case p := <-w.inPayloads:
+			if p.IsEmpty() {
+				continue
+			}
 			w.payloadBuffer = append(w.payloadBuffer, p)
 			w.Flush()
 		case sm := <-w.inServices:

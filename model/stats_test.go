@@ -34,12 +34,7 @@ func TestStatsBucketDefault(t *testing.T) {
 	// No custom aggregators only the defaults
 	aggr := []string{}
 	for _, s := range testSpans {
-		t.Logf("s: %v", s)
-		t.Logf("sb: %v", sb)
-		//sb.HandleSpan(s, aggr)
-		aggrString, tgs := getAggregateGrain(s, defaultEnv, aggr, &sb.keyBuf)
-		t.Logf("aggrString: %s", aggrString)
-		sb.addToTagSet(s, aggrString, tgs)
+		sb.HandleSpan(s, defaultEnv, aggr, nil)
 	}
 
 	expectedCounts := map[string]int64{
@@ -84,7 +79,7 @@ func TestStatsBucketExtraAggregators(t *testing.T) {
 	// one custom aggregator
 	aggr := []string{"version"}
 	for _, s := range testSpans {
-		sb.HandleSpan(s, defaultEnv, aggr)
+		sb.HandleSpan(s, defaultEnv, aggr, nil)
 	}
 
 	expectedCounts := map[string]int64{
@@ -147,23 +142,28 @@ func TestTsRounding(t *testing.T) {
 }
 
 func BenchmarkHandleSpan(b *testing.B) {
+
 	sb := NewStatsBucket(0, 1e9)
 	aggr := []string{}
+
+	b.ResetTimer()
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		for _, s := range testSpans {
-			sb.HandleSpan(s, defaultEnv, aggr)
+			sb.HandleSpan(s, defaultEnv, aggr, nil)
 		}
 	}
-	b.ReportAllocs()
 }
 
-func BenchmarkGetAggregateString(b *testing.B) {
-	aggr := []string{}
+func TestGrain(t *testing.T) {
 	sb := NewStatsBucket(0, 1e9)
-	for i := 0; i < b.N; i++ {
-		for _, s := range testSpans {
-			getAggregateGrain(s, defaultEnv, aggr, &sb.keyBuf)
-		}
-	}
-	b.ReportAllocs()
+	assert := assert.New(t)
+
+	s := Span{Service: "thing", Name: "other", Resource: "yo"}
+	keys := []string{"env", "resource", "service"}
+	vals := []string{"default", s.Resource, s.Service}
+	aggr, tgs := assembleGrain(&sb.keyBuf, keys, vals)
+
+	assert.Equal("env:default,resource:yo,service:thing", aggr)
+	assert.Equal(TagSet{Tag{"env", "default"}, Tag{"resource", "yo"}, Tag{"service", "thing"}}, tgs)
 }

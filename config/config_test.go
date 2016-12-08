@@ -109,7 +109,6 @@ func TestDDAgentConfigWithLegacy(t *testing.T) {
 
 	// Check some defaults
 	assert.Equal(defaultConfig.BucketInterval, agentConfig.BucketInterval)
-	assert.Equal(defaultConfig.OldestSpanCutoff, agentConfig.OldestSpanCutoff)
 	assert.Equal(defaultConfig.StatsdHost, agentConfig.StatsdHost)
 }
 

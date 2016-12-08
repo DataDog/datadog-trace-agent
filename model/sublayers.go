@@ -1,48 +1,25 @@
-package main
+package model
 
-import (
-	"bytes"
+import "bytes"
 
-	"github.com/DataDog/datadog-trace-agent/model"
-)
-
-const (
-	metricPrefixType    = "_sublayers.duration.by_type.sublayer_type:"
-	metricPrefixService = "_sublayers.duration.by_service.sublayer_service:"
-)
-
-// SublayerTagger is a dumb worker that adds sublayer stats to traces
-type SublayerTagger struct {
-	in  chan model.Trace
-	out chan model.Trace
+// SublayerValue is just a span-metric placeholder for a given
+// sublayer val
+type SublayerValue struct {
+	Metric string
+	Tag    Tag
+	Value  float64
 }
 
-// NewSublayerTagger inits a new SublayerTagger
-func NewSublayerTagger(in chan model.Trace) *SublayerTagger {
-	return &SublayerTagger{
-		in:  in,
-		out: make(chan model.Trace),
-	}
-}
-
-// Run starts tagging sublayers onto traces
-func (st *SublayerTagger) Run() {
-	for t := range st.in {
-		st.out <- tagSublayers(t)
-	}
-
-	close(st.out)
-}
-
-func tagSublayers(t model.Trace) model.Trace {
-	iter := model.NewTraceLevelIterator(t)
+// ComputeSublayers extracts sublayer values by type & service for a trace
+func ComputeSublayers(t *Trace) []SublayerValue {
+	iter := NewTraceLevelIterator(*t)
 	root, err := iter.NextSpan()
 	if err != nil {
 		// no root, skip sublayers
-		return t
+		return []SublayerValue{}
 	}
 
-	ss := newSublayerSpan()
+	ss := newSublayerSpans()
 	ss.Add(root)
 
 	for iter.NextLevel() == nil {
@@ -51,28 +28,34 @@ func tagSublayers(t model.Trace) model.Trace {
 		}
 	}
 
-	// account for sublayer statsx
-	var mName bytes.Buffer
-	byType, byService := ss.OutputStats()
+	s := ss.OutputSublayers()
+	s = append(s, SublayerValue{
+		Metric: "_sublayers.span_count",
+		Value:  float64(len(*t)),
+	})
 
-	if root.Metrics == nil {
-		root.Metrics = make(map[string]float64)
-	}
-	root.Metrics["_sublayers.span_count"] = float64(len(t))
-	for k, v := range byType {
-		mName.WriteString(metricPrefixType)
-		mName.WriteString(k)
-		root.Metrics[mName.String()] = float64(v)
-		mName.Reset()
-	}
-	for k, v := range byService {
-		mName.WriteString(metricPrefixService)
-		mName.WriteString(k)
-		root.Metrics[mName.String()] = float64(v)
-		mName.Reset()
+	return s
+}
+
+// SetSublayersOnSpan takes some sublayers and pins them on the given span.Metrics
+func SetSublayersOnSpan(span *Span, sv []SublayerValue) {
+	var b bytes.Buffer
+
+	if span.Metrics == nil {
+		span.Metrics = make(map[string]float64, len(sv))
 	}
 
-	return t
+	for _, s := range sv {
+		b.WriteString(s.Metric)
+		if s.Tag.Name != "" {
+			b.WriteRune('.')
+			b.WriteString(s.Tag.Name)
+			b.WriteRune(':')
+			b.WriteString(s.Tag.Value)
+		}
+		span.Metrics[b.String()] = s.Value
+		b.Reset()
+	}
 }
 
 type timeSpan struct {
@@ -120,19 +103,19 @@ func insertTS(sts []timeSpan, ts timeSpan) []timeSpan {
 	return sts
 }
 
-type sublayerSpan struct {
+type sublayerSpans struct {
 	byType    []timeSpan
 	byService []timeSpan
 }
 
-func newSublayerSpan() *sublayerSpan {
-	return &sublayerSpan{
+func newSublayerSpans() *sublayerSpans {
+	return &sublayerSpans{
 		byType:    []timeSpan{},
 		byService: []timeSpan{},
 	}
 }
 
-func (ss *sublayerSpan) Add(s *model.Span) {
+func (ss *sublayerSpans) Add(s *Span) {
 	tsType := timeSpan{s.Type, s.Start, s.Duration}
 	tsService := timeSpan{s.Service, s.Start, s.Duration}
 
@@ -140,7 +123,7 @@ func (ss *sublayerSpan) Add(s *model.Span) {
 	ss.byService = insertTS(ss.byService, tsService)
 }
 
-func (ss *sublayerSpan) OutputStats() (map[string]float64, map[string]float64) {
+func (ss *sublayerSpans) OutputSublayers() []SublayerValue {
 	mType := make(map[string]float64)
 	mService := make(map[string]float64)
 
@@ -151,5 +134,20 @@ func (ss *sublayerSpan) OutputStats() (map[string]float64, map[string]float64) {
 		mService[ts.Name] += float64(ts.Duration)
 	}
 
-	return mType, mService
+	sublayers := make([]SublayerValue, 0, len(mType)+len(mService)+1)
+	for k, v := range mType {
+		sublayers = append(sublayers, SublayerValue{
+			Metric: "_sublayers.duration.by_type",
+			Tag:    Tag{"sublayer_type", k},
+			Value:  v,
+		})
+	}
+	for k, v := range mService {
+		sublayers = append(sublayers, SublayerValue{
+			Metric: "_sublayers.duration.by_service",
+			Tag:    Tag{"sublayer_service", k},
+			Value:  v,
+		})
+	}
+	return sublayers
 }

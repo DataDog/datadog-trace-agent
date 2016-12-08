@@ -102,38 +102,6 @@ func TestFilterTags(t *testing.T) {
 	}
 
 }
-
-func TestAggrString(t *testing.T) {
-	sb := NewStatsBucket(0, 1e9)
-
-	assert := assert.New(t)
-	span := Span{Service: "thing", Name: "other", Resource: "yo"}
-	aggregators := []string{}
-
-	aggr, tgs := getAggregateGrain(span, defaultEnv, aggregators, &sb.keyBuf)
-	assert.Equal("env:default,resource:yo,service:thing", aggr)
-	assert.Equal(TagSet{Tag{"env", "default"}, Tag{"resource", "yo"}, Tag{"service", "thing"}}, tgs)
-
-	aggregators = []string{"version"}
-
-	span = Span{Service: "thing", Name: "other", Resource: "yo", Meta: map[string]string{"version": "1.5"}}
-	aggr, tgs = getAggregateGrain(span, defaultEnv, aggregators, &sb.keyBuf)
-	assert.Equal("env:default,resource:yo,service:thing,version:1.5", aggr)
-	assert.Equal(TagSet{Tag{"env", "default"}, Tag{"resource", "yo"}, Tag{"service", "thing"}, Tag{"version", "1.5"}}, tgs)
-
-	// test something with special chars
-	span = Span{Service: "thing", Name: "other:brother", Resource: "yo,mec,how goes it", Meta: map[string]string{"version": "1.5"}}
-	aggr, tgs = getAggregateGrain(span, defaultEnv, aggregators, &sb.keyBuf)
-	assert.Equal("env:default,resource:yo,mec,how goes it,service:thing,version:1.5", aggr)
-	assert.Equal(TagSet{Tag{"env", "default"}, Tag{"resource", "yo,mec,how goes it"}, Tag{"service", "thing"}, Tag{"version", "1.5"}}, tgs)
-
-	// test something empty
-	span = Span{TraceID: 0, SpanID: 1}
-	aggr, tgs = getAggregateGrain(span, defaultEnv, []string{}, &sb.keyBuf)
-	assert.Equal("env:default", aggr)
-	assert.Equal(1, len(tgs))
-}
-
 func TestUnset(t *testing.T) {
 	assert := assert.New(t)
 	ts := NewTagSetFromString("service:mcnulty,resource:template,name:magicfunc")

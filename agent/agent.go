@@ -6,21 +6,26 @@ import (
 
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/quantizer"
 	log "github.com/cihub/seelog"
 )
 
+type processedTrace struct {
+	Trace     model.Trace
+	Root      *model.Span
+	Env       string
+	Sublayers []model.SublayerValue
+}
+
 // Agent struct holds all the sub-routines structs and make the data flow between them
 type Agent struct {
-	Receiver       *HTTPReceiver
-	SublayerTagger *SublayerTagger
-	CutoffFilter   *CutoffFilter
-	Quantizer      *Quantizer
-	Concentrator   *Concentrator
-	Sampler        *Sampler
-	Writer         *Writer
+	Receiver     *HTTPReceiver
+	Concentrator *Concentrator
+	Sampler      *Sampler
+	Writer       *Writer
 
 	// config
-	Config *config.AgentConfig
+	conf *config.AgentConfig
 
 	// Used to synchronize on a clean exit
 	exit chan struct{}
@@ -31,128 +36,98 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 	exit := make(chan struct{})
 
 	r := NewHTTPReceiver(conf)
-	st := NewSublayerTagger(r.traces)
-	cf := NewCutoffFilter(st.out, conf)
-	q := NewQuantizer(cf.out)
-
-	cChan, sChan := chanTPipe(q.out)
-	c := NewConcentrator(cChan, conf)
-	s := NewSampler(sChan, conf)
+	c := NewConcentrator(
+		conf.ExtraAggregators,
+		conf.BucketInterval.Nanoseconds(),
+	)
+	s := NewSampler(conf)
 
 	w := NewWriter(conf)
 	w.inServices = r.services
 
 	return &Agent{
-		Config:         conf,
-		Receiver:       r,
-		SublayerTagger: st,
-		CutoffFilter:   cf,
-		Quantizer:      q,
-		Concentrator:   c,
-		Sampler:        s,
-		Writer:         w,
-		exit:           exit,
+		Receiver:     r,
+		Concentrator: c,
+		Sampler:      s,
+		Writer:       w,
+		conf:         conf,
+		exit:         exit,
 	}
 }
 
 // Run starts routers routines and individual pieces then stop them when the exit order is received
 func (a *Agent) Run() {
-	// Start all workers, last component first
+	flushTicker := time.NewTicker(a.conf.BucketInterval)
+	defer flushTicker.Stop()
+
+	a.Receiver.Run()
 	go a.Writer.Run()
-	go a.runFlusher()
-	go a.Sampler.Run()
-	go a.Concentrator.Run()
-	go a.Quantizer.Run()
-	go a.CutoffFilter.Run()
-	go a.SublayerTagger.Run()
-	go a.Receiver.Run()
 
-	<-a.exit
-	log.Info("exiting")
-	a.Stop()
-}
-
-// runFlusher periodically send a flush marker, collect the results and send the payload to the Writer
-func (a *Agent) runFlusher() {
-	ticker := time.NewTicker(a.Config.BucketInterval)
 	for {
 		select {
-		case <-ticker.C:
-			log.Debug("tick - agent triggering flush")
-			a.Quantizer.out <- model.NewTraceFlushMarker()
-
-			// Collect and merge partial flushs
-			var wg sync.WaitGroup
+		case t := <-a.Receiver.traces:
+			a.Process(t)
+		case <-flushTicker.C:
 			p := model.AgentPayload{
-				HostName: a.Config.HostName,
-				Env:      a.Config.DefaultEnv,
+				HostName: a.conf.HostName,
+				Env:      a.conf.DefaultEnv,
 			}
+			var wg sync.WaitGroup
 			wg.Add(2)
 			go func() {
 				defer wg.Done()
-				p.Stats = <-a.Concentrator.out
+				p.Stats = a.Concentrator.Flush()
 			}()
 			go func() {
 				defer wg.Done()
-				traces := <-a.Sampler.out
-				p.Traces = traces
+				p.Traces = a.Sampler.Flush()
 			}()
-			wg.Wait()
-			log.Debugf("tock - all routines flushed (%d stats, %d traces)", len(p.Stats), len(p.Traces))
 
-			if !p.IsEmpty() {
-				a.Writer.inPayloads <- p
-			} else {
-				log.Debug("flush produced an empty payload, skipping")
-			}
+			wg.Wait()
+
+			a.Writer.inPayloads <- p
 		case <-a.exit:
-			ticker.Stop()
+			log.Info("exiting")
+			close(a.Receiver.exit)
+			close(a.Writer.exit)
 			return
 		}
 	}
 }
 
-// Stop stops all components
-func (a *Agent) Stop() {
-	log.Info("stopping the trace-agent")
+// Process is the default work unit that receives a trace, transforms it and
+// passes it downstream
+func (a *Agent) Process(t model.Trace) {
+	if len(t) == 0 {
+		log.Debugf("skipping received empty trace")
+		return
+	}
 
-	close(a.Receiver.exit)
-	// this will stop in chain all of the agent components
-	close(a.SublayerTagger.in)
-	// flush last payload if possible
-	close(a.Writer.exit)
-}
+	sublayers := model.ComputeSublayers(&t)
+	root := t.GetRoot()
+	model.SetSublayersOnSpan(root, sublayers)
 
-// chanTPipe redistributes incoming traces to multiple components by returning multiple channels
-func chanTPipe(fromQuantizer chan model.Trace) (chan model.Trace, chan model.Trace) {
-	toConcentrator := make(chan model.Trace)
-	toSampler := make(chan model.Trace)
+	if root.End() < model.Now()-2*a.conf.BucketInterval.Nanoseconds() {
+		log.Debugf("skipping trace with root too far in past, root:%v", *root)
+		return
+	}
 
-	go func() {
-		for t := range fromQuantizer {
-			t2 := make(model.Trace, len(t))
-			copy(t2, t)
+	for i := range t {
+		t[i] = quantizer.Quantize(t[i])
+	}
 
-			for i := range t2 {
-				if t2[i].Metrics == nil {
-					continue
-				}
+	pt := processedTrace{
+		Trace:     t,
+		Root:      root,
+		Env:       a.conf.DefaultEnv,
+		Sublayers: sublayers,
+	}
+	if tenv := t.GetEnv(); tenv != "" {
+		pt.Env = tenv
+	}
 
-				// this hack is needed because Metrics are read by the concentrator
-				// (data from the sublayer tagger) and by the sampler which also writes
-				// data to it. This avoids concurrent read/write map clashes.
-				t2[i].Metrics = make(map[string]float64)
-				for k, v := range t[i].Metrics {
-					s2 := t2[i]
-					s2.Metrics[k] = v
-					t2[i] = s2
-				}
-			}
-
-			toConcentrator <- t
-			toSampler <- t2
-		}
-	}()
-
-	return toConcentrator, toSampler
+	// NOTE: right now we don't use the .Metrics map in the concentrator
+	// but if we did, it would be racy with the Sampler that edits it
+	go a.Concentrator.Add(pt)
+	go a.Sampler.Add(pt)
 }
