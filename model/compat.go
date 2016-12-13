@@ -1,5 +1,7 @@
 package model
 
+// TracesFromSpans transforms a slice of spans into a slice of traces
+// grouping them by trace IDs
 // FIXME[1.x] this can be removed as we get pre-assembled traces from
 // clients
 func TracesFromSpans(spans []Span) []Trace {

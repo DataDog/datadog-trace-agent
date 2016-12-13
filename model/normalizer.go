@@ -142,6 +142,14 @@ func (s *Span) Normalize() error {
 	return nil
 }
 
+// NormalizeTrace takes a trace and
+// * rejects the trace if there is a trace ID discrepancy in 2 spans
+// * rejects spans that cannot be normalized
+// * rejects empty traces
+// * rejects traces where all spans cannot be normalized
+// * return the number of spans rejected and
+//   - nil if the trace can be accepted
+//   - an error string if the trace needs to be dropped
 func NormalizeTrace(t *Trace) (int, error) {
 	badSpans := 0
 

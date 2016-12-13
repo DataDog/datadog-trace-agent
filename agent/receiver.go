@@ -41,7 +41,6 @@ func httpHandleWithVersion(v APIVersion, f func(APIVersion, http.ResponseWriter,
 	}
 }
 
-// receiverStats tracks statistics about incoming payloads
 // HTTPReceiver is a collector that uses HTTP protocol and just holds
 // a chan where the spans received are sent one by one
 type HTTPReceiver struct {

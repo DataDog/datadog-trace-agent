@@ -7,11 +7,13 @@ import (
 	"github.com/ugorji/go/codec"
 )
 
-// Decoder is the common interface that all decoders should honor
+// ClientDecoder is the common interface that all decoders should honor
 type ClientDecoder interface {
 	Decode(v interface{}) error
 }
 
+// DecoderFromContentType returns a ClientDecoder depending on the contentType value
+// orig. coming from a request header
 func DecoderFromContentType(contentType string, bodyBuffer io.Reader) ClientDecoder {
 	// select the right Decoder based on the given content-type header
 	switch contentType {
