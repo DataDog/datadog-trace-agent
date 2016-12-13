@@ -3,7 +3,7 @@ package main
 import (
 	"net/http"
 
-	"github.com/DataDog/dd-go/statsd"
+	"github.com/DataDog/raclette/statsd"
 )
 
 // HTTPFormatError is used for payload format errors
