@@ -52,7 +52,7 @@ func TestConsumerError(t *testing.T) {
 
 	output, err := consumer.Process(input)
 	assert.NotNil(err)
-	assert.Equal("Invalid SQL query", output)
+	assert.Equal("", output)
 }
 
 // Benchmark the Tokenizer using a SQL statement

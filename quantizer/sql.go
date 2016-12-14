@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	sqlVariableReplacement = "?"
-	sqlQueryTag            = "sql.query"
+	sqlQueryTag      = "sql.query"
+	sqlQuantizeError = "agent.parse.error"
 )
 
 // sets the filters used in the QuantizeSQL process
@@ -26,23 +26,23 @@ func QuantizeSQL(span model.Span) model.Span {
 		return span
 	}
 
-	// start quantization
 	log.Debugf("Quantize SQL command, generate resource from the query, SpanID: %d", span.SpanID)
-	resource, err := tokenQuantizer.Process(span.Resource)
+	quantizedString, err := tokenQuantizer.Process(span.Resource)
+
 	if err != nil {
-		// TODO[manu]: the quantization has found a LEX_ERROR and we should decide
-		// the best strategy to address the limit of our quantizer
-		span.Resource = resource
+		// if we have an error, the partially parsed SQL is discarded so that we don't pollute
+		// users resources. Here we may provide more information to debug the problem.
+		span.Resource = "Non-parsable SQL query"
 
 		if span.Meta == nil {
 			span.Meta = make(map[string]string)
 		}
 
-		span.Meta["sql.parse.error"] = resource
+		span.Meta[sqlQuantizeError] = "Query not parsed"
 		return span
 	}
 
-	span.Resource = resource
+	span.Resource = quantizedString
 
 	// set the sql.query tag if and only if it's not already set by users. If a users set
 	// this value, we send that value AS IS to the backend. If the value is not set, we
@@ -58,6 +58,6 @@ func QuantizeSQL(span model.Span) model.Span {
 		span.Meta = make(map[string]string)
 	}
 
-	span.Meta[sqlQueryTag] = resource
+	span.Meta[sqlQueryTag] = quantizedString
 	return span
 }

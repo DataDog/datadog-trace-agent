@@ -50,6 +50,19 @@ func TestSQLResourceWithoutQuery(t *testing.T) {
 	assert.Equal("SELECT * FROM users WHERE id = ?", spanQ.Meta["sql.query"])
 }
 
+func TestSQLResourceWithError(t *testing.T) {
+	assert := assert.New(t)
+	span := model.Span{
+		Resource: "SELECT * FROM users WHERE id = '' AND '",
+		Type:     "sql",
+	}
+
+	spanQ := Quantize(span)
+	assert.Equal("Non-parsable SQL query", spanQ.Resource)
+	assert.Equal("", spanQ.Meta["sql.query"])
+	assert.Equal("Query not parsed", spanQ.Meta["agent.parse.error"])
+}
+
 func TestSQLQuantizer(t *testing.T) {
 	assert := assert.New(t)
 

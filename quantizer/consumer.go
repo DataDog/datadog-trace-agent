@@ -66,16 +66,17 @@ type TokenConsumer struct {
 func (t *TokenConsumer) Process(in string) (string, error) {
 	out := &bytes.Buffer{}
 	t.tokenizer.InStream.Reset(in)
-	token, buff := t.tokenizer.Scan()
 
+	// reset the Tokenizer internals to reuse allocated memory
+	defer t.tokenizer.Reset()
+
+	token, buff := t.tokenizer.Scan()
 	for ; token != EOFChar; token, buff = t.tokenizer.Scan() {
 		// handle terminal case
 		if token == LexError {
-			// TODO[manu]: in this case the tokenizer is unable  to process the SQL
-			// string, so the output will be surely wrong. In this case we have to
-			// decide if we want to return a partial processed string, or just an
-			// error.
-			return "Invalid SQL query", errors.New("the tokenizer was unable to process the string")
+			// the tokenizer is unable  to process the SQL  string, so the output will be
+			// surely wrong. In this case we return an error and an empty string.
+			return "", errors.New("the tokenizer was unable to process the string")
 		}
 
 		// apply all registered filters
@@ -106,8 +107,6 @@ func (t *TokenConsumer) Process(in string) (string, error) {
 	result := r.ReplaceAllString(out.String(), " ? ")
 	result = strings.TrimSpace(result)
 
-	// reset the Tokenizer internals to reuse allocated memory
-	t.tokenizer.Reset()
 	return result, nil
 }
 
