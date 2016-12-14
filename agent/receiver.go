@@ -255,7 +255,7 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 
 // logStats periodically submits stats about the receiver to statsd
 func (r *HTTPReceiver) logStats() {
-	for range time.Tick(10 * time.Second) {
+	for range time.Tick(60 * time.Second) {
 		// Load counters and reset them for the next flush
 		spans := atomic.LoadInt64(&r.stats.SpansReceived)
 		r.stats.SpansReceived = 0
@@ -275,6 +275,7 @@ func (r *HTTPReceiver) logStats() {
 		statsd.Client.Count("trace_agent.receiver.trace_dropped", tdropped, nil, 1)
 
 		log.Infof("receiver handled %d spans, dropped %d ; handled %d traces, dropped %d", spans, sdropped, traces, tdropped)
+		r.logger.Reset()
 	}
 }
 

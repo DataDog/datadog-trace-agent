@@ -22,13 +22,14 @@ func (l *errorLogger) Errorf(format string, params ...interface{}) {
 		log.Errorf(format, params...)
 	}
 	if l.errors == maxPerInterval {
-		log.Errorf("too many error messages to display, truncating output till next period")
+		log.Infof("too many error messages to display, skipping output till next minute")
 	}
 
 	l.errors++
 }
 
 func (l *errorLogger) Reset() {
+	log.Infof("skipped %d errors", l.errors-maxPerInterval+1)
 	l.Lock()
 	l.errors = 0
 	l.Unlock()
