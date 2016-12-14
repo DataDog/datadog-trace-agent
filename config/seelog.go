@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/xml"
+	"fmt"
 	"strings"
 
 	log "github.com/cihub/seelog"
@@ -27,10 +28,15 @@ type seelog struct {
 	LogLevel string  `xml:"minlevel,attr"`
 }
 
-func newSeelogConfig() seelog {
+func newSeelogConfig(logFilePath string) seelog {
 	// Rotate log files when size reaches 10MB
+	outputXml := fmt.Sprintf(
+		"<console /> <rollingfile type=\"size\" filename=\"%s\" maxsize=\"10000000\" maxrolls=\"5\" />",
+		logFilePath,
+	)
+
 	return seelog{
-		Outputs: outputs{"common", "<console /> <rollingfile type=\"size\" filename=\"/var/log/datadog/trace-agent.log\" maxsize=\"10000000\" maxrolls=\"5\" />"},
+		Outputs: outputs{"common", outputXml},
 		Formats: formats{
 			format{
 				ID:     "common",
@@ -50,9 +56,8 @@ func NewLoggerLevel(debug bool) error {
 }
 
 // NewLoggerLevelCustom creates a logger with the given level.
-func NewLoggerLevelCustom(level string) error {
-	cfg := newSeelogConfig()
-
+func NewLoggerLevelCustom(level, logFilePath string) error {
+	cfg := newSeelogConfig(logFilePath)
 	ll, ok := log.LogLevelFromString(strings.ToLower(level))
 	if !ok {
 		ll = log.InfoLvl

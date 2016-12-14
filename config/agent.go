@@ -45,7 +45,8 @@ type AgentConfig struct {
 	StatsdPort int
 
 	// logging
-	LogLevel string
+	LogLevel    string
+	LogFilePath string
 }
 
 // mergeEnv applies overrides from environment variables to the trace agent configuration
@@ -118,7 +119,8 @@ func NewDefaultAgentConfig() *AgentConfig {
 		StatsdHost: "localhost",
 		StatsdPort: 8125,
 
-		LogLevel: "INFO",
+		LogLevel:    "INFO",
+		LogFilePath: "/var/log/datadog/trace-agent.log",
 	}
 
 	return ac
@@ -179,6 +181,10 @@ APM_CONF:
 
 	if v, _ := conf.Get("trace.config", "log_level"); v != "" {
 		c.LogLevel = v
+	}
+
+	if v, _ := conf.Get("trace.config", "log_file"); v != "" {
+		c.LogFilePath = v
 	}
 
 	if v, _ := conf.Get("trace.api", "api_key"); v != "" {
