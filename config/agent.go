@@ -177,6 +177,10 @@ APM_CONF:
 		c.DefaultEnv = v
 	}
 
+	if v, _ := conf.Get("trace.config", "log_level"); v != "" {
+		c.LogLevel = v
+	}
+
 	if v, _ := conf.Get("trace.api", "api_key"); v != "" {
 		vals := strings.Split(v, ",")
 		for i := range vals {
