@@ -47,7 +47,7 @@ func TestCassQuantizer(t *testing.T) {
 		},
 		{
 			"SELECT timestamp, processes FROM process_snapshot.minutely WHERE org_id = ? AND host = ? AND timestamp >= ? AND timestamp <= ?",
-			"SELECT timestamp, processes FROM process_snapshot.minutely WHERE org_id = :v1 AND host = :v2 AND timestamp >= :v3 AND timestamp <= :v4",
+			"SELECT timestamp, processes FROM process_snapshot.minutely WHERE org_id = ? AND host = ? AND timestamp >= ? AND timestamp <= ?",
 		},
 	}
 

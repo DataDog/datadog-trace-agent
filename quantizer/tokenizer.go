@@ -3,7 +3,6 @@ package quantizer
 
 import (
 	"bytes"
-	"fmt"
 	"strings"
 )
 
@@ -34,10 +33,9 @@ const (
 // Tokenizer is the struct used to generate SQL
 // tokens for the parser.
 type Tokenizer struct {
-	InStream    *strings.Reader
-	Position    int
-	lastChar    uint16
-	posVarIndex int
+	InStream *strings.Reader
+	Position int
+	lastChar uint16
 }
 
 // NewStringTokenizer creates a new Tokenizer for the
@@ -51,7 +49,6 @@ func (tkn *Tokenizer) Reset() {
 	tkn.InStream.Reset("")
 	tkn.Position = 0
 	tkn.lastChar = 0
-	tkn.posVarIndex = 0
 }
 
 // keywords used to recognize string tokens
@@ -86,13 +83,8 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 		switch ch {
 		case EOFCHAR:
 			return EOFCHAR, nil
-		case '=', ',', ';', '(', ')', '+', '*', '&', '|', '^', '~', '[', ']':
+		case '=', ',', ';', '(', ')', '+', '*', '&', '|', '^', '~', '[', ']', '?':
 			return int(ch), []byte{byte(ch)}
-		case '?':
-			tkn.posVarIndex++
-			buf := new(bytes.Buffer)
-			fmt.Fprintf(buf, ":v%d", tkn.posVarIndex)
-			return VALUE_ARG, buf.Bytes()
 		case '.':
 			if isDigit(tkn.lastChar) {
 				return tkn.scanNumber(true)

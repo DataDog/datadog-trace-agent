@@ -130,7 +130,7 @@ func TestSQLQuantizer(t *testing.T) {
 		},
 		{
 			"SELECT articles.* FROM articles WHERE ( title = ? ) AND ( author = ? )",
-			"SELECT articles.* FROM articles WHERE ( title = :v1 ) AND ( author = :v2 )",
+			"SELECT articles.* FROM articles WHERE ( title = ? ) AND ( author = ? )",
 		},
 		{
 			"SELECT articles.* FROM articles WHERE ( title = :title )",
