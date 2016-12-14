@@ -60,7 +60,7 @@ func (t *TokenConsumer) Process(in string) (string, error) {
 			// string, so the output will be surely wrong. In this case we have to
 			// decide if we want to return a partial processed string, or just an
 			// error.
-			return "", errors.New("the tokenizer was unable to process the string")
+			return "Invalid SQL query", errors.New("the tokenizer was unable to process the string")
 		}
 
 		// apply all registered filters

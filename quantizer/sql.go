@@ -32,6 +32,13 @@ func QuantizeSQL(span model.Span) model.Span {
 	if err != nil {
 		// TODO[manu]: the quantization has found a LEX_ERROR and we should decide
 		// the best strategy to address the limit of our quantizer
+		span.Resource = resource
+
+		if span.Meta == nil {
+			span.Meta = make(map[string]string)
+		}
+
+		span.Meta["sql.parse.error"] = resource
 		return span
 	}
 
