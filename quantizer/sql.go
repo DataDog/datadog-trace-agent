@@ -1,9 +1,6 @@
 package quantizer
 
 import (
-	"regexp"
-	"strings"
-
 	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/raclette/model"
@@ -14,31 +11,30 @@ const (
 	sqlQueryTag            = "sql.query"
 )
 
-var sqlVariablesRegexp = regexp.MustCompile("('[^']+')|([\\$]*\\b[0-9]+\\b)")
-var sqlLiteralsRegexp = regexp.MustCompile("\\b(?i:true|false|null)\\b")
-var sqlalchemyVariablesRegexp = regexp.MustCompile("%\\(.+?\\)s")
-var sqlListVariablesRegexp = regexp.MustCompile("\\?[\\? ,]+\\?")
-var sqlCommentsRegexp = regexp.MustCompile("(--[^\n]*)|(/\\*(.|\n)*?\\*/)")
+// sets the filters used in the QuantizeSQL process
+var sqlFilters = []TokenFilter{
+	&DiscardFilter{},
+	&ReplaceFilter{},
+}
 
-// CQL encodes query params with %s
-var cqlListVariablesRegex = regexp.MustCompile(`%s(([,\s]|%s)+%s\s*|)`) // (%s, %s, %s, %s)
+// is the token consumer that will quantize the query
+var tokenQuantizer = NewTokenConsumer(sqlFilters)
 
 // QuantizeSQL generates resource and sql.query meta for SQL spans
 func QuantizeSQL(span model.Span) model.Span {
-	// Trim spaces and ending special chars
-	query := span.Resource
-
-	// remove special characters to get a clean query
-	query = strings.TrimSpace(query)
-	query = strings.TrimSuffix(query, ";")
-
-	if query == "" {
-		span.Resource = query
+	if span.Resource == "" {
 		return span
 	}
 
+	// start quantization
 	log.Debugf("Quantize SQL command, generate resource from the query, SpanID: %d", span.SpanID)
-	resource := quantize(query)
+	resource, err := tokenQuantizer.Process(span.Resource)
+	if err != nil {
+		// TODO[manu]: the quantization has found a LEX_ERROR and we should decide
+		// the best strategy to address the limit of our quantizer
+		return span
+	}
+
 	span.Resource = resource
 
 	// set the sql.query tag if and only if it's not already set by users. If a users set
@@ -56,28 +52,5 @@ func QuantizeSQL(span model.Span) model.Span {
 	}
 
 	span.Meta[sqlQueryTag] = resource
-
 	return span
-}
-
-// quantize returns a quantized string for the given query
-func quantize(query string) string {
-	// Remove variables
-	query = sqlVariablesRegexp.ReplaceAllString(query, sqlVariableReplacement)
-	query = sqlLiteralsRegexp.ReplaceAllString(query, sqlVariableReplacement)
-	query = sqlalchemyVariablesRegexp.ReplaceAllString(query, sqlVariableReplacement)
-
-	// Deal with list of variables of arbitrary size
-	query = sqlListVariablesRegexp.ReplaceAllString(query, sqlVariableReplacement)
-
-	// Remove comments
-	query = sqlCommentsRegexp.ReplaceAllString(query, "")
-
-	// Uniform spacing
-	query = compactAllSpaces(query)
-
-	// Replace parenthesized variable lists (%s, %s, %s, %s)
-	query = cqlListVariablesRegex.ReplaceAllString(query, sqlVariableReplacement)
-
-	return query
 }
