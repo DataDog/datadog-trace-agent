@@ -34,7 +34,6 @@ var opts struct {
 	ddConfigFile string
 	configFile   string
 	debug        bool
-	logLevel     string
 	version      bool
 }
 
