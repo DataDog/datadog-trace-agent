@@ -25,7 +25,7 @@ type seelog struct {
 
 func newSeelogConfig() seelog {
 	return seelog{
-		Outputs: outputs{"common", "<console />"},
+		Outputs: outputs{"common", "<console /> <rollingfile type=\"size\" filename=\"/var/log/datadog/trace-agent.log\" maxsize=\"10000000\" maxrolls=\"5\" />"},
 		Formats: formats{
 			format{
 				ID:     "common",
