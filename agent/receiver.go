@@ -177,17 +177,17 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 	// normalize data
 	for i := range traces {
 		spans := len(traces[i])
-		dropped, err := model.NormalizeTrace(&traces[i])
+		normTrace, err := model.NormalizeTrace(traces[i])
 		if err != nil {
 			atomic.AddInt64(&r.stats.TracesDropped, 1)
-			r.logger.Errorf("dropping trace %v, reason: %s", traces[i], err)
+			r.logger.Errorf("dropping trace %50v, reason: %s (debug for more info)", normTrace, err)
 		} else {
-			r.traces <- traces[i]
+			r.traces <- normTrace
 		}
 
 		atomic.AddInt64(&r.stats.TracesReceived, 1)
 		atomic.AddInt64(&r.stats.SpansReceived, int64(spans))
-		atomic.AddInt64(&r.stats.SpansDropped, int64(dropped))
+		atomic.AddInt64(&r.stats.SpansDropped, int64(spans-len(normTrace)))
 	}
 }
 
