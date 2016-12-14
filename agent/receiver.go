@@ -180,14 +180,21 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		normTrace, err := model.NormalizeTrace(traces[i])
 		if err != nil {
 			atomic.AddInt64(&r.stats.TracesDropped, 1)
-			r.logger.Errorf("dropping trace %50v, reason: %s (debug for more info)", normTrace, err)
+			atomic.AddInt64(&r.stats.SpansDropped, int64(spans))
+
+			// this is a potentially very spammy log message, so extra care
+			errorMsg := fmt.Sprintf("dropping trace reason: %s (debug for more info), %v", err, normTrace)
+			if len(errorMsg) > 150 {
+				errorMsg = errorMsg[:150] + "..."
+			}
+			r.logger.Errorf(errorMsg)
 		} else {
+			atomic.AddInt64(&r.stats.SpansDropped, int64(spans-len(normTrace)))
 			r.traces <- normTrace
 		}
 
 		atomic.AddInt64(&r.stats.TracesReceived, 1)
 		atomic.AddInt64(&r.stats.SpansReceived, int64(spans))
-		atomic.AddInt64(&r.stats.SpansDropped, int64(spans-len(normTrace)))
 	}
 }
 
