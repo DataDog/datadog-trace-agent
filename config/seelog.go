@@ -1,7 +1,11 @@
 package config
 
-import "encoding/xml"
-import log "github.com/cihub/seelog"
+import (
+	"encoding/xml"
+	"strings"
+
+	log "github.com/cihub/seelog"
+)
 
 type outputs struct {
 	FormatID string `xml:"formatid,attr"`
@@ -47,7 +51,13 @@ func NewLoggerLevel(debug bool) error {
 // NewLoggerLevelCustom creates a logger with the given level.
 func NewLoggerLevelCustom(level string) error {
 	cfg := newSeelogConfig()
-	cfg.LogLevel = level
+
+	ll, ok := log.LogLevelFromString(strings.ToLower(level))
+	if !ok {
+		ll = log.InfoLvl
+	}
+	cfg.LogLevel = ll.String()
+
 	l, err := log.LoggerFromConfigAsString(cfg.String())
 	if err != nil {
 		return err
