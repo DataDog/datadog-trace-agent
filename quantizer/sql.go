@@ -31,7 +31,8 @@ func QuantizeSQL(span model.Span) model.Span {
 
 	if err != nil {
 		// if we have an error, the partially parsed SQL is discarded so that we don't pollute
-		// users resources. Here we may provide more information to debug the problem.
+		// users resources. Here we provide more details to debug the problem.
+		log.Debugf("Error parsing the query: `%s`", span.Resource)
 		span.Resource = "Non-parsable SQL query"
 
 		if span.Meta == nil {
