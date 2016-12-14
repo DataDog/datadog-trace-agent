@@ -197,6 +197,18 @@ func TestSQLQuantizer(t *testing.T) {
 			`INSERT INTO delayed_jobs (attempts, created_at, failed_at, handler, last_error, locked_at, locked_by, priority, queue, run_at, updated_at) VALUES (0, '2016-12-04 17:09:59', NULL, '--- !ruby/object:Delayed::PerformableMethod\nobject: !ruby/object:Item\n  store:\n  - a simple string\n  - an \'escaped \' string\n  - another \'escaped\' string\n  - 42\n  string: a string with many \\\\\'escapes\\\\\'\nmethod_name: :show_store\nargs: []\n', NULL, NULL, NULL, 0, NULL, '2016-12-04 17:09:59', '2016-12-04 17:09:59')`,
 			"INSERT INTO delayed_jobs ( attempts, created_at, failed_at, handler, last_error, locked_at, locked_by, priority, queue, run_at, updated_at ) VALUES ?",
 		},
+		{
+			"SELECT name, pretty_print(address) FROM people;",
+			"SELECT name, pretty_print ( address ) FROM people",
+		},
+		{
+			"* SELECT * FROM fake_data(1, 2, 3);",
+			"* SELECT * FROM fake_data ?",
+		},
+		{
+			"CREATE FUNCTION add(integer, integer) RETURNS integer\n AS 'select $1 + $2;'\n LANGUAGE SQL\n IMMUTABLE\n RETURNS NULL ON NULL INPUT;",
+			"CREATE FUNCTION add ( integer, integer ) RETURNS integer AS ? LANGUAGE SQL IMMUTABLE RETURNS ? ON ? INPUT",
+		},
 	}
 
 	for _, c := range cases {
