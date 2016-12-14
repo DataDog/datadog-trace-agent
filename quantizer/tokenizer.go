@@ -1,4 +1,3 @@
-// the tokenizer.go implementation has been inspired by https://github.com/youtube/vitess sql parser
 package quantizer
 
 import (
@@ -6,28 +5,30 @@ import (
 	"strings"
 )
 
+// the tokenizer.go implementation has been inspired by https://github.com/youtube/vitess sql parser
+
 // list of available tokens; this list has been reduced because we don't
 // need a full-fledged tokenizer to implement a Lexer
 const (
-	EOFCHAR            = 0x100
-	LEX_ERROR          = 57346
-	ID                 = 57347
-	LIMIT              = 57348
-	NULL               = 57349
-	STRING             = 57350
-	NUMBER             = 57351
-	BOOLEAN_LITERAL    = 57352
-	VALUE_ARG          = 57353
-	LIST_ARG           = 57354
-	COMMENT            = 57355
-	VARIABLE           = 57356
-	SAVEPOINT          = 57357
-	PREPARED_STATEMENT = 57358
-	ESCAPE_SEQUENCE    = 57359
-	NULL_SAFE_EQUAL    = 57360
-	LE                 = 57361
-	GE                 = 57362
-	NE                 = 57363
+	EOFChar           = 0x100
+	LexError          = 57346
+	ID                = 57347
+	Limit             = 57348
+	Null              = 57349
+	String            = 57350
+	Number            = 57351
+	BooleanLiteral    = 57352
+	ValueArg          = 57353
+	ListArg           = 57354
+	Comment           = 57355
+	Variable          = 57356
+	Savepoint         = 57357
+	PreparedStatement = 57358
+	EscapeSequence    = 57359
+	NullSafeEqual     = 57360
+	LE                = 57361
+	GE                = 57362
+	NE                = 57363
 )
 
 // Tokenizer is the struct used to generate SQL
@@ -53,11 +54,11 @@ func (tkn *Tokenizer) Reset() {
 
 // keywords used to recognize string tokens
 var keywords = map[string]int{
-	"NULL":      NULL,
-	"TRUE":      BOOLEAN_LITERAL,
-	"FALSE":     BOOLEAN_LITERAL,
-	"SAVEPOINT": SAVEPOINT,
-	"LIMIT":     LIMIT,
+	"NULL":      Null,
+	"TRUE":      BooleanLiteral,
+	"FALSE":     BooleanLiteral,
+	"SAVEPOINT": Savepoint,
+	"LIMIT":     Limit,
 }
 
 // Scan scans the tokenizer for the next token and returns
@@ -81,16 +82,15 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 	default:
 		tkn.next()
 		switch ch {
-		case EOFCHAR:
-			return EOFCHAR, nil
+		case EOFChar:
+			return EOFChar, nil
 		case '=', ',', ';', '(', ')', '+', '*', '&', '|', '^', '~', '[', ']', '?':
 			return int(ch), []byte{byte(ch)}
 		case '.':
 			if isDigit(tkn.lastChar) {
 				return tkn.scanNumber(true)
-			} else {
-				return int(ch), []byte{byte(ch)}
 			}
+			return int(ch), []byte{byte(ch)}
 		case '/':
 			switch tkn.lastChar {
 			case '/':
@@ -106,9 +106,8 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 			if tkn.lastChar == '-' {
 				tkn.next()
 				return tkn.scanCommentType1("--")
-			} else {
-				return int(ch), []byte{byte(ch)}
 			}
+			return int(ch), []byte{byte(ch)}
 		case '<':
 			switch tkn.lastChar {
 			case '>':
@@ -119,7 +118,7 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 				switch tkn.lastChar {
 				case '>':
 					tkn.next()
-					return NULL_SAFE_EQUAL, []byte("<=>")
+					return NullSafeEqual, []byte("<=>")
 				default:
 					return LE, []byte("<=")
 				}
@@ -130,17 +129,16 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 			if tkn.lastChar == '=' {
 				tkn.next()
 				return GE, []byte(">=")
-			} else {
-				return int(ch), []byte{byte(ch)}
 			}
+			return int(ch), []byte{byte(ch)}
 		case '!':
 			if tkn.lastChar == '=' {
 				tkn.next()
 				return NE, []byte("!=")
 			}
-			return LEX_ERROR, []byte("!")
+			return LexError, []byte("!")
 		case '\'':
-			return tkn.scanString(ch, STRING)
+			return tkn.scanString(ch, String)
 		case '`':
 			return tkn.scanLiteralIdentifier('`')
 		case '"':
@@ -148,15 +146,14 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 		case '%':
 			if tkn.lastChar == '(' {
 				return tkn.scanVariableIdentifier('%')
-			} else {
-				return tkn.scanFormatParameter('%')
 			}
+			return tkn.scanFormatParameter('%')
 		case '$':
 			return tkn.scanPreparedStatement('$')
 		case '{':
 			return tkn.scanEscapeSequence('{')
 		default:
-			return LEX_ERROR, []byte{byte(ch)}
+			return LexError, []byte{byte(ch)}
 		}
 	}
 }
@@ -178,9 +175,9 @@ func (tkn *Tokenizer) scanIdentifier() (int, []byte) {
 		buffer.WriteByte(byte(tkn.lastChar))
 		tkn.next()
 	}
-	lowered := bytes.ToUpper(buffer.Bytes())
-	if keywordId, found := keywords[string(lowered)]; found {
-		return keywordId, lowered
+	upper := bytes.ToUpper(buffer.Bytes())
+	if keywordID, found := keywords[string(upper)]; found {
+		return keywordID, upper
 	}
 	return ID, buffer.Bytes()
 }
@@ -189,7 +186,7 @@ func (tkn *Tokenizer) scanLiteralIdentifier(quote rune) (int, []byte) {
 	buffer := &bytes.Buffer{}
 	buffer.WriteByte(byte(tkn.lastChar))
 	if !isLetter(tkn.lastChar) {
-		return LEX_ERROR, buffer.Bytes()
+		return LexError, buffer.Bytes()
 	}
 	for tkn.next(); isLetter(tkn.lastChar) || isDigit(tkn.lastChar); tkn.next() {
 		buffer.WriteByte(byte(tkn.lastChar))
@@ -197,7 +194,7 @@ func (tkn *Tokenizer) scanLiteralIdentifier(quote rune) (int, []byte) {
 
 	// literals identifier are enclosed between quotes
 	if tkn.lastChar != uint16(quote) {
-		return LEX_ERROR, buffer.Bytes()
+		return LexError, buffer.Bytes()
 	}
 	tkn.next()
 	return ID, buffer.Bytes()
@@ -210,7 +207,7 @@ func (tkn *Tokenizer) scanVariableIdentifier(prefix rune) (int, []byte) {
 
 	// expects that the variable is enclosed between '(' and ')' parenthesis
 	if tkn.lastChar != '(' {
-		return LEX_ERROR, buffer.Bytes()
+		return LexError, buffer.Bytes()
 	}
 	for tkn.next(); tkn.lastChar != ')'; tkn.next() {
 		buffer.WriteByte(byte(tkn.lastChar))
@@ -220,10 +217,10 @@ func (tkn *Tokenizer) scanVariableIdentifier(prefix rune) (int, []byte) {
 	tkn.next()
 	buffer.WriteByte(byte(tkn.lastChar))
 	if !isLetter(tkn.lastChar) {
-		return LEX_ERROR, buffer.Bytes()
+		return LexError, buffer.Bytes()
 	}
 	tkn.next()
-	return VARIABLE, buffer.Bytes()
+	return Variable, buffer.Bytes()
 }
 
 func (tkn *Tokenizer) scanFormatParameter(prefix rune) (int, []byte) {
@@ -234,11 +231,11 @@ func (tkn *Tokenizer) scanFormatParameter(prefix rune) (int, []byte) {
 	// a format parameter is like '%s' so it should be a letter otherwise
 	// we're having something different
 	if !isLetter(tkn.lastChar) {
-		return LEX_ERROR, buffer.Bytes()
+		return LexError, buffer.Bytes()
 	}
 
 	tkn.next()
-	return VARIABLE, buffer.Bytes()
+	return Variable, buffer.Bytes()
 }
 
 func (tkn *Tokenizer) scanPreparedStatement(prefix rune) (int, []byte) {
@@ -246,52 +243,52 @@ func (tkn *Tokenizer) scanPreparedStatement(prefix rune) (int, []byte) {
 
 	// a prepared statement expect a digit identifier like $1
 	if !isDigit(tkn.lastChar) {
-		return LEX_ERROR, buffer.Bytes()
+		return LexError, buffer.Bytes()
 	}
 
 	// read numbers and return an error if any
 	token, buff := tkn.scanNumber(false)
-	if token == LEX_ERROR {
-		return LEX_ERROR, buffer.Bytes()
+	if token == LexError {
+		return LexError, buffer.Bytes()
 	}
 
 	buffer.WriteRune(prefix)
 	buffer.Write(buff)
-	return PREPARED_STATEMENT, buffer.Bytes()
+	return PreparedStatement, buffer.Bytes()
 }
 
 func (tkn *Tokenizer) scanEscapeSequence(braces rune) (int, []byte) {
 	buffer := &bytes.Buffer{}
 	buffer.WriteByte(byte(braces))
 
-	for tkn.lastChar != '}' && tkn.lastChar != EOFCHAR {
+	for tkn.lastChar != '}' && tkn.lastChar != EOFChar {
 		buffer.WriteByte(byte(tkn.lastChar))
 		tkn.next()
 	}
 
 	// we've reached the end of the string without finding
 	// the closing curly braces
-	if tkn.lastChar == EOFCHAR {
-		return LEX_ERROR, buffer.Bytes()
+	if tkn.lastChar == EOFChar {
+		return LexError, buffer.Bytes()
 	}
 
 	buffer.WriteByte(byte(tkn.lastChar))
 	tkn.next()
-	return ESCAPE_SEQUENCE, buffer.Bytes()
+	return EscapeSequence, buffer.Bytes()
 }
 
 func (tkn *Tokenizer) scanBindVar() (int, []byte) {
 	buffer := &bytes.Buffer{}
 	buffer.WriteByte(byte(tkn.lastChar))
-	token := VALUE_ARG
+	token := ValueArg
 	tkn.next()
 	if tkn.lastChar == ':' {
-		token = LIST_ARG
+		token = ListArg
 		buffer.WriteByte(byte(tkn.lastChar))
 		tkn.next()
 	}
 	if !isLetter(tkn.lastChar) {
-		return LEX_ERROR, buffer.Bytes()
+		return LexError, buffer.Bytes()
 	}
 	for isLetter(tkn.lastChar) || isDigit(tkn.lastChar) || tkn.lastChar == '.' {
 		buffer.WriteByte(byte(tkn.lastChar))
@@ -302,7 +299,7 @@ func (tkn *Tokenizer) scanBindVar() (int, []byte) {
 
 func (tkn *Tokenizer) scanMantissa(base int, buffer *bytes.Buffer) {
 	for digitVal(tkn.lastChar) < base {
-		tkn.ConsumeNext(buffer)
+		tkn.consumeNext(buffer)
 	}
 }
 
@@ -316,10 +313,10 @@ func (tkn *Tokenizer) scanNumber(seenDecimalPoint bool) (int, []byte) {
 
 	if tkn.lastChar == '0' {
 		// int or float
-		tkn.ConsumeNext(buffer)
+		tkn.consumeNext(buffer)
 		if tkn.lastChar == 'x' || tkn.lastChar == 'X' {
 			// hexadecimal int
-			tkn.ConsumeNext(buffer)
+			tkn.consumeNext(buffer)
 			tkn.scanMantissa(16, buffer)
 		} else {
 			// octal int or float
@@ -335,7 +332,7 @@ func (tkn *Tokenizer) scanNumber(seenDecimalPoint bool) (int, []byte) {
 			}
 			// octal int
 			if seenDecimalDigit {
-				return LEX_ERROR, buffer.Bytes()
+				return LexError, buffer.Bytes()
 			}
 		}
 		goto exit
@@ -346,21 +343,21 @@ func (tkn *Tokenizer) scanNumber(seenDecimalPoint bool) (int, []byte) {
 
 fraction:
 	if tkn.lastChar == '.' {
-		tkn.ConsumeNext(buffer)
+		tkn.consumeNext(buffer)
 		tkn.scanMantissa(10, buffer)
 	}
 
 exponent:
 	if tkn.lastChar == 'e' || tkn.lastChar == 'E' {
-		tkn.ConsumeNext(buffer)
+		tkn.consumeNext(buffer)
 		if tkn.lastChar == '+' || tkn.lastChar == '-' {
-			tkn.ConsumeNext(buffer)
+			tkn.consumeNext(buffer)
 		}
 		tkn.scanMantissa(10, buffer)
 	}
 
 exit:
-	return NUMBER, buffer.Bytes()
+	return Number, buffer.Bytes()
 }
 
 func (tkn *Tokenizer) scanString(delim uint16, typ int) (int, []byte) {
@@ -375,15 +372,15 @@ func (tkn *Tokenizer) scanString(delim uint16, typ int) (int, []byte) {
 				break
 			}
 		} else if ch == '\\' {
-			if tkn.lastChar == EOFCHAR {
-				return LEX_ERROR, buffer.Bytes()
+			if tkn.lastChar == EOFChar {
+				return LexError, buffer.Bytes()
 			}
 
 			ch = tkn.lastChar
 			tkn.next()
 		}
-		if ch == EOFCHAR {
-			return LEX_ERROR, buffer.Bytes()
+		if ch == EOFChar {
+			return LexError, buffer.Bytes()
 		}
 		buffer.WriteByte(byte(ch))
 	}
@@ -393,14 +390,14 @@ func (tkn *Tokenizer) scanString(delim uint16, typ int) (int, []byte) {
 func (tkn *Tokenizer) scanCommentType1(prefix string) (int, []byte) {
 	buffer := &bytes.Buffer{}
 	buffer.WriteString(prefix)
-	for tkn.lastChar != EOFCHAR {
+	for tkn.lastChar != EOFChar {
 		if tkn.lastChar == '\n' {
-			tkn.ConsumeNext(buffer)
+			tkn.consumeNext(buffer)
 			break
 		}
-		tkn.ConsumeNext(buffer)
+		tkn.consumeNext(buffer)
 	}
-	return COMMENT, buffer.Bytes()
+	return Comment, buffer.Bytes()
 }
 
 func (tkn *Tokenizer) scanCommentType2() (int, []byte) {
@@ -408,23 +405,23 @@ func (tkn *Tokenizer) scanCommentType2() (int, []byte) {
 	buffer.WriteString("/*")
 	for {
 		if tkn.lastChar == '*' {
-			tkn.ConsumeNext(buffer)
+			tkn.consumeNext(buffer)
 			if tkn.lastChar == '/' {
-				tkn.ConsumeNext(buffer)
+				tkn.consumeNext(buffer)
 				break
 			}
 			continue
 		}
-		if tkn.lastChar == EOFCHAR {
-			return LEX_ERROR, buffer.Bytes()
+		if tkn.lastChar == EOFChar {
+			return LexError, buffer.Bytes()
 		}
-		tkn.ConsumeNext(buffer)
+		tkn.consumeNext(buffer)
 	}
-	return COMMENT, buffer.Bytes()
+	return Comment, buffer.Bytes()
 }
 
-func (tkn *Tokenizer) ConsumeNext(buffer *bytes.Buffer) {
-	if tkn.lastChar == EOFCHAR {
+func (tkn *Tokenizer) consumeNext(buffer *bytes.Buffer) {
+	if tkn.lastChar == EOFChar {
 		// This should never happen.
 		panic("unexpected EOF")
 	}
@@ -435,7 +432,7 @@ func (tkn *Tokenizer) ConsumeNext(buffer *bytes.Buffer) {
 func (tkn *Tokenizer) next() {
 	if ch, err := tkn.InStream.ReadByte(); err != nil {
 		// Only EOF is possible.
-		tkn.lastChar = EOFCHAR
+		tkn.lastChar = EOFChar
 	} else {
 		tkn.lastChar = uint16(ch)
 	}
