@@ -30,13 +30,13 @@ type seelog struct {
 
 func newSeelogConfig(logFilePath string) seelog {
 	// Rotate log files when size reaches 10MB
-	outputXml := fmt.Sprintf(
+	outputXML := fmt.Sprintf(
 		"<console /> <rollingfile type=\"size\" filename=\"%s\" maxsize=\"10000000\" maxrolls=\"5\" />",
 		logFilePath,
 	)
 
 	return seelog{
-		Outputs: outputs{"common", outputXml},
+		Outputs: outputs{"common", outputXML},
 		Formats: formats{
 			format{
 				ID:     "common",
