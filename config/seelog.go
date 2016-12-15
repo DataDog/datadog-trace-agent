@@ -47,14 +47,6 @@ func newSeelogConfig(logFilePath string) seelog {
 	}
 }
 
-// NewLoggerLevel sets the global log level.
-func NewLoggerLevel(debug bool) error {
-	if debug {
-		return NewLoggerLevelCustom("debug")
-	}
-	return NewLoggerLevelCustom("info")
-}
-
 // NewLoggerLevelCustom creates a logger with the given level.
 func NewLoggerLevelCustom(level, logFilePath string) error {
 	cfg := newSeelogConfig(logFilePath)
