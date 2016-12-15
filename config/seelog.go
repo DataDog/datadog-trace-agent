@@ -55,7 +55,6 @@ func NewLoggerLevelCustom(level, logFilePath string) error {
 		ll = log.InfoLvl
 	}
 	cfg.LogLevel = ll.String()
-
 	l, err := log.LoggerFromConfigAsString(cfg.String())
 	if err != nil {
 		return err

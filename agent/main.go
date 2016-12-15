@@ -102,6 +102,7 @@ func main() {
 	if opts.debug {
 		level = "debug"
 	}
+
 	err = config.NewLoggerLevelCustom(level, agentConf.LogFilePath)
 	if err != nil {
 		panic(fmt.Errorf("error with logger: %v", err))
