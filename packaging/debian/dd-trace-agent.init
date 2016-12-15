@@ -23,7 +23,7 @@ case "$1" in
         start-stop-daemon --start --quiet --oknodo --background \
             --make-pidfile --pidfile $TRACE_PIDFILE --chuid dd-agent \
             --startas /bin/bash -- -c \
-            "exec $DAEMON >> /var/log/datadog/trace-agent.log 2>&1"
+            "exec $DAEMON 2>&1"
         ;;
 
     stop)
@@ -39,7 +39,7 @@ case "$1" in
         start-stop-daemon --start --quiet --oknodo --background \
             --make-pidfile --pidfile $TRACE_PIDFILE --chuid dd-agent \
             --startas /bin/bash -- -c \
-            "exec $DAEMON >> /var/log/datadog/trace-agent.log 2>&1"
+            "exec $DAEMON 2>&1"
         ;;
 
     status)

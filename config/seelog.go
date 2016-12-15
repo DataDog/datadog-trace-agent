@@ -1,7 +1,12 @@
 package config
 
-import "encoding/xml"
-import log "github.com/cihub/seelog"
+import (
+	"encoding/xml"
+	"fmt"
+	"strings"
+
+	log "github.com/cihub/seelog"
+)
 
 type outputs struct {
 	FormatID string `xml:"formatid,attr"`
@@ -23,9 +28,15 @@ type seelog struct {
 	LogLevel string  `xml:"minlevel,attr"`
 }
 
-func newSeelogConfig() seelog {
+func newSeelogConfig(logFilePath string) seelog {
+	// Rotate log files when size reaches 10MB
+	outputXML := fmt.Sprintf(
+		"<console /> <rollingfile type=\"size\" filename=\"%s\" maxsize=\"10000000\" maxrolls=\"5\" />",
+		logFilePath,
+	)
+
 	return seelog{
-		Outputs: outputs{"common", "<console />"},
+		Outputs: outputs{"common", outputXML},
 		Formats: formats{
 			format{
 				ID:     "common",
@@ -36,18 +47,14 @@ func newSeelogConfig() seelog {
 	}
 }
 
-// NewLoggerLevel sets the global log level.
-func NewLoggerLevel(debug bool) error {
-	if debug {
-		return NewLoggerLevelCustom("debug")
-	}
-	return NewLoggerLevelCustom("info")
-}
-
 // NewLoggerLevelCustom creates a logger with the given level.
-func NewLoggerLevelCustom(level string) error {
-	cfg := newSeelogConfig()
-	cfg.LogLevel = level
+func NewLoggerLevelCustom(level, logFilePath string) error {
+	cfg := newSeelogConfig(logFilePath)
+	ll, ok := log.LogLevelFromString(strings.ToLower(level))
+	if !ok {
+		ll = log.InfoLvl
+	}
+	cfg.LogLevel = ll.String()
 	l, err := log.LoggerFromConfigAsString(cfg.String())
 	if err != nil {
 		return err

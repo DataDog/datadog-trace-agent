@@ -10,4 +10,4 @@ respawn limit 10 5
 
 setuid dd-agent
 
-exec /opt/datadog-agent/bin/trace-agent >> /var/log/datadog/trace-agent.log 2>&1
+exec /opt/datadog-agent/bin/trace-agent 2>&1
