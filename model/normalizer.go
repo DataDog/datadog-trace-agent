@@ -172,7 +172,8 @@ func NormalizeTrace(t Trace) (Trace, error) {
 		return t, errors.New("empty trace, or all spans dropped")
 	}
 
-	for _, idx := range toRemove {
+	for i := len(toRemove) - 1; i >= 0; i-- {
+		idx := toRemove[i]
 		t[idx] = t[len(t)-1]
 		t = t[:len(t)-1]
 	}
