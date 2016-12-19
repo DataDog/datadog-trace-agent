@@ -52,15 +52,35 @@ func TestSQLResourceWithoutQuery(t *testing.T) {
 
 func TestSQLResourceWithError(t *testing.T) {
 	assert := assert.New(t)
-	span := model.Span{
-		Resource: "SELECT * FROM users WHERE id = '' AND '",
-		Type:     "sql",
+	testCases := []struct {
+		span model.Span
+	}{
+		{
+			model.Span{
+				Resource: "SELECT * FROM users WHERE id = '' AND '",
+				Type:     "sql",
+			},
+		},
+		{
+			model.Span{
+				Resource: "INSERT INTO pages (id, name) VALUES (%(id0)s, %(name0)s), (%(id1)s, %(name1",
+				Type:     "sql",
+			},
+		},
+		{
+			model.Span{
+				Resource: "INSERT INTO pages (id, name) VALUES (%(id0)s, %(name0)s), (%(id1)s, %(name1)",
+				Type:     "sql",
+			},
+		},
 	}
 
-	spanQ := Quantize(span)
-	assert.Equal("Non-parsable SQL query", spanQ.Resource)
-	assert.Equal("", spanQ.Meta["sql.query"])
-	assert.Equal("Query not parsed", spanQ.Meta["agent.parse.error"])
+	for _, tc := range testCases {
+		spanQ := Quantize(tc.span)
+		assert.Equal("Non-parsable SQL query", spanQ.Resource)
+		assert.Equal("", spanQ.Meta["sql.query"])
+		assert.Equal("Query not parsed", spanQ.Meta["agent.parse.error"])
+	}
 }
 
 func TestSQLQuantizer(t *testing.T) {
@@ -208,10 +228,6 @@ func TestSQLQuantizer(t *testing.T) {
 		{
 			"CREATE FUNCTION add(integer, integer) RETURNS integer\n AS 'select $1 + $2;'\n LANGUAGE SQL\n IMMUTABLE\n RETURNS NULL ON NULL INPUT;",
 			"CREATE FUNCTION add ( integer, integer ) RETURNS integer AS ? LANGUAGE SQL IMMUTABLE RETURNS ? ON ? INPUT",
-		},
-		{
-			"INSERT INTO pages (id, name) VALUES (%(id0)s, %(name0)s), (%(id1)s, %(name1",
-			"Non-parsable SQL query",
 		},
 	}
 
