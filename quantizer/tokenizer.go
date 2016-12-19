@@ -209,7 +209,7 @@ func (tkn *Tokenizer) scanVariableIdentifier(prefix rune) (int, []byte) {
 	if tkn.lastChar != '(' {
 		return LexError, buffer.Bytes()
 	}
-	for tkn.next(); tkn.lastChar != ')'; tkn.next() {
+	for tkn.next(); tkn.lastChar != ')' && tkn.lastChar != EOFChar; tkn.next() {
 		buffer.WriteByte(byte(tkn.lastChar))
 	}
 
