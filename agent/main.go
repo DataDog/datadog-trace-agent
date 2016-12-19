@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/DataDog/raclette/config"
-	"github.com/DataDog/raclette/statsd"
+	"github.com/DataDog/datadog-trace-agent/config"
+	"github.com/DataDog/datadog-trace-agent/statsd"
 	log "github.com/cihub/seelog"
 )
 

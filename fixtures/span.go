@@ -10,7 +10,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/DataDog/raclette/model"
+	"github.com/DataDog/datadog-trace-agent/model"
 )
 
 // YearNS is the number of nanoseconds in a year

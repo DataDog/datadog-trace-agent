@@ -4,7 +4,7 @@ DISTRIBUTION = $(DISTRO)
 TRACE_AGENT_VERSION ?= 0.99.0
 PACKAGEVERSION = $(TRACE_AGENT_VERSION)-0~$(DISTRIBUTION)0
 TARBALL = dd-trace-agent-$(VERSION).tar.gz
-URL = https://github.com/DataDog/raclette
+URL = https://github.com/DataDog/datadog-trace-agent
 
 %:
 	dh $@

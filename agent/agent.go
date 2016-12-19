@@ -4,8 +4,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DataDog/raclette/config"
-	"github.com/DataDog/raclette/model"
+	"github.com/DataDog/datadog-trace-agent/config"
+	"github.com/DataDog/datadog-trace-agent/model"
 	log "github.com/cihub/seelog"
 )
 

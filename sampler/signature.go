@@ -4,7 +4,7 @@ import (
 	"hash/fnv"
 	"sort"
 
-	"github.com/DataDog/raclette/model"
+	"github.com/DataDog/datadog-trace-agent/model"
 )
 
 // Signature is a simple representation of trace, used to identify simlar traces

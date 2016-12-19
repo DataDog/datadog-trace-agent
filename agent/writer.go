@@ -5,8 +5,8 @@ import (
 
 	log "github.com/cihub/seelog"
 
-	"github.com/DataDog/raclette/config"
-	"github.com/DataDog/raclette/model"
+	"github.com/DataDog/datadog-trace-agent/config"
+	"github.com/DataDog/datadog-trace-agent/model"
 )
 
 // Writer is the last chain of trace-agent which takes the

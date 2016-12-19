@@ -1,5 +1,5 @@
-%define _builddir /go/src/github.com/DataDog/raclette
-%define _rpmdir /go/src/github.com/DataDog/raclette/RPMS
+%define _builddir /go/src/github.com/DataDog/datadog-trace-agent
+%define _rpmdir /go/src/github.com/DataDog/datadog-trace-agent/RPMS
 
 Name: dd-trace-agent
 Version: 0.99.0
@@ -7,7 +7,7 @@ Requires: datadog-agent >= 1:5.8.0-1
 Release: 1
 License: BSD
 Summary: A tracing agent crafted with <3 from Datadog
-Buildroot: /go/src/github.com/DataDog/raclette
+Buildroot: /go/src/github.com/DataDog/datadog-trace-agent
 Packager: Datadog <dev@datadoghq.com>
 BuildRequires: systemd
 

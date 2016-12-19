@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 
-	"github.com/DataDog/raclette/model"
+	"github.com/DataDog/datadog-trace-agent/model"
 )
 
 const (

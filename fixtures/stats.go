@@ -2,8 +2,7 @@ package fixtures
 
 import (
 	"encoding/json"
-
-	"github.com/DataDog/raclette/model"
+	"github.com/DataDog/datadog-trace-agent/model"
 )
 
 var defaultAggregators = []string{"service", "resource"}
