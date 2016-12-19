@@ -1,45 +1,49 @@
 package quantizer
 
 import (
-	"regexp"
-	"strings"
-
 	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/raclette/model"
 )
 
 const (
-	sqlVariableReplacement = "?"
-	sqlQueryTag            = "sql.query"
+	sqlQueryTag      = "sql.query"
+	sqlQuantizeError = "agent.parse.error"
 )
 
-var sqlVariablesRegexp = regexp.MustCompile("('[^']+')|([\\$]*\\b[0-9]+\\b)")
-var sqlLiteralsRegexp = regexp.MustCompile("\\b(?i:true|false|null)\\b")
-var sqlalchemyVariablesRegexp = regexp.MustCompile("%\\(.+?\\)s")
-var sqlListVariablesRegexp = regexp.MustCompile("\\?[\\? ,]+\\?")
-var sqlCommentsRegexp = regexp.MustCompile("(--[^\n]*)|(/\\*(.|\n)*?\\*/)")
+// sets the filters used in the QuantizeSQL process
+var sqlFilters = []TokenFilter{
+	&DiscardFilter{},
+	&ReplaceFilter{},
+}
 
-// CQL encodes query params with %s
-var cqlListVariablesRegex = regexp.MustCompile(`%s(([,\s]|%s)+%s\s*|)`) // (%s, %s, %s, %s)
+// is the token consumer that will quantize the query
+var tokenQuantizer = NewTokenConsumer(sqlFilters)
 
 // QuantizeSQL generates resource and sql.query meta for SQL spans
 func QuantizeSQL(span model.Span) model.Span {
-	// Trim spaces and ending special chars
-	query := span.Resource
-
-	// remove special characters to get a clean query
-	query = strings.TrimSpace(query)
-	query = strings.TrimSuffix(query, ";")
-
-	if query == "" {
-		span.Resource = query
+	if span.Resource == "" {
 		return span
 	}
 
 	log.Debugf("Quantize SQL command, generate resource from the query, SpanID: %d", span.SpanID)
-	resource := quantize(query)
-	span.Resource = resource
+	quantizedString, err := tokenQuantizer.Process(span.Resource)
+
+	if err != nil {
+		// if we have an error, the partially parsed SQL is discarded so that we don't pollute
+		// users resources. Here we provide more details to debug the problem.
+		log.Debugf("Error parsing the query: `%s`", span.Resource)
+		span.Resource = "Non-parsable SQL query"
+
+		if span.Meta == nil {
+			span.Meta = make(map[string]string)
+		}
+
+		span.Meta[sqlQuantizeError] = "Query not parsed"
+		return span
+	}
+
+	span.Resource = quantizedString
 
 	// set the sql.query tag if and only if it's not already set by users. If a users set
 	// this value, we send that value AS IS to the backend. If the value is not set, we
@@ -55,29 +59,6 @@ func QuantizeSQL(span model.Span) model.Span {
 		span.Meta = make(map[string]string)
 	}
 
-	span.Meta[sqlQueryTag] = resource
-
+	span.Meta[sqlQueryTag] = quantizedString
 	return span
-}
-
-// quantize returns a quantized string for the given query
-func quantize(query string) string {
-	// Remove variables
-	query = sqlVariablesRegexp.ReplaceAllString(query, sqlVariableReplacement)
-	query = sqlLiteralsRegexp.ReplaceAllString(query, sqlVariableReplacement)
-	query = sqlalchemyVariablesRegexp.ReplaceAllString(query, sqlVariableReplacement)
-
-	// Deal with list of variables of arbitrary size
-	query = sqlListVariablesRegexp.ReplaceAllString(query, sqlVariableReplacement)
-
-	// Remove comments
-	query = sqlCommentsRegexp.ReplaceAllString(query, "")
-
-	// Uniform spacing
-	query = compactAllSpaces(query)
-
-	// Replace parenthesized variable lists (%s, %s, %s, %s)
-	query = cqlListVariablesRegex.ReplaceAllString(query, sqlVariableReplacement)
-
-	return query
 }
