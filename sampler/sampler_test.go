@@ -13,7 +13,7 @@ import (
 
 func getTestSampler() *Sampler {
 	// Disable debug logs in these tests
-	config.NewLoggerLevel(false)
+	config.NewLoggerLevelCustom("INFO", "/var/log/datadog/trace-agent.log")
 
 	// No extra fixed sampling, no maximum TPS
 	extraRate := 1.0

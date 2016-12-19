@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=forking
 User=dd-agent
-ExecStart=/opt/datadog-agent/bin/trace-agent >> /var/log/datadog/trace-agent.log 2>&1
+ExecStart=/opt/datadog-agent/bin/trace-agent 2>&1
 
 [Install]
 WantedBy=multi-user.target

@@ -8,7 +8,6 @@ import (
 	_ "net/http/pprof" // register debugger
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -35,6 +34,7 @@ var opts struct {
 	ddConfigFile string
 	configFile   string
 	debug        bool
+	logLevel     string
 	version      bool
 }
 
@@ -98,8 +98,12 @@ func main() {
 	}
 
 	// Initialize logging
-	debugLogging := opts.debug || strings.EqualFold(agentConf.LogLevel, "debug")
-	err = config.NewLoggerLevel(debugLogging)
+	level := agentConf.LogLevel
+	if opts.debug {
+		level = "debug"
+	}
+
+	err = config.NewLoggerLevelCustom(level, agentConf.LogFilePath)
 	if err != nil {
 		panic(fmt.Errorf("error with logger: %v", err))
 	}

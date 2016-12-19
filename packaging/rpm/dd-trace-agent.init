@@ -34,7 +34,7 @@ start() {
             exit 2;
     else
         echo "Starting dd-trace-agent"
-        daemon --pidfile $TRACE_PIDFILE --user dd-agent "nohup $DAEMON >>/var/log/datadog/trace-agent.log 2>&1 &"
+        daemon --pidfile $TRACE_PIDFILE --user dd-agent "nohup $DAEMON 2>&1 &"
         [ $? -eq 0 ] && makePid $DAEMON
     fi
     echo
