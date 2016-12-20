@@ -12,7 +12,7 @@ dependencies:
   pre:
     # Install requirements
     - rm -Rf /home/ubuntu/.go_workspace/src/*
-    - rake restore
+    - GOPATH=/home/ubuntu/.go_workspace rake restore
 
   override:
     # put the package in the right $GOPATH
