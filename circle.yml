@@ -1,6 +1,7 @@
 machine:
   environment:
     GODIST: "go1.7.1.linux-amd64.tar.gz"
+    GOPATH: /home/ubuntu/.go_workspace
     IMPORT_PATH: "github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
   post:
     - mkdir -p download
@@ -13,7 +14,6 @@ dependencies:
     - mkdir -p "$GOPATH/src/$IMPORT_PATH"
     - rsync -azC --delete ./ "$GOPATH/src/$IMPORT_PATH/"
     - rake restore
-
 
 test:
   override:
