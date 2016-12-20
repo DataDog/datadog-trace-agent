@@ -15,6 +15,7 @@ const (
 var sqlFilters = []TokenFilter{
 	&DiscardFilter{},
 	&ReplaceFilter{},
+	&GroupingFilter{},
 }
 
 // is the token consumer that will quantize the query

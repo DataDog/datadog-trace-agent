@@ -105,7 +105,7 @@ func TestSQLQuantizer(t *testing.T) {
 		},
 		{
 			"SELECT * FROM `host` WHERE `id` IN (42, 43) /*comment with parameters,host:localhost,url:controller#home,id:FF005:00CAA*/",
-			"SELECT * FROM host WHERE id IN ?",
+			"SELECT * FROM host WHERE id IN ( ? )",
 		},
 		{
 			"SELECT `host`.`address` FROM `host` WHERE org_id=42",
@@ -120,22 +120,22 @@ func TestSQLQuantizer(t *testing.T) {
 			multiline comment with parameters,
 			host:localhost,url:controller#home,id:FF005:00CAA
 			*/`,
-			"SELECT * FROM host WHERE id IN ?",
+			"SELECT * FROM host WHERE id IN ( ? )",
 		},
 		{
 			"UPDATE user_dash_pref SET json_prefs = %(json_prefs)s, modified = '2015-08-27 22:10:32.492912' WHERE user_id = %(user_id)s AND url = %(url)s",
-			"UPDATE user_dash_pref SET json_prefs = ?, modified = ? WHERE user_id = ? AND url = ?"},
+			"UPDATE user_dash_pref SET json_prefs = ? modified = ? WHERE user_id = ? AND url = ?"},
 		{
 			"SELECT DISTINCT host.id AS host_id FROM host JOIN host_alias ON host_alias.host_id = host.id WHERE host.org_id = %(org_id_1)s AND host.name NOT IN (%(name_1)s) AND host.name IN (%(name_2)s, %(name_3)s, %(name_4)s, %(name_5)s)",
-			"SELECT DISTINCT host.id AS host_id FROM host JOIN host_alias ON host_alias.host_id = host.id WHERE host.org_id = ? AND host.name NOT IN ? AND host.name IN ?",
+			"SELECT DISTINCT host.id AS host_id FROM host JOIN host_alias ON host_alias.host_id = host.id WHERE host.org_id = ? AND host.name NOT IN ( ? ) AND host.name IN ( ? )",
 		},
 		{
 			"SELECT org_id, metric_key FROM metrics_metadata WHERE org_id = %(org_id)s AND metric_key = ANY(array[75])",
-			"SELECT org_id, metric_key FROM metrics_metadata WHERE org_id = ? AND metric_key = ANY ( array ? )",
+			"SELECT org_id, metric_key FROM metrics_metadata WHERE org_id = ? AND metric_key = ANY ( array [ ? ] )",
 		},
 		{
 			"SELECT org_id, metric_key   FROM metrics_metadata   WHERE org_id = %(org_id)s AND metric_key = ANY(array[21, 25, 32])",
-			"SELECT org_id, metric_key FROM metrics_metadata WHERE org_id = ? AND metric_key = ANY ( array ? )",
+			"SELECT org_id, metric_key FROM metrics_metadata WHERE org_id = ? AND metric_key = ANY ( array [ ? ] )",
 		},
 		{
 			"SELECT articles.* FROM articles WHERE articles.id = 1 LIMIT 1",
@@ -187,11 +187,11 @@ func TestSQLQuantizer(t *testing.T) {
 		},
 		{
 			"SELECT articles.* FROM articles WHERE articles.id IN (1, 3, 5)",
-			"SELECT articles.* FROM articles WHERE articles.id IN ?",
+			"SELECT articles.* FROM articles WHERE articles.id IN ( ? )",
 		},
 		{
 			"SELECT * FROM clients WHERE (clients.first_name = 'Andy') LIMIT 1 BEGIN INSERT INTO clients (created_at, first_name, locked, orders_count, updated_at) VALUES ('2011-08-30 05:22:57', 'Andy', 1, NULL, '2011-08-30 05:22:57') COMMIT",
-			"SELECT * FROM clients WHERE ( clients.first_name = ? ) LIMIT 1 BEGIN INSERT INTO clients ( created_at, first_name, locked, orders_count, updated_at ) VALUES ? COMMIT",
+			"SELECT * FROM clients WHERE ( clients.first_name = ? ) LIMIT 1 BEGIN INSERT INTO clients ( created_at, first_name, locked, orders_count, updated_at ) VALUES ( ? ) COMMIT",
 		},
 		{
 			"SAVEPOINT \"s139956586256192_x1\"",
@@ -199,7 +199,7 @@ func TestSQLQuantizer(t *testing.T) {
 		},
 		{
 			"INSERT INTO user (id, username) VALUES ('Fred','Smith'), ('John','Smith'), ('Michael','Smith'), ('Robert','Smith');",
-			"INSERT INTO user ( id, username ) VALUES ?",
+			"INSERT INTO user ( id, username ) VALUES ( ? )",
 		},
 		{
 			"CREATE KEYSPACE Excelsior WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 3};",
@@ -215,7 +215,7 @@ func TestSQLQuantizer(t *testing.T) {
 		},
 		{
 			`INSERT INTO delayed_jobs (attempts, created_at, failed_at, handler, last_error, locked_at, locked_by, priority, queue, run_at, updated_at) VALUES (0, '2016-12-04 17:09:59', NULL, '--- !ruby/object:Delayed::PerformableMethod\nobject: !ruby/object:Item\n  store:\n  - a simple string\n  - an \'escaped \' string\n  - another \'escaped\' string\n  - 42\n  string: a string with many \\\\\'escapes\\\\\'\nmethod_name: :show_store\nargs: []\n', NULL, NULL, NULL, 0, NULL, '2016-12-04 17:09:59', '2016-12-04 17:09:59')`,
-			"INSERT INTO delayed_jobs ( attempts, created_at, failed_at, handler, last_error, locked_at, locked_by, priority, queue, run_at, updated_at ) VALUES ?",
+			"INSERT INTO delayed_jobs ( attempts, created_at, failed_at, handler, last_error, locked_at, locked_by, priority, queue, run_at, updated_at ) VALUES ( ? )",
 		},
 		{
 			"SELECT name, pretty_print(address) FROM people;",
@@ -223,11 +223,15 @@ func TestSQLQuantizer(t *testing.T) {
 		},
 		{
 			"* SELECT * FROM fake_data(1, 2, 3);",
-			"* SELECT * FROM fake_data ?",
+			"* SELECT * FROM fake_data ( ? )",
 		},
 		{
 			"CREATE FUNCTION add(integer, integer) RETURNS integer\n AS 'select $1 + $2;'\n LANGUAGE SQL\n IMMUTABLE\n RETURNS NULL ON NULL INPUT;",
 			"CREATE FUNCTION add ( integer, integer ) RETURNS integer AS ? LANGUAGE SQL IMMUTABLE RETURNS ? ON ? INPUT",
+		},
+		{
+			"SELECT * FROM public.table ( array [ ROW ( array [ 'magic', 'foo',",
+			"SELECT * FROM public.table ( array [ ROW ( array [ ?",
 		},
 	}
 

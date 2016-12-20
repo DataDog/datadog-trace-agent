@@ -30,6 +30,7 @@ const (
 	LE                = 57361
 	GE                = 57362
 	NE                = 57363
+	Filtered          = 57364
 )
 
 // Tokenizer is the struct used to generate SQL

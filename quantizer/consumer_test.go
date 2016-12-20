@@ -19,13 +19,14 @@ func TestMultipleProcess(t *testing.T) {
 		},
 		{
 			"SELECT articles.* FROM articles WHERE articles.id IN (1, 3, 5)",
-			"SELECT articles.* FROM articles WHERE articles.id IN ?",
+			"SELECT articles.* FROM articles WHERE articles.id IN ( ? )",
 		},
 	}
 
 	filters := []TokenFilter{
 		&DiscardFilter{},
 		&ReplaceFilter{},
+		&GroupingFilter{},
 	}
 
 	// The consumer is the same between executions
@@ -47,6 +48,7 @@ func TestConsumerError(t *testing.T) {
 	filters := []TokenFilter{
 		&DiscardFilter{},
 		&ReplaceFilter{},
+		&GroupingFilter{},
 	}
 	consumer := NewTokenConsumer(filters)
 
@@ -61,6 +63,7 @@ func BenchmarkTokenizer(b *testing.B) {
 	filters := []TokenFilter{
 		&DiscardFilter{},
 		&ReplaceFilter{},
+		&GroupingFilter{},
 	}
 	consumer := NewTokenConsumer(filters)
 

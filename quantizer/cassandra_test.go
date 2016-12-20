@@ -25,16 +25,16 @@ func TestCassQuantizer(t *testing.T) {
 		// List compacted and replaced
 		{
 			"select key, status, modified from org_check_run where org_id = %s and check in (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-			"select key, status, modified from org_check_run where org_id = ? and check in ?",
+			"select key, status, modified from org_check_run where org_id = ? and check in ( ? )",
 		},
 		// Some whitespace-y things
 		{
 			"select key, status, modified from org_check_run where org_id = %s and check in (%s, %s, %s)",
-			"select key, status, modified from org_check_run where org_id = ? and check in ?",
+			"select key, status, modified from org_check_run where org_id = ? and check in ( ? )",
 		},
 		{
 			"select key, status, modified from org_check_run where org_id = %s and check in (%s , %s , %s )",
-			"select key, status, modified from org_check_run where org_id = ? and check in ?",
+			"select key, status, modified from org_check_run where org_id = ? and check in ( ? )",
 		},
 		// %s replaced with ? as in sql quantize
 		{
