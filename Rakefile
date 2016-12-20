@@ -71,7 +71,7 @@ end
 
 # FIXME: add :test in the list
 desc "Datadog Trace agent CI script (fmt, vet, etc)"
-task :ci => [:restore, :fmt, :vet, :lint, :test, :build]
+task :ci => [:fmt, :vet, :lint, :test, :build]
 
 task :err do
   sh "errcheck github.com/DataDog/datadog-trace-agent"
