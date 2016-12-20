@@ -1,0 +1,28 @@
+machine:
+  environment:
+    GODIST: "go1.7.1.linux-amd64.tar.gz"
+    IMPORT_PATH: "/home/ubuntu/.go_workspace/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
+  post:
+    - mkdir -p download
+    - test -e download/$GODIST || curl -o download/$GODIST https://storage.googleapis.com/golang/$GODIST
+    - sudo rm -rf /usr/local/go
+    - sudo tar -C /usr/local -xzf download/$GODIST
+
+dependencies:
+  pre:
+    # Install requirements
+    - rm -Rf /home/ubuntu/.go_workspace/src/*
+    - rake restore
+
+  override:
+    # put the package in the right $GOPATH
+    - mkdir -p "$IMPORT_PATH"
+    - rsync -azr --delete ./ "$IMPORT_PATH"
+
+test:
+  override:
+    - cd "$IMPORT_PATH" && rake ci
+
+  post:
+    # add the coverage HTML report as CircleCI artifact
+    - cd "$IMPORT_PATH" && go tool cover -html=profile.cov -o $CIRCLE_ARTIFACTS/coverage.html
