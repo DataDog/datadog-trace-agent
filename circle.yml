@@ -15,9 +15,7 @@ dependencies:
     - mkdir -p "$GOPATH/src/$IMPORT_PATH"
     - rsync -azC --delete ./ "$GOPATH/src/$IMPORT_PATH/"
     - go get -d github.com/robfig/glock
-    - cd $GLOCK_PATH
-    - git checkout 7bc8ce51048e2adc11733f90a87b1c02fb7feebe
-    - cd "$GOPATH/src/$IMPORT_PATH"
+    - cd $GLOCK_PATH && git checkout 7bc8ce51048e2adc11733f90a87b1c02fb7feebe && cd "$GOPATH/src/$IMPORT_PATH"
     - pwd
     - rake restore
 
