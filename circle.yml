@@ -11,18 +11,12 @@ machine:
 dependencies:
   pre:
     # Install requirements
-    - rm -Rf /home/ubuntu/.go_workspace/src/*
-    - GOPATH=/home/ubuntu/.go_workspace rake restore
-
-  override:
-    # put the package in the right $GOPATH
-    - mkdir -p "$IMPORT_PATH"
-    - rsync -azr --delete ./ "$IMPORT_PATH"
+    - rake restore
 
 test:
   override:
-    - cd "$IMPORT_PATH" && rake ci
+    - rake ci
 
   post:
     # add the coverage HTML report as CircleCI artifact
-    - cd "$IMPORT_PATH" && go tool cover -html=profile.cov -o $CIRCLE_ARTIFACTS/coverage.html
+    - go tool cover -html=profile.cov -o $CIRCLE_ARTIFACTS/coverage.html
