@@ -1,3 +1,5 @@
+[![CircleCI](https://circleci.com/gh/DataDog/datadog-trace-agent.svg?style=svg)](https://circleci.com/gh/DataDog/datadog-trace-agent)
+
 # Datadog APM agent
 
 An agent that collects traces from various sources, normalizes and pre-processes them before sending the info to the Datadog backend.
