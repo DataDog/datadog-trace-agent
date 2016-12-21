@@ -22,7 +22,3 @@ dependencies:
 test:
   override:
     - rake ci
-
-  post:
-    # add the coverage HTML report as CircleCI artifact
-    - go tool cover -html=profile.cov -o $CIRCLE_ARTIFACTS/coverage.html
