@@ -3,7 +3,6 @@ package quantizer
 import (
 	"bytes"
 	"errors"
-	"strings"
 )
 
 // TokenFilter is a generic interface that a TokenConsumer expects. It defines
@@ -142,7 +141,9 @@ func (t *TokenConsumer) Process(in string) (string, error) {
 
 		// write the resulting buffer
 		if buff != nil {
-			if token != ',' {
+			// ensure that whitespaces properly separate
+			// received tokens
+			if out.Len() != 0 && token != ',' {
 				out.WriteRune(' ')
 			}
 
@@ -152,9 +153,7 @@ func (t *TokenConsumer) Process(in string) (string, error) {
 		t.lastToken = token
 	}
 
-	// remove whitespaces at the begin / end of the string
-	result := strings.TrimSpace(out.String())
-	return result, nil
+	return out.String(), nil
 }
 
 // Reset restores the initial states for all components so that memory can be re-used
