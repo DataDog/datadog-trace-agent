@@ -39,6 +39,7 @@ type AgentConfig struct {
 	ReceiverHost    string
 	ReceiverPort    int
 	ConnectionLimit int // for rate-limiting, how many unique connections to allow in a lease period (30s)
+	ReceiverTimeout int
 
 	// internal telemetry
 	StatsdHost string
@@ -234,6 +235,10 @@ APM_CONF:
 
 	if v, e := conf.GetInt("trace.receiver", "connection_limit"); e == nil {
 		c.ConnectionLimit = v
+	}
+
+	if v, e := conf.GetInt("trace.receiver", "timeout"); e == nil {
+		c.ReceiverTimeout = v
 	}
 
 ENV_CONF:
