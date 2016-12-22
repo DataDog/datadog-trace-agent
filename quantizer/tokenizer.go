@@ -5,7 +5,12 @@ import (
 	"strings"
 )
 
-// the tokenizer.go implementation has been inspired by https://github.com/youtube/vitess sql parser
+// tokenizer.go implemenents a lexer-like iterator that tokenizes SQL and CQL
+// strings, so that an external component can filter or alter each token of the
+// string. This implementation can't be used as a real SQL lexer (so a parser
+// cannot build the AST) because many rules are ignored to make the tokenizer
+// simpler.
+// This implementation was inspired by https://github.com/youtube/vitess sql parser
 // TODO: add the license to the NOTICE file
 
 // list of available tokens; this list has been reduced because we don't
