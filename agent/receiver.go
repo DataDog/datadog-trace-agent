@@ -94,7 +94,11 @@ func (r *HTTPReceiver) Run() {
 	sl, err := NewStoppableListener(tcpL, r.exit, r.conf.ConnectionLimit)
 	// some clients might use keep-alive and keep open their connections too long
 	// avoid leaks
-	server := http.Server{ReadTimeout: 5 * time.Second}
+	timeout := 5
+	if r.conf.ReceiverTimeout > 0 {
+		timeout = r.conf.ReceiverTimeout
+	}
+	server := http.Server{ReadTimeout: time.Second * time.Duration(timeout)}
 
 	go r.logStats()
 	go sl.Refresh(r.conf.ConnectionLimit)
