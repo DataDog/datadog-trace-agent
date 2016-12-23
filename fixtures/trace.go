@@ -1,7 +1,6 @@
 package fixtures
 
 import (
-	"fmt"
 	"math/rand"
 
 	"github.com/DataDog/datadog-trace-agent/model"
@@ -18,8 +17,6 @@ func genNextLevel(prevLevel []model.Span) []model.Span {
 	var spans []model.Span
 	numSpans := rand.Intn(100) + 1
 
-	fmt.Printf("prevLevel %d numSpans %d\n", len(prevLevel), numSpans)
-
 	// the spans have to be "nested" in the previous level
 	// choose randomly spans from prev level
 	chosenSpans := rand.Perm(len(prevLevel))
@@ -29,7 +26,6 @@ func genNextLevel(prevLevel []model.Span) []model.Span {
 		maxParentSpans = 1
 	}
 	chosenSpans = chosenSpans[:maxParentSpans]
-	fmt.Printf("chosenSpans %v, maxParentSpans %d\n", chosenSpans, maxParentSpans)
 
 	// now choose a random amount of spans per chosen span
 	// total needs to be numSpans
@@ -37,10 +33,11 @@ func genNextLevel(prevLevel []model.Span) []model.Span {
 		prev := prevLevel[prevIdx]
 
 		var childSpans int
-		if i == len(chosenSpans)-1 {
+		value := numSpans - (len(chosenSpans) - i)
+		if i == len(chosenSpans)-1 || value < 1 {
 			childSpans = numSpans
 		} else {
-			childSpans = rand.Intn(numSpans - (len(chosenSpans) - i))
+			childSpans = rand.Intn(value)
 		}
 		numSpans -= childSpans
 
@@ -65,7 +62,6 @@ func genNextLevel(prevLevel []model.Span) []model.Span {
 			curSpans = append(curSpans, news)
 		}
 
-		fmt.Printf("for span %d, spans: %d\n", prevIdx, len(curSpans))
 		spans = append(spans, curSpans...)
 	}
 
@@ -79,8 +75,10 @@ func RandomTrace() model.Trace {
 	maxDepth := rand.Intn(10)
 
 	for i := 0; i < maxDepth; i++ {
-		prevLevel = genNextLevel(prevLevel)
-		t = append(t, prevLevel...)
+		if len(prevLevel) > 0 {
+			prevLevel = genNextLevel(prevLevel)
+			t = append(t, prevLevel...)
+		}
 	}
 
 	return t
