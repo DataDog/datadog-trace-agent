@@ -17,7 +17,7 @@ import (
 	"math"
 	"time"
 
-	agentmodel "github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/model"
 )
 
 const (
@@ -87,13 +87,13 @@ func (s *Sampler) Stop() {
 }
 
 // Sample counts an incoming trace and tells if it is a sample which has to be kept
-func (s *Sampler) Sample(trace agentmodel.Trace, root *agentmodel.Span, env string) bool {
+func (s *Sampler) Sample(trace model.Trace, root *model.Span, env string) bool {
 	// Extra safety, just in case one trace is empty
 	if len(trace) == 0 {
 		return false
 	}
 
-	signature := ComputeSignatureWithRoot(trace, root)
+	signature := ComputeSignatureWithRootAndEnv(trace, root, env)
 
 	// Update sampler state by counting this trace
 	s.Backend.CountSignature(signature)
@@ -119,7 +119,7 @@ func (s *Sampler) Sample(trace agentmodel.Trace, root *agentmodel.Span, env stri
 }
 
 // GetSampleRate returns the sample rate to apply to a trace.
-func (s *Sampler) GetSampleRate(trace agentmodel.Trace, root *agentmodel.Span, signature Signature) float64 {
+func (s *Sampler) GetSampleRate(trace model.Trace, root *model.Span, signature Signature) float64 {
 	sampleRate := s.GetSignatureSampleRate(signature) * s.extraRate
 
 	return sampleRate
@@ -142,7 +142,7 @@ func (s *Sampler) GetMaxTPSSampleRate() float64 {
 
 // ApplySampleRate applies a sample rate over a trace root, returning if the trace should be sampled or not.
 // It takes into account any previous sampling.
-func ApplySampleRate(root *agentmodel.Span, sampleRate float64) bool {
+func ApplySampleRate(root *model.Span, sampleRate float64) bool {
 	initialRate := GetTraceAppliedSampleRate(root)
 	newRate := initialRate * sampleRate
 	SetTraceAppliedSampleRate(root, newRate)
@@ -153,7 +153,7 @@ func ApplySampleRate(root *agentmodel.Span, sampleRate float64) bool {
 }
 
 // GetTraceAppliedSampleRate gets the sample rate the sample rate applied earlier in the pipeline.
-func GetTraceAppliedSampleRate(root *agentmodel.Span) float64 {
+func GetTraceAppliedSampleRate(root *model.Span) float64 {
 	if rate, ok := root.Metrics[SampleRateMetricKey]; ok {
 		return rate
 	}
@@ -162,7 +162,7 @@ func GetTraceAppliedSampleRate(root *agentmodel.Span) float64 {
 }
 
 // SetTraceAppliedSampleRate sets the currently applied sample rate in the trace data to allow chained up sampling.
-func SetTraceAppliedSampleRate(root *agentmodel.Span, sampleRate float64) {
+func SetTraceAppliedSampleRate(root *model.Span, sampleRate float64) {
 	if root.Metrics == nil {
 		root.Metrics = make(map[string]float64)
 	}
