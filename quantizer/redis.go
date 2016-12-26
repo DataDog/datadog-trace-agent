@@ -1,6 +1,8 @@
 package quantizer
 
 import (
+	"bytes"
+	"sort"
 	"strings"
 
 	"github.com/DataDog/datadog-trace-agent/model"
@@ -12,38 +14,57 @@ var redisCompoundCommandSet = map[string]bool{
 
 // QuantizeRedis generates resource for Redis spans
 func QuantizeRedis(span model.Span) model.Span {
-	query := span.Resource
+	query := compactWhitespaces(span.Resource)
 
-	resource := ""
-	previousCommand := ""
-	previousDuplicate := false
-
-	query = compactWhitespaces(query)
-	lines := strings.Split(query, "\n")
-
-	for _, q := range lines {
-		q = strings.Trim(q, " ")
-		if len(q) > 0 {
-			args := strings.SplitN(q, " ", 3)
-			command := strings.ToUpper(args[0])
-			if redisCompoundCommandSet[command] {
-				command += " " + strings.ToUpper(args[1])
-			}
-
-			if command == previousCommand {
-				if !previousDuplicate {
-					resource += "*"
-					previousDuplicate = true
-				}
-			} else {
-				resource += " " + command
-				previousCommand = command
-				previousDuplicate = false
-			}
+	rawLines := strings.Split(query, "\n")
+	lines := make([]string, 0, len(rawLines))
+	for _, rawLine := range rawLines {
+		if line := strings.Trim(rawLine, " "); len(line) > 0 {
+			lines = append(lines, line)
 		}
 	}
 
-	span.Resource = strings.Trim(resource, " ")
+	readLine := func(line string) string {
+		args := strings.SplitN(line, " ", 3)
+		command := strings.ToUpper(args[0])
+
+		if redisCompoundCommandSet[command] {
+			command += " " + strings.ToUpper(args[1])
+		}
+
+		return command
+	}
+
+	var resource bytes.Buffer
+
+	switch len(lines) {
+	case 1:
+		// Single command
+		resource.WriteString(readLine(lines[0]))
+
+	default:
+		// Pipeline
+		commandMap := make(map[string]struct{})
+
+		for _, line := range lines {
+			commandMap[readLine(line)] = struct{}{}
+		}
+
+		commands := make([]string, 0, len(commandMap))
+		for command := range commandMap {
+			commands = append(commands, command)
+		}
+		sort.Strings(commands)
+
+		resource.WriteString("PIPELINE [")
+		for _, command := range commands {
+			resource.WriteByte(' ')
+			resource.WriteString(command)
+		}
+		resource.WriteString(" ]")
+	}
+
+	span.Resource = strings.Trim(resource.String(), " ")
 
 	return span
 }
