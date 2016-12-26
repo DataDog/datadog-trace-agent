@@ -86,17 +86,19 @@ func (b *Backend) CountSample() {
 // It is normalized to represent a number of signatures per second.
 func (b *Backend) GetSignatureScore(signature Signature) float64 {
 	b.mu.Lock()
-	defer b.mu.Unlock()
+	score := b.scores[signature] / b.countScaleFactor
+	b.mu.Unlock()
 
-	return b.scores[signature] / b.countScaleFactor
+	return score
 }
 
 // GetSampledScore returns the global score of all sampled traces.
 func (b *Backend) GetSampledScore() float64 {
 	b.mu.Lock()
-	defer b.mu.Unlock()
+	score := b.sampledScore / b.countScaleFactor
+	b.mu.Unlock()
 
-	return b.sampledScore / b.countScaleFactor
+	return score
 }
 
 // DecayScore applies the decay to the rolling counters

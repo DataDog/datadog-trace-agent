@@ -36,7 +36,6 @@ func NewConcentrator(aggregators []string, bsize int64) *Concentrator {
 // Add appends to the proper stats bucket this trace's statistics
 func (c *Concentrator) Add(t processedTrace) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 
 	for _, s := range t.Trace {
 		btime := s.End() - s.End()%c.bsize
@@ -53,6 +52,8 @@ func (c *Concentrator) Add(t processedTrace) {
 			b.HandleSpan(s, t.Env, c.aggregators, nil)
 		}
 	}
+
+	c.mu.Unlock()
 }
 
 // Flush deletes and returns complete statistic buckets
@@ -61,8 +62,6 @@ func (c *Concentrator) Flush() []model.StatsBucket {
 	now := model.Now()
 
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	for ts, bucket := range c.buckets {
 		// always keep one bucket opened
 		// this is a trade-off: we accept slightly late traces (clock skew and stuff)
@@ -78,6 +77,7 @@ func (c *Concentrator) Flush() []model.StatsBucket {
 		sb = append(sb, bucket)
 		delete(c.buckets, ts)
 	}
+	c.mu.Unlock()
 
 	return sb
 }
