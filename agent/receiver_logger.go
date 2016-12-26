@@ -16,7 +16,6 @@ type errorLogger struct {
 
 func (l *errorLogger) Errorf(format string, params ...interface{}) {
 	l.Lock()
-	defer l.Unlock()
 
 	if l.errors < maxPerInterval {
 		log.Errorf(format, params...)
@@ -26,6 +25,7 @@ func (l *errorLogger) Errorf(format string, params ...interface{}) {
 	}
 
 	l.errors++
+	l.Unlock()
 }
 
 func (l *errorLogger) Reset() {

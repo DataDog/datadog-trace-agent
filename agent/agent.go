@@ -75,12 +75,12 @@ func (a *Agent) Run() {
 			var wg sync.WaitGroup
 			wg.Add(2)
 			go func() {
-				defer wg.Done()
 				p.Stats = a.Concentrator.Flush()
+				wg.Done()
 			}()
 			go func() {
-				defer wg.Done()
 				p.Traces = a.Sampler.Flush()
+				wg.Done()
 			}()
 
 			wg.Wait()
