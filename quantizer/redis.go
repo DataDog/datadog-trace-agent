@@ -16,11 +16,21 @@ var redisCompoundCommandSet = map[string]bool{
 func QuantizeRedis(span model.Span) model.Span {
 	query := compactWhitespaces(span.Resource)
 
-	rawLines := strings.Split(query, "\n")
-	lines := make([]string, 0, len(rawLines))
-	for _, rawLine := range rawLines {
+	lines := []string{}
+	for len(query) > 0 {
+		var rawLine string
+
+		idx := strings.IndexByte(query, '\n')
+		if idx == -1 {
+			rawLine = query
+			query = ""
+		} else {
+			rawLine = query[:idx]
+			query = query[idx+1:]
+		}
+
 		if line := strings.Trim(rawLine, " "); len(line) > 0 {
-			lines = append(lines, line)
+			lines = append(lines, string(line))
 		}
 	}
 

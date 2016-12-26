@@ -33,6 +33,9 @@ func TestRedisQuantizer(t *testing.T) {
 		{"SET le_key le_value",
 			"SET"},
 
+		{"\n\n  \nSET foo bar  \n  \n\n  ",
+			"SET"},
+
 		{"CONFIG SET parameter value",
 			"CONFIG SET"},
 
