@@ -8,6 +8,10 @@ import (
 	"github.com/DataDog/datadog-trace-agent/model"
 )
 
+// truncationMark is used as suffix by tracing libraries to indicate that a
+// command was truncated.
+const truncationMark = "..."
+
 // Redis commands consisting in 2 words
 var redisCompoundCommandSet = map[string]bool{
 	"CLIENT": true, "CLUSTER": true, "COMMAND": true, "CONFIG": true, "DEBUG": true, "SCRIPT": true}
@@ -36,6 +40,11 @@ func QuantizeRedis(span model.Span) model.Span {
 
 	readLine := func(line string) string {
 		args := strings.SplitN(line, " ", 3)
+
+		if strings.HasSuffix(args[0], truncationMark) {
+			return ""
+		}
+
 		command := strings.ToUpper(args[0])
 
 		if redisCompoundCommandSet[command] {
@@ -48,16 +57,23 @@ func QuantizeRedis(span model.Span) model.Span {
 	var resource bytes.Buffer
 
 	switch len(lines) {
+	case 0:
+		break
+
 	case 1:
 		// Single command
-		resource.WriteString(readLine(lines[0]))
+		if cmd := readLine(lines[0]); cmd != "" {
+			resource.WriteString(cmd)
+		}
 
 	default:
 		// Pipeline
 		commandMap := make(map[string]struct{})
 
 		for _, line := range lines {
-			commandMap[readLine(line)] = struct{}{}
+			if cmd := readLine(line); cmd != "" {
+				commandMap[cmd] = struct{}{}
+			}
 		}
 
 		commands := make([]string, 0, len(commandMap))

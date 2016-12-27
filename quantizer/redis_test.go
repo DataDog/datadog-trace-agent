@@ -50,6 +50,21 @@ func TestRedisQuantizer(t *testing.T) {
 
 		{"DEL k1\nDEL k2\nHMSET k1 \"a\" 1 \"b\" 2 \"c\" 3\nHMSET k2 \"d\" \"4\" \"e\" \"4\"\nDEL k3\nHMSET k3 \"f\" \"5\"\nDEL k1\nDEL k2\nHMSET k1 \"a\" 1 \"b\" 2 \"c\" 3\nHMSET k2 \"d\" \"4\" \"e\" \"4\"\nDEL k3\nHMSET k3 \"f\" \"5\"\nDEL k1\nDEL k2\nHMSET k1 \"a\" 1 \"b\" 2 \"c\" 3\nHMSET k2 \"d\" \"4\" \"e\" \"4\"\nDEL k3\nHMSET k3 \"f\" \"5\"\nDEL k1\nDEL k2\nHMSET k1 \"a\" 1 \"b\" 2 \"c\" 3\nHMSET k2 \"d\" \"4\" \"e\" \"4\"\nDEL k3\nHMSET k3 \"f\" \"5\"",
 			"PIPELINE [ DEL HMSET ]"},
+
+		{"GET...",
+			""},
+
+		{"GET k...",
+			"GET"},
+
+		{"GET k1\nGET k2\nG...",
+			"PIPELINE [ GET ]"},
+
+		{"GET k...\nDEL k2\nMS...",
+			"PIPELINE [ DEL GET ]"},
+
+		{"GET k...\nDE...\nMS...",
+			"PIPELINE [ GET ]"},
 	}
 
 	for _, testCase := range queryToExpected {
