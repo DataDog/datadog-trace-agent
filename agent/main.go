@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"runtime"
 	"runtime/pprof"
 	"syscall"
 	"time"
@@ -83,6 +84,7 @@ func main() {
 
 	// profiling arguments
 	cpuprofile := flag.String("cpuprofile", "", "write cpu profile to file")
+	memprofile := flag.String("memprofile", "", "write memory profile to `file`")
 	flag.Parse()
 
 	// start CPU profiling
@@ -141,4 +143,19 @@ func main() {
 	go handleSignal(agent.exit)
 
 	agent.Run()
+
+	// collect memory profile
+	if *memprofile != "" {
+		f, err := os.Create(*memprofile)
+		if err != nil {
+			log.Critical("could not create memory profile: ", err)
+		}
+
+		// get up-to-date statistics
+		runtime.GC()
+		if err := pprof.WriteHeapProfile(f); err != nil {
+			log.Critical("could not write memory profile: ", err)
+		}
+		f.Close()
+	}
 }
