@@ -17,6 +17,6 @@ func BenchmarkAgentTraceProcessing(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		agent.Process(fixtures.RandomTrace())
+		agent.Process(fixtures.RandomTrace(10, 8))
 	}
 }
