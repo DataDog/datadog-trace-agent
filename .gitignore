@@ -1,5 +1,6 @@
 raclette
 trace-agent
+trace-flood
 generator
 *.swp
 python/raclette.egg-info
@@ -11,5 +12,5 @@ stats/stats
 tracegen/tracegen
 agent/agent
 coverage.out
-prof*
+*.prof
 *test
