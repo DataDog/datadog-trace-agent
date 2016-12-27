@@ -6,16 +6,15 @@ import (
 	"github.com/DataDog/datadog-trace-agent/model"
 )
 
-/* tree structure
-   from 1 to 10 levels
+const (
+	maxLevel = 10
+	maxSpans = 100
+)
 
-   always one root
-   each level has at most 100 spans
-*/
-
+/// genNextLevel generates a new level for the trace tree structure
 func genNextLevel(prevLevel []model.Span) []model.Span {
 	var spans []model.Span
-	numSpans := rand.Intn(100) + 1
+	numSpans := rand.Intn(maxSpans) + 1
 
 	// the spans have to be "nested" in the previous level
 	// choose randomly spans from prev level
@@ -68,11 +67,13 @@ func genNextLevel(prevLevel []model.Span) []model.Span {
 	return spans
 }
 
+// RandomTrace generates a random trace with a depth from 1 to
+// 10 levels of spans. Each level has at most 100 spans
 func RandomTrace() model.Trace {
 	t := model.Trace{RandomSpan()}
 
 	prevLevel := t
-	maxDepth := rand.Intn(10)
+	maxDepth := rand.Intn(maxLevel)
 
 	for i := 0; i < maxDepth; i++ {
 		if len(prevLevel) > 0 {
@@ -82,14 +83,4 @@ func RandomTrace() model.Trace {
 	}
 
 	return t
-}
-
-func SingleSpanTrace() model.Trace {
-	var t model.Trace
-	t = append(t, RandomSpan())
-	return t
-}
-
-func FuzzTrace() model.Trace {
-	return model.Trace{}
 }
