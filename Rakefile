@@ -16,6 +16,7 @@ PACKAGES = %w(
   ./fixtures
   ./model
   ./cmd/traceflood
+  ./profile
   ./quantile
   ./quantizer
   ./sampler
