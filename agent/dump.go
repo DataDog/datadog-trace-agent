@@ -53,10 +53,14 @@ func dumpServices(services model.ServicesMetadata) {
 }
 
 func dumpClose() {
+	if globalTracesDumpFile != nil {
+		globalTracesDumpFile.Close()
+		globalTracesDumpFile = nil
+	}
+	globalTracesDumper = nil
 	if globalServicesDumpFile != nil {
 		globalServicesDumpFile.Close()
+		globalServicesDumpFile = nil
 	}
-	if globalServicesDumpFile != nil {
-		globalServicesDumpFile.Close()
-	}
+	globalServicesDumper = nil
 }
