@@ -13,15 +13,16 @@ type ServicesMetadata map[string]map[string]string
 // Update compares this metadata blob with the one given in the argument
 // if different, update s1 and return true. If equal, return false
 func (s1 ServicesMetadata) Update(s2 ServicesMetadata) bool {
-	if reflect.DeepEqual(s1, s2) {
-		return false
-	}
+	updated := false
 
 	for s, metas := range s2 {
-		s1[s] = metas
+		if !reflect.DeepEqual(s1[s], metas) {
+			s1[s] = metas
+			updated = true
+		}
 	}
 
-	return true
+	return updated
 }
 
 // EncodeServicesPayload will return a slice of bytes representing the
