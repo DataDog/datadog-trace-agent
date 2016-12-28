@@ -39,6 +39,8 @@ var opts struct {
 	debug        bool
 	logLevel     string
 	version      bool
+	dumpTraces   string
+	dumpServices string
 }
 
 // version info sourced from build flags
@@ -81,6 +83,8 @@ func main() {
 	flag.StringVar(&opts.configFile, "config", "/etc/datadog/trace-agent.ini", "Trace agent ini config file.")
 	flag.BoolVar(&opts.debug, "debug", false, "Turn on debug mode")
 	flag.BoolVar(&opts.version, "version", false, "Show version information and exit")
+	flag.BoolVar(&opts.dumpTraces, "dumptraces", "", "File in which all incoming traces are written as JSON (debug only)")
+	flag.BoolVar(&opts.dumpServices, "dumpservices", "", "File in which all incoming services are written as JSON (debug only)")
 
 	// profiling arguments
 	cpuprofile := flag.String("cpuprofile", "", "write cpu profile to file")
