@@ -137,16 +137,11 @@ func NewStatsBucket(ts, d int64) StatsBucket {
 func assembleGrain(b *bytes.Buffer, env, resource, service string, m map[string]string) (string, TagSet) {
 	b.Reset()
 
-	b.WriteString("env")
-	b.WriteRune(':')
+	b.WriteString("env:")
 	b.WriteString(env)
-	b.WriteRune(',')
-	b.WriteString("resource")
-	b.WriteRune(':')
+	b.WriteString(",resource:")
 	b.WriteString(resource)
-	b.WriteRune(',')
-	b.WriteString("service")
-	b.WriteRune(':')
+	b.WriteString(",service:")
 	b.WriteString(service)
 
 	tagset := TagSet{{"env", env}, {"resource", resource}, {"service", service}}
