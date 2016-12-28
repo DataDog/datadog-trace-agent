@@ -3,6 +3,7 @@ package model
 import (
 	"bytes"
 	"fmt"
+	"sort"
 
 	"github.com/DataDog/datadog-trace-agent/quantile"
 )
@@ -133,25 +134,45 @@ func NewStatsBucket(ts, d int64) StatsBucket {
 	}
 }
 
-func assembleGrain(b *bytes.Buffer, keys, vals []string) (string, TagSet) {
-	if len(keys) != len(vals) {
-		panic("assembleGrain diff lengths!")
-	}
-
+func assembleGrain(b *bytes.Buffer, env, resource, service string, m map[string]string) (string, TagSet) {
 	b.Reset()
-	var t TagSet
 
-	for i := range keys {
-		b.WriteString(keys[i])
-		b.WriteRune(':')
-		b.WriteString(vals[i])
-		if i != len(keys)-1 {
-			b.WriteRune(',')
-		}
-		t = append(t, Tag{keys[i], vals[i]})
+	b.WriteString("env")
+	b.WriteRune(':')
+	b.WriteString(env)
+	b.WriteRune(',')
+	b.WriteString("resource")
+	b.WriteRune(':')
+	b.WriteString(resource)
+	b.WriteRune(',')
+	b.WriteString("service")
+	b.WriteRune(':')
+	b.WriteString(service)
+
+	tagset := TagSet{{"env", env}, {"resource", resource}, {"service", service}}
+
+	if m == nil || len(m) == 0 {
+		return b.String(), tagset
 	}
 
-	return b.String(), t
+	keys := make([]string, len(m))
+	j := 0
+	for k := range m {
+		keys[j] = k
+		j++
+	}
+
+	sort.Strings(keys) // required else aggregations would not work
+
+	for _, key := range keys {
+		b.WriteRune(',')
+		b.WriteString(key)
+		b.WriteRune(':')
+		b.WriteString(m[key])
+		tagset = append(tagset, Tag{key, m[key]})
+	}
+
+	return b.String(), tagset
 }
 
 // HandleSpan adds the span to this bucket stats, aggregated with the finest grain matching given aggregators
@@ -160,27 +181,17 @@ func (sb *StatsBucket) HandleSpan(s Span, env string, aggregators []string, subl
 		panic("env should never be empty")
 	}
 
-	keys := []string{
-		"env",
-		"resource",
-		"service",
-	}
-	vals := []string{
-		env,
-		s.Resource,
-		s.Service,
-	}
+	m := make(map[string]string)
 
 	for _, agg := range aggregators {
-		if agg != "resource" && agg != "service" && agg != "env" {
+		if agg != "env" && agg != "resource" && agg != "service" {
 			if v, ok := s.Meta[agg]; ok {
-				keys = append(keys, agg)
-				vals = append(vals, v)
+				m[agg] = v
 			}
 		}
 	}
 
-	grain, tags := assembleGrain(&sb.keyBuf, keys, vals)
+	grain, tags := assembleGrain(&sb.keyBuf, env, s.Resource, s.Service, m)
 	sb.addToTagSet(s, grain, tags)
 
 	// sublayers - special case
