@@ -16,12 +16,14 @@ type ServicesDumper interface {
 	Dump(trace model.ServicesMetadata) error
 }
 
+// ServicesDump is a simple services dumper that appends data to a writer
+// (typically, a log file)
 type ServicesDump struct {
 	m      sync.Mutex
 	writer io.Writer
 }
 
-// NewTracesDump creates a ServicesDumper which writes data to a standard writer
+// NewServicesDump creates a ServicesDumper which writes data to a standard writer
 func NewServicesDump(writer io.Writer) ServicesDumper {
 	return &ServicesDump{writer: writer}
 }

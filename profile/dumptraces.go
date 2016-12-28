@@ -16,6 +16,8 @@ type TracesDumper interface {
 	Dump(traces []model.Trace) error
 }
 
+// TracesDump is a simple traces dumper that appends data to a writer
+// (typically, a log file)
 type TracesDump struct {
 	m      sync.Mutex
 	writer io.Writer
