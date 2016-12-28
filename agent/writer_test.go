@@ -143,8 +143,9 @@ receivingLoop:
 			t.Fatal("did not receive service data in time")
 		}
 	}
-	time.Sleep(100 * time.Millisecond)
+
+	w.Stop()
 
 	// we should just have ignored the 400 error on the other backend
-	assert.Equal(w.getPayloadBufferLen(), 0)
+	assert.Equal(0, len(w.payloadBuffer))
 }

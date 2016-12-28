@@ -1,7 +1,7 @@
 package main
 
 import (
-	"sync/atomic"
+	"sync"
 
 	log "github.com/cihub/seelog"
 
@@ -22,9 +22,8 @@ type Writer struct {
 	payloadBuffer []model.AgentPayload   // buffered of payloads ready to send
 	serviceBuffer model.ServicesMetadata // services are merged into this map continuously
 
-	payloadBufferLen int32 // used for async debugging, not always exact
-
-	exit chan struct{}
+	exit   chan struct{}
+	exitWG *sync.WaitGroup
 }
 
 // NewWriter returns a new Writer
@@ -47,7 +46,8 @@ func NewWriter(conf *config.AgentConfig) *Writer {
 		payloadBuffer: make([]model.AgentPayload, 0, 5),
 		serviceBuffer: make(model.ServicesMetadata),
 
-		exit: make(chan struct{}),
+		exit:   make(chan struct{}),
+		exitWG: &sync.WaitGroup{},
 	}
 }
 
@@ -56,6 +56,9 @@ func NewWriter(conf *config.AgentConfig) *Writer {
 // NOTE: this currently happens sequentially, but it would not be too
 // hard to mutex and parallelize. Not sure it's needed though.
 func (w *Writer) Run() {
+	w.exitWG.Add(1)
+	defer w.exitWG.Done()
+
 	for {
 		select {
 		case p := <-w.inPayloads:
@@ -74,8 +77,13 @@ func (w *Writer) Run() {
 			w.Flush()
 			return
 		}
-		atomic.StoreInt32(&w.payloadBufferLen, int32(len(w.payloadBuffer)))
 	}
+}
+
+// Stop stops the main Run loop
+func (w *Writer) Stop() {
+	close(w.exit)
+	w.exitWG.Wait()
 }
 
 // FlushServices initiate a flush of the services to the services endpoint
@@ -94,6 +102,3 @@ func (w *Writer) Flush() {
 	w.payloadBuffer = nil
 }
 
-func (w *Writer) getPayloadBufferLen() int32 {
-	return atomic.LoadInt32(&w.payloadBufferLen)
-}
