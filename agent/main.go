@@ -34,13 +34,15 @@ func handleSignal(exit chan struct{}) {
 
 // opts are the command-line options
 var opts struct {
-	ddConfigFile string
-	configFile   string
-	debug        bool
-	logLevel     string
-	version      bool
-	dumpTraces   string
-	dumpServices string
+	ddConfigFile   string
+	configFile     string
+	debug          bool
+	logLevel       string
+	version        bool
+	dumpTraces     string
+	dumpServices   string
+	replayTraces   string
+	replayServices string
 }
 
 // version info sourced from build flags
@@ -83,8 +85,10 @@ func main() {
 	flag.StringVar(&opts.configFile, "config", "/etc/datadog/trace-agent.ini", "Trace agent ini config file.")
 	flag.BoolVar(&opts.debug, "debug", false, "Turn on debug mode")
 	flag.BoolVar(&opts.version, "version", false, "Show version information and exit")
-	flag.BoolVar(&opts.dumpTraces, "dumptraces", "", "File in which all incoming traces are written as JSON (debug only)")
-	flag.BoolVar(&opts.dumpServices, "dumpservices", "", "File in which all incoming services are written as JSON (debug only)")
+	flag.StringVar(&opts.dumpTraces, "dumptraces", "", "File in which all incoming traces are written as JSON (debug only)")
+	flag.StringVar(&opts.dumpServices, "dumpservices", "", "File in which all incoming services are written as JSON (debug only)")
+	flag.StringVar(&opts.replayTraces, "replaytraces", "", "File containing traces replay JSON data (debug only)")
+	flag.StringVar(&opts.replayServices, "replayservices", "", "File containing services replay JSON data (debug only)")
 
 	// profiling arguments
 	cpuprofile := flag.String("cpuprofile", "", "write cpu profile to file")
@@ -140,6 +144,10 @@ func main() {
 
 	// Seed rand
 	rand.Seed(time.Now().UTC().UnixNano())
+
+	// Dump init (for debug)
+	dumpInit(opts.dumpTraces, opts.dumpServices)
+	defer dumpClose()
 
 	agent := NewAgent(agentConf)
 
