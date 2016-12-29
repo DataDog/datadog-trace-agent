@@ -34,15 +34,13 @@ func handleSignal(exit chan struct{}) {
 
 // opts are the command-line options
 var opts struct {
-	ddConfigFile   string
-	configFile     string
-	debug          bool
-	logLevel       string
-	version        bool
-	dumpTraces     string
-	dumpServices   string
-	replayTraces   string
-	replayServices string
+	ddConfigFile string
+	configFile   string
+	debug        bool
+	logLevel     string
+	version      bool
+	dumpTraces   string
+	dumpServices string
 }
 
 // version info sourced from build flags
@@ -87,8 +85,6 @@ func main() {
 	flag.BoolVar(&opts.version, "version", false, "Show version information and exit")
 	flag.StringVar(&opts.dumpTraces, "dumptraces", "", "File in which all incoming traces are written as JSON (debug only)")
 	flag.StringVar(&opts.dumpServices, "dumpservices", "", "File in which all incoming services are written as JSON (debug only)")
-	flag.StringVar(&opts.replayTraces, "replaytraces", "", "File containing traces replay JSON data (debug only)")
-	flag.StringVar(&opts.replayServices, "replayservices", "", "File containing services replay JSON data (debug only)")
 
 	// profiling arguments
 	cpuprofile := flag.String("cpuprofile", "", "write cpu profile to file")
