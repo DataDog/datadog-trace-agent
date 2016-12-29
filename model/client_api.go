@@ -7,6 +7,8 @@ import (
 	"github.com/ugorji/go/codec"
 )
 
+//go:generate codecgen -u -o typed_msgpack.go span.go trace.go services.go
+
 // ClientDecoder is the common interface that all decoders should honor
 type ClientDecoder interface {
 	Decode(v interface{}) error

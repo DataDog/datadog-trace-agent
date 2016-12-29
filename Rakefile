@@ -23,6 +23,10 @@ PACKAGES = %w(
   ./statsd
 )
 
+GENERATED_FILES = [
+  'model/typed_msgpack.go'
+]
+
 task :default => [:ci]
 
 desc "Build Datadog Trace agent"
@@ -59,7 +63,14 @@ task :lint do
   error = false
   PACKAGES.each do |pkg|
     puts "golint #{pkg}"
-    output = `golint #{pkg}`.strip
+    output = `golint #{pkg}`.split("\n")
+
+    # exclude auto-generated files from the linting process
+    output = output.reject do |line|
+      filename = line.split(':')[0]
+      GENERATED_FILES.include?(filename)
+    end
+
     if output.length > 0
       puts output
       error = true
@@ -74,6 +85,16 @@ end
 
 task :fmt do
   PACKAGES.each { |pkg| go_fmt(pkg) }
+end
+
+namespace :generator do
+  desc "Update generated go files"
+  task :update do
+    # generate msgpack types so that reflection
+    # is not used at runtime and strings aren't
+    # copied during the decoding process
+    sh "go generate ./model/client_api.go"
+  end
 end
 
 # FIXME: add :test in the list
