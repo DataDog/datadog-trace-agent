@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	duration           = time.Second / 10
+	tracesDuration     = time.Second / 5
+	servicesDuration   = time.Second / 20
 	defaultHTTPTimeout = time.Second
 	tracesEndPoint     = "http://localhost:7777/v0.3/traces"
 	servicesEndPoint   = "http://localhost:7777/v0.3/services"
@@ -46,6 +47,8 @@ func sendTraces(client *http.Client, traces string) error {
 		scanner := bufio.NewScanner(tracesFile)
 		l := 0
 		sent := 0
+		nbTraces := 0
+		nbSpans := 0
 		for scanner.Scan() {
 			l++
 			inBuf := bytes.NewReader(scanner.Bytes())
@@ -71,9 +74,14 @@ func sendTraces(client *http.Client, traces string) error {
 				continue
 			}
 			sent++
-			time.Sleep(duration)
+			nbTraces += len(traces)
+			for _, trace := range traces {
+				nbSpans += len(trace)
+			}
+
+			time.Sleep(tracesDuration)
 		}
-		log.Printf("sent %d/%d traces payloads", sent, l)
+		log.Printf("traces: sent %d/%d payloads (%d traces, %d spans)", sent, l, nbTraces, nbSpans)
 	}
 
 	return nil
@@ -118,15 +126,17 @@ func sendServices(client *http.Client, services string) error {
 				continue
 			}
 			sent++
-			time.Sleep(duration)
+			time.Sleep(servicesDuration)
 		}
-		log.Printf("sent %d/%d services payloads", sent, l)
+		log.Printf("services: sent %d/%d payloads", sent, l)
 	}
 
 	return nil
 }
 
 func main() {
+	done := make(chan struct{}, 2)
+
 	// flags
 	flag.BoolVar(&opts.loop, "loop", false, "Loop and keeping re-sending the same data over and over")
 	flag.StringVar(&opts.traces, "traces", "traces.json", "Traces log file containing one JSON entry per line")
@@ -138,13 +148,29 @@ func main() {
 		Timeout: defaultHTTPTimeout,
 	}
 
-	// infinite loop if loop is set to true; it expects a SIGINT/SIGTERM to be stopped
-	for {
-		sendTraces(client, opts.traces)
-		sendServices(client, opts.services)
-		// quit if not in loop mode
-		if !opts.loop {
-			break
+	go func() {
+		// infinite loop if loop is set to true; it expects a SIGINT/SIGTERM to be stopped
+		for {
+			sendTraces(client, opts.traces)
+			if !opts.loop {
+				break
+			}
 		}
-	}
+		done <- struct{}{}
+	}()
+
+	go func() {
+		// infinite loop if loop is set to true; it expects a SIGINT/SIGTERM to be stopped
+		for {
+			sendServices(client, opts.services)
+			if !opts.loop {
+				break
+			}
+		}
+		done <- struct{}{}
+	}()
+
+	// Wait for traces & services to finish
+	<-done
+	<-done
 }
