@@ -1,6 +1,7 @@
 raclette
 trace-agent
 trace-flood
+trace-replay
 generator
 *.swp
 python/raclette.egg-info
