@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -37,6 +38,21 @@ func newTestServer(t *testing.T, data chan dataFromAPI) *httptest.Server {
 		}
 		w.WriteHeader(http.StatusOK)
 	}))
+}
+
+func newFailingTestServer(t *testing.T) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+}
+
+func newTestPayload(env string) model.AgentPayload {
+	return model.AgentPayload{
+		HostName: "test.host",
+		Env:      env,
+		Traces:   []model.Trace{model.Trace{fixtures.TestSpan()}},
+		Stats:    []model.StatsBucket{fixtures.TestStatsBucket()},
+	}
 }
 
 func TestWriterServices(t *testing.T) {
@@ -94,9 +110,7 @@ func TestWriterPayload(t *testing.T) {
 	defer testAPI.Close()
 
 	// buggy server
-	testAPI2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
+	testAPI2 := newFailingTestServer(t)
 	defer testAPI2.Close()
 
 	conf := config.NewDefaultAgentConfig()
@@ -106,13 +120,7 @@ func TestWriterPayload(t *testing.T) {
 	w := NewWriter(conf)
 	go w.Run()
 
-	p := model.AgentPayload{
-		HostName: "test.host",
-		Traces:   []model.Trace{model.Trace{fixtures.TestSpan()}},
-		Stats:    []model.StatsBucket{fixtures.TestStatsBucket()},
-	}
-
-	w.inPayloads <- p
+	w.inPayloads <- newTestPayload("test")
 
 receivingLoop:
 	for {
@@ -133,6 +141,83 @@ receivingLoop:
 
 	w.Stop()
 
-	// we should just have ignored the 400 error on the other backend
+	// The payload for testAPI2 must have been kept in the buffer since it
+	// could not be written
+	assert.Equal(1, len(w.payloadBuffer))
+
+	p0 := w.payloadBuffer[0]
+	endpoint := p0.endpoint.(APIEndpoint)
+	assert.Equal(1, len(endpoint.apiKeys))
+	assert.Equal("yyyyyyyy", endpoint.apiKeys[0])
+}
+
+func TestWriterBuffering(t *testing.T) {
+	assert := assert.New(t)
+
+	nbPayloads := 3
+	payloads := make([]model.AgentPayload, nbPayloads)
+	payloadSizes := make([]int, nbPayloads)
+	for i := range payloads {
+		payload := newTestPayload(fmt.Sprintf("p%d", i))
+		payloads[i] = payload
+
+		data, err := model.EncodeAgentPayload(payload)
+		if err != nil {
+			t.Fatalf("cannot encode test payload: %v", err)
+		}
+		payloadSizes[i] = len(data)
+	}
+
+	// Use a server that will reject all requests to make sure our
+	// payloads are kept in the buffer.
+	server := newFailingTestServer(t)
+	defer server.Close()
+
+	conf := config.NewDefaultAgentConfig()
+	conf.APIEndpoints = []string{server.URL}
+	conf.APIKeys = []string{"key"}
+	conf.APIPayloadBufferMaxSize = payloadSizes[0] + payloadSizes[1]
+
+	w := NewWriter(conf)
+	// Make the chan unbuffered to block on write
+	w.inPayloads = make(chan model.AgentPayload)
+	go w.Run()
+
+	for _, payload := range payloads {
+		w.inPayloads <- payload
+	}
+
+	w.Stop()
+
+	// Since the writer was created with a buffer just large enough for
+	// the first two payloads, the third payload overflowed the buffer,
+	// and the first and oldest payload (p0) was discarded.
+	assert.Equal(2, len(w.payloadBuffer))
+	assert.Equal("p1", w.payloadBuffer[0].payload.Env)
+	assert.Equal("p2", w.payloadBuffer[1].payload.Env)
+}
+
+func TestWriterDisabledBuffering(t *testing.T) {
+	assert := assert.New(t)
+
+	server := newFailingTestServer(t)
+	defer server.Close()
+
+	conf := config.NewDefaultAgentConfig()
+	conf.APIEndpoints = []string{server.URL}
+	conf.APIKeys = []string{"key"}
+	conf.APIPayloadBufferMaxSize = 0
+
+	w := NewWriter(conf)
+	// Make the chan unbuffered to block on write
+	w.inPayloads = make(chan model.AgentPayload)
+	go w.Run()
+
+	w.inPayloads <- newTestPayload("test")
+
+	w.Stop()
+
+	// Since buffering is disabled, the payload should have been
+	// dropped and the buffer should be empty.
 	assert.Equal(0, len(w.payloadBuffer))
 }
