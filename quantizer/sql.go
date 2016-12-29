@@ -130,15 +130,13 @@ func (t *TokenConsumer) Process(in string) (string, error) {
 	out := &bytes.Buffer{}
 	t.tokenizer.InStream.Reset(in)
 
-	// reset internals to reuse allocated memory
-	defer t.Reset()
-
 	token, buff := t.tokenizer.Scan()
 	for ; token != EOFChar; token, buff = t.tokenizer.Scan() {
 		// handle terminal case
 		if token == LexError {
 			// the tokenizer is unable  to process the SQL  string, so the output will be
 			// surely wrong. In this case we return an error and an empty string.
+			t.Reset()
 			return "", errors.New("the tokenizer was unable to process the string")
 		}
 
@@ -161,6 +159,8 @@ func (t *TokenConsumer) Process(in string) (string, error) {
 		t.lastToken = token
 	}
 
+	// reset internals to reuse allocated memory
+	t.Reset()
 	return out.String(), nil
 }
 
