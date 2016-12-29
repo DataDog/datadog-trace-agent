@@ -20,16 +20,11 @@ type dataFromAPI struct {
 	body      string
 }
 
-func TestWriterServices(t *testing.T) {
-	assert := assert.New(t)
-	// where we'll receive data
-	data := make(chan dataFromAPI, 1)
-
-	// make a real HTTP endpoint so we can test that too
-	testAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func newTestServer(t *testing.T, data chan dataFromAPI) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := ioutil.ReadAll(r.Body)
 		if err != nil {
-			t.Logf("http test server problem when reading, %v", err)
+			t.Errorf("test server: cannot read request body: %v", err)
 			return
 		}
 		defer r.Body.Close()
@@ -40,9 +35,17 @@ func TestWriterServices(t *testing.T) {
 			header:    r.Header,
 			body:      string(body),
 		}
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 	}))
+}
 
+func TestWriterServices(t *testing.T) {
+	assert := assert.New(t)
+	// where we'll receive data
+	data := make(chan dataFromAPI, 1)
+
+	// make a real HTTP endpoint so we can test that too
+	testAPI := newTestServer(t, data)
 	defer testAPI.Close()
 
 	conf := config.NewDefaultAgentConfig()
@@ -87,29 +90,13 @@ func TestWriterPayload(t *testing.T) {
 	data := make(chan dataFromAPI, 1)
 
 	// make a real HTTP endpoint so we can test that too
-	testAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			t.Logf("http test server problem when reading, %v", err)
-			return
-		}
-		defer r.Body.Close()
-
-		data <- dataFromAPI{
-			urlPath:   r.URL.Path,
-			urlParams: r.URL.Query(),
-			header:    r.Header,
-			body:      string(body),
-		}
-		w.WriteHeader(200)
-	}))
+	testAPI := newTestServer(t, data)
+	defer testAPI.Close()
 
 	// buggy server
 	testAPI2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(400)
+		w.WriteHeader(http.StatusInternalServerError)
 	}))
-
-	defer testAPI.Close()
 	defer testAPI2.Close()
 
 	conf := config.NewDefaultAgentConfig()
