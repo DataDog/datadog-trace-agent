@@ -124,3 +124,74 @@ func TestDecodersReusable(t *testing.T) {
 		assert.False(reflect.DeepEqual(firstTraces, secondTraces))
 	}
 }
+
+func TestPoolBorrowCreate(t *testing.T) {
+	assert := assert.New(t)
+	testCases := []struct {
+		contentType string
+	}{
+		{"application/json"},
+		{"application/msgpack"},
+		{""},
+	}
+
+	for _, tc := range testCases {
+		// borrow a decoder from the pool
+		pool := NewDecoderPool(1)
+		decoder := pool.Borrow(tc.contentType)
+		assert.NotNil(decoder)
+	}
+}
+
+func TestPoolBorrowJSON(t *testing.T) {
+	assert := assert.New(t)
+	pool := NewDecoderPool(1)
+	decoder := pool.Borrow("application/json")
+	_, ok := decoder.(*jsonDecoder)
+	assert.True(ok)
+}
+
+func TestPoolBorrowMsgpack(t *testing.T) {
+	assert := assert.New(t)
+	pool := NewDecoderPool(1)
+	decoder := pool.Borrow("application/msgpack")
+	_, ok := decoder.(*msgpackDecoder)
+	assert.True(ok)
+}
+
+func TestPoolReuseDecoder(t *testing.T) {
+	assert := assert.New(t)
+	pool := NewDecoderPool(1)
+	decoder := pool.Borrow("application/msgpack")
+	pool.Release(decoder)
+	anotherDecoder := pool.Borrow("application/msgpack")
+	assert.Equal(anotherDecoder, decoder)
+}
+
+func TestPoolReleaseSize(t *testing.T) {
+	pool := NewDecoderPool(1)
+	decoder := newMsgpackDecoder()
+	anotherDecoder := newMsgpackDecoder()
+
+	// put two decoders in the pool with a maximum size of 1
+	// doesn't hang the caller
+	pool.Release(decoder)
+	pool.Release(anotherDecoder)
+}
+
+func TestPoolBorrowSize(t *testing.T) {
+	assert := assert.New(t)
+	pool := NewDecoderPool(1)
+
+	// borrow two decoders from the pool with a maximum size of 1
+	// doesn't hang the caller; a new decoder is created and discarded
+	decoder := pool.Borrow("application/msgpack")
+	anotherDecoder := pool.Borrow("application/msgpack")
+
+	assert.True(decoder != anotherDecoder)
+	pool.Release(decoder)
+	pool.Release(anotherDecoder)
+
+	check := pool.Borrow("application/msgpack")
+	assert.Equal(check, decoder)
+}

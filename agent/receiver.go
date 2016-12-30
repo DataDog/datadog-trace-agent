@@ -17,6 +17,13 @@ import (
 // APIVersion is a dumb way to version our collector handlers
 type APIVersion int
 
+// Max size of decoders pool
+const decoderSize = 10
+
+// Pool of decoders to prevent continuous allocations
+// TODO[manu]: don't make it global
+var decoderPool *model.DecoderPool = model.NewDecoderPool(decoderSize)
+
 const (
 	// v01 DEPRECATED, FIXME[1.x]
 	// Traces: JSON, slice of spans
@@ -126,14 +133,16 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 
 		// in v01 we actually get spans that we have to transform in traces
 		var spans []model.Span
-		dec := model.DecoderFromContentType(contentType)
+		dec := decoderPool.Borrow(contentType)
 		err := dec.Decode(req.Body, &spans)
 		if err != nil {
 			r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
+			decoderPool.Release(dec)
 			HTTPDecodingError(handlerTags, w)
 			return
 		}
 
+		decoderPool.Release(dec)
 		traces = model.TracesFromSpans(spans)
 	case v02:
 		if contentType != "application/json" && contentType != "text/json" && contentType != "" {
@@ -142,16 +151,19 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 			return
 		}
 
-		dec := model.DecoderFromContentType(contentType)
+		dec := decoderPool.Borrow(contentType)
 		err := dec.Decode(req.Body, &traces)
 		if err != nil {
 			r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
+			decoderPool.Release(dec)
 			HTTPDecodingError(handlerTags, w)
 			return
 		}
+
+		decoderPool.Release(dec)
 	case v03:
 		// select the right Decoder based on the given content-type header
-		dec := model.DecoderFromContentType(contentType)
+		dec := decoderPool.Borrow(contentType)
 		err := dec.Decode(req.Body, &traces)
 		if err != nil {
 			if strings.Contains(contentType, "json") {
@@ -159,9 +171,12 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 			} else {
 				r.logger.Errorf("error when decoding msgpack traces")
 			}
+			decoderPool.Release(dec)
 			HTTPDecodingError(handlerTags, w)
 			return
 		}
+
+		decoderPool.Release(dec)
 	default:
 		HTTPEndpointNotSupported(handlerTags, w)
 		return
@@ -221,7 +236,7 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 		}
 
 		// select the right Decoder based on the given content-type header
-		dec := model.DecoderFromContentType(contentType)
+		dec := decoderPool.Borrow(contentType)
 		err := dec.Decode(req.Body, &servicesMeta)
 		if err != nil {
 			r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
@@ -230,7 +245,7 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 		}
 	case v03:
 		// select the right Decoder based on the given content-type header
-		dec := model.DecoderFromContentType(contentType)
+		dec := decoderPool.Borrow(contentType)
 		err := dec.Decode(req.Body, &servicesMeta)
 		if err != nil {
 			if strings.Contains(contentType, "json") {
