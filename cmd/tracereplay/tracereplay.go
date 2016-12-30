@@ -34,7 +34,7 @@ var opts struct {
 	services string
 }
 
-func makeTracesBuffers(tracesPath string) (error, [][]byte) {
+func makeTracesBuffers(tracesPath string) ([][]byte, error) {
 	var traces []model.Trace
 	var buffers [][]byte
 	buf := make([]byte, bufferSize)
@@ -72,13 +72,13 @@ func makeTracesBuffers(tracesPath string) (error, [][]byte) {
 		err = encoder.Encode(traces)
 		if err != nil {
 			log.Fatalf("unable to encode %s:%d\n", traces, nbPayloads)
-			return err, nil
+			return nil, err
 		}
 		nbBytes += outBuf.Len()
 		buffers = append(buffers, outBuf.Bytes())
 	}
 	log.Printf("traces: %d payloads %d traces %d spans %d bytes", nbPayloads, nbTraces, nbSpans, nbBytes)
-	return nil, buffers
+	return buffers, nil
 }
 
 func sendTraces(client *http.Client, buffers [][]byte) error {
@@ -163,7 +163,7 @@ func main() {
 	}
 
 	go func() {
-		_, buffers := makeTracesBuffers(opts.traces)
+		buffers, _ := makeTracesBuffers(opts.traces)
 		if buffers != nil {
 			// infinite loop if loop is set to true; it expects a SIGINT/SIGTERM to be stopped
 			for {
