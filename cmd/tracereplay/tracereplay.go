@@ -16,11 +16,12 @@ import (
 )
 
 const (
-	tracesDuration     = time.Second / 5
-	servicesDuration   = time.Second / 20
+	tracesDuration     = time.Second / 25
+	servicesDuration   = time.Second / 33
 	defaultHTTPTimeout = time.Second
 	tracesEndPoint     = "http://localhost:7777/v0.3/traces"
 	servicesEndPoint   = "http://localhost:7777/v0.3/services"
+	bufferSize         = int(1e7)
 )
 
 var mh codec.MsgpackHandle
@@ -33,56 +34,69 @@ var opts struct {
 	services string
 }
 
-func sendTraces(client *http.Client, traces string) error {
-	tracesFile, tracesErr := os.Open(opts.traces)
+func makeTracesBuffers(tracesPath string) (error, [][]byte) {
+	var traces []model.Trace
+	var buffers [][]byte
+	buf := make([]byte, bufferSize)
+
+	tracesFile, tracesErr := os.Open(tracesPath)
 	if tracesErr != nil {
 		tracesNotFound.Do(func() {
 			log.Printf("unable to open traces log file '%s': %v\n", opts.traces, tracesErr)
 		})
+		return nil, nil
 	}
 	defer tracesFile.Close()
 
-	if tracesFile != nil {
-		var traces []model.Trace
-		scanner := bufio.NewScanner(tracesFile)
-		l := 0
-		sent := 0
-		nbTraces := 0
-		nbSpans := 0
-		for scanner.Scan() {
-			l++
-			inBuf := bytes.NewReader(scanner.Bytes())
-			dec := json.NewDecoder(inBuf)
-			err := dec.Decode(&traces)
-			if err != nil {
-				log.Printf("bad traces input %s:%d\n", traces, l)
-				continue
-			}
-			outBuf := &bytes.Buffer{}
-			encoder := codec.NewEncoder(outBuf, &mh)
-			err = encoder.Encode(traces)
-			if err != nil {
-				log.Fatalf("unable to encode %s:%d\n", traces, l)
-				return err
-			}
-
-			req, _ := http.NewRequest("POST", tracesEndPoint, outBuf)
-			req.Header.Set("Content-Type", "application/msgpack")
-			_, err = client.Do(req)
-			if err != nil {
-				log.Printf("client error: %v\n", err)
-				continue
-			}
-			sent++
-			nbTraces += len(traces)
-			for _, trace := range traces {
-				nbSpans += len(trace)
-			}
-
-			time.Sleep(tracesDuration)
+	scanner := bufio.NewScanner(tracesFile)
+	scanner.Buffer(buf, cap(buf)) // traces line can be very big, need a dedicated buffer
+	nbPayloads := 0
+	nbTraces := 0
+	nbSpans := 0
+	nbBytes := 0
+	for scanner.Scan() {
+		nbPayloads++
+		inBuf := bytes.NewReader(scanner.Bytes())
+		dec := json.NewDecoder(inBuf)
+		err := dec.Decode(&traces)
+		if err != nil {
+			log.Printf("bad traces input %s:%d\n", traces, nbPayloads)
+			continue
 		}
-		log.Printf("traces: sent %d/%d payloads (%d traces, %d spans)", sent, l, nbTraces, nbSpans)
+		nbTraces += len(traces)
+		for _, trace := range traces {
+			nbSpans += len(trace)
+		}
+		outBuf := &bytes.Buffer{}
+		encoder := codec.NewEncoder(outBuf, &mh)
+		err = encoder.Encode(traces)
+		if err != nil {
+			log.Fatalf("unable to encode %s:%d\n", traces, nbPayloads)
+			return err, nil
+		}
+		nbBytes += outBuf.Len()
+		buffers = append(buffers, outBuf.Bytes())
 	}
+	log.Printf("traces: %d payloads %d traces %d spans %d bytes", nbPayloads, nbTraces, nbSpans, nbBytes)
+	return nil, buffers
+}
+
+func sendTraces(client *http.Client, buffers [][]byte) error {
+
+	sent := 0
+	for _, buffer := range buffers {
+		req, _ := http.NewRequest("POST", tracesEndPoint, bytes.NewReader(buffer))
+		req.Header.Set("Content-Type", "application/msgpack")
+		_, err := client.Do(req)
+		if err != nil {
+			log.Printf("client error: %v\n", err)
+			continue
+		}
+		sent++
+
+		time.Sleep(tracesDuration)
+	}
+	log.Printf("traces: sent %d/%d payloads", sent, len(buffers))
 
 	return nil
 }
@@ -149,11 +163,14 @@ func main() {
 	}
 
 	go func() {
-		// infinite loop if loop is set to true; it expects a SIGINT/SIGTERM to be stopped
-		for {
-			sendTraces(client, opts.traces)
-			if !opts.loop {
-				break
+		_, buffers := makeTracesBuffers(opts.traces)
+		if buffers != nil {
+			// infinite loop if loop is set to true; it expects a SIGINT/SIGTERM to be stopped
+			for {
+				sendTraces(client, buffers)
+				if !opts.loop {
+					break
+				}
 			}
 		}
 		done <- struct{}{}
