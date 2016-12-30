@@ -7,45 +7,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/DataDog/datadog-trace-agent/config"
+	"github.com/DataDog/datadog-trace-agent/fixtures"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/ugorji/go/codec"
 )
-
-// getTestSpan returns a Span with different fields set
-func getTestSpan() model.Span {
-	return model.Span{
-		TraceID:  42,
-		SpanID:   52,
-		ParentID: 42,
-		Type:     "web",
-		Service:  "fennel_IS amazing!",
-		Name:     "something &&<@# that should be a metric!",
-		Resource: "NOT touched because it is going to be hashed",
-		Start:    time.Now().UnixNano(),
-		Duration: time.Second.Nanoseconds(),
-		Meta:     map[string]string{"http.host": "192.168.0.1"},
-		Metrics:  map[string]float64{"http.monitor": 41.99},
-	}
-}
-
-// getTestTrace returns a []Trace that is composed by ``traceN`` number
-// of traces, each one composed by ``size`` number of spans.
-func getTestTrace(traceN, size int) []model.Trace {
-	traces := []model.Trace{}
-
-	for i := 0; i < traceN; i++ {
-		trace := model.Trace{}
-		for j := 0; j < size; j++ {
-			trace = append(trace, getTestSpan())
-		}
-		traces = append(traces, trace)
-	}
-	return traces
-}
 
 func TestLegacyReceiver(t *testing.T) {
 	// testing traces without content-type in agent endpoints, it should use JSON decoding
@@ -58,8 +26,8 @@ func TestLegacyReceiver(t *testing.T) {
 		contentType string
 		traces      model.Trace
 	}{
-		{"v01 with empty content-type", NewHTTPReceiver(config), v01, "", model.Trace{getTestSpan()}},
-		{"v01 with application/json", NewHTTPReceiver(config), v01, "application/json", model.Trace{getTestSpan()}},
+		{"v01 with empty content-type", NewHTTPReceiver(config), v01, "", model.Trace{fixtures.GetTestSpan()}},
+		{"v01 with application/json", NewHTTPReceiver(config), v01, "application/json", model.Trace{fixtures.GetTestSpan()}},
 	}
 
 	for _, tc := range testCases {
@@ -114,12 +82,12 @@ func TestReceiverJSONDecoder(t *testing.T) {
 		contentType string
 		traces      []model.Trace
 	}{
-		{"v02 with empty content-type", NewHTTPReceiver(config), v02, "", getTestTrace(1, 1)},
-		{"v03 with empty content-type", NewHTTPReceiver(config), v03, "", getTestTrace(1, 1)},
-		{"v02 with application/json", NewHTTPReceiver(config), v02, "application/json", getTestTrace(1, 1)},
-		{"v03 with application/json", NewHTTPReceiver(config), v03, "application/json", getTestTrace(1, 1)},
-		{"v02 with text/json", NewHTTPReceiver(config), v02, "text/json", getTestTrace(1, 1)},
-		{"v03 with text/json", NewHTTPReceiver(config), v03, "text/json", getTestTrace(1, 1)},
+		{"v02 with empty content-type", NewHTTPReceiver(config), v02, "", fixtures.GetTestTrace(1, 1)},
+		{"v03 with empty content-type", NewHTTPReceiver(config), v03, "", fixtures.GetTestTrace(1, 1)},
+		{"v02 with application/json", NewHTTPReceiver(config), v02, "application/json", fixtures.GetTestTrace(1, 1)},
+		{"v03 with application/json", NewHTTPReceiver(config), v03, "application/json", fixtures.GetTestTrace(1, 1)},
+		{"v02 with text/json", NewHTTPReceiver(config), v02, "text/json", fixtures.GetTestTrace(1, 1)},
+		{"v03 with text/json", NewHTTPReceiver(config), v03, "text/json", fixtures.GetTestTrace(1, 1)},
 	}
 
 	for _, tc := range testCases {
@@ -176,9 +144,9 @@ func TestReceiverMsgpackDecoder(t *testing.T) {
 		contentType string
 		traces      []model.Trace
 	}{
-		{"v01 with application/msgpack", NewHTTPReceiver(config), v01, "application/msgpack", getTestTrace(1, 1)},
-		{"v02 with application/msgpack", NewHTTPReceiver(config), v02, "application/msgpack", getTestTrace(1, 1)},
-		{"v03 with application/msgpack", NewHTTPReceiver(config), v03, "application/msgpack", getTestTrace(1, 1)},
+		{"v01 with application/msgpack", NewHTTPReceiver(config), v01, "application/msgpack", fixtures.GetTestTrace(1, 1)},
+		{"v02 with application/msgpack", NewHTTPReceiver(config), v02, "application/msgpack", fixtures.GetTestTrace(1, 1)},
+		{"v03 with application/msgpack", NewHTTPReceiver(config), v03, "application/msgpack", fixtures.GetTestTrace(1, 1)},
 	}
 
 	for _, tc := range testCases {
@@ -380,7 +348,7 @@ func TestReceiverServiceMsgpackDecoder(t *testing.T) {
 
 func BenchmarkDecoderJSON(b *testing.B) {
 	assert := assert.New(b)
-	traces := getTestTrace(150, 66)
+	traces := fixtures.GetTestTrace(150, 66)
 
 	// json payload
 	payload, err := json.Marshal(traces)
@@ -398,7 +366,7 @@ func BenchmarkDecoderJSON(b *testing.B) {
 
 func BenchmarkDecoderMsgpack(b *testing.B) {
 	assert := assert.New(b)
-	traces := getTestTrace(150, 66)
+	traces := fixtures.GetTestTrace(150, 66)
 
 	// msgpack payload
 	var payload []byte
