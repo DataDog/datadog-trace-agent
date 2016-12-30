@@ -1,10 +1,7 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"strings"
@@ -115,15 +112,9 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		return
 	}
 	defer req.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		return
-	}
-
-	bodyBuffer := bytes.NewReader(bodyBytes)
-	contentType := req.Header.Get("Content-Type")
 
 	var traces []model.Trace
+	contentType := req.Header.Get("Content-Type")
 
 	switch v {
 	case v01:
@@ -135,10 +126,10 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 
 		// in v01 we actually get spans that we have to transform in traces
 		var spans []model.Span
-		dec := json.NewDecoder(bodyBuffer)
-		err := dec.Decode(&spans)
+		dec := model.DecoderFromContentType(contentType)
+		err := dec.Decode(req.Body, &spans)
 		if err != nil {
-			r.logger.Errorf(model.HumanReadableJSONError(bodyBuffer, err))
+			//r.logger.Errorf(model.HumanReadableJSONError(bodyBuffer, err))
 			HTTPDecodingError(handlerTags, w)
 			return
 		}
@@ -151,20 +142,20 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 			return
 		}
 
-		dec := json.NewDecoder(bodyBuffer)
-		err := dec.Decode(&traces)
+		dec := model.DecoderFromContentType(contentType)
+		err := dec.Decode(req.Body, &traces)
 		if err != nil {
-			r.logger.Errorf(model.HumanReadableJSONError(bodyBuffer, err))
+			//r.logger.Errorf(model.HumanReadableJSONError(bodyBuffer, err))
 			HTTPDecodingError(handlerTags, w)
 			return
 		}
 	case v03:
 		// select the right Decoder based on the given content-type header
-		dec := model.DecoderFromContentType(contentType, bodyBuffer)
-		err := dec.Decode(&traces)
+		dec := model.DecoderFromContentType(contentType)
+		err := dec.Decode(req.Body, &traces)
 		if err != nil {
 			if strings.Contains(contentType, "json") {
-				r.logger.Errorf(model.HumanReadableJSONError(bodyBuffer, err))
+				//r.logger.Errorf(model.HumanReadableJSONError(bodyBuffer, err))
 			} else {
 				r.logger.Errorf("error when decoding msgpack traces")
 			}
@@ -214,15 +205,9 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 	if req.Body == nil {
 		return
 	}
-
 	defer req.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		return
-	}
 
 	var servicesMeta model.ServicesMetadata
-	bodyBuffer := bytes.NewReader(bodyBytes)
 	contentType := req.Header.Get("Content-Type")
 
 	switch v {
@@ -235,20 +220,21 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 			return
 		}
 
-		dec := json.NewDecoder(bodyBuffer)
-		err = dec.Decode(&servicesMeta)
+		// select the right Decoder based on the given content-type header
+		dec := model.DecoderFromContentType(contentType)
+		err := dec.Decode(req.Body, &servicesMeta)
 		if err != nil {
-			r.logger.Errorf(model.HumanReadableJSONError(bodyBuffer, err))
+			//r.logger.Errorf(model.HumanReadableJSONError(bodyBuffer, err))
 			HTTPDecodingError(handlerTags, w)
 			return
 		}
 	case v03:
 		// select the right Decoder based on the given content-type header
-		dec := model.DecoderFromContentType(contentType, bodyBuffer)
-		err = dec.Decode(&servicesMeta)
+		dec := model.DecoderFromContentType(contentType)
+		err := dec.Decode(req.Body, &servicesMeta)
 		if err != nil {
 			if strings.Contains(contentType, "json") {
-				r.logger.Errorf(model.HumanReadableJSONError(bodyBuffer, err))
+				//r.logger.Errorf(model.HumanReadableJSONError(bodyBuffer, err))
 			} else {
 				r.logger.Errorf("error when decoding msgpack traces")
 			}
