@@ -37,16 +37,19 @@ func readAll(source io.Reader, dest *bytes.Buffer) (err error) {
 // ClientDecoder is the common interface that all decoders should honor
 type ClientDecoder interface {
 	Decode(body io.Reader, v interface{}) error
+	BufferReader() *bytes.Reader
 }
 
 type jsonDecoder struct {
 	decoder *json.Decoder
 	buf     *bytes.Buffer
+	slice   []byte
 }
 
 type msgpackDecoder struct {
 	decoder *codec.Decoder
 	buf     *bytes.Buffer
+	slice   []byte
 }
 
 func newJSONDecoder() *jsonDecoder {
@@ -55,6 +58,7 @@ func newJSONDecoder() *jsonDecoder {
 	buf := bytes.NewBuffer(make([]byte, 0, minBufferSize))
 	return &jsonDecoder{
 		buf:     buf,
+		slice:   buf.Bytes(),
 		decoder: json.NewDecoder(buf),
 	}
 }
@@ -70,12 +74,17 @@ func (d *jsonDecoder) Decode(body io.Reader, v interface{}) error {
 	return d.decoder.Decode(v)
 }
 
+func (d *jsonDecoder) BufferReader() *bytes.Reader {
+	return bytes.NewReader(d.slice)
+}
+
 func newMsgpackDecoder() *msgpackDecoder {
 	// sets the size of the buffer so that it usually doesn't need
 	// to be expanded or reallocated
 	buf := bytes.NewBuffer(make([]byte, 0, minBufferSize))
 	return &msgpackDecoder{
 		buf:     buf,
+		slice:   buf.Bytes(),
 		decoder: codec.NewDecoder(buf, &codec.MsgpackHandle{}),
 	}
 }
@@ -89,6 +98,10 @@ func (d *msgpackDecoder) Decode(body io.Reader, v interface{}) error {
 
 	// decode the payload to the given interface
 	return d.decoder.Decode(v)
+}
+
+func (d *msgpackDecoder) BufferReader() *bytes.Reader {
+	return bytes.NewReader(d.slice)
 }
 
 // DecoderFromContentType returns a ClientDecoder depending on the contentType value

@@ -129,7 +129,7 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		dec := model.DecoderFromContentType(contentType)
 		err := dec.Decode(req.Body, &spans)
 		if err != nil {
-			//r.logger.Errorf(model.HumanReadableJSONError(bodyBuffer, err))
+			r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
 			HTTPDecodingError(handlerTags, w)
 			return
 		}
@@ -145,7 +145,7 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		dec := model.DecoderFromContentType(contentType)
 		err := dec.Decode(req.Body, &traces)
 		if err != nil {
-			//r.logger.Errorf(model.HumanReadableJSONError(bodyBuffer, err))
+			r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
 			HTTPDecodingError(handlerTags, w)
 			return
 		}
@@ -155,7 +155,7 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		err := dec.Decode(req.Body, &traces)
 		if err != nil {
 			if strings.Contains(contentType, "json") {
-				//r.logger.Errorf(model.HumanReadableJSONError(bodyBuffer, err))
+				r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
 			} else {
 				r.logger.Errorf("error when decoding msgpack traces")
 			}
@@ -224,7 +224,7 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 		dec := model.DecoderFromContentType(contentType)
 		err := dec.Decode(req.Body, &servicesMeta)
 		if err != nil {
-			//r.logger.Errorf(model.HumanReadableJSONError(bodyBuffer, err))
+			r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
 			HTTPDecodingError(handlerTags, w)
 			return
 		}
@@ -234,7 +234,7 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 		err := dec.Decode(req.Body, &servicesMeta)
 		if err != nil {
 			if strings.Contains(contentType, "json") {
-				//r.logger.Errorf(model.HumanReadableJSONError(bodyBuffer, err))
+				r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
 			} else {
 				r.logger.Errorf("error when decoding msgpack traces")
 			}
