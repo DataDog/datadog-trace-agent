@@ -8,7 +8,9 @@ import (
 	"github.com/ugorji/go/codec"
 )
 
-// average size of a buffer
+// average size of a buffer; because usually the payloads are huge,
+// this value ensures that initialized buffers are big enough so that
+// the resize operation is not usually called while reading the response.
 const minBufferSize = 512
 
 // readAll reads from source until an error or EOF and writes to dest;
@@ -117,19 +119,21 @@ func (d *msgpackDecoder) ContentType() string {
 	return d.contentType
 }
 
-// DecoderPool is a pool meant to share buffers required to decode traces.
+// DecoderPool is a pool meant to share buffers for traces and services decoding.
 // It naively tries to cap the number of active encoders, but doesn't enforce
-// the limit. To use a pool, you should Borrow() for a decoder and then
-// Return() that decoder to the pool. Decoders in that pool should honor
-// the ClientDecoder interface.
-// For compatibility, the pool owns both JSON and Msgpack decoders so that
-// we don't need multiple pools. Borrowing a decoder, means asking a decoder
-// for the given content type
+// that limit. To use a pool, you should Borrow() a decoder and then Release()
+// that decoder in the pool. Borrowing and Releasing decoders are thread-safe
+// operation since channels are used.
+// Decoders in that pool should honor the ClientDecoder interface.
+// For compatibility reason, the pool includes both JSON and Msgpack decoders so that
+// the caller should not decide which ClientDecoder is needed.
 type DecoderPool struct {
 	json    chan ClientDecoder
 	msgpack chan ClientDecoder
 }
 
+// NewDecoderPool initializes a new struct that includes two different pools,
+// one for JSON decoders and one for Msgpack decoders.
 func NewDecoderPool(size int) *DecoderPool {
 	return &DecoderPool{
 		json:    make(chan ClientDecoder, size),
@@ -137,6 +141,10 @@ func NewDecoderPool(size int) *DecoderPool {
 	}
 }
 
+// Borrow is used to borrow a ClientDecoder according to given contentType.
+// this operation ensures that if the pool limit is reached, a new decoder
+// is created so that the call is not blocking. This operation is thread-safe
+// since channels are used.
 func (p *DecoderPool) Borrow(contentType string) ClientDecoder {
 	// select the right Decoder based on the given content-type header
 	var decoder ClientDecoder
@@ -160,32 +168,23 @@ func (p *DecoderPool) Borrow(contentType string) ClientDecoder {
 	return decoder
 }
 
+// Release is used to give back a ClientDecoder to the pool. According to the
+// given contentType, the ClientDecoder is sent into the right pool. If the pool
+// limit is reached, the decoder is discarded so that the call is not blocking.
+// This operation is thread-safe since channels are used.
 func (p *DecoderPool) Release(dec ClientDecoder) {
 	switch dec.ContentType() {
 	case "application/msgpack":
 		select {
 		case p.msgpack <- dec:
 		default:
-			// discard
+			// discard the ClientDecoder
 		}
 	default:
 		select {
 		case p.json <- dec:
 		default:
-			// discard
+			// discard the ClientDecoder
 		}
-	}
-}
-
-// DecoderFromContentType returns a ClientDecoder depending on the contentType value
-// orig. coming from a request header
-func DecoderFromContentType(contentType string) ClientDecoder {
-	// select the right Decoder based on the given content-type header
-	switch contentType {
-	case "application/msgpack":
-		return newMsgpackDecoder()
-	default:
-		// if the client doesn't use a specific decoder, fallback to JSON
-		return newJSONDecoder()
 	}
 }
