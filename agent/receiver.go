@@ -17,11 +17,14 @@ import (
 // APIVersion is a dumb way to version our collector handlers
 type APIVersion int
 
-// Max size of decoders pool
-const decoderSize = 10
+const (
+	decoderSize       = 10 // Max size of decoders pool
+	tagTraceHandler   = "handler:traces"
+	tagServiceHandler = "handler:services"
+)
 
 // Pool of decoders to prevent continuous allocations
-// TODO[manu]: don't make it global
+// TODO[manu]: don't make it global even if it's thread-safe (uses channels)
 var decoderPool *model.DecoderPool = model.NewDecoderPool(decoderSize)
 
 const (
@@ -111,7 +114,6 @@ func (r *HTTPReceiver) Run() {
 
 // handleTraces knows how to handle a bunch of traces
 func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *http.Request) {
-	handlerTags := []string{"handler:traces", fmt.Sprintf("v:%d", v)}
 	// we need an io.ReadSeeker if we want to be able to display
 	// error feedback to the user, otherwise r.Body is trash
 	// once it's been decoded
@@ -127,7 +129,7 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 	case v01:
 		if contentType != "application/json" && contentType != "text/json" && contentType != "" {
 			r.logger.Errorf("rejecting client request, unsupported media type: '%s'", contentType)
-			HTTPFormatError(handlerTags, w)
+			HTTPFormatError([]string{tagTraceHandler, fmt.Sprintf("v:%d", v)}, w)
 			return
 		}
 
@@ -138,7 +140,7 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		if err != nil {
 			r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
 			decoderPool.Release(dec)
-			HTTPDecodingError(handlerTags, w)
+			HTTPDecodingError([]string{tagTraceHandler, fmt.Sprintf("v:%d", v)}, w)
 			return
 		}
 
@@ -147,7 +149,7 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 	case v02:
 		if contentType != "application/json" && contentType != "text/json" && contentType != "" {
 			r.logger.Errorf("rejecting client request, unsupported media type: '%s'", contentType)
-			HTTPFormatError(handlerTags, w)
+			HTTPFormatError([]string{tagTraceHandler, fmt.Sprintf("v:%d", v)}, w)
 			return
 		}
 
@@ -156,7 +158,7 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		if err != nil {
 			r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
 			decoderPool.Release(dec)
-			HTTPDecodingError(handlerTags, w)
+			HTTPDecodingError([]string{tagTraceHandler, fmt.Sprintf("v:%d", v)}, w)
 			return
 		}
 
@@ -172,13 +174,13 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 				r.logger.Errorf("error when decoding msgpack traces")
 			}
 			decoderPool.Release(dec)
-			HTTPDecodingError(handlerTags, w)
+			HTTPDecodingError([]string{tagTraceHandler, fmt.Sprintf("v:%d", v)}, w)
 			return
 		}
 
 		decoderPool.Release(dec)
 	default:
-		HTTPEndpointNotSupported(handlerTags, w)
+		HTTPEndpointNotSupported([]string{tagTraceHandler, fmt.Sprintf("v:%d", v)}, w)
 		return
 	}
 
@@ -212,7 +214,6 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 
 // handleServices handle a request with a list of several services
 func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *http.Request) {
-	handlerTags := []string{"handler:services", fmt.Sprintf("v:%d", v)}
 
 	// we need an io.ReadSeeker if we want to be able to display
 	// error feedback to the user, otherwise req.Body is trash
@@ -231,7 +232,7 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 	case v02:
 		if contentType != "application/json" && contentType != "text/json" && contentType != "" {
 			r.logger.Errorf("rejecting client request, unsupported media type: '%s'", contentType)
-			HTTPFormatError(handlerTags, w)
+			HTTPFormatError([]string{tagServiceHandler, fmt.Sprintf("v:%d", v)}, w)
 			return
 		}
 
@@ -240,7 +241,7 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 		err := dec.Decode(req.Body, &servicesMeta)
 		if err != nil {
 			r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
-			HTTPDecodingError(handlerTags, w)
+			HTTPDecodingError([]string{tagServiceHandler, fmt.Sprintf("v:%d", v)}, w)
 			return
 		}
 	case v03:
@@ -253,11 +254,11 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 			} else {
 				r.logger.Errorf("error when decoding msgpack traces")
 			}
-			HTTPDecodingError(handlerTags, w)
+			HTTPDecodingError([]string{tagServiceHandler, fmt.Sprintf("v:%d", v)}, w)
 			return
 		}
 	default:
-		HTTPEndpointNotSupported(handlerTags, w)
+		HTTPEndpointNotSupported([]string{tagServiceHandler, fmt.Sprintf("v:%d", v)}, w)
 		return
 	}
 
