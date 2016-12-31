@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"net/http"
 
 	"github.com/DataDog/datadog-trace-agent/statsd"
@@ -30,5 +31,5 @@ func HTTPEndpointNotSupported(tags []string, w http.ResponseWriter) {
 // HTTPOK is a dumb response for when things are a OK
 func HTTPOK(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK\n"))
+	io.WriteString(w, "OK\n")
 }

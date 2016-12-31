@@ -346,6 +346,41 @@ func TestReceiverServiceMsgpackDecoder(t *testing.T) {
 	}
 }
 
+func BenchmarkHandleTraces(b *testing.B) {
+	// prepare the payload
+	var data []byte
+	enc := codec.NewEncoderBytes(&data, &codec.MsgpackHandle{})
+	enc.Encode(fixtures.GetTestTrace(1, 1))
+
+	// prepare the receiver
+	config := config.NewDefaultAgentConfig()
+	receiver := NewHTTPReceiver(config)
+
+	// response recorder
+	handler := http.HandlerFunc(httpHandleWithVersion(v03, receiver.handleTraces))
+
+	// benchmark
+	b.ResetTimer()
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		b.StopTimer()
+		// consume the traces channel without doing anything
+		select {
+		case <-receiver.traces:
+		default:
+		}
+
+		// forge the request
+		rr := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/v0.3/traces", bytes.NewReader(data))
+		req.Header.Set("Content-Type", "application/msgpack")
+
+		// trace only this execution
+		b.StartTimer()
+		handler.ServeHTTP(rr, req)
+	}
+}
+
 func BenchmarkDecoderJSON(b *testing.B) {
 	assert := assert.New(b)
 	traces := fixtures.GetTestTrace(150, 66)
