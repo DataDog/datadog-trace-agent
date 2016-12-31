@@ -25,7 +25,7 @@ const (
 
 // Pool of decoders to prevent continuous allocations
 // TODO[manu]: don't make it global even if it's thread-safe (uses channels)
-var decoderPool *model.DecoderPool = model.NewDecoderPool(decoderSize)
+var decoderPool = model.NewDecoderPool(decoderSize)
 
 const (
 	// v01 DEPRECATED, FIXME[1.x]
