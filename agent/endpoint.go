@@ -102,10 +102,10 @@ func (a APIEndpoint) Write(p model.AgentPayload) (int, error) {
 		url := a.urls[i] + model.AgentPayloadAPIPath()
 		req, err := http.NewRequest("POST", url, bytes.NewBuffer(data))
 		if err != nil {
-			log.Errorf("could not create request for endpoint %s: %v", url, err)
 			// If the request cannot be created, there is no point
 			// in trying again later, it will always yield the
 			// same result.
+			log.Errorf("could not create request for endpoint %s: %v", url, err)
 			continue
 		}
 
@@ -132,20 +132,14 @@ func (a APIEndpoint) Write(p model.AgentPayload) (int, error) {
 			if resp.StatusCode/100 == 5 {
 				endpointErr.Append(a.urls[i], a.apiKeys[i], err)
 			}
+
 			continue
 		}
 
 		flushTime := time.Since(startFlush)
 		log.Infof("flushed payload to the API, time:%s, size:%d", flushTime, len(data))
-		truncKey := a.apiKeys[i]
-		if len(truncKey) > 5 {
-			truncKey = truncKey[0:5]
-		}
-		tags := []string{
-			fmt.Sprintf("url:%s", a.urls[i]),
-			fmt.Sprintf("apikey:%s", truncKey),
-		}
-		statsd.Client.Gauge("trace_agent.writer.flush_duration", flushTime.Seconds(), tags, 1)
+		statsd.Client.Gauge("trace_agent.writer.flush_duration",
+			flushTime.Seconds(), nil, 1)
 	}
 
 	if endpointErr.IsEmpty() {

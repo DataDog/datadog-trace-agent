@@ -8,6 +8,7 @@ import (
 
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/statsd"
 )
 
 // the amount of time in seconds to wait before resending a payload
@@ -151,6 +152,9 @@ func (w *Writer) Flush() {
 		bufSize += p.size
 	}
 
+	nbSuccesses := 0
+	nbErrors := 0
+
 	for _, p := range w.payloadBuffer {
 		if w.isPayloadBufferingEnabled() && p.nextFlush.After(now) {
 			// We already tried to flush recently, so there's no
@@ -160,6 +164,12 @@ func (w *Writer) Flush() {
 		}
 
 		err := p.write()
+
+		if err == nil {
+			nbSuccesses++
+		} else {
+			nbErrors++
+		}
 
 		if err == nil || !w.isPayloadBufferingEnabled() {
 			continue
@@ -171,6 +181,8 @@ func (w *Writer) Flush() {
 
 			if now.Sub(p.creationDate) > payloadMaxAge {
 				// The payload is too old, let's drop it
+				statsd.Client.Count("trace_agent.writer.dropped_payload",
+					int64(1), []string{"reason:too_old"}, 1)
 				continue
 			}
 
@@ -183,6 +195,16 @@ func (w *Writer) Flush() {
 		}
 	}
 
+	if nbSuccesses > 0 {
+		statsd.Client.Count("trace_agent.writer.flush",
+			int64(nbSuccesses), []string{"status:success"}, 1)
+	}
+
+	if nbErrors > 0 {
+		statsd.Client.Count("trace_agent.writer.flush",
+			int64(nbErrors), []string{"status:error"}, 1)
+	}
+
 	// Drop payloads to respect the buffer size limit if necessary.
 	nbDrops := 0
 	for n := 0; n < len(payloads) && bufSize > w.conf.APIPayloadBufferMaxSize; n++ {
@@ -192,9 +214,14 @@ func (w *Writer) Flush() {
 
 	if nbDrops > 0 {
 		log.Infof("dropping %d payloads (payload buffer full)", nbDrops)
+		statsd.Client.Count("trace_agent.writer.dropped_payload",
+			int64(nbDrops), []string{"reason:buffer_full"}, 1)
 
 		payloads = payloads[nbDrops:]
 	}
+
+	statsd.Client.Gauge("trace_agent.writer.payload_buffer_size",
+		float64(bufSize), nil, 1)
 
 	w.payloadBuffer = payloads
 }
