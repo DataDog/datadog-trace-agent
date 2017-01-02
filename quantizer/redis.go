@@ -2,11 +2,16 @@ package quantizer
 
 import (
 	"bytes"
-	"sort"
 	"strings"
 
 	"github.com/DataDog/datadog-trace-agent/model"
 )
+
+// redisTruncationMark is used as suffix by tracing libraries to indicate that a
+// command was truncated.
+const redisTruncationMark = "..."
+
+const maxRedisNbCommands = 3
 
 // Redis commands consisting in 2 words
 var redisCompoundCommandSet = map[string]bool{
@@ -34,11 +39,25 @@ func QuantizeRedis(span model.Span) model.Span {
 		}
 	}
 
+	isArgTruncated := func(arg string) bool {
+		return strings.HasSuffix(arg, redisTruncationMark)
+	}
+
 	readLine := func(line string) string {
 		args := strings.SplitN(line, " ", 3)
+
+		// Ignore truncated commands
+		if isArgTruncated(args[0]) {
+			return ""
+		}
+
 		command := strings.ToUpper(args[0])
 
 		if redisCompoundCommandSet[command] {
+			if isArgTruncated(args[1]) {
+				return ""
+			}
+
 			command += " " + strings.ToUpper(args[1])
 		}
 
@@ -46,32 +65,44 @@ func QuantizeRedis(span model.Span) model.Span {
 	}
 
 	var resource bytes.Buffer
+	var prevCmd string
 
-	switch len(lines) {
-	case 1:
-		// Single command
-		resource.WriteString(readLine(lines[0]))
+	multipleCmds := false
+	nbCmds := 0
+	truncatedLastLine := false
 
-	default:
-		// Pipeline
-		commandMap := make(map[string]struct{})
-
-		for _, line := range lines {
-			commandMap[readLine(line)] = struct{}{}
+	for i, line := range lines {
+		cmd := readLine(line)
+		if cmd == "" {
+			if i == len(lines)-1 {
+				truncatedLastLine = true
+			}
+			continue
 		}
 
-		commands := make([]string, 0, len(commandMap))
-		for command := range commandMap {
-			commands = append(commands, command)
-		}
-		sort.Strings(commands)
+		if cmd == prevCmd {
+			if !multipleCmds {
+				resource.WriteByte('*')
+			}
 
-		resource.WriteString("PIPELINE [")
-		for _, command := range commands {
+			multipleCmds = true
+		} else {
 			resource.WriteByte(' ')
-			resource.WriteString(command)
+			resource.WriteString(cmd)
+
+			nbCmds++
+			if nbCmds == maxRedisNbCommands {
+				break
+			}
+
+			multipleCmds = false
 		}
-		resource.WriteString(" ]")
+
+		prevCmd = cmd
+	}
+
+	if nbCmds == maxRedisNbCommands || truncatedLastLine {
+		resource.WriteString(" ...")
 	}
 
 	span.Resource = strings.Trim(resource.String(), " ")

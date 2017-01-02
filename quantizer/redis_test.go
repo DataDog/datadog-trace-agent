@@ -40,16 +40,43 @@ func TestRedisQuantizer(t *testing.T) {
 			"CONFIG SET"},
 
 		{"SET toto tata \n \n  EXPIRE toto 15  ",
-			"PIPELINE [ EXPIRE SET ]"},
+			"SET EXPIRE"},
 
 		{"MSET toto tata toto tata toto tata \n ",
 			"MSET"},
 
 		{"MULTI\nSET k1 v1\nSET k2 v2\nSET k3 v3\nSET k4 v4\nDEL to_del\nEXEC",
-			"PIPELINE [ DEL EXEC MULTI SET ]"},
+			"MULTI SET* DEL ..."},
 
 		{"DEL k1\nDEL k2\nHMSET k1 \"a\" 1 \"b\" 2 \"c\" 3\nHMSET k2 \"d\" \"4\" \"e\" \"4\"\nDEL k3\nHMSET k3 \"f\" \"5\"\nDEL k1\nDEL k2\nHMSET k1 \"a\" 1 \"b\" 2 \"c\" 3\nHMSET k2 \"d\" \"4\" \"e\" \"4\"\nDEL k3\nHMSET k3 \"f\" \"5\"\nDEL k1\nDEL k2\nHMSET k1 \"a\" 1 \"b\" 2 \"c\" 3\nHMSET k2 \"d\" \"4\" \"e\" \"4\"\nDEL k3\nHMSET k3 \"f\" \"5\"\nDEL k1\nDEL k2\nHMSET k1 \"a\" 1 \"b\" 2 \"c\" 3\nHMSET k2 \"d\" \"4\" \"e\" \"4\"\nDEL k3\nHMSET k3 \"f\" \"5\"",
-			"PIPELINE [ DEL HMSET ]"},
+			"DEL* HMSET* DEL ..."},
+
+		{"GET...",
+			"..."},
+
+		{"GET k...",
+			"GET"},
+
+		{"GET k1\nGET k2\nG...",
+			"GET* ..."},
+
+		{"GET k1\nGET k2\nDEL k3\nGET k...",
+			"GET* DEL GET ..."},
+
+		{"GET k1\nGET k2\nHDEL k3 a\nG...",
+			"GET* HDEL ..."},
+
+		{"GET k...\nDEL k2\nMS...",
+			"GET DEL ..."},
+
+		{"GET k...\nDE...\nMS...",
+			"GET ..."},
+
+		{"GET k1\nDE...\nGET k2",
+			"GET*"},
+
+		{"GET k1\nDE...\nGET k2\nHDEL k3 a\nGET k4\nDEL k5",
+			"GET* HDEL GET ..."},
 	}
 
 	for _, testCase := range queryToExpected {
