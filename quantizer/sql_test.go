@@ -1,8 +1,11 @@
 package quantizer
 
 import (
+	"flag"
+	"os"
 	"testing"
 
+	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -20,6 +23,15 @@ func SQLSpan(query string) model.Span {
 			"sql.query": query,
 		},
 	}
+}
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+
+	// neutralize logs for tests
+	config.NewLoggerLevelCustom("critical", "")
+
+	os.Exit(m.Run())
 }
 
 func TestSQLResourceQuery(t *testing.T) {
