@@ -4,8 +4,6 @@ import (
 	"regexp"
 	"strings"
 
-	log "github.com/cihub/seelog"
-
 	"github.com/DataDog/datadog-trace-agent/model"
 )
 
@@ -42,7 +40,6 @@ func Quantize(span model.Span) model.Span {
 		// redis
 		return QuantizeRedis(span)
 	default:
-		log.Debugf("No quantization for this span, Type: %s", span.Type)
 		return span
 	}
 

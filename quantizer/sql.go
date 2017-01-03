@@ -196,7 +196,6 @@ func QuantizeSQL(span model.Span) model.Span {
 		return span
 	}
 
-	log.Debugf("Quantize SQL command, generate resource from the query, SpanID: %d", span.SpanID)
 	quantizedString, err := tokenQuantizer.Process(span.Resource)
 
 	if err != nil {
