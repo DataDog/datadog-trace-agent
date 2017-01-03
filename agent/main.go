@@ -161,7 +161,9 @@ func main() {
 
 		// get up-to-date statistics
 		runtime.GC()
-		if err := pprof.WriteHeapProfile(f); err != nil {
+		// Not using WriteHeapProfile but instead calling WriteTo to
+		// make sure we pass debug=1 and resolve pointers to names.
+		if err := pprof.Lookup("heap").WriteTo(f, 1); err != nil {
 			log.Critical("could not write memory profile: ", err)
 		}
 		f.Close()
