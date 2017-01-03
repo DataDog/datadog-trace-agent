@@ -30,8 +30,8 @@ func (l *errorLogger) Errorf(format string, params ...interface{}) {
 
 func (l *errorLogger) Reset() {
 	l.Lock()
-	if l.errors > 0 {
-		log.Infof("skipped %d error messages", l.errors-maxPerInterval+1)
+	if l.errors > maxPerInterval {
+		log.Infof("skipped %d error messages", l.errors-maxPerInterval)
 	}
 	l.errors = 0
 	l.Unlock()
