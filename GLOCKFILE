@@ -1,6 +1,6 @@
 cmd github.com/golang/lint/golint
 github.com/DataDog/datadog-go a9c7a9896c1847c9cc2b068a2ae68e9d74540a5d
-github.com/cihub/seelog 83d0dcad636b63c066856045962befa246e00c79
+github.com/cihub/seelog d2c6e5aa9fbfdd1c624e140287063c7730654115
 golang.org/x/tools 344080534465c5613c3563c30fd38c031073841d
 github.com/golang/lint 32a87160691b3c96046c0c678fe57c5bef761456
 github.com/stretchr/testify 8ce79b9f0b77745113f82c17d0756771456ccbd3
