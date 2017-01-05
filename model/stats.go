@@ -192,7 +192,7 @@ func (sb *StatsBucket) HandleSpan(s Span, env string, aggregators []string, subl
 	// sublayers - special case
 	if sublayers != nil {
 		for _, sub := range *sublayers {
-			subgrain := fmt.Sprintf("%s,%s:%s", grain, sub.Tag.Name, sub.Tag.Value)
+			subgrain := grain + "," + sub.Tag.Name + ":" + sub.Tag.Value
 			subtags := make(TagSet, len(tags)+1)
 			copy(subtags, tags)
 			subtags[len(tags)] = sub.Tag
