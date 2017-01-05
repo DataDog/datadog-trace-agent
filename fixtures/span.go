@@ -272,8 +272,8 @@ func GetTestSpan() model.Span {
 		Service:  "fennel_IS amazing!",
 		Name:     "something &&<@# that should be a metric!",
 		Resource: "NOT touched because it is going to be hashed",
-		Start:    time.Now().UnixNano(),
-		Duration: time.Second.Nanoseconds(),
+		Start:    9223372036854775807,
+		Duration: 9223372036854775807,
 		Meta:     map[string]string{"http.host": "192.168.0.1"},
 		Metrics:  map[string]float64{"http.monitor": 41.99},
 	}

@@ -4,8 +4,13 @@ import (
 	log "github.com/cihub/seelog"
 )
 
+//go:generate msgp
+
 // Trace is a collection of spans with the same trace ID
 type Trace []Span
+
+// Traces is a list of traces that represents the  ...
+type Traces []Trace
 
 // GetEnv returns the meta value for the "env" key for
 // the first trace it finds or an empty string

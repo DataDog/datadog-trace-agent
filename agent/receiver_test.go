@@ -12,6 +12,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/fixtures"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/stretchr/testify/assert"
+	"github.com/tinylib/msgp/msgp"
 	"github.com/ugorji/go/codec"
 )
 
@@ -401,21 +402,52 @@ func BenchmarkDecoderJSON(b *testing.B) {
 
 func BenchmarkDecoderMsgpack(b *testing.B) {
 	assert := assert.New(b)
-	traces := fixtures.GetTestTrace(150, 66)
 
 	// msgpack payload
 	var payload []byte
 	var mh codec.MsgpackHandle
 	enc := codec.NewEncoderBytes(&payload, &mh)
-	err := enc.Encode(traces)
+	err := enc.Encode(fixtures.GetTestTrace(150, 66))
 	assert.Nil(err)
 
 	// benchmark
 	b.ResetTimer()
 	b.ReportAllocs()
 	for n := 0; n < b.N; n++ {
-		var spans []model.Trace
-		decoder := codec.NewDecoder(bytes.NewReader(payload), &mh)
-		_ = decoder.Decode(&spans)
+		b.StopTimer()
+		reader := bytes.NewReader(payload)
+
+		b.StartTimer()
+		var traces model.ReceiverPayload
+		_ = msgp.Decode(reader, &traces)
 	}
+}
+
+func TestMsgpOverflowUint64(t *testing.T) {
+	assert := assert.New(t)
+
+	// msgpack payload
+	var payload []byte
+	mh := codec.MsgpackHandle{}
+	enc := codec.NewEncoderBytes(&payload, &mh)
+	err := enc.Encode(fixtures.GetTestTrace(150, 66))
+	assert.Nil(err)
+
+	var traces model.ReceiverPayload
+	err = msgp.Decode(bytes.NewReader(payload), &traces)
+	assert.Nil(err)
+	assert.Len(traces, 150)
+	assert.Len(traces[0], 66)
+
+	// the span is properly decoded
+	span := traces[0][0]
+	assert.Equal(uint64(42), span.TraceID)
+	assert.Equal(uint64(52), span.SpanID)
+	assert.Equal(9223372036854775807, span.Start)
+	assert.Equal(9223372036854775807, span.Duration)
+	assert.Equal("fennel_IS amazing!", span.Service)
+	assert.Equal("something &&<@# that should be a metric!", span.Name)
+	assert.Equal("NOT touched because it is going to be hashed", span.Resource)
+	assert.Equal("192.168.0.1", span.Meta["http.host"])
+	assert.Equal(41.99, span.Metrics["http.monitor"])
 }

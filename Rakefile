@@ -21,6 +21,8 @@ PACKAGES = %w(
   ./statsd
 )
 
+EXCLUDE_LINT = 'span_gen.go'
+
 task :default => [:ci]
 
 desc "Build Datadog Trace agent"
@@ -52,7 +54,7 @@ task :lint do
   error = false
   PACKAGES.each do |pkg|
     puts "golint #{pkg}"
-    output = `golint #{pkg}`.strip
+    output = `golint #{pkg} | grep -v #{EXCLUDE_LINT}`.strip
     if output.length > 0
       puts output
       error = true
