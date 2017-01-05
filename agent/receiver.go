@@ -184,8 +184,6 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 
 	HTTPOK(w)
 
-	dumpTraces(traces) // for debug
-
 	// normalize data
 	for i := range traces {
 		spans := len(traces[i])
@@ -262,8 +260,6 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 
 	statsd.Client.Count("trace_agent.receiver.service", int64(len(servicesMeta)), nil, 1)
 	HTTPOK(w)
-
-	dumpServices(servicesMeta) // for debug
 
 	r.services <- servicesMeta
 }
