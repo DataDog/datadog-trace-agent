@@ -188,6 +188,8 @@ var grainAggr = "resource:SELECT * FROM stuff,service:mysql"
 
 // testing out various way of doing string ops, to check which one is most efficient
 func BenchmarkGrainKey(b *testing.B) {
+	b.ResetTimer()
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		_ = GrainKey(grainName, grainMeasure, grainAggr)
 	}
@@ -197,6 +199,8 @@ func BenchmarkStringPlus(b *testing.B) {
 	if testing.Short() {
 		return
 	}
+	b.ResetTimer()
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		_ = grainName + "|" + grainMeasure + "|" + grainAggr
 	}
@@ -206,6 +210,8 @@ func BenchmarkSprintf(b *testing.B) {
 	if testing.Short() {
 		return
 	}
+	b.ResetTimer()
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		_ = fmt.Sprintf("%s|%s|%s", grainName, grainMeasure, grainAggr)
 	}
@@ -216,6 +222,8 @@ func BenchmarkBufferWriteByte(b *testing.B) {
 		return
 	}
 	var buf bytes.Buffer
+	b.ResetTimer()
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		buf.Reset()
 		buf.WriteString(grainName)
@@ -232,6 +240,8 @@ func BenchmarkBufferWriteRune(b *testing.B) {
 		return
 	}
 	var buf bytes.Buffer
+	b.ResetTimer()
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		buf.Reset()
 		buf.WriteString(grainName)
@@ -248,6 +258,8 @@ func BenchmarkStringsJoin(b *testing.B) {
 		return
 	}
 	a := []string{grainName, grainMeasure, grainAggr}
+	b.ResetTimer()
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		_ = strings.Join(a, "|")
 	}
