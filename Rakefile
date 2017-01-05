@@ -15,9 +15,6 @@ PACKAGES = %w(
   ./config
   ./fixtures
   ./model
-  ./cmd/traceflood
-  ./cmd/tracereplay
-  ./profile
   ./quantile
   ./quantizer
   ./sampler
@@ -34,12 +31,6 @@ end
 desc "Install Datadog Trace agent"
 task :install do
   go_build("github.com/DataDog/datadog-trace-agent/agent", :cmd=>"go build -i -o $GOPATH/bin/trace-agent")
-end
-
-desc "Build Datadog Trace tools"
-task :build_tools do
-  go_build("github.com/DataDog/datadog-trace-agent/cmd/traceflood", :cmd => "go build -a -o trace-flood")
-  go_build("github.com/DataDog/datadog-trace-agent/cmd/tracereplay", :cmd => "go build -a -o trace-replay")
 end
 
 desc "Test Datadog Trace agent"
