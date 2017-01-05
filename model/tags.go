@@ -2,7 +2,6 @@ package model
 
 import (
 	"bytes"
-	"fmt"
 	"sort"
 	"strings"
 	"unicode"
@@ -56,7 +55,7 @@ func (t TagSet) TagKey(m string) string {
 		tagStrings[i] = tag.String()
 	}
 	sort.Strings(tagStrings)
-	return fmt.Sprintf("%s|%s", m, strings.Join(tagStrings, ","))
+	return m + "|" + strings.Join(tagStrings, ",")
 }
 
 func (t TagSet) Len() int      { return len(t) }
