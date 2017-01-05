@@ -93,12 +93,17 @@ func (w *Writer) isPayloadBufferingEnabled() bool {
 	return w.conf.APIPayloadBufferMaxSize > 0
 }
 
-// Run starts the writer and starts writing what comes through the
-// input channel.
-// NOTE: this currently happens sequentially, but it would not be too
-// hard to mutex and parallelize. Not sure it's needed though.
+// Run starts the writer.
 func (w *Writer) Run() {
 	w.exitWG.Add(1)
+	go w.main()
+}
+
+// main is the main loop of the writer goroutine. If buffers payloads and
+// services read from input chans and flushes them when necessary.
+// NOTE: this currently happens sequentially, but it would not be too
+// hard to mutex and parallelize. Not sure it's needed though.
+func (w *Writer) main() {
 	defer w.exitWG.Done()
 
 	flushTicker := time.NewTicker(time.Second)

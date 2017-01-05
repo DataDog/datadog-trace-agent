@@ -61,7 +61,7 @@ func (a *Agent) Run() {
 	defer flushTicker.Stop()
 
 	a.Receiver.Run()
-	go a.Writer.Run()
+	a.Writer.Run()
 
 	for {
 		select {
