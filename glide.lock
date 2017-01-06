@@ -15,6 +15,10 @@ imports:
   version: 362bfb3384d53ae4d5dd745983a4d70b6d23628c
   subpackages:
   - msgp
+- name: github.com/shirou/gopsutil
+  version: 93564b314264efac01934715fad4c355ed6af1c5
+  subpackages:
+  - cpu
 testImports:
 - name: github.com/davecgh/go-spew
   version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9
