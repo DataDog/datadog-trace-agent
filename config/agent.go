@@ -20,9 +20,10 @@ type AgentConfig struct {
 	DefaultEnv string // the traces will default to this environment
 
 	// API
-	APIEndpoints []string
-	APIKeys      []string
-	APIEnabled   bool
+	APIEndpoints            []string
+	APIKeys                 []string
+	APIEnabled              bool
+	APIPayloadBufferMaxSize int
 
 	// Concentrator
 	BucketInterval   time.Duration // the size of our pre-aggregation per bucket
@@ -97,11 +98,12 @@ func NewDefaultAgentConfig() *AgentConfig {
 		hostname = ""
 	}
 	ac := &AgentConfig{
-		HostName:     hostname,
-		DefaultEnv:   "none",
-		APIEndpoints: []string{"https://trace.agent.datadoghq.com"},
-		APIKeys:      []string{},
-		APIEnabled:   true,
+		HostName:                hostname,
+		DefaultEnv:              "none",
+		APIEndpoints:            []string{"https://trace.agent.datadoghq.com"},
+		APIKeys:                 []string{},
+		APIEnabled:              true,
+		APIPayloadBufferMaxSize: 16 * 1024 * 1024,
 
 		BucketInterval:   time.Duration(10) * time.Second,
 		ExtraAggregators: []string{},
@@ -198,6 +200,10 @@ APM_CONF:
 			vals[i] = strings.TrimSpace(vals[i])
 		}
 		c.APIEndpoints = vals
+	}
+
+	if v, e := conf.GetInt("trace.api", "payload_buffer_max_size"); e == nil {
+		c.APIPayloadBufferMaxSize = v
 	}
 
 	if v, e := conf.GetInt("trace.concentrator", "bucket_size_seconds"); e == nil {

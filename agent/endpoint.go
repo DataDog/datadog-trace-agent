@@ -11,12 +11,48 @@ import (
 	log "github.com/cihub/seelog"
 )
 
+// apiError stores a list of errors triggered when sending data to a
+// list of endpoints. The endpoints member contains an api key and url for
+// each error.
+type apiError struct {
+	errs     []error // the errors, one for each endpoint
+	endpoint APIEndpoint
+}
+
+func newAPIError() *apiError {
+	return &apiError{}
+}
+
+func (err *apiError) IsEmpty() bool {
+	return len(err.errs) == 0
+}
+
+func (err *apiError) Append(url, apiKey string, e error) {
+	err.errs = append(err.errs, e)
+	err.endpoint.urls = append(err.endpoint.urls, url)
+	err.endpoint.apiKeys = append(err.endpoint.apiKeys, apiKey)
+}
+
+func (err *apiError) Error() string {
+	var buf bytes.Buffer
+
+	for i, e := range err.errs {
+		if i > 0 {
+			buf.WriteString(", ")
+		}
+
+		fmt.Fprintf(&buf, "%s: %v", err.endpoint.urls[i], e)
+	}
+
+	return buf.String()
+}
+
 // AgentEndpoint is an interface where we write the data
 // that comes out of the agent
 type AgentEndpoint interface {
 	// Write sends an agent payload which carries all the
 	// pre-processed stats/traces
-	Write(b model.AgentPayload)
+	Write(b model.AgentPayload) (int, error)
 	// WriteServices sends updates about the services metadata
 	WriteServices(s model.ServicesMetadata)
 }
@@ -49,17 +85,16 @@ func NewAPIEndpoint(urls, apiKeys []string) APIEndpoint {
 }
 
 // Write writes the bucket to the API collector endpoint.
-// Currently, the errors are just logged and we fail silently, keeping
-// writing till we have tried everything. This is because currently the
-// choice is to just drop the data we cannot write on the floor.
-// FIXME?
-func (a APIEndpoint) Write(p model.AgentPayload) {
+func (a APIEndpoint) Write(p model.AgentPayload) (int, error) {
 	data, err := model.EncodeAgentPayload(p)
 	if err != nil {
 		log.Errorf("encoding issue: %v", err)
-		return
+		return 0, err
 	}
-	statsd.Client.Count("trace_agent.writer.payload_bytes", int64(len(data)), nil, 1)
+	payloadSize := len(data)
+	statsd.Client.Count("trace_agent.writer.payload_bytes", int64(payloadSize), nil, 1)
+
+	endpointErr := newAPIError()
 
 	for i := range a.urls {
 		startFlush := time.Now()
@@ -67,6 +102,9 @@ func (a APIEndpoint) Write(p model.AgentPayload) {
 		url := a.urls[i] + model.AgentPayloadAPIPath()
 		req, err := http.NewRequest("POST", url, bytes.NewBuffer(data))
 		if err != nil {
+			// If the request cannot be created, there is no point
+			// in trying again later, it will always yield the
+			// same result.
 			log.Errorf("could not create request for endpoint %s: %v", url, err)
 			continue
 		}
@@ -79,27 +117,37 @@ func (a APIEndpoint) Write(p model.AgentPayload) {
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			log.Errorf("error when requesting to endpoint %s: %v", url, err)
+			endpointErr.Append(a.urls[i], a.apiKeys[i], err)
 			continue
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode/100 != 2 {
-			log.Errorf("request to %s responded with %s", url, resp.Status)
+			err := fmt.Errorf("request to %s responded with %s", url, resp.Status)
+			log.Error(err)
+
+			// Only retry for 5xx (server) errors; for 4xx errors,
+			// something is wrong with the request and there is
+			// usually no point in trying again.
+			if resp.StatusCode/100 == 5 {
+				endpointErr.Append(a.urls[i], a.apiKeys[i], err)
+			}
+
 			continue
 		}
 
 		flushTime := time.Since(startFlush)
 		log.Infof("flushed payload to the API, time:%s, size:%d", flushTime, len(data))
-		truncKey := a.apiKeys[i]
-		if len(truncKey) > 5 {
-			truncKey = truncKey[0:5]
-		}
-		tags := []string{
-			fmt.Sprintf("url:%s", a.urls[i]),
-			fmt.Sprintf("apikey:%s", truncKey),
-		}
-		statsd.Client.Gauge("trace_agent.writer.flush_duration", flushTime.Seconds(), tags, 1)
+		statsd.Client.Gauge("trace_agent.writer.flush_duration",
+			flushTime.Seconds(), nil, 1)
 	}
+
+	if endpointErr.IsEmpty() {
+		// The payload was sent to all endpoints without any error
+		return payloadSize, nil
+	}
+
+	return payloadSize, endpointErr
 }
 
 // WriteServices writes services to the services endpoint
@@ -146,8 +194,9 @@ func (a APIEndpoint) WriteServices(s model.ServicesMetadata) {
 type NullEndpoint struct{}
 
 // Write just logs and bails
-func (ne NullEndpoint) Write(p model.AgentPayload) {
+func (ne NullEndpoint) Write(p model.AgentPayload) (int, error) {
 	log.Debug("null endpoint: dropping payload, %d traces, %d stats buckets", p.Traces, p.Stats)
+	return 0, nil
 }
 
 // WriteServices just logs and stops
