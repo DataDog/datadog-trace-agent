@@ -98,6 +98,8 @@ func (s *Span) Normalize() error {
 		return errors.New("span.normalize: spans with zeroed `Duration` are discarded, use annotations")
 	}
 
+	s.MetaExpand()
+
 	// Error - Nothing to do
 	// Optional data, Meta & Metrics can be nil
 	// Soft fail on those
