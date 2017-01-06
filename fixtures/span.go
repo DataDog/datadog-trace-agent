@@ -262,6 +262,23 @@ func RandomSpan() model.Span {
 	}
 }
 
+// GetTestSpan returns a Span with different fields set
+func GetTestSpan() model.Span {
+	return model.Span{
+		TraceID:  42,
+		SpanID:   52,
+		ParentID: 42,
+		Type:     "web",
+		Service:  "fennel_IS amazing!",
+		Name:     "something &&<@# that should be a metric!",
+		Resource: "NOT touched because it is going to be hashed",
+		Start:    time.Now().UnixNano(),
+		Duration: time.Second.Nanoseconds(),
+		Meta:     map[string]string{"http.host": "192.168.0.1"},
+		Metrics:  map[string]float64{"http.monitor": 41.99},
+	}
+}
+
 // TestSpan returns a fix span with hardcoded info, useful for reproducible tests
 func TestSpan() model.Span {
 	return model.Span{

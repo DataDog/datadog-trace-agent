@@ -1,6 +1,9 @@
 package model
 
 import (
+	"bytes"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -160,10 +163,104 @@ func TestGrain(t *testing.T) {
 	assert := assert.New(t)
 
 	s := Span{Service: "thing", Name: "other", Resource: "yo"}
-	keys := []string{"env", "resource", "service"}
-	vals := []string{"default", s.Resource, s.Service}
-	aggr, tgs := assembleGrain(&sb.keyBuf, keys, vals)
+	aggr, tgs := assembleGrain(&sb.keyBuf, "default", s.Resource, s.Service, nil)
 
 	assert.Equal("env:default,resource:yo,service:thing", aggr)
 	assert.Equal(TagSet{Tag{"env", "default"}, Tag{"resource", "yo"}, Tag{"service", "thing"}}, tgs)
+}
+
+func TestGrainWithExtraTags(t *testing.T) {
+	sb := NewStatsBucket(0, 1e9)
+	assert := assert.New(t)
+
+	s := Span{Service: "thing", Name: "other", Resource: "yo", Meta: map[string]string{"meta2": "two", "meta1": "ONE"}}
+	aggr, tgs := assembleGrain(&sb.keyBuf, "default", s.Resource, s.Service, s.Meta)
+
+	assert.Equal("env:default,resource:yo,service:thing,meta1:ONE,meta2:two", aggr)
+	assert.Equal(TagSet{Tag{"env", "default"}, Tag{"resource", "yo"}, Tag{"service", "thing"}, Tag{"meta1", "ONE"}, Tag{"meta2", "two"}}, tgs)
+}
+
+// it's important to have these defined as var and not const/inline
+// else compiler performs compile-time optimization when using + with strings
+var grainName = "mysql.query"
+var grainMeasure = "duration"
+var grainAggr = "resource:SELECT * FROM stuff,service:mysql"
+
+// testing out various way of doing string ops, to check which one is most efficient
+func BenchmarkGrainKey(b *testing.B) {
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = GrainKey(grainName, grainMeasure, grainAggr)
+	}
+}
+
+func BenchmarkStringPlus(b *testing.B) {
+	if testing.Short() {
+		return
+	}
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = grainName + "|" + grainMeasure + "|" + grainAggr
+	}
+}
+
+func BenchmarkSprintf(b *testing.B) {
+	if testing.Short() {
+		return
+	}
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = fmt.Sprintf("%s|%s|%s", grainName, grainMeasure, grainAggr)
+	}
+}
+
+func BenchmarkBufferWriteByte(b *testing.B) {
+	if testing.Short() {
+		return
+	}
+	var buf bytes.Buffer
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		buf.Reset()
+		buf.WriteString(grainName)
+		buf.WriteByte('|')
+		buf.WriteString(grainMeasure)
+		buf.WriteByte('|')
+		buf.WriteString(grainAggr)
+		_ = buf.String()
+	}
+}
+
+func BenchmarkBufferWriteRune(b *testing.B) {
+	if testing.Short() {
+		return
+	}
+	var buf bytes.Buffer
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		buf.Reset()
+		buf.WriteString(grainName)
+		buf.WriteRune('|')
+		buf.WriteString(grainMeasure)
+		buf.WriteRune('|')
+		buf.WriteString(grainAggr)
+		_ = buf.String()
+	}
+}
+
+func BenchmarkStringsJoin(b *testing.B) {
+	if testing.Short() {
+		return
+	}
+	a := []string{grainName, grainMeasure, grainAggr}
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = strings.Join(a, "|")
+	}
 }

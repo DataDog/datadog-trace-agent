@@ -1,10 +1,7 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"strings"
@@ -19,6 +16,12 @@ import (
 
 // APIVersion is a dumb way to version our collector handlers
 type APIVersion int
+
+const (
+	decoderSize       = 10 // Max size of decoders pool
+	tagTraceHandler   = "handler:traces"
+	tagServiceHandler = "handler:services"
+)
 
 const (
 	// v01 DEPRECATED, FIXME[1.x]
@@ -44,9 +47,10 @@ func httpHandleWithVersion(v APIVersion, f func(APIVersion, http.ResponseWriter,
 // HTTPReceiver is a collector that uses HTTP protocol and just holds
 // a chan where the spans received are sent one by one
 type HTTPReceiver struct {
-	traces   chan model.Trace
-	services chan model.ServicesMetadata
-	conf     *config.AgentConfig
+	traces      chan model.Trace
+	services    chan model.ServicesMetadata
+	decoderPool *model.DecoderPool
+	conf        *config.AgentConfig
 
 	// due to the high volume the receiver handles
 	// custom logger that rate-limits errors and track statistics
@@ -60,11 +64,12 @@ type HTTPReceiver struct {
 func NewHTTPReceiver(conf *config.AgentConfig) *HTTPReceiver {
 	// use buffered channels so that handlers are not waiting on downstream processing
 	return &HTTPReceiver{
-		traces:   make(chan model.Trace, 50),
-		services: make(chan model.ServicesMetadata, 50),
-		conf:     conf,
-		logger:   &errorLogger{},
-		exit:     make(chan struct{}),
+		traces:      make(chan model.Trace, 50),
+		services:    make(chan model.ServicesMetadata, 50),
+		decoderPool: model.NewDecoderPool(decoderSize),
+		conf:        conf,
+		logger:      &errorLogger{},
+		exit:        make(chan struct{}),
 	}
 }
 
@@ -107,7 +112,6 @@ func (r *HTTPReceiver) Run() {
 
 // handleTraces knows how to handle a bunch of traces
 func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *http.Request) {
-	handlerTags := []string{"handler:traces", fmt.Sprintf("v:%d", v)}
 	// we need an io.ReadSeeker if we want to be able to display
 	// error feedback to the user, otherwise r.Body is trash
 	// once it's been decoded
@@ -115,64 +119,66 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		return
 	}
 	defer req.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		return
-	}
-
-	bodyBuffer := bytes.NewReader(bodyBytes)
-	contentType := req.Header.Get("Content-Type")
 
 	var traces []model.Trace
+	contentType := req.Header.Get("Content-Type")
 
 	switch v {
 	case v01:
 		if contentType != "application/json" && contentType != "text/json" && contentType != "" {
 			r.logger.Errorf("rejecting client request, unsupported media type: '%s'", contentType)
-			HTTPFormatError(handlerTags, w)
+			HTTPFormatError([]string{tagTraceHandler, fmt.Sprintf("v:%d", v)}, w)
 			return
 		}
 
 		// in v01 we actually get spans that we have to transform in traces
 		var spans []model.Span
-		dec := json.NewDecoder(bodyBuffer)
-		err := dec.Decode(&spans)
+		dec := r.decoderPool.Borrow(contentType)
+		err := dec.Decode(req.Body, &spans)
 		if err != nil {
-			r.logger.Errorf(model.HumanReadableJSONError(bodyBuffer, err))
-			HTTPDecodingError(handlerTags, w)
+			r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
+			r.decoderPool.Release(dec)
+			HTTPDecodingError([]string{tagTraceHandler, fmt.Sprintf("v:%d", v)}, w)
 			return
 		}
 
+		r.decoderPool.Release(dec)
 		traces = model.TracesFromSpans(spans)
 	case v02:
 		if contentType != "application/json" && contentType != "text/json" && contentType != "" {
 			r.logger.Errorf("rejecting client request, unsupported media type: '%s'", contentType)
-			HTTPFormatError(handlerTags, w)
+			HTTPFormatError([]string{tagTraceHandler, fmt.Sprintf("v:%d", v)}, w)
 			return
 		}
 
-		dec := json.NewDecoder(bodyBuffer)
-		err := dec.Decode(&traces)
+		dec := r.decoderPool.Borrow(contentType)
+		err := dec.Decode(req.Body, &traces)
 		if err != nil {
-			r.logger.Errorf(model.HumanReadableJSONError(bodyBuffer, err))
-			HTTPDecodingError(handlerTags, w)
+			r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
+			r.decoderPool.Release(dec)
+			HTTPDecodingError([]string{tagTraceHandler, fmt.Sprintf("v:%d", v)}, w)
 			return
 		}
+
+		r.decoderPool.Release(dec)
 	case v03:
 		// select the right Decoder based on the given content-type header
-		dec := model.DecoderFromContentType(contentType, bodyBuffer)
-		err := dec.Decode(&traces)
+		dec := r.decoderPool.Borrow(contentType)
+		err := dec.Decode(req.Body, &traces)
 		if err != nil {
 			if strings.Contains(contentType, "json") {
-				r.logger.Errorf(model.HumanReadableJSONError(bodyBuffer, err))
+				r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
 			} else {
 				r.logger.Errorf("error when decoding msgpack traces")
 			}
-			HTTPDecodingError(handlerTags, w)
+			r.decoderPool.Release(dec)
+			HTTPDecodingError([]string{tagTraceHandler, fmt.Sprintf("v:%d", v)}, w)
 			return
 		}
+
+		r.decoderPool.Release(dec)
 	default:
-		HTTPEndpointNotSupported(handlerTags, w)
+		HTTPEndpointNotSupported([]string{tagTraceHandler, fmt.Sprintf("v:%d", v)}, w)
 		return
 	}
 
@@ -204,7 +210,6 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 
 // handleServices handle a request with a list of several services
 func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *http.Request) {
-	handlerTags := []string{"handler:services", fmt.Sprintf("v:%d", v)}
 
 	// we need an io.ReadSeeker if we want to be able to display
 	// error feedback to the user, otherwise req.Body is trash
@@ -212,15 +217,9 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 	if req.Body == nil {
 		return
 	}
-
 	defer req.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		return
-	}
 
 	var servicesMeta model.ServicesMetadata
-	bodyBuffer := bytes.NewReader(bodyBytes)
 	contentType := req.Header.Get("Content-Type")
 
 	switch v {
@@ -229,32 +228,33 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 	case v02:
 		if contentType != "application/json" && contentType != "text/json" && contentType != "" {
 			r.logger.Errorf("rejecting client request, unsupported media type: '%s'", contentType)
-			HTTPFormatError(handlerTags, w)
+			HTTPFormatError([]string{tagServiceHandler, fmt.Sprintf("v:%d", v)}, w)
 			return
 		}
 
-		dec := json.NewDecoder(bodyBuffer)
-		err = dec.Decode(&servicesMeta)
+		// select the right Decoder based on the given content-type header
+		dec := r.decoderPool.Borrow(contentType)
+		err := dec.Decode(req.Body, &servicesMeta)
 		if err != nil {
-			r.logger.Errorf(model.HumanReadableJSONError(bodyBuffer, err))
-			HTTPDecodingError(handlerTags, w)
+			r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
+			HTTPDecodingError([]string{tagServiceHandler, fmt.Sprintf("v:%d", v)}, w)
 			return
 		}
 	case v03:
 		// select the right Decoder based on the given content-type header
-		dec := model.DecoderFromContentType(contentType, bodyBuffer)
-		err = dec.Decode(&servicesMeta)
+		dec := r.decoderPool.Borrow(contentType)
+		err := dec.Decode(req.Body, &servicesMeta)
 		if err != nil {
 			if strings.Contains(contentType, "json") {
-				r.logger.Errorf(model.HumanReadableJSONError(bodyBuffer, err))
+				r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
 			} else {
 				r.logger.Errorf("error when decoding msgpack traces")
 			}
-			HTTPDecodingError(handlerTags, w)
+			HTTPDecodingError([]string{tagServiceHandler, fmt.Sprintf("v:%d", v)}, w)
 			return
 		}
 	default:
-		HTTPEndpointNotSupported(handlerTags, w)
+		HTTPEndpointNotSupported([]string{tagServiceHandler, fmt.Sprintf("v:%d", v)}, w)
 		return
 	}
 
