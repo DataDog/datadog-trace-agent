@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"io"
+	"math"
 	"os"
 	"reflect"
 	"testing"
@@ -12,25 +13,25 @@ import (
 
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/stretchr/testify/assert"
-	"github.com/ugorji/go/codec"
+	"github.com/tinylib/msgp/msgp"
 )
 
 // getTestTrace returns a Trace with a single Span
-func getTestTrace() []Trace {
-	return []Trace{
+func getTestTrace() Traces {
+	return Traces{
 		Trace{
 			Span{
-				TraceID:  42,
-				SpanID:   52,
-				ParentID: 42,
+				TraceID:  math.MaxUint64,
+				SpanID:   math.MaxUint64,
+				ParentID: math.MaxUint64,
 				Type:     "web",
 				Service:  "fennel_IS amazing!",
 				Name:     "something &&<@# that should be a metric!",
 				Resource: "NOT touched because it is going to be hashed",
 				Start:    time.Now().UnixNano(),
-				Duration: time.Second.Nanoseconds(),
+				Duration: math.MaxInt64,
 				Meta:     map[string]string{"http.host": "192.168.0.1"},
-				Metrics:  map[string]float64{"http.monitor": 41.99},
+				Metrics:  map[string]float64{"http.monitor": math.MaxFloat64},
 			},
 		},
 	}
@@ -42,10 +43,9 @@ func getJSONPayload() io.Reader {
 }
 
 func getMsgpackPayload() io.Reader {
-	var data []byte
-	enc := codec.NewEncoderBytes(&data, &codec.MsgpackHandle{})
-	enc.Encode(getTestTrace())
-	return bytes.NewReader(data)
+	var buf bytes.Buffer
+	msgp.Encode(&buf, getTestTrace())
+	return bytes.NewReader(buf.Bytes())
 }
 
 func TestMain(m *testing.M) {
@@ -76,13 +76,14 @@ func TestDecoders(t *testing.T) {
 		trace := traces[0]
 		assert.Len(trace, 1)
 		span := trace[0]
-		assert.Equal(uint64(42), span.TraceID)
-		assert.Equal(uint64(52), span.SpanID)
+		assert.Equal(uint64(math.MaxUint64), span.TraceID)
+		assert.Equal(uint64(math.MaxUint64), span.SpanID)
+		assert.Equal(math.MaxInt64, span.Duration)
 		assert.Equal("fennel_IS amazing!", span.Service)
 		assert.Equal("something &&<@# that should be a metric!", span.Name)
 		assert.Equal("NOT touched because it is going to be hashed", span.Resource)
 		assert.Equal("192.168.0.1", span.Meta["http.host"])
-		assert.Equal(41.99, span.Metrics["http.monitor"])
+		assert.Equal(math.MaxFloat64, span.Metrics["http.monitor"])
 	}
 }
 
@@ -112,13 +113,14 @@ func TestDecodersReusable(t *testing.T) {
 		trace := secondTraces[0]
 		assert.Len(trace, 1)
 		span := trace[0]
-		assert.Equal(uint64(42), span.TraceID)
-		assert.Equal(uint64(52), span.SpanID)
+		assert.Equal(uint64(math.MaxUint64), span.TraceID)
+		assert.Equal(uint64(math.MaxUint64), span.SpanID)
+		assert.Equal(math.MaxInt64, span.Duration)
 		assert.Equal("fennel_IS amazing!", span.Service)
 		assert.Equal("something &&<@# that should be a metric!", span.Name)
 		assert.Equal("NOT touched because it is going to be hashed", span.Resource)
 		assert.Equal("192.168.0.1", span.Meta["http.host"])
-		assert.Equal(41.99, span.Metrics["http.monitor"])
+		assert.Equal(math.MaxFloat64, span.Metrics["http.monitor"])
 
 		// the two data structures should be different because of the timestamps
 		assert.False(reflect.DeepEqual(firstTraces, secondTraces))

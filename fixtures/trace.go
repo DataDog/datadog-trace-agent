@@ -83,8 +83,8 @@ func RandomTrace(maxLevels, maxSpans int) model.Trace {
 
 // GetTestTrace returns a []Trace that is composed by ``traceN`` number
 // of traces, each one composed by ``size`` number of spans.
-func GetTestTrace(traceN, size int) []model.Trace {
-	traces := []model.Trace{}
+func GetTestTrace(traceN, size int) model.Traces {
+	traces := model.Traces{}
 
 	for i := 0; i < traceN; i++ {
 		trace := model.Trace{}
