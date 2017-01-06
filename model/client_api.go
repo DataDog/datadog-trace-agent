@@ -3,9 +3,10 @@ package model
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 
-	"github.com/ugorji/go/codec"
+	"github.com/tinylib/msgp/msgp"
 )
 
 // average size of a buffer; because usually the payloads are huge,
@@ -51,7 +52,6 @@ type jsonDecoder struct {
 }
 
 type msgpackDecoder struct {
-	decoder     *codec.Decoder
 	buf         *bytes.Buffer
 	slice       []byte
 	contentType string
@@ -95,7 +95,6 @@ func newMsgpackDecoder() *msgpackDecoder {
 	return &msgpackDecoder{
 		buf:         buf,
 		slice:       buf.Bytes(),
-		decoder:     codec.NewDecoder(buf, &codec.MsgpackHandle{}),
 		contentType: "application/msgpack",
 	}
 }
@@ -108,7 +107,14 @@ func (d *msgpackDecoder) Decode(body io.Reader, v interface{}) error {
 	}
 
 	// decode the payload to the given interface
-	return d.decoder.Decode(v)
+	switch t := v.(type) {
+	case *Traces:
+		return msgp.Decode(d.buf, t)
+	case *ServicesMetadata:
+		return msgp.Decode(d.buf, t)
+	default:
+		return errors.New("No implementation for this interface")
+	}
 }
 
 func (d *msgpackDecoder) BufferReader() *bytes.Reader {

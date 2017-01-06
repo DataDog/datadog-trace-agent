@@ -418,7 +418,7 @@ func BenchmarkDecoderMsgpack(b *testing.B) {
 		reader := bytes.NewReader(payload)
 
 		b.StartTimer()
-		var traces model.ReceiverPayload
+		var traces model.Traces
 		_ = msgp.Decode(reader, &traces)
 	}
 }
@@ -433,7 +433,7 @@ func TestMsgpOverflowUint64(t *testing.T) {
 	err := enc.Encode(fixtures.GetTestTrace(150, 66))
 	assert.Nil(err)
 
-	var traces model.ReceiverPayload
+	var traces model.Traces
 	err = msgp.Decode(bytes.NewReader(payload), &traces)
 	assert.Nil(err)
 	assert.Len(traces, 150)
