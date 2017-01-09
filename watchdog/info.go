@@ -1,10 +1,11 @@
 package watchdog
 
 import (
-	log "github.com/cihub/seelog"
-	"github.com/shirou/gopsutil/cpu"
 	"runtime"
 	"time"
+
+	log "github.com/cihub/seelog"
+	"github.com/shirou/gopsutil/cpu"
 )
 
 // CPUInfo contains very basic CPU information
@@ -95,12 +96,14 @@ func (pi *ProcessInfo) Mem() MemInfo {
 	return ret
 }
 
-// CPU returns basic CPU info
+// CPU returns basic CPU info.
+// Uses a global shared struct to store information, therefore not thread safe.
 func CPU() CPUInfo {
 	return globalProcessInfo.CPU()
 }
 
 // Mem returns basic memory information
+// Uses a global shared struct to store information, therefore not thread safe.
 func Mem() MemInfo {
 	return globalProcessInfo.Mem()
 }
