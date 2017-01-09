@@ -8,8 +8,12 @@ import (
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/quantizer"
+	"github.com/DataDog/datadog-trace-agent/statsd"
+	"github.com/DataDog/datadog-trace-agent/watchdog"
 	log "github.com/cihub/seelog"
 )
+
+const processStatsInterval = time.Minute
 
 type processedTrace struct {
 	Trace     model.Trace
@@ -67,6 +71,8 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 func (a *Agent) Run() {
 	flushTicker := time.NewTicker(a.conf.BucketInterval)
 	defer flushTicker.Stop()
+	statsTicker := time.NewTicker(processStatsInterval)
+	defer statsTicker.Stop()
 
 	a.Receiver.Run()
 	a.Writer.Run()
@@ -95,6 +101,8 @@ func (a *Agent) Run() {
 			wg.Wait()
 
 			a.Writer.inPayloads <- p
+		case <-statsTicker.C:
+			processStats()
 		case <-a.exit:
 			log.Info("exiting")
 			close(a.Receiver.exit)
@@ -143,4 +151,13 @@ func (a *Agent) Process(t model.Trace) {
 	weight := pt.weight() // need to do this now because sampler edits .Metrics map
 	go a.Concentrator.Add(pt, weight)
 	go a.Sampler.Add(pt)
+}
+
+func processStats() {
+	tags := []string{"version:" + Version, "go_version:" + GoVersion}
+	c := watchdog.CPU()
+	statsd.Client.Gauge("trace_agent.process.cpu.pct", c.UserAvg*100.0, tags, 1)
+	m := watchdog.Mem()
+	statsd.Client.Gauge("trace_agent.process.mem.alloc", float64(m.Alloc), tags, 1)
+	statsd.Client.Gauge("trace_agent.process.mem.alloc_per_sec", m.AllocPerSec, tags, 1)
 }

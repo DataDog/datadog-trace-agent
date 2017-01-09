@@ -3,6 +3,7 @@ package watchdog
 import (
 	"os"
 	"runtime"
+	"sync"
 	"time"
 
 	log "github.com/cihub/seelog"
@@ -31,7 +32,8 @@ type MemInfo struct {
 // ProcessInfo is used to query CPU and Mem info, it keeps data from
 // the previous calls to calculate averages. It is not thread safe.
 type ProcessInfo struct {
-	p *process.Process
+	p  *process.Process
+	mu sync.Mutex
 
 	lastCPUTime time.Time
 	lastCPUUser float64
@@ -66,6 +68,9 @@ func NewProcessInfo() (*ProcessInfo, error) {
 
 // CPU returns basic CPU info
 func (pi *ProcessInfo) CPU() CPUInfo {
+	pi.mu.Lock()
+	defer pi.mu.Unlock()
+
 	now := time.Now()
 	dt := now.Sub(pi.lastCPUTime)
 	if dt <= 0 {
@@ -91,6 +96,9 @@ func (pi *ProcessInfo) CPU() CPUInfo {
 
 // Mem returns basic memory information
 func (pi *ProcessInfo) Mem() MemInfo {
+	pi.mu.Lock()
+	defer pi.mu.Unlock()
+
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
 	ret := MemInfo{Alloc: ms.Alloc, AllocPerSec: pi.lastMem.AllocPerSec}
@@ -114,7 +122,6 @@ func (pi *ProcessInfo) Mem() MemInfo {
 }
 
 // CPU returns basic CPU info.
-// Uses a global shared struct to store information, therefore not thread safe.
 func CPU() CPUInfo {
 	if globalProcessInfo == nil {
 		return CPUInfo{}
@@ -123,7 +130,6 @@ func CPU() CPUInfo {
 }
 
 // Mem returns basic memory information
-// Uses a global shared struct to store information, therefore not thread safe.
 func Mem() MemInfo {
 	if globalProcessInfo == nil {
 		return MemInfo{}
