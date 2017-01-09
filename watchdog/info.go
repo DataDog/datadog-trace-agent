@@ -1,11 +1,12 @@
 package watchdog
 
 import (
+	"os"
 	"runtime"
 	"time"
 
 	log "github.com/cihub/seelog"
-	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/process"
 )
 
 // CPUInfo contains very basic CPU information
@@ -30,6 +31,8 @@ type MemInfo struct {
 // ProcessInfo is used to query CPU and Mem info, it keeps data from
 // the previous calls to calculate averages. It is not thread safe.
 type ProcessInfo struct {
+	p *process.Process
+
 	lastCPUTime time.Time
 	lastCPUUser float64
 	lastCPU     CPUInfo
@@ -41,7 +44,25 @@ type ProcessInfo struct {
 
 // globalProcessInfo is a global default object one can safely use
 // if only one goroutine is polling for CPU() and Mem()
-var globalProcessInfo ProcessInfo
+var globalProcessInfo *ProcessInfo
+
+func init() {
+	var err error
+	globalProcessInfo, err = NewProcessInfo()
+	if err != nil {
+		log.Errorf("unable to create global Process: %v", err)
+	}
+}
+
+// NewProcessInfo creates a new ProcessInfo referring to the current running program.
+func NewProcessInfo() (*ProcessInfo, error) {
+	p, err := process.NewProcess(int32(os.Getpid()))
+	if err != nil {
+		log.Debugf("unable to create Process: %v", err)
+		return nil, err
+	}
+	return &ProcessInfo{p: p}, nil
+}
 
 // CPU returns basic CPU info
 func (pi *ProcessInfo) CPU() CPUInfo {
@@ -50,23 +71,19 @@ func (pi *ProcessInfo) CPU() CPUInfo {
 	if dt <= 0 {
 		return pi.lastCPU // shouldn't happen unless time decreases or back to back calls
 	}
-	ts, err := cpu.Times(false)
+	times, err := pi.p.Times()
 	if err != nil {
-		log.Debugf("unable to get CPU info: %v", err)
-		return pi.lastCPU
-	}
-	if len(ts) != 1 {
-		log.Debugf("inconsistent CPU info len=%d", len(ts))
+		log.Debugf("unable to get CPU times: %v", err)
 		return pi.lastCPU
 	}
 	pi.lastCPUTime = now
-	dua := ts[0].User - pi.lastCPUUser
-	pi.lastCPUUser = ts[0].User
+	dua := times.User - pi.lastCPUUser
+	pi.lastCPUUser = times.User
 	if dua <= 0 {
 		pi.lastCPU.UserAvg = 0 // shouldn't happen, but make sure result is always > 0
 	} else {
 		pi.lastCPU.UserAvg = float64(time.Second) * dua / float64(dt)
-		pi.lastCPUUser = ts[0].User
+		pi.lastCPUUser = times.User
 	}
 
 	return pi.lastCPU
@@ -99,11 +116,17 @@ func (pi *ProcessInfo) Mem() MemInfo {
 // CPU returns basic CPU info.
 // Uses a global shared struct to store information, therefore not thread safe.
 func CPU() CPUInfo {
+	if globalProcessInfo == nil {
+		return CPUInfo{}
+	}
 	return globalProcessInfo.CPU()
 }
 
 // Mem returns basic memory information
 // Uses a global shared struct to store information, therefore not thread safe.
 func Mem() MemInfo {
+	if globalProcessInfo == nil {
+		return MemInfo{}
+	}
 	return globalProcessInfo.Mem()
 }

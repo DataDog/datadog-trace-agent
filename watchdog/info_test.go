@@ -2,11 +2,12 @@ package watchdog
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 	"testing"
 	"time"
 
-	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/process"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,8 +26,8 @@ func TestCPULow(t *testing.T) {
 
 	// checking that CPU is low enough, this is theorically flaky,
 	// but eating 50% of CPU for a time.Sleep is still not likely to happen often
-	assert.Condition(func() bool { return c.UserAvg >= 0.0 }, "cpu avg should be positive")
-	assert.Condition(func() bool { return c.UserAvg <= 0.5 }, "cpu avg should be below 0.5")
+	assert.Condition(func() bool { return c.UserAvg >= 0.0 }, fmt.Sprintf("cpu avg should be positive, got %f", c.UserAvg))
+	assert.Condition(func() bool { return c.UserAvg <= 0.5 }, fmt.Sprintf("cpu avg should be below 0.5, got %f", c.UserAvg))
 }
 
 func doTestCPUHigh(t *testing.T, n int) {
@@ -59,8 +60,8 @@ func doTestCPUHigh(t *testing.T, n int) {
 	// enough to stimulate one core and make it over 50%. One of the goals
 	// of this test is to check that values are not wrong by a factor 100, such
 	// as mismatching percentages and [0...1]  values.
-	assert.Condition(func() bool { return c.UserAvg >= 0.5 }, "cpu avg is too low")
-	assert.Condition(func() bool { return c.UserAvg <= float64(n+1) }, "cpu avg is too high")
+	assert.Condition(func() bool { return c.UserAvg >= 0.5 }, fmt.Sprintf("cpu avg is too low, got %f", c.UserAvg))
+	assert.Condition(func() bool { return c.UserAvg <= float64(n+1) }, fmt.Sprintf("cpu avg is too high, target is %d, got %f", n, c.UserAvg))
 }
 
 func TestCPUHigh(t *testing.T) {
@@ -148,8 +149,12 @@ func BenchmarkMem(b *testing.B) {
 func BenchmarkCPUTimes(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
+	p, err := process.NewProcess(int32(os.Getpid()))
+	if err != nil {
+		b.Fatalf("unable to create Process: %v", err)
+	}
 	for i := 0; i < b.N; i++ {
-		_, _ = cpu.Times(false)
+		_, _ = p.Times()
 	}
 }
 
