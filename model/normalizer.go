@@ -107,12 +107,12 @@ func (s *Span) Normalize() error {
 		if len(k) > MaxMetaKeyLen {
 			log.Debugf("span.normalize: truncating `Meta` key (max %d chars): %s", MaxMetaKeyLen, k)
 			delete(s.Meta, k)
-			k = fmt.Sprintf("%s...", k[:MaxMetaKeyLen])
+			k = k[:MaxMetaKeyLen] + "..."
 			modified = true
 		}
 
 		if len(v) > MaxMetaValLen {
-			v = fmt.Sprintf("%s...", v[:MaxMetaValLen])
+			v = v[:MaxMetaValLen] + "..."
 			modified = true
 		}
 
@@ -125,7 +125,7 @@ func (s *Span) Normalize() error {
 		if len(k) > MaxMetricsKeyLen {
 			log.Debugf("span.normalize: truncating `Metrics` key (max %d chars): %s", MaxMetricsKeyLen, k)
 			delete(s.Metrics, k)
-			k = fmt.Sprintf("%s...", k[:MaxMetricsKeyLen])
+			k = k[:MaxMetricsKeyLen] + "..."
 
 			s.Metrics[k] = v
 		}
