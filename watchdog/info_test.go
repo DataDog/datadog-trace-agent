@@ -1,6 +1,7 @@
 package watchdog
 
 import (
+	"runtime"
 	"testing"
 	"time"
 
@@ -64,4 +65,35 @@ func TestCPUHigh(t *testing.T) {
 	}
 	doTestCPUHigh(t, 10)
 	doTestCPUHigh(t, 100)
+}
+
+func TestCPUMem(t *testing.T) {
+	assert := assert.New(t)
+	runtime.GC()
+	c := Mem()
+	time.Sleep(testDuration)
+	c = Mem()
+	t.Logf("Nen (sleep): %v", c)
+
+	// checking that Mem is low enough, this is theorically flaky,
+	// unless some other random GoRoutine is running, figures should remain low
+	assert.Condition(func() bool { return c.Alloc <= 1e8 }, "over 100 Mb allocated, way to high for a program doing nothing")
+	assert.Condition(func() bool { return c.AllocPerSec >= 0.5 }, "allocs per sec should be positive")
+	assert.Condition(func() bool { return c.AllocPerSec <= 1e5 }, "over 100 Kb allocated per sec, way too high for a program doing nothing")
+}
+
+func BenchmarkCPU(b *testing.B) {
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = CPU()
+	}
+}
+
+func BenchmarkMem(b *testing.B) {
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = Mem()
+	}
 }
