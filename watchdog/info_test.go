@@ -86,7 +86,7 @@ func TestMemLow(t *testing.T) {
 	// unless some other random GoRoutine is running, figures should remain low
 	assert.Condition(func() bool { return int64(m.Alloc)-int64(oldM.Alloc) <= 1e4 }, "over 10 Kb allocated since last call, way to high for almost no operation")
 	assert.Condition(func() bool { return m.Alloc <= 1e8 }, "over 100 Mb allocated, way to high for almost no operation")
-	assert.Condition(func() bool { return m.AllocPerSec >= 0.5 }, "allocs per sec should be positive")
+	assert.Condition(func() bool { return m.AllocPerSec >= 0.0 }, "allocs per sec should be positive")
 	assert.Condition(func() bool { return m.AllocPerSec <= 1e5 }, "over 100 Kb allocated per sec, way too high for a program doing nothing")
 }
 
@@ -116,7 +116,7 @@ func doTestMemHigh(t *testing.T, n int) {
 	assert.Condition(func() bool { return m.Alloc >= uint64(n) }, "not enough bytes allocated")
 	assert.Condition(func() bool { return int64(m.Alloc)-int64(oldM.Alloc) >= int64(n) }, "not enough bytes allocated since last call")
 	expectedAllocPerSec := float64(n) * float64(time.Second) / (float64(testDuration))
-	assert.Condition(func() bool { return m.AllocPerSec >= 0.5*expectedAllocPerSec }, fmt.Sprintf("not enough bytes allocated per second, expected %f", expectedAllocPerSec))
+	assert.Condition(func() bool { return m.AllocPerSec >= 0.1*expectedAllocPerSec }, fmt.Sprintf("not enough bytes allocated per second, expected %f", expectedAllocPerSec))
 	assert.Condition(func() bool { return m.AllocPerSec <= 1.5*expectedAllocPerSec }, fmt.Sprintf("not enough bytes allocated per second, expected %f", expectedAllocPerSec))
 	<-data
 }
