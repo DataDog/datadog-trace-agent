@@ -1,6 +1,7 @@
 package main
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -26,6 +27,7 @@ func TestWatchdog(t *testing.T) {
 			case string:
 				if strings.HasPrefix(v, "exceeded max memory") {
 					t.Logf("watchdog worked, trapped the right error: %s", v)
+					runtime.GC() // make sure we clean up after allocating all this
 					return
 				}
 			}
@@ -44,7 +46,6 @@ func TestWatchdog(t *testing.T) {
 	// without this. runtime could be smart and free memory before we Run()
 	buf[0] = 2
 	buf[len(buf)-1] = 2
-
 }
 
 func BenchmarkAgentTraceProcessing(b *testing.B) {
@@ -58,5 +59,17 @@ func BenchmarkAgentTraceProcessing(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		agent.Process(fixtures.RandomTrace(10, 8))
+	}
+}
+
+func BenchmarkWatchdog(b *testing.B) {
+	conf := config.NewDefaultAgentConfig()
+	conf.APIKeys = append(conf.APIKeys, "apikey_2")
+	agent := NewAgent(conf)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		agent.watchdog()
 	}
 }
