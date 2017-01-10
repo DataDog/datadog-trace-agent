@@ -5,8 +5,6 @@ import (
 	"math/rand"
 )
 
-//go:generate msgp
-
 // Span is the common struct we use to represent a dapper-like span
 type Span struct {
 	// Mandatory

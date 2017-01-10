@@ -7,7 +7,7 @@ import (
 	"reflect"
 )
 
-//go:generate msgp
+//go:generate msgp -marshal=false
 
 // ServicesMetadata is a standard key/val meta map attached to each named service
 type ServicesMetadata map[string]map[string]string

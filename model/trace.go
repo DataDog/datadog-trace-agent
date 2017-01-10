@@ -4,7 +4,7 @@ import (
 	log "github.com/cihub/seelog"
 )
 
-//go:generate msgp
+//go:generate msgp -marshal=false
 
 // Trace is a collection of spans with the same trace ID
 type Trace []Span
