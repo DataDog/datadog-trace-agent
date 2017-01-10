@@ -72,7 +72,7 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 func (a *Agent) Run() {
 	flushTicker := time.NewTicker(a.conf.BucketInterval)
 	defer flushTicker.Stop()
-	watchdogTicker := time.NewTicker(watchdogInterval)
+	watchdogTicker := time.NewTicker(a.conf.WatchdogInterval)
 	defer watchdogTicker.Stop()
 
 	a.Receiver.Run()
