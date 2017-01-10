@@ -32,14 +32,14 @@ func TestGrainKey(t *testing.T) {
 func TestStatsBucketDefault(t *testing.T) {
 	assert := assert.New(t)
 
-	scb := NewStatsCalcBucket(0, 1e9)
+	srb := NewStatsRawBucket(0, 1e9)
 
 	// No custom aggregators only the defaults
 	aggr := []string{}
 	for _, s := range testSpans {
-		scb.HandleSpan(s, defaultEnv, aggr, nil)
+		srb.HandleSpan(s, defaultEnv, aggr, nil)
 	}
-	sb := scb.Export()
+	sb := srb.Export()
 
 	expectedCounts := map[string]int64{
 		"A.foo|duration|env:default,resource:α,service:A":     1,
@@ -78,14 +78,14 @@ func TestStatsBucketDefault(t *testing.T) {
 func TestStatsBucketExtraAggregators(t *testing.T) {
 	assert := assert.New(t)
 
-	scb := NewStatsCalcBucket(0, 1e9)
+	srb := NewStatsRawBucket(0, 1e9)
 
 	// one custom aggregator
 	aggr := []string{"version"}
 	for _, s := range testSpans {
-		scb.HandleSpan(s, defaultEnv, aggr, nil)
+		srb.HandleSpan(s, defaultEnv, aggr, nil)
 	}
-	sb := scb.Export()
+	sb := srb.Export()
 
 	expectedCounts := map[string]int64{
 		"A.foo|duration|env:default,resource:α,service:A":                 1,
@@ -148,35 +148,35 @@ func TestTsRounding(t *testing.T) {
 
 func BenchmarkHandleSpan(b *testing.B) {
 
-	scb := NewStatsCalcBucket(0, 1e9)
+	srb := NewStatsRawBucket(0, 1e9)
 	aggr := []string{}
 
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		for _, s := range testSpans {
-			scb.HandleSpan(s, defaultEnv, aggr, nil)
+			srb.HandleSpan(s, defaultEnv, aggr, nil)
 		}
 	}
 }
 
 func TestGrain(t *testing.T) {
-	scb := NewStatsCalcBucket(0, 1e9)
+	srb := NewStatsRawBucket(0, 1e9)
 	assert := assert.New(t)
 
 	s := Span{Service: "thing", Name: "other", Resource: "yo"}
-	aggr, tgs := assembleGrain(&scb.keyBuf, "default", s.Resource, s.Service, nil)
+	aggr, tgs := assembleGrain(&srb.keyBuf, "default", s.Resource, s.Service, nil)
 
 	assert.Equal("env:default,resource:yo,service:thing", aggr)
 	assert.Equal(TagSet{Tag{"env", "default"}, Tag{"resource", "yo"}, Tag{"service", "thing"}}, tgs)
 }
 
 func TestGrainWithExtraTags(t *testing.T) {
-	scb := NewStatsCalcBucket(0, 1e9)
+	srb := NewStatsRawBucket(0, 1e9)
 	assert := assert.New(t)
 
 	s := Span{Service: "thing", Name: "other", Resource: "yo", Meta: map[string]string{"meta2": "two", "meta1": "ONE"}}
-	aggr, tgs := assembleGrain(&scb.keyBuf, "default", s.Resource, s.Service, s.Meta)
+	aggr, tgs := assembleGrain(&srb.keyBuf, "default", s.Resource, s.Service, s.Meta)
 
 	assert.Equal("env:default,resource:yo,service:thing,meta1:ONE,meta2:two", aggr)
 	assert.Equal(TagSet{Tag{"env", "default"}, Tag{"resource", "yo"}, Tag{"service", "thing"}, Tag{"meta1", "ONE"}, Tag{"meta2", "two"}}, tgs)

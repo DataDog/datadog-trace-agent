@@ -137,9 +137,14 @@ type statsKey struct {
 	aggr string
 }
 
-type StatsCalcBucket struct {
-	Start    int64 // timestamp of start in our format
-	Duration int64 // duration of a bucket in nanoseconds
+// StatsRawBucket is used to compute span data and aggregate it
+// within a time-framed bucket. This should not be used outside
+// the agent, use StatsBucket for this.
+type StatsRawBucket struct {
+	// This should really have no public fields. At all.
+
+	start    int64 // timestamp of start in our format
+	duration int64 // duration of a bucket in nanoseconds
 
 	// this should really remain private as it's subject to refactoring
 	data map[statsKey]groupedStats
@@ -159,18 +164,21 @@ func NewStatsBucket(ts, d int64) StatsBucket {
 	}
 }
 
-// NewStatsCalcBucket opens a new calculation bucket for time ts and initializes it properly
-func NewStatsCalcBucket(ts, d int64) StatsCalcBucket {
+// NewStatsRawBucket opens a new calculation bucket for time ts and initializes it properly
+func NewStatsRawBucket(ts, d int64) StatsRawBucket {
 	// The only non-initialized value is the Duration which should be set by whoever closes that bucket
-	return StatsCalcBucket{
-		Start:    ts,
-		Duration: d,
+	return StatsRawBucket{
+		start:    ts,
+		duration: d,
 		data:     make(map[statsKey]groupedStats),
 	}
 }
 
-func (sb *StatsCalcBucket) Export() StatsBucket {
-	ret := NewStatsBucket(sb.Start, sb.Duration)
+// Export transforms a StatsRawBucket into a StatsBucket, typically used
+// before communicating data to the API, as StatsRawBucket is the internal
+// type while StatsBucket is the public, shared one.
+func (sb *StatsRawBucket) Export() StatsBucket {
+	ret := NewStatsBucket(sb.start, sb.duration)
 	for k, v := range sb.data {
 		hitsKey := GrainKey(k.name, HITS, k.aggr)
 		ret.Counts[hitsKey] = Count{
@@ -244,7 +252,7 @@ func assembleGrain(b *bytes.Buffer, env, resource, service string, m map[string]
 }
 
 // HandleSpan adds the span to this bucket stats, aggregated with the finest grain matching given aggregators
-func (sb *StatsCalcBucket) HandleSpan(s Span, env string, aggregators []string, sublayers *[]SublayerValue) {
+func (sb *StatsRawBucket) HandleSpan(s Span, env string, aggregators []string, sublayers *[]SublayerValue) {
 	if env == "" {
 		panic("env should never be empty")
 	}
@@ -270,7 +278,7 @@ func (sb *StatsCalcBucket) HandleSpan(s Span, env string, aggregators []string, 
 	}
 }
 
-func (sb StatsCalcBucket) add(s Span, aggr string, tgs TagSet) {
+func (sb StatsRawBucket) add(s Span, aggr string, tgs TagSet) {
 	var gs groupedStats
 	var ok bool
 
@@ -293,7 +301,7 @@ func (sb StatsCalcBucket) add(s Span, aggr string, tgs TagSet) {
 	sb.data[key] = gs
 }
 
-func (sb StatsCalcBucket) addSublayer(s Span, aggr string, tgs TagSet, sub SublayerValue) {
+func (sb StatsRawBucket) addSublayer(s Span, aggr string, tgs TagSet, sub SublayerValue) {
 	var gs groupedStats
 	var ok bool
 
