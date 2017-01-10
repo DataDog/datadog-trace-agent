@@ -115,6 +115,34 @@ type StatsBucket struct {
 	// stats indexed by keys
 	Counts        map[string]Count        // All the true counts we keep
 	Distributions map[string]Distribution // All the true distribution we keep to answer quantile queries
+}
+
+type groupedStats struct {
+	tgs                  TagSet
+	hitsCount            int64
+	errorsCount          int64
+	durationCount        int64
+	durationDistribution *quantile.SliceSummary
+}
+
+func newGroupedStats(tgs TagSet) groupedStats {
+	return groupedStats{
+		tgs:                  tgs,
+		durationDistribution: quantile.NewSliceSummary(),
+	}
+}
+
+type statsKey struct {
+	name string
+	aggr string
+}
+
+type StatsCalcBucket struct {
+	Start    int64 // timestamp of start in our format
+	Duration int64 // duration of a bucket in nanoseconds
+
+	// this should really remain private as it's subject to refactoring
+	data map[statsKey]groupedStats
 
 	// internal buffer for aggregate strings - not threadsafe
 	keyBuf bytes.Buffer
@@ -122,16 +150,61 @@ type StatsBucket struct {
 
 // NewStatsBucket opens a new bucket for time ts and initializes it properly
 func NewStatsBucket(ts, d int64) StatsBucket {
-	counts := make(map[string]Count)
-	distros := make(map[string]Distribution)
-
 	// The only non-initialized value is the Duration which should be set by whoever closes that bucket
 	return StatsBucket{
 		Start:         ts,
 		Duration:      d,
-		Counts:        counts,
-		Distributions: distros,
+		Counts:        make(map[string]Count),
+		Distributions: make(map[string]Distribution),
 	}
+}
+
+// NewStatsCalcBucket opens a new calculation bucket for time ts and initializes it properly
+func NewStatsCalcBucket(ts, d int64) StatsCalcBucket {
+	// The only non-initialized value is the Duration which should be set by whoever closes that bucket
+	return StatsCalcBucket{
+		Start:    ts,
+		Duration: d,
+		data:     make(map[statsKey]groupedStats),
+	}
+}
+
+func (sb *StatsCalcBucket) Export() StatsBucket {
+	ret := NewStatsBucket(sb.Start, sb.Duration)
+	for k, v := range sb.data {
+		hitsKey := GrainKey(k.name, HITS, k.aggr)
+		ret.Counts[hitsKey] = Count{
+			Key:     hitsKey,
+			Name:    k.name,
+			Measure: HITS,
+			TagSet:  v.tgs,
+			Value:   float64(v.hitsCount),
+		}
+		errorsKey := GrainKey(k.name, ERRORS, k.aggr)
+		ret.Counts[errorsKey] = Count{
+			Key:     errorsKey,
+			Name:    k.name,
+			Measure: ERRORS,
+			TagSet:  v.tgs,
+			Value:   float64(v.errorsCount),
+		}
+		durationKey := GrainKey(k.name, DURATION, k.aggr)
+		ret.Counts[durationKey] = Count{
+			Key:     durationKey,
+			Name:    k.name,
+			Measure: DURATION,
+			TagSet:  v.tgs,
+			Value:   float64(v.durationCount),
+		}
+		ret.Distributions[durationKey] = Distribution{
+			Key:     durationKey,
+			Name:    k.name,
+			Measure: DURATION,
+			TagSet:  v.tgs,
+			Summary: v.durationDistribution,
+		}
+	}
+	return ret
 }
 
 func assembleGrain(b *bytes.Buffer, env, resource, service string, m map[string]string) (string, TagSet) {
@@ -171,7 +244,7 @@ func assembleGrain(b *bytes.Buffer, env, resource, service string, m map[string]
 }
 
 // HandleSpan adds the span to this bucket stats, aggregated with the finest grain matching given aggregators
-func (sb *StatsBucket) HandleSpan(s Span, env string, aggregators []string, sublayers *[]SublayerValue) {
+func (sb *StatsCalcBucket) HandleSpan(s Span, env string, aggregators []string, sublayers *[]SublayerValue) {
 	if env == "" {
 		panic("env should never be empty")
 	}
@@ -187,39 +260,63 @@ func (sb *StatsBucket) HandleSpan(s Span, env string, aggregators []string, subl
 	}
 
 	grain, tags := assembleGrain(&sb.keyBuf, env, s.Resource, s.Service, m)
-	sb.addToTagSet(s, grain, tags)
+	sb.add(s, grain, tags)
 
 	// sublayers - special case
 	if sublayers != nil {
 		for _, sub := range *sublayers {
-			subgrain := grain + "," + sub.Tag.Name + ":" + sub.Tag.Value
-			subtags := make(TagSet, len(tags)+1)
-			copy(subtags, tags)
-			subtags[len(tags)] = sub.Tag
-
-			sb.addToCount(sub.Metric, sub.Value, subgrain, s.Name, subtags)
+			sb.addSublayer(s, grain, tags, sub)
 		}
 	}
 }
 
-func (sb StatsBucket) addToTagSet(s Span, aggr string, tgs TagSet) {
-	// HITS
-	sb.addToCount(HITS, 1, aggr, s.Name, tgs)
-	// FIXME: this does not really make sense actually
-	// ERRORS
-	if s.Error != 0 {
-		sb.addToCount(ERRORS, 1, aggr, s.Name, tgs)
-	} else {
-		sb.addToCount(ERRORS, 0, aggr, s.Name, tgs)
+func (sb StatsCalcBucket) add(s Span, aggr string, tgs TagSet) {
+	var gs groupedStats
+	var ok bool
+
+	key := statsKey{name: s.Name, aggr: aggr}
+	if gs, ok = sb.data[key]; !ok {
+		gs = newGroupedStats(tgs)
 	}
-	// DURATION
-	sb.addToCount(DURATION, float64(s.Duration), aggr, s.Name, tgs)
+
+	gs.hitsCount++
+	if s.Error != 0 {
+		gs.errorsCount++
+	}
+	gs.durationCount += s.Duration
 
 	// TODO add for s.Metrics ability to define arbitrary counts and distros, check some config?
-
 	// alter resolution of duration distro
 	trundur := nsTimestampToFloat(s.Duration)
-	sb.addToDistribution(DURATION, trundur, s.SpanID, aggr, s.Name, tgs)
+	gs.durationDistribution.Insert(trundur, s.SpanID)
+
+	sb.data[key] = gs
+}
+
+func (sb StatsCalcBucket) addSublayer(s Span, aggr string, tgs TagSet, sub SublayerValue) {
+	var gs groupedStats
+	var ok bool
+
+	subAggr := aggr + "," + sub.Tag.Name + ":" + sub.Tag.Value
+	subTgs := make(TagSet, len(tgs)+1)
+	copy(subTgs, tgs)
+	subTgs[len(tgs)] = sub.Tag
+
+	key := statsKey{name: s.Name, aggr: subAggr}
+	if gs, ok = sb.data[key]; !ok {
+		gs = newGroupedStats(subTgs)
+	}
+
+	switch sub.Metric {
+	case HITS:
+		gs.hitsCount += int64(sub.Value)
+	case ERRORS:
+		gs.errorsCount += int64(sub.Value)
+	case DURATION:
+		gs.durationCount += int64(sub.Value)
+	}
+
+	sb.data[key] = gs
 }
 
 func (sb StatsBucket) addToCount(m string, v float64, aggr, name string, tgs TagSet) {
