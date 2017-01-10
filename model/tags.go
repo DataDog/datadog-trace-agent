@@ -241,8 +241,8 @@ func FilterTags(tags, groups []string) []string {
 // taken from dd-go.model.NormalizeTag
 func NormalizeTag(tag string) string {
 	// unless you just throw out unicode, this is already as fast as it gets
-	var buf bytes.Buffer
 
+	buf := bytes.NewBuffer(make([]byte, 0, 2*len(tag)))
 	lastWasUnderscore := false
 
 	for _, c := range tag {
@@ -283,12 +283,11 @@ func NormalizeTag(tag string) string {
 		}
 	}
 
-	b := buf.Bytes()
-
 	// strip trailing underscores
 	if lastWasUnderscore {
+		b := buf.Bytes()
 		return string(b[:len(b)-1])
 	}
 
-	return string(b)
+	return buf.String()
 }
