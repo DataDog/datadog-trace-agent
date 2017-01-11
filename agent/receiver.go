@@ -120,7 +120,7 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 	}
 	defer req.Body.Close()
 
-	var traces []model.Trace
+	var traces model.Traces
 	contentType := req.Header.Get("Content-Type")
 
 	switch v {

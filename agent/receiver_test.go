@@ -12,7 +12,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/fixtures"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/stretchr/testify/assert"
-	"github.com/ugorji/go/codec"
+	"github.com/tinylib/msgp/msgp"
 )
 
 func TestLegacyReceiver(t *testing.T) {
@@ -134,7 +134,6 @@ func TestReceiverJSONDecoder(t *testing.T) {
 func TestReceiverMsgpackDecoder(t *testing.T) {
 	// testing traces without content-type in agent endpoints, it should use Msgpack decoding
 	// or it should raise a 415 Unsupported media type
-	var mh codec.MsgpackHandle
 	assert := assert.New(t)
 	config := config.NewDefaultAgentConfig()
 	testCases := []struct {
@@ -142,7 +141,7 @@ func TestReceiverMsgpackDecoder(t *testing.T) {
 		r           *HTTPReceiver
 		apiVersion  APIVersion
 		contentType string
-		traces      []model.Trace
+		traces      model.Traces
 	}{
 		{"v01 with application/msgpack", NewHTTPReceiver(config), v01, "application/msgpack", fixtures.GetTestTrace(1, 1)},
 		{"v02 with application/msgpack", NewHTTPReceiver(config), v02, "application/msgpack", fixtures.GetTestTrace(1, 1)},
@@ -157,11 +156,10 @@ func TestReceiverMsgpackDecoder(t *testing.T) {
 			)
 
 			// send traces to that endpoint using the msgpack content-type
-			var data []byte
-			enc := codec.NewEncoderBytes(&data, &mh)
-			err := enc.Encode(tc.traces)
+			var buf bytes.Buffer
+			err := msgp.Encode(&buf, tc.traces)
 			assert.Nil(err)
-			req, err := http.NewRequest("POST", server.URL, bytes.NewBuffer(data))
+			req, err := http.NewRequest("POST", server.URL, bytes.NewReader(buf.Bytes()))
 			assert.Nil(err)
 			req.Header.Set("Content-Type", tc.contentType)
 
@@ -273,7 +271,6 @@ func TestReceiverServiceJSONDecoder(t *testing.T) {
 func TestReceiverServiceMsgpackDecoder(t *testing.T) {
 	// testing traces without content-type in agent endpoints, it should use Msgpack decoding
 	// or it should raise a 415 Unsupported media type
-	var mh codec.MsgpackHandle
 	assert := assert.New(t)
 	config := config.NewDefaultAgentConfig()
 	testCases := []struct {
@@ -307,11 +304,10 @@ func TestReceiverServiceMsgpackDecoder(t *testing.T) {
 			}
 
 			// send traces to that endpoint using the Msgpack content-type
-			var data []byte
-			enc := codec.NewEncoderBytes(&data, &mh)
-			err := enc.Encode(services)
+			var buf bytes.Buffer
+			err := msgp.Encode(&buf, services)
 			assert.Nil(err)
-			req, err := http.NewRequest("POST", server.URL, bytes.NewBuffer(data))
+			req, err := http.NewRequest("POST", server.URL, bytes.NewReader(buf.Bytes()))
 			assert.Nil(err)
 			req.Header.Set("Content-Type", tc.contentType)
 
@@ -348,9 +344,9 @@ func TestReceiverServiceMsgpackDecoder(t *testing.T) {
 
 func BenchmarkHandleTraces(b *testing.B) {
 	// prepare the payload
-	var data []byte
-	enc := codec.NewEncoderBytes(&data, &codec.MsgpackHandle{})
-	enc.Encode(fixtures.GetTestTrace(1, 1))
+	// msgpack payload
+	var buf bytes.Buffer
+	msgp.Encode(&buf, fixtures.GetTestTrace(1, 1))
 
 	// prepare the receiver
 	config := config.NewDefaultAgentConfig()
@@ -372,7 +368,7 @@ func BenchmarkHandleTraces(b *testing.B) {
 
 		// forge the request
 		rr := httptest.NewRecorder()
-		req, _ := http.NewRequest("POST", "/v0.3/traces", bytes.NewReader(data))
+		req, _ := http.NewRequest("POST", "/v0.3/traces", bytes.NewReader(buf.Bytes()))
 		req.Header.Set("Content-Type", "application/msgpack")
 
 		// trace only this execution
@@ -393,29 +389,33 @@ func BenchmarkDecoderJSON(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for n := 0; n < b.N; n++ {
-		var spans []model.Trace
-		decoder := json.NewDecoder(bytes.NewReader(payload))
+		b.StopTimer()
+		reader := bytes.NewReader(payload)
+
+		b.StartTimer()
+		var spans model.Traces
+		decoder := json.NewDecoder(reader)
 		_ = decoder.Decode(&spans)
 	}
 }
 
 func BenchmarkDecoderMsgpack(b *testing.B) {
 	assert := assert.New(b)
-	traces := fixtures.GetTestTrace(150, 66)
 
 	// msgpack payload
-	var payload []byte
-	var mh codec.MsgpackHandle
-	enc := codec.NewEncoderBytes(&payload, &mh)
-	err := enc.Encode(traces)
+	var buf bytes.Buffer
+	err := msgp.Encode(&buf, fixtures.GetTestTrace(150, 66))
 	assert.Nil(err)
 
 	// benchmark
 	b.ResetTimer()
 	b.ReportAllocs()
 	for n := 0; n < b.N; n++ {
-		var spans []model.Trace
-		decoder := codec.NewDecoder(bytes.NewReader(payload), &mh)
-		_ = decoder.Decode(&spans)
+		b.StopTimer()
+		reader := bytes.NewReader(buf.Bytes())
+
+		b.StartTimer()
+		var traces model.Traces
+		_ = msgp.Decode(reader, &traces)
 	}
 }
