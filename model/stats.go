@@ -1,9 +1,7 @@
 package model
 
 import (
-	"bytes"
 	"fmt"
-	"sort"
 
 	"github.com/DataDog/datadog-trace-agent/quantile"
 )
@@ -115,147 +113,20 @@ type StatsBucket struct {
 	// stats indexed by keys
 	Counts        map[string]Count        // All the true counts we keep
 	Distributions map[string]Distribution // All the true distribution we keep to answer quantile queries
-
-	// internal buffer for aggregate strings - not threadsafe
-	keyBuf bytes.Buffer
 }
 
 // NewStatsBucket opens a new bucket for time ts and initializes it properly
 func NewStatsBucket(ts, d int64) StatsBucket {
-	counts := make(map[string]Count)
-	distros := make(map[string]Distribution)
-
 	// The only non-initialized value is the Duration which should be set by whoever closes that bucket
 	return StatsBucket{
 		Start:         ts,
 		Duration:      d,
-		Counts:        counts,
-		Distributions: distros,
+		Counts:        make(map[string]Count),
+		Distributions: make(map[string]Distribution),
 	}
-}
-
-func assembleGrain(b *bytes.Buffer, env, resource, service string, m map[string]string) (string, TagSet) {
-	b.Reset()
-
-	b.WriteString("env:")
-	b.WriteString(env)
-	b.WriteString(",resource:")
-	b.WriteString(resource)
-	b.WriteString(",service:")
-	b.WriteString(service)
-
-	tagset := TagSet{{"env", env}, {"resource", resource}, {"service", service}}
-
-	if m == nil || len(m) == 0 {
-		return b.String(), tagset
-	}
-
-	keys := make([]string, len(m))
-	j := 0
-	for k := range m {
-		keys[j] = k
-		j++
-	}
-
-	sort.Strings(keys) // required else aggregations would not work
-
-	for _, key := range keys {
-		b.WriteRune(',')
-		b.WriteString(key)
-		b.WriteRune(':')
-		b.WriteString(m[key])
-		tagset = append(tagset, Tag{key, m[key]})
-	}
-
-	return b.String(), tagset
-}
-
-// HandleSpan adds the span to this bucket stats, aggregated with the finest grain matching given aggregators
-func (sb *StatsBucket) HandleSpan(s Span, env string, aggregators []string, sublayers *[]SublayerValue) {
-	if env == "" {
-		panic("env should never be empty")
-	}
-
-	m := make(map[string]string)
-
-	for _, agg := range aggregators {
-		if agg != "env" && agg != "resource" && agg != "service" {
-			if v, ok := s.Meta[agg]; ok {
-				m[agg] = v
-			}
-		}
-	}
-
-	grain, tags := assembleGrain(&sb.keyBuf, env, s.Resource, s.Service, m)
-	sb.addToTagSet(s, grain, tags)
-
-	// sublayers - special case
-	if sublayers != nil {
-		for _, sub := range *sublayers {
-			subgrain := grain + "," + sub.Tag.Name + ":" + sub.Tag.Value
-			subtags := make(TagSet, len(tags)+1)
-			copy(subtags, tags)
-			subtags[len(tags)] = sub.Tag
-
-			sb.addToCount(sub.Metric, sub.Value, subgrain, s.Name, subtags)
-		}
-	}
-}
-
-func (sb StatsBucket) addToTagSet(s Span, aggr string, tgs TagSet) {
-	// HITS
-	sb.addToCount(HITS, 1, aggr, s.Name, tgs)
-	// FIXME: this does not really make sense actually
-	// ERRORS
-	if s.Error != 0 {
-		sb.addToCount(ERRORS, 1, aggr, s.Name, tgs)
-	} else {
-		sb.addToCount(ERRORS, 0, aggr, s.Name, tgs)
-	}
-	// DURATION
-	sb.addToCount(DURATION, float64(s.Duration), aggr, s.Name, tgs)
-
-	// TODO add for s.Metrics ability to define arbitrary counts and distros, check some config?
-
-	// alter resolution of duration distro
-	trundur := nsTimestampToFloat(s.Duration)
-	sb.addToDistribution(DURATION, trundur, s.SpanID, aggr, s.Name, tgs)
-}
-
-func (sb StatsBucket) addToCount(m string, v float64, aggr, name string, tgs TagSet) {
-	ckey := GrainKey(name, m, aggr)
-
-	if _, ok := sb.Counts[ckey]; !ok {
-		sb.Counts[ckey] = NewCount(m, ckey, name, tgs)
-	}
-
-	sb.Counts[ckey] = sb.Counts[ckey].Add(v)
-}
-
-func (sb StatsBucket) addToDistribution(m string, v float64, sampleID uint64, aggr, name string, tgs TagSet) {
-	ckey := GrainKey(name, m, aggr)
-
-	if _, ok := sb.Distributions[ckey]; !ok {
-		sb.Distributions[ckey] = NewDistribution(m, ckey, name, tgs)
-	}
-
-	sb.Distributions[ckey].Add(v, sampleID)
 }
 
 // IsEmpty just says if this stats bucket has no information (in which case it's useless)
 func (sb StatsBucket) IsEmpty() bool {
 	return len(sb.Counts) == 0 && len(sb.Distributions) == 0
-}
-
-// 10 bits precision (any value will be +/- 1/1024)
-const roundMask int64 = 1 << 10
-
-// nsTimestampToFloat converts a nanosec timestamp into a float nanosecond timestamp truncated to a fixed precision
-func nsTimestampToFloat(ns int64) float64 {
-	var shift uint
-	for ns > roundMask {
-		ns = ns >> 1
-		shift++
-	}
-	return float64(ns << shift)
 }

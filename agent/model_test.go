@@ -15,7 +15,7 @@ const (
 )
 
 func BenchmarkHandleSpanRandom(b *testing.B) {
-	sb := model.NewStatsBucket(0, 1e9)
+	sb := model.NewStatsRawBucket(0, 1e9)
 	aggr := []string{}
 
 	b.ResetTimer()

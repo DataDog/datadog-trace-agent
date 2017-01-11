@@ -18,7 +18,7 @@ type Concentrator struct {
 	aggregators []string
 	bsize       int64
 
-	buckets map[int64]model.StatsBucket // buckets used to aggregate stats per timestamp
+	buckets map[int64]model.StatsRawBucket // buckets used to aggregate stats per timestamp
 	mu      sync.Mutex
 }
 
@@ -27,7 +27,7 @@ func NewConcentrator(aggregators []string, bsize int64) *Concentrator {
 	c := Concentrator{
 		aggregators: aggregators,
 		bsize:       bsize,
-		buckets:     make(map[int64]model.StatsBucket),
+		buckets:     make(map[int64]model.StatsRawBucket),
 	}
 	sort.Strings(c.aggregators)
 	return &c
@@ -41,7 +41,7 @@ func (c *Concentrator) Add(t processedTrace) {
 		btime := s.End() - s.End()%c.bsize
 		b, ok := c.buckets[btime]
 		if !ok {
-			b = model.NewStatsBucket(btime, c.bsize)
+			b = model.NewStatsRawBucket(btime, c.bsize)
 			c.buckets[btime] = b
 		}
 
@@ -62,7 +62,9 @@ func (c *Concentrator) Flush() []model.StatsBucket {
 	now := model.Now()
 
 	c.mu.Lock()
-	for ts, bucket := range c.buckets {
+	for ts, srb := range c.buckets {
+		bucket := srb.Export()
+
 		// always keep one bucket opened
 		// this is a trade-off: we accept slightly late traces (clock skew and stuff)
 		// but we delay flushing by at most 2 buckets

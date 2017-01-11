@@ -11,8 +11,9 @@ const defaultEnv = "none"
 
 // TestStatsBucket returns a fixed stats bucket to be used in unit tests
 func TestStatsBucket() model.StatsBucket {
-	sb := model.NewStatsBucket(0, 1e9)
-	sb.HandleSpan(TestSpan(), defaultEnv, defaultAggregators, nil)
+	srb := model.NewStatsRawBucket(0, 1e9)
+	srb.HandleSpan(TestSpan(), defaultEnv, defaultAggregators, nil)
+	sb := srb.Export()
 
 	// marshalling then unmarshalling data to:
 	// 1) make a deep copy which prevents unexpected side effects with
@@ -33,11 +34,11 @@ func TestStatsBucket() model.StatsBucket {
 
 // StatsBucketWithSpans returns a stats bucket populated with spans stats
 func StatsBucketWithSpans(s []model.Span) model.StatsBucket {
-	sb := model.NewStatsBucket(0, 1e9)
+	srb := model.NewStatsRawBucket(0, 1e9)
 	for _, s := range s {
-		sb.HandleSpan(s, defaultEnv, defaultAggregators, nil)
+		srb.HandleSpan(s, defaultEnv, defaultAggregators, nil)
 	}
-	return sb
+	return srb.Export()
 }
 
 // RandomStatsBucket returns a bucket made from n random spans, useful to run benchmarks and tests
