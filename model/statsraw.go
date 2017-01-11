@@ -160,7 +160,7 @@ func (sb *StatsRawBucket) HandleSpan(s Span, env string, aggregators []string, s
 	}
 }
 
-func (sb StatsRawBucket) add(s Span, aggr string, tags TagSet) {
+func (sb *StatsRawBucket) add(s Span, aggr string, tags TagSet) {
 	var gs groupedStats
 	var ok bool
 
@@ -183,7 +183,7 @@ func (sb StatsRawBucket) add(s Span, aggr string, tags TagSet) {
 	sb.data[key] = gs
 }
 
-func (sb StatsRawBucket) addSublayer(s Span, aggr string, tags TagSet, sub SublayerValue) {
+func (sb *StatsRawBucket) addSublayer(s Span, aggr string, tags TagSet, sub SublayerValue) {
 	// This is not as efficient as a "regular" add as we don't update
 	// all sublayers at once (one call for HITS, and another one for ERRORS, DURATION...)
 	// when logically, if we have a sublayer for HITS, we also have one for DURATION,
