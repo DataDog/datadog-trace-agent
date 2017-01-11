@@ -12,9 +12,9 @@ import (
 
 type groupedStats struct {
 	tgs                  TagSet
-	hitsCount            int64
-	errorsCount          int64
-	durationCount        int64
+	hits                 int64
+	errors               int64
+	duration             int64
 	durationDistribution *quantile.SliceSummary
 }
 
@@ -68,7 +68,7 @@ func (sb *StatsRawBucket) Export() StatsBucket {
 			Name:    k.name,
 			Measure: HITS,
 			TagSet:  v.tgs,
-			Value:   float64(v.hitsCount),
+			Value:   float64(v.hits),
 		}
 		errorsKey := GrainKey(k.name, ERRORS, k.aggr)
 		ret.Counts[errorsKey] = Count{
@@ -76,7 +76,7 @@ func (sb *StatsRawBucket) Export() StatsBucket {
 			Name:    k.name,
 			Measure: ERRORS,
 			TagSet:  v.tgs,
-			Value:   float64(v.errorsCount),
+			Value:   float64(v.errors),
 		}
 		durationKey := GrainKey(k.name, DURATION, k.aggr)
 		ret.Counts[durationKey] = Count{
@@ -84,7 +84,7 @@ func (sb *StatsRawBucket) Export() StatsBucket {
 			Name:    k.name,
 			Measure: DURATION,
 			TagSet:  v.tgs,
-			Value:   float64(v.durationCount),
+			Value:   float64(v.duration),
 		}
 		ret.Distributions[durationKey] = Distribution{
 			Key:     durationKey,
@@ -169,11 +169,11 @@ func (sb StatsRawBucket) add(s Span, aggr string, tgs TagSet) {
 		gs = newGroupedStats(tgs)
 	}
 
-	gs.hitsCount++
+	gs.hits++
 	if s.Error != 0 {
-		gs.errorsCount++
+		gs.errors++
 	}
-	gs.durationCount += s.Duration
+	gs.duration += s.Duration
 
 	// TODO add for s.Metrics ability to define arbitrary counts and distros, check some config?
 	// alter resolution of duration distro
@@ -204,11 +204,11 @@ func (sb StatsRawBucket) addSublayer(s Span, aggr string, tgs TagSet, sub Sublay
 
 	switch sub.Metric {
 	case HITS:
-		gs.hitsCount += int64(sub.Value)
+		gs.hits += int64(sub.Value)
 	case ERRORS:
-		gs.errorsCount += int64(sub.Value)
+		gs.errors += int64(sub.Value)
 	case DURATION:
-		gs.durationCount += int64(sub.Value)
+		gs.duration += int64(sub.Value)
 	}
 
 	sb.data[key] = gs
