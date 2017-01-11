@@ -11,16 +11,16 @@ import (
 // is that the final data, the one with send after a call to Export(), is correct.
 
 type groupedStats struct {
-	tgs                  TagSet
+	tags                 TagSet
 	hits                 int64
 	errors               int64
 	duration             int64
 	durationDistribution *quantile.SliceSummary
 }
 
-func newGroupedStats(tgs TagSet) groupedStats {
+func newGroupedStats(tags TagSet) groupedStats {
 	return groupedStats{
-		tgs:                  tgs,
+		tags:                 tags,
 		durationDistribution: quantile.NewSliceSummary(),
 	}
 }
@@ -67,7 +67,7 @@ func (sb *StatsRawBucket) Export() StatsBucket {
 			Key:     hitsKey,
 			Name:    k.name,
 			Measure: HITS,
-			TagSet:  v.tgs,
+			TagSet:  v.tags,
 			Value:   float64(v.hits),
 		}
 		errorsKey := GrainKey(k.name, ERRORS, k.aggr)
@@ -75,7 +75,7 @@ func (sb *StatsRawBucket) Export() StatsBucket {
 			Key:     errorsKey,
 			Name:    k.name,
 			Measure: ERRORS,
-			TagSet:  v.tgs,
+			TagSet:  v.tags,
 			Value:   float64(v.errors),
 		}
 		durationKey := GrainKey(k.name, DURATION, k.aggr)
@@ -83,14 +83,14 @@ func (sb *StatsRawBucket) Export() StatsBucket {
 			Key:     durationKey,
 			Name:    k.name,
 			Measure: DURATION,
-			TagSet:  v.tgs,
+			TagSet:  v.tags,
 			Value:   float64(v.duration),
 		}
 		ret.Distributions[durationKey] = Distribution{
 			Key:     durationKey,
 			Name:    k.name,
 			Measure: DURATION,
-			TagSet:  v.tgs,
+			TagSet:  v.tags,
 			Summary: v.durationDistribution,
 		}
 	}
@@ -160,13 +160,13 @@ func (sb *StatsRawBucket) HandleSpan(s Span, env string, aggregators []string, s
 	}
 }
 
-func (sb StatsRawBucket) add(s Span, aggr string, tgs TagSet) {
+func (sb StatsRawBucket) add(s Span, aggr string, tags TagSet) {
 	var gs groupedStats
 	var ok bool
 
 	key := statsKey{name: s.Name, aggr: aggr}
 	if gs, ok = sb.data[key]; !ok {
-		gs = newGroupedStats(tgs)
+		gs = newGroupedStats(tags)
 	}
 
 	gs.hits++
@@ -183,7 +183,7 @@ func (sb StatsRawBucket) add(s Span, aggr string, tgs TagSet) {
 	sb.data[key] = gs
 }
 
-func (sb StatsRawBucket) addSublayer(s Span, aggr string, tgs TagSet, sub SublayerValue) {
+func (sb StatsRawBucket) addSublayer(s Span, aggr string, tags TagSet, sub SublayerValue) {
 	// This is not as efficient as a "regular" add as we don't update
 	// all sublayers at once (one call for HITS, and another one for ERRORS, DURATION...)
 	// when logically, if we have a sublayer for HITS, we also have one for DURATION,
@@ -193,13 +193,13 @@ func (sb StatsRawBucket) addSublayer(s Span, aggr string, tgs TagSet, sub Sublay
 	var ok bool
 
 	subAggr := aggr + "," + sub.Tag.Name + ":" + sub.Tag.Value
-	subTgs := make(TagSet, len(tgs)+1)
-	copy(subTgs, tgs)
-	subTgs[len(tgs)] = sub.Tag
+	subTags := make(TagSet, len(tags)+1)
+	copy(subTags, tags)
+	subTags[len(tags)] = sub.Tag
 
 	key := statsKey{name: s.Name, aggr: subAggr}
 	if gs, ok = sb.data[key]; !ok {
-		gs = newGroupedStats(subTgs)
+		gs = newGroupedStats(subTags)
 	}
 
 	switch sub.Metric {
