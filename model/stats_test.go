@@ -298,6 +298,25 @@ func BenchmarkHandleSpan(b *testing.B) {
 	}
 }
 
+func BenchmarkHandleSpanSublayers(b *testing.B) {
+
+	srb := NewStatsRawBucket(0, 1e9)
+	aggr := []string{}
+
+	tr := testTrace()
+	sublayers := ComputeSublayers(&tr)
+	root := tr.GetRoot()
+	SetSublayersOnSpan(root, sublayers)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		for _, s := range tr {
+			srb.HandleSpan(s, defaultEnv, aggr, &sublayers)
+		}
+	}
+}
+
 // it's important to have these defined as var and not const/inline
 // else compiler performs compile-time optimization when using + with strings
 var grainName = "mysql.query"
