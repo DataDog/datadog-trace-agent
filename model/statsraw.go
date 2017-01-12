@@ -18,6 +18,11 @@ type groupedStats struct {
 	durationDistribution *quantile.SliceSummary
 }
 
+type sublayerStats struct {
+	tags  TagSet
+	value int64
+}
+
 func newGroupedStats(tags TagSet) groupedStats {
 	return groupedStats{
 		tags:                 tags,
@@ -25,9 +30,21 @@ func newGroupedStats(tags TagSet) groupedStats {
 	}
 }
 
+func newSublayerStats(tags TagSet) sublayerStats {
+	return sublayerStats{
+		tags: tags,
+	}
+}
+
 type statsKey struct {
 	name string
 	aggr string
+}
+
+type statsSubKey struct {
+	name    string
+	measure string
+	aggr    string
 }
 
 // StatsRawBucket is used to compute span data and aggregate it
@@ -40,19 +57,21 @@ type StatsRawBucket struct {
 	duration int64 // duration of a bucket in nanoseconds
 
 	// this should really remain private as it's subject to refactoring
-	data map[statsKey]groupedStats
+	data         map[statsKey]groupedStats
+	sublayerData map[statsSubKey]sublayerStats
 
 	// internal buffer for aggregate strings - not threadsafe
 	keyBuf bytes.Buffer
 }
 
 // NewStatsRawBucket opens a new calculation bucket for time ts and initializes it properly
-func NewStatsRawBucket(ts, d int64) StatsRawBucket {
+func NewStatsRawBucket(ts, d int64) *StatsRawBucket {
 	// The only non-initialized value is the Duration which should be set by whoever closes that bucket
-	return StatsRawBucket{
-		start:    ts,
-		duration: d,
-		data:     make(map[statsKey]groupedStats),
+	return &StatsRawBucket{
+		start:        ts,
+		duration:     d,
+		data:         make(map[statsKey]groupedStats),
+		sublayerData: make(map[statsSubKey]sublayerStats),
 	}
 }
 
@@ -92,6 +111,16 @@ func (sb *StatsRawBucket) Export() StatsBucket {
 			Measure: DURATION,
 			TagSet:  v.tags,
 			Summary: v.durationDistribution,
+		}
+	}
+	for k, v := range sb.sublayerData {
+		key := GrainKey(k.name, k.measure, k.aggr)
+		ret.Counts[key] = Count{
+			Key:     key,
+			Name:    k.name,
+			Measure: k.measure,
+			TagSet:  v.tags,
+			Value:   float64(v.value),
 		}
 	}
 	return ret
@@ -160,7 +189,7 @@ func (sb *StatsRawBucket) HandleSpan(s Span, env string, aggregators []string, s
 	}
 }
 
-func (sb StatsRawBucket) add(s Span, aggr string, tags TagSet) {
+func (sb *StatsRawBucket) add(s Span, aggr string, tags TagSet) {
 	var gs groupedStats
 	var ok bool
 
@@ -183,13 +212,13 @@ func (sb StatsRawBucket) add(s Span, aggr string, tags TagSet) {
 	sb.data[key] = gs
 }
 
-func (sb StatsRawBucket) addSublayer(s Span, aggr string, tags TagSet, sub SublayerValue) {
+func (sb *StatsRawBucket) addSublayer(s Span, aggr string, tags TagSet, sub SublayerValue) {
 	// This is not as efficient as a "regular" add as we don't update
 	// all sublayers at once (one call for HITS, and another one for ERRORS, DURATION...)
 	// when logically, if we have a sublayer for HITS, we also have one for DURATION,
 	// they should indeed come together. Still room for improvement here.
 
-	var gs groupedStats
+	var ss sublayerStats
 	var ok bool
 
 	subAggr := aggr + "," + sub.Tag.Name + ":" + sub.Tag.Value
@@ -197,21 +226,14 @@ func (sb StatsRawBucket) addSublayer(s Span, aggr string, tags TagSet, sub Subla
 	copy(subTags, tags)
 	subTags[len(tags)] = sub.Tag
 
-	key := statsKey{name: s.Name, aggr: subAggr}
-	if gs, ok = sb.data[key]; !ok {
-		gs = newGroupedStats(subTags)
+	key := statsSubKey{name: s.Name, measure: sub.Metric, aggr: subAggr}
+	if ss, ok = sb.sublayerData[key]; !ok {
+		ss = newSublayerStats(tags)
 	}
 
-	switch sub.Metric {
-	case HITS:
-		gs.hits += int64(sub.Value)
-	case ERRORS:
-		gs.errors += int64(sub.Value)
-	case DURATION:
-		gs.duration += int64(sub.Value)
-	}
+	ss.value += int64(sub.Value)
 
-	sb.data[key] = gs
+	sb.sublayerData[key] = ss
 }
 
 // 10 bits precision (any value will be +/- 1/1024)

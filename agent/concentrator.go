@@ -18,7 +18,7 @@ type Concentrator struct {
 	aggregators []string
 	bsize       int64
 
-	buckets map[int64]model.StatsRawBucket // buckets used to aggregate stats per timestamp
+	buckets map[int64]*model.StatsRawBucket // buckets used to aggregate stats per timestamp
 	mu      sync.Mutex
 }
 
@@ -27,7 +27,7 @@ func NewConcentrator(aggregators []string, bsize int64) *Concentrator {
 	c := Concentrator{
 		aggregators: aggregators,
 		bsize:       bsize,
-		buckets:     make(map[int64]model.StatsRawBucket),
+		buckets:     make(map[int64]*model.StatsRawBucket),
 	}
 	sort.Strings(c.aggregators)
 	return &c
