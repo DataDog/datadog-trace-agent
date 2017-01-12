@@ -62,6 +62,7 @@ func (a *Agent) Run() {
 
 	a.Receiver.Run()
 	a.Writer.Run()
+	a.Sampler.Run()
 
 	for {
 		select {
@@ -87,12 +88,13 @@ func (a *Agent) Run() {
 
 			a.Writer.inPayloads <- p
 		case <-a.exit:
-			log.Info("exiting")
-			close(a.Receiver.exit)
-			close(a.Writer.exit)
-			return
+			break
 		}
 	}
+	log.Info("exiting")
+	close(a.Receiver.exit)
+	close(a.Writer.exit)
+	a.Sampler.Stop()
 }
 
 // Process is the default work unit that receives a trace, transforms it and
