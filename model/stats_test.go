@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/quantile"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -36,7 +37,7 @@ func testTrace() Trace {
 		Span{TraceID: 42, SpanID: 42, ParentID: 0, Service: "A", Name: "A.foo", Type: "web", Resource: "α", Start: 0, Duration: 100},
 		Span{TraceID: 42, SpanID: 100, ParentID: 42, Service: "B", Name: "B.bar", Type: "web", Resource: "α", Start: 1, Duration: 20},
 		Span{TraceID: 42, SpanID: 2000, ParentID: 100, Service: "C", Name: "sql.query", Type: "sql", Resource: "SELECT value FROM table", Start: 2, Duration: 5},
-		Span{TraceID: 42, SpanID: 3000, ParentID: 100, Service: "C", Name: "sql.query", Type: "sql", Resource: "SELECT ololololo... value FROM Table", Start: 10, Duration: 3, Error: 1},
+		Span{TraceID: 42, SpanID: 3000, ParentID: 100, Service: "C", Name: "sql.query", Type: "sql", Resource: "SELECT ololololo... value FROM table", Start: 10, Duration: 3, Error: 1},
 	}
 }
 
@@ -212,23 +213,23 @@ func TestStatsBucketSublayers(t *testing.T) {
 		"B.bar|duration|env:default,resource:α,service:B":                                                                                 20,
 		"B.bar|errors|env:default,resource:α,service:B":                                                                                   0,
 		"B.bar|hits|env:default,resource:α,service:B":                                                                                     1,
-		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT ololololo... value FROM Table,service:C,sublayer_service:A": 80,
-		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT ololololo... value FROM Table,service:C,sublayer_service:B": 12,
-		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT ololololo... value FROM Table,service:C,sublayer_service:C": 8,
+		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT ololololo... value FROM table,service:C,sublayer_service:A": 80,
+		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT ololololo... value FROM table,service:C,sublayer_service:B": 12,
+		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT ololololo... value FROM table,service:C,sublayer_service:C": 8,
 		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT value FROM table,service:C,sublayer_service:A":              80,
 		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT value FROM table,service:C,sublayer_service:B":              12,
 		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT value FROM table,service:C,sublayer_service:C":              8,
-		"sql.query|_sublayers.duration.by_type|env:default,resource:SELECT ololololo... value FROM Table,service:C,sublayer_type:sql":     8,
-		"sql.query|_sublayers.duration.by_type|env:default,resource:SELECT ololololo... value FROM Table,service:C,sublayer_type:web":     92,
+		"sql.query|_sublayers.duration.by_type|env:default,resource:SELECT ololololo... value FROM table,service:C,sublayer_type:sql":     8,
+		"sql.query|_sublayers.duration.by_type|env:default,resource:SELECT ololololo... value FROM table,service:C,sublayer_type:web":     92,
 		"sql.query|_sublayers.duration.by_type|env:default,resource:SELECT value FROM table,service:C,sublayer_type:sql":                  8,
 		"sql.query|_sublayers.duration.by_type|env:default,resource:SELECT value FROM table,service:C,sublayer_type:web":                  92,
-		"sql.query|_sublayers.span_count|env:default,resource:SELECT ololololo... value FROM Table,service:C,:":                           4,
+		"sql.query|_sublayers.span_count|env:default,resource:SELECT ololololo... value FROM table,service:C,:":                           4,
 		"sql.query|_sublayers.span_count|env:default,resource:SELECT value FROM table,service:C,:":                                        4,
-		"sql.query|duration|env:default,resource:SELECT ololololo... value FROM Table,service:C":                                          3,
+		"sql.query|duration|env:default,resource:SELECT ololololo... value FROM table,service:C":                                          3,
 		"sql.query|duration|env:default,resource:SELECT value FROM table,service:C":                                                       5,
-		"sql.query|errors|env:default,resource:SELECT ololololo... value FROM Table,service:C":                                            1,
+		"sql.query|errors|env:default,resource:SELECT ololololo... value FROM table,service:C":                                            1,
 		"sql.query|errors|env:default,resource:SELECT value FROM table,service:C":                                                         0,
-		"sql.query|hits|env:default,resource:SELECT ololololo... value FROM Table,service:C":                                              1,
+		"sql.query|hits|env:default,resource:SELECT ololololo... value FROM table,service:C":                                              1,
 		"sql.query|hits|env:default,resource:SELECT value FROM table,service:C":                                                           1,
 	}
 
@@ -239,6 +240,22 @@ func TestStatsBucketSublayers(t *testing.T) {
 			assert.Fail("Unexpected count %s", ckey)
 		}
 		assert.Equal(val, c.Value, "Count %s wrong value", ckey)
+	}
+
+	expectedDistributions := map[string][]quantile.Entry{
+		"A.foo|duration|env:default,resource:α,service:A":                                        []quantile.Entry{quantile.Entry{V: 100, G: 1, Delta: 0, Samples: []uint64{42}}},
+		"B.bar|duration|env:default,resource:α,service:B":                                        []quantile.Entry{quantile.Entry{V: 20, G: 1, Delta: 0, Samples: []uint64{100}}},
+		"sql.query|duration|env:default,resource:SELECT value FROM table,service:C":              []quantile.Entry{quantile.Entry{V: 5, G: 1, Delta: 0, Samples: []uint64{2000}}},
+		"sql.query|duration|env:default,resource:SELECT ololololo... value FROM table,service:C": []quantile.Entry{quantile.Entry{V: 3, G: 1, Delta: 0, Samples: []uint64{3000}}},
+	}
+
+	assert.Len(sb.Distributions, len(expectedDistributions), "Missing distributions!")
+	for dkey, c := range sb.Distributions {
+		val, ok := expectedDistributions[dkey]
+		if !ok {
+			assert.Fail("Unexpected distribution %s", dkey)
+		}
+		assert.Equal(val, c.Summary.Entries, "Distribution %s wrong value", dkey)
 	}
 }
 
