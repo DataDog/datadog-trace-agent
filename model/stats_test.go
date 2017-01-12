@@ -13,15 +13,31 @@ import (
 
 const defaultEnv = "default"
 
-var testSpans = []Span{
-	Span{Service: "A", Name: "A.foo", Resource: "α", Duration: 1},
-	Span{Service: "A", Name: "A.foo", Resource: "β", Duration: 2, Error: 1},
-	Span{Service: "B", Name: "B.foo", Resource: "γ", Duration: 3},
-	Span{Service: "B", Name: "B.foo", Resource: "ε", Duration: 4, Error: 404},
-	Span{Service: "B", Name: "B.foo", Resource: "ζ", Duration: 5, Meta: map[string]string{"version": "1.3"}},
-	Span{Service: "B", Name: "sql.query", Resource: "ζ", Duration: 6, Meta: map[string]string{"version": "1.4"}},
-	Span{Service: "C", Name: "sql.query", Resource: "δ", Duration: 7},
-	Span{Service: "C", Name: "sql.query", Resource: "δ", Duration: 8},
+func testSpans() []Span {
+	return []Span{
+		Span{Service: "A", Name: "A.foo", Resource: "α", Duration: 1},
+		Span{Service: "A", Name: "A.foo", Resource: "β", Duration: 2, Error: 1},
+		Span{Service: "B", Name: "B.foo", Resource: "γ", Duration: 3},
+		Span{Service: "B", Name: "B.foo", Resource: "ε", Duration: 4, Error: 404},
+		Span{Service: "B", Name: "B.foo", Resource: "ζ", Duration: 5, Meta: map[string]string{"version": "1.3"}},
+		Span{Service: "B", Name: "sql.query", Resource: "ζ", Duration: 6, Meta: map[string]string{"version": "1.4"}},
+		Span{Service: "C", Name: "sql.query", Resource: "δ", Duration: 7},
+		Span{Service: "C", Name: "sql.query", Resource: "δ", Duration: 8},
+	}
+}
+
+func testTrace() Trace {
+	// Data below represents a trace with some sublayers, so that we make sure,
+	// those data are correctly calculated when aggregating in HandleSpan()
+	// A |---------------------------------------------------------------| duration: 100
+	// B   |----------------------|                                        duration: 20
+	// C     |-----| |---|                                                 duration: 5+3
+	return Trace{
+		Span{TraceID: 42, SpanID: 42, ParentID: 0, Service: "A", Name: "A.foo", Type: "web", Resource: "α", Start: 0, Duration: 100},
+		Span{TraceID: 42, SpanID: 100, ParentID: 42, Service: "B", Name: "B.bar", Type: "web", Resource: "α", Start: 1, Duration: 20},
+		Span{TraceID: 42, SpanID: 2000, ParentID: 100, Service: "C", Name: "sql.query", Type: "sql", Resource: "SELECT value FROM table", Start: 2, Duration: 5},
+		Span{TraceID: 42, SpanID: 3000, ParentID: 100, Service: "C", Name: "sql.query", Type: "sql", Resource: "SELECT ololololo... value FROM Table", Start: 10, Duration: 3, Error: 1},
+	}
 }
 
 func TestGrainKey(t *testing.T) {
@@ -37,7 +53,7 @@ func TestStatsBucketDefault(t *testing.T) {
 
 	// No custom aggregators only the defaults
 	aggr := []string{}
-	for _, s := range testSpans {
+	for _, s := range testSpans() {
 		srb.HandleSpan(s, defaultEnv, aggr, nil)
 	}
 	sb := srb.Export()
@@ -83,7 +99,7 @@ func TestStatsBucketExtraAggregators(t *testing.T) {
 
 	// one custom aggregator
 	aggr := []string{"version"}
-	for _, s := range testSpans {
+	for _, s := range testSpans() {
 		srb.HandleSpan(s, defaultEnv, aggr, nil)
 	}
 	sb := srb.Export()
@@ -158,6 +174,74 @@ func TestStatsBucketMany(t *testing.T) {
 	}
 }
 
+func TestStatsBucketSublayers(t *testing.T) {
+	assert := assert.New(t)
+
+	tr := testTrace()
+	sublayers := ComputeSublayers(&tr)
+	root := tr.GetRoot()
+	SetSublayersOnSpan(root, sublayers)
+
+	assert.NotNil(sublayers)
+
+	srb := NewStatsRawBucket(0, 1e9)
+
+	// No custom aggregators only the defaults
+	aggr := []string{}
+	for _, s := range tr {
+		srb.HandleSpan(s, defaultEnv, aggr, &sublayers)
+	}
+	sb := srb.Export()
+
+	expectedCounts := map[string]int64{
+		"A.foo|_sublayers.duration.by_service|env:default,resource:α,service:A,sublayer_service:A":                                        80,
+		"A.foo|_sublayers.duration.by_service|env:default,resource:α,service:A,sublayer_service:B":                                        12,
+		"A.foo|_sublayers.duration.by_service|env:default,resource:α,service:A,sublayer_service:C":                                        8,
+		"A.foo|_sublayers.duration.by_type|env:default,resource:α,service:A,sublayer_type:sql":                                            8,
+		"A.foo|_sublayers.duration.by_type|env:default,resource:α,service:A,sublayer_type:web":                                            92,
+		"A.foo|_sublayers.span_count|env:default,resource:α,service:A,:":                                                                  4,
+		"A.foo|duration|env:default,resource:α,service:A":                                                                                 100,
+		"A.foo|errors|env:default,resource:α,service:A":                                                                                   0,
+		"A.foo|hits|env:default,resource:α,service:A":                                                                                     1,
+		"B.bar|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:A":                                        80,
+		"B.bar|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:B":                                        12,
+		"B.bar|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:C":                                        8,
+		"B.bar|_sublayers.duration.by_type|env:default,resource:α,service:B,sublayer_type:sql":                                            8,
+		"B.bar|_sublayers.duration.by_type|env:default,resource:α,service:B,sublayer_type:web":                                            92,
+		"B.bar|_sublayers.span_count|env:default,resource:α,service:B,:":                                                                  4,
+		"B.bar|duration|env:default,resource:α,service:B":                                                                                 20,
+		"B.bar|errors|env:default,resource:α,service:B":                                                                                   0,
+		"B.bar|hits|env:default,resource:α,service:B":                                                                                     1,
+		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT ololololo... value FROM Table,service:C,sublayer_service:A": 80,
+		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT ololololo... value FROM Table,service:C,sublayer_service:B": 12,
+		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT ololololo... value FROM Table,service:C,sublayer_service:C": 8,
+		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT value FROM table,service:C,sublayer_service:A":              80,
+		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT value FROM table,service:C,sublayer_service:B":              12,
+		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT value FROM table,service:C,sublayer_service:C":              8,
+		"sql.query|_sublayers.duration.by_type|env:default,resource:SELECT ololololo... value FROM Table,service:C,sublayer_type:sql":     8,
+		"sql.query|_sublayers.duration.by_type|env:default,resource:SELECT ololololo... value FROM Table,service:C,sublayer_type:web":     92,
+		"sql.query|_sublayers.duration.by_type|env:default,resource:SELECT value FROM table,service:C,sublayer_type:sql":                  8,
+		"sql.query|_sublayers.duration.by_type|env:default,resource:SELECT value FROM table,service:C,sublayer_type:web":                  92,
+		"sql.query|_sublayers.span_count|env:default,resource:SELECT ololololo... value FROM Table,service:C,:":                           4,
+		"sql.query|_sublayers.span_count|env:default,resource:SELECT value FROM table,service:C,:":                                        4,
+		"sql.query|duration|env:default,resource:SELECT ololololo... value FROM Table,service:C":                                          3,
+		"sql.query|duration|env:default,resource:SELECT value FROM table,service:C":                                                       5,
+		"sql.query|errors|env:default,resource:SELECT ololololo... value FROM Table,service:C":                                            1,
+		"sql.query|errors|env:default,resource:SELECT value FROM table,service:C":                                                         0,
+		"sql.query|hits|env:default,resource:SELECT ololololo... value FROM Table,service:C":                                              1,
+		"sql.query|hits|env:default,resource:SELECT value FROM table,service:C":                                                           1,
+	}
+
+	assert.Len(sb.Counts, len(expectedCounts), "Missing counts!")
+	for ckey, c := range sb.Counts {
+		val, ok := expectedCounts[ckey]
+		if !ok {
+			assert.Fail("Unexpected count %s", ckey)
+		}
+		assert.Equal(val, c.Value, "Count %s wrong value", ckey)
+	}
+}
+
 func TestTsRounding(t *testing.T) {
 	assert := assert.New(t)
 
@@ -191,7 +275,7 @@ func BenchmarkHandleSpan(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		for _, s := range testSpans {
+		for _, s := range testSpans() {
 			srb.HandleSpan(s, defaultEnv, aggr, nil)
 		}
 	}
