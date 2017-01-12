@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/profile"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	log "github.com/cihub/seelog"
 )
@@ -37,6 +39,20 @@ const (
 	// Services: msgpack/JSON, map[string]map[string][string]
 	v03
 )
+
+var receiverTags []string
+
+func init() {
+	if Version != "" {
+		receiverTags = append(receiverTags, "version:"+Version)
+	}
+	if GoVersion != "" {
+		receiverTags = append(receiverTags, "go_version:"+GoVersion)
+	}
+	if GitCommit != "" {
+		receiverTags = append(receiverTags, "git_commit:"+GitCommit)
+	}
+}
 
 func httpHandleWithVersion(v APIVersion, f func(APIVersion, http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -122,6 +138,7 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 
 	var traces model.Traces
 	contentType := req.Header.Get("Content-Type")
+	contentLength := req.Header.Get("Content-Length")
 
 	switch v {
 	case v01:
@@ -183,6 +200,12 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 	}
 
 	HTTPOK(w)
+
+	atomic.AddInt64(&r.stats.PayloadsReceived, 1)
+	l, err := strconv.Atoi(contentLength)
+	if err == nil {
+		atomic.AddInt64(&r.stats.BytesReceived, int64(l))
+	}
 
 	// normalize data
 	for i := range traces {
@@ -268,6 +291,12 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 func (r *HTTPReceiver) logStats() {
 	for range time.Tick(60 * time.Second) {
 		// Load counters and reset them for the next flush
+		payloads := atomic.LoadInt64(&r.stats.PayloadsReceived)
+		r.stats.PayloadsReceived = 0
+
+		bytes := atomic.LoadInt64(&r.stats.BytesReceived)
+		r.stats.BytesReceived = 0
+
 		spans := atomic.LoadInt64(&r.stats.SpansReceived)
 		r.stats.SpansReceived = 0
 
@@ -280,10 +309,20 @@ func (r *HTTPReceiver) logStats() {
 		tdropped := atomic.LoadInt64(&r.stats.TracesDropped)
 		r.stats.TracesDropped = 0
 
-		statsd.Client.Count("trace_agent.receiver.span", spans, nil, 1)
-		statsd.Client.Count("trace_agent.receiver.trace", traces, nil, 1)
-		statsd.Client.Count("trace_agent.receiver.span_dropped", sdropped, nil, 1)
-		statsd.Client.Count("trace_agent.receiver.trace_dropped", tdropped, nil, 1)
+		statsd.Client.Count("trace_agent.receiver.payload", payloads, receiverTags, 1)
+		statsd.Client.Count("trace_agent.receiver.byte", bytes, receiverTags, 1)
+		statsd.Client.Count("trace_agent.receiver.span", spans, receiverTags, 1)
+		statsd.Client.Count("trace_agent.receiver.trace", traces, receiverTags, 1)
+		statsd.Client.Count("trace_agent.receiver.span_dropped", sdropped, receiverTags, 1)
+		statsd.Client.Count("trace_agent.receiver.trace_dropped", tdropped, receiverTags, 1)
+
+		profile.CPUStatsd(profile.IntakeStats{
+			Payloads: payloads,
+			Traces:   traces - tdropped,
+			Spans:    spans - tdropped,
+			Bytes:    bytes,
+		}, receiverTags)
+		profile.MemStatsd(receiverTags)
 
 		log.Infof("receiver handled %d spans, dropped %d ; handled %d traces, dropped %d", spans, sdropped, traces, tdropped)
 		r.logger.Reset()
@@ -291,8 +330,10 @@ func (r *HTTPReceiver) logStats() {
 }
 
 type receiverStats struct {
-	SpansReceived  int64
-	TracesReceived int64
-	SpansDropped   int64
-	TracesDropped  int64
+	PayloadsReceived int64
+	BytesReceived    int64
+	SpansReceived    int64
+	TracesReceived   int64
+	SpansDropped     int64
+	TracesDropped    int64
 }
