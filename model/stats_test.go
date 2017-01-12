@@ -91,6 +91,28 @@ func TestStatsBucketDefault(t *testing.T) {
 		}
 		assert.Equal(val, c.Value, "Count %s wrong value", ckey)
 	}
+
+	expectedDistributions := map[string]int{
+		"A.foo|duration|env:default,resource:α,service:A":     1,
+		"A.foo|duration|env:default,resource:β,service:A":     1,
+		"B.foo|duration|env:default,resource:γ,service:B":     1,
+		"B.foo|duration|env:default,resource:ε,service:B":     1,
+		"B.foo|duration|env:default,resource:ζ,service:B":     1,
+		"sql.query|duration|env:default,resource:ζ,service:B": 1,
+		"sql.query|duration|env:default,resource:δ,service:C": 2,
+	}
+
+	for k, v := range sb.Distributions {
+		t.Logf("%v: %v", k, v.Summary.Entries)
+	}
+	assert.Len(sb.Distributions, len(expectedDistributions), "Missing distributions!")
+	for dkey, c := range sb.Distributions {
+		val, ok := expectedDistributions[dkey]
+		if !ok {
+			assert.Fail("Unexpected distribution %s", dkey)
+		}
+		assert.Equal(val, len(c.Summary.Entries), "Distribution %s wrong value", dkey)
+	}
 }
 
 func TestStatsBucketExtraAggregators(t *testing.T) {
