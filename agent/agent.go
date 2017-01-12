@@ -88,13 +88,12 @@ func (a *Agent) Run() {
 
 			a.Writer.inPayloads <- p
 		case <-a.exit:
-			break
+			log.Info("exiting")
+			close(a.Receiver.exit)
+			close(a.Writer.exit)
+			a.Sampler.Stop()
 		}
 	}
-	log.Info("exiting")
-	close(a.Receiver.exit)
-	close(a.Writer.exit)
-	a.Sampler.Stop()
 }
 
 // Process is the default work unit that receives a trace, transforms it and
