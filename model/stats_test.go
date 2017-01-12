@@ -3,6 +3,7 @@ package model
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -118,6 +119,42 @@ func TestStatsBucketExtraAggregators(t *testing.T) {
 			assert.Fail("Unexpected count %s", ckey)
 		}
 		assert.Equal(val, c.Value, "Count %s wrong value", ckey)
+	}
+}
+
+func TestStatsBucketMany(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+
+	assert := assert.New(t)
+
+	templateSpan := Span{Service: "A", Name: "A.foo", Resource: "α", Duration: 7}
+	const n = 100000
+
+	srb := NewStatsRawBucket(0, 1e9)
+
+	// No custom aggregators only the defaults
+	aggr := []string{}
+	for i := 0; i < n; i++ {
+		s := templateSpan
+		s.Resource = "α" + strconv.Itoa(i)
+		srbCopy := *srb
+		srbCopy.HandleSpan(s, defaultEnv, aggr, nil)
+	}
+	sb := srb.Export()
+
+	assert.Len(sb.Counts, 3*n, "Missing counts %d != %d", len(sb.Counts), 3*n)
+	for ckey, c := range sb.Counts {
+		if strings.Contains(ckey, "|duration|") {
+			assert.Equal(7, c.Value, "duration %s wrong value", ckey)
+		}
+		if strings.Contains(ckey, "|errors|") {
+			assert.Equal(0, c.Value, "errors %s wrong value", ckey)
+		}
+		if strings.Contains(ckey, "|hits|") {
+			assert.Equal(1, c.Value, "hits %s wrong value", ckey)
+		}
 	}
 }
 
