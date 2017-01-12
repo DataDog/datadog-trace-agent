@@ -228,7 +228,7 @@ func (sb *StatsRawBucket) addSublayer(s Span, aggr string, tags TagSet, sub Subl
 
 	key := statsSubKey{name: s.Name, measure: sub.Metric, aggr: subAggr}
 	if ss, ok = sb.sublayerData[key]; !ok {
-		ss = newSublayerStats(tags)
+		ss = newSublayerStats(subTags)
 	}
 
 	ss.value += int64(sub.Value)

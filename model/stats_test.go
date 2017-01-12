@@ -158,6 +158,9 @@ func TestStatsBucketExtraAggregators(t *testing.T) {
 			assert.Fail("Unexpected count %s", ckey)
 		}
 		assert.Equal(val, c.Value, "Count %s wrong value", ckey)
+		keyFields := strings.Split(ckey, "|")
+		tags := NewTagSetFromString(keyFields[2])
+		assert.Equal(tags, c.TagSet, "bad tagset for count %s", ckey)
 	}
 }
 
@@ -262,6 +265,9 @@ func TestStatsBucketSublayers(t *testing.T) {
 			assert.Fail("Unexpected count %s", ckey)
 		}
 		assert.Equal(val, c.Value, "Count %s wrong value", ckey)
+		keyFields := strings.Split(ckey, "|")
+		tags := NewTagSetFromString(keyFields[2])
+		assert.Equal(tags, c.TagSet, "bad tagset for count %s", ckey)
 	}
 
 	expectedDistributions := map[string][]quantile.Entry{
@@ -272,12 +278,15 @@ func TestStatsBucketSublayers(t *testing.T) {
 	}
 
 	assert.Len(sb.Distributions, len(expectedDistributions), "Missing distributions!")
-	for dkey, c := range sb.Distributions {
+	for dkey, d := range sb.Distributions {
 		val, ok := expectedDistributions[dkey]
 		if !ok {
 			assert.Fail("Unexpected distribution %s", dkey)
 		}
-		assert.Equal(val, c.Summary.Entries, "Distribution %s wrong value", dkey)
+		assert.Equal(val, d.Summary.Entries, "Distribution %s wrong value", dkey)
+		keyFields := strings.Split(dkey, "|")
+		tags := NewTagSetFromString(keyFields[2])
+		assert.Equal(tags, d.TagSet, "bad tagset for distribution %s", dkey)
 	}
 }
 
