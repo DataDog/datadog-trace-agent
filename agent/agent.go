@@ -62,6 +62,7 @@ func (a *Agent) Run() {
 
 	a.Receiver.Run()
 	a.Writer.Run()
+	a.Sampler.Run()
 
 	for {
 		select {
@@ -90,7 +91,7 @@ func (a *Agent) Run() {
 			log.Info("exiting")
 			close(a.Receiver.exit)
 			close(a.Writer.exit)
-			return
+			a.Sampler.Stop()
 		}
 	}
 }
