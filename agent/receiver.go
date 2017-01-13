@@ -285,7 +285,10 @@ func (r *HTTPReceiver) logStats() {
 		statsd.Client.Count("trace_agent.receiver.span_dropped", sdropped, nil, 1)
 		statsd.Client.Count("trace_agent.receiver.trace_dropped", tdropped, nil, 1)
 
-		log.Infof("receiver handled %d spans, dropped %d ; handled %d traces, dropped %d", spans, sdropped, traces, tdropped)
+		if opts.debug || spans > 0 || sdropped > 0 || traces > 0 || tdropped > 0 {
+			log.Infof("receiver handled %d spans, dropped %d ; handled %d traces, dropped %d",
+				spans, sdropped, traces, tdropped)
+		}
 		r.logger.Reset()
 	}
 }
