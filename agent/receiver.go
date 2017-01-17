@@ -280,6 +280,8 @@ func (r *HTTPReceiver) logStats() {
 		tdropped := atomic.LoadInt64(&r.stats.TracesDropped)
 		r.stats.TracesDropped = 0
 
+		statsd.Client.Gauge("trace_agent.heartbeat", 1, []string{fmt.Sprintf("version:%s", Version)}, 1)
+
 		statsd.Client.Count("trace_agent.receiver.span", spans, nil, 1)
 		statsd.Client.Count("trace_agent.receiver.trace", traces, nil, 1)
 		statsd.Client.Count("trace_agent.receiver.span_dropped", sdropped, nil, 1)
