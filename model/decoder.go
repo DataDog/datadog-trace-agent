@@ -120,6 +120,36 @@ func parseInt64(dc *msgp.Reader) (int64, error) {
 	}
 }
 
+// parseUint64 parses an uint64 even if the sent value is an int64;
+// this is required because the language used for the encoding library
+// may not have unsigned types. An example is early version of Java
+// (and so JRuby interpreter) that encodes uint64 as int64:
+// http://docs.oracle.com/javase/tutorial/java/nutsandbolts/datatypes.html
+func parseUint64(dc *msgp.Reader) (uint64, error) {
+	// read the generic representation type without decoding
+	t, err := dc.NextType()
+	if err != nil {
+		return 0, err
+	}
+
+	switch t {
+	case msgp.UintType:
+		u, err := dc.ReadUint64()
+		if err != nil {
+			return 0, err
+		}
+		return u, err
+	case msgp.IntType:
+		i, err := dc.ReadInt64()
+		if err != nil {
+			return 0, err
+		}
+		return uint64(i), nil
+	default:
+		return 0, msgp.TypeError{Encoded: t, Method: msgp.IntType}
+	}
+}
+
 // cast to int32 values that are int32 but that are sent in uint32
 // over the wire. Set to 0 if they overflow the MaxInt32 size. This
 // cast should be used ONLY while decoding int32 values that are

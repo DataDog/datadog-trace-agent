@@ -57,7 +57,7 @@ func (z *Span) DecodeMsg(dc *msgp.Reader) (err error) {
 				break
 			}
 
-			z.TraceID, err = dc.ReadUint64()
+			z.TraceID, err = parseUint64(dc)
 			if err != nil {
 				return
 			}
@@ -67,7 +67,7 @@ func (z *Span) DecodeMsg(dc *msgp.Reader) (err error) {
 				break
 			}
 
-			z.SpanID, err = dc.ReadUint64()
+			z.SpanID, err = parseUint64(dc)
 			if err != nil {
 				return
 			}
@@ -171,7 +171,7 @@ func (z *Span) DecodeMsg(dc *msgp.Reader) (err error) {
 				break
 			}
 
-			z.ParentID, err = dc.ReadUint64()
+			z.ParentID, err = parseUint64(dc)
 			if err != nil {
 				return
 			}
