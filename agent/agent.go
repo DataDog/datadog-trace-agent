@@ -90,8 +90,9 @@ func (a *Agent) Run() {
 		case <-a.exit:
 			log.Info("exiting")
 			close(a.Receiver.exit)
-			close(a.Writer.exit)
+			a.Writer.Stop()
 			a.Sampler.Stop()
+			return
 		}
 	}
 }
