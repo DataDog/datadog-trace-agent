@@ -21,10 +21,14 @@ var redisCompoundCommandSet = map[string]bool{
 func QuantizeRedis(span model.Span) model.Span {
 	query := compactWhitespaces(span.Resource)
 
-	lines := []string{}
-	for len(query) > 0 {
+	var resource bytes.Buffer
+	truncated := false
+	nbCmds := 0
+
+	for len(query) > 0 && nbCmds < maxRedisNbCommands {
 		var rawLine string
 
+		// Read the next command
 		idx := strings.IndexByte(query, '\n')
 		if idx == -1 {
 			rawLine = query
@@ -34,74 +38,39 @@ func QuantizeRedis(span model.Span) model.Span {
 			query = query[idx+1:]
 		}
 
-		if line := strings.Trim(rawLine, " "); len(line) > 0 {
-			lines = append(lines, string(line))
+		line := strings.Trim(rawLine, " ")
+		if len(line) == 0 {
+			continue
 		}
-	}
 
-	isArgTruncated := func(arg string) bool {
-		return strings.HasSuffix(arg, redisTruncationMark)
-	}
-
-	readLine := func(line string) string {
+		// Parse arguments
 		args := strings.SplitN(line, " ", 3)
 
-		// Ignore truncated commands
-		if isArgTruncated(args[0]) {
-			return ""
+		if strings.HasSuffix(args[0], redisTruncationMark) {
+			truncated = true
+			continue
 		}
 
 		command := strings.ToUpper(args[0])
 
 		if redisCompoundCommandSet[command] {
-			if isArgTruncated(args[1]) {
-				return ""
+			if strings.HasSuffix(args[1], redisTruncationMark) {
+				truncated = true
+				continue
 			}
 
 			command += " " + strings.ToUpper(args[1])
 		}
 
-		return command
+		// Write the command representation
+		resource.WriteByte(' ')
+		resource.WriteString(command)
+
+		nbCmds++
+		truncated = false
 	}
 
-	var resource bytes.Buffer
-	var prevCmd string
-
-	multipleCmds := false
-	nbCmds := 0
-	truncatedLastLine := false
-
-	for i, line := range lines {
-		cmd := readLine(line)
-		if cmd == "" {
-			if i == len(lines)-1 {
-				truncatedLastLine = true
-			}
-			continue
-		}
-
-		if cmd == prevCmd {
-			if !multipleCmds {
-				resource.WriteByte('*')
-			}
-
-			multipleCmds = true
-		} else {
-			resource.WriteByte(' ')
-			resource.WriteString(cmd)
-
-			nbCmds++
-			if nbCmds == maxRedisNbCommands {
-				break
-			}
-
-			multipleCmds = false
-		}
-
-		prevCmd = cmd
-	}
-
-	if nbCmds == maxRedisNbCommands || truncatedLastLine {
+	if nbCmds == maxRedisNbCommands || truncated {
 		resource.WriteString(" ...")
 	}
 
