@@ -5,7 +5,6 @@ import (
 
 	"github.com/DataDog/datadog-trace-agent/fixtures"
 	"github.com/DataDog/datadog-trace-agent/model"
-	// "github.com/stretchr/testify/assert"
 )
 
 func newBenchPayload(traces, spans, stats int) model.AgentPayload {
@@ -33,13 +32,11 @@ func newBenchPayload(traces, spans, stats int) model.AgentPayload {
 
 func BenchmarkEncodeAgentPayload(b *testing.B) {
 	payload := newBenchPayload(10, 1000, 100)
-	var err error
 
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_, err = model.EncodeAgentPayload(payload)
-		if err != nil {
+		if _, err := model.EncodeAgentPayload(payload); err != nil {
 			b.Fatalf("error encoding payload: %v", b)
 		}
 	}

@@ -47,7 +47,10 @@ func EncodeAgentPayload(p AgentPayload) ([]byte, error) {
 
 	switch GlobalAgentPayloadVersion {
 	case AgentPayloadV01:
-		gz := gzip.NewWriter(&b)
+		gz, err := gzip.NewWriterLevel(&b, gzip.BestSpeed)
+		if err != nil {
+			return nil, err
+		}
 		err = json.NewEncoder(gz).Encode(p)
 		gz.Close()
 	default:
