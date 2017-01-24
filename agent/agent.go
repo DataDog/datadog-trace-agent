@@ -2,6 +2,7 @@ package main
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/config"
@@ -101,6 +102,8 @@ func (a *Agent) Run() {
 // passes it downstream
 func (a *Agent) Process(t model.Trace) {
 	if len(t) == 0 {
+		// XXX Should never happen since we reject empty traces during
+		// normalization.
 		log.Debugf("skipping received empty trace")
 		return
 	}
@@ -111,6 +114,8 @@ func (a *Agent) Process(t model.Trace) {
 
 	if root.End() < model.Now()-2*a.conf.BucketInterval.Nanoseconds() {
 		log.Debugf("skipping trace with root too far in past, root:%v", *root)
+		atomic.AddInt64(&a.Receiver.stats.TracesDropped, 1)
+		atomic.AddInt64(&a.Receiver.stats.SpansDropped, int64(len(t)))
 		return
 	}
 
