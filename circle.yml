@@ -22,3 +22,7 @@ dependencies:
 test:
   override:
     - rake ci
+
+general:
+  artifacts:
+    - gobench

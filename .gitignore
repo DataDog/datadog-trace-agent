@@ -13,3 +13,4 @@ agent/agent
 coverage.out
 prof*
 *test
+gobench

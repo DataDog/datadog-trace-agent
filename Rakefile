@@ -44,6 +44,16 @@ task :test do
   PACKAGES.each { |pkg| go_test(pkg) }
 end
 
+desc "Bench Datadog Trace agent"
+task :bench do
+  sh "install -d ./gobench"
+  rev = `git rev-parse --short HEAD`.strip
+  PACKAGES.each { |pkg|
+    name = pkg.gsub(/[\.\/]/, '')
+    go_bench(pkg, "./gobench/trace-agent-#{rev}-#{name}-gobench.txt")
+  }
+end
+
 desc "Run Datadog Trace agent"
 task :run do
   sh "./trace-agent -debug -config ./agent/trace-agent.ini"
@@ -79,9 +89,8 @@ task :fmt do
   PACKAGES.each { |pkg| go_fmt(pkg) }
 end
 
-# FIXME: add :test in the list
 desc "Datadog Trace agent CI script (fmt, vet, etc)"
-task :ci => [:fmt, :vet, :lint, :test, :build]
+task :ci => [:fmt, :vet, :lint, :test, :build, :bench]
 
 task :err do
   sh "errcheck github.com/DataDog/datadog-trace-agent"
