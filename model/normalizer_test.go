@@ -229,3 +229,47 @@ func TestSpecialZipkinRootSpan(t *testing.T) {
 	assert.Equal(t, beforeTraceID, s.TraceID)
 	assert.Equal(t, beforeSpanID, s.SpanID)
 }
+
+func TestNormalizeTraceEmpty(t *testing.T) {
+	trace := Trace{}
+
+	_, err := NormalizeTrace(trace)
+	assert.NotNil(t, err)
+}
+
+func TestNormalizeTraceTraceIdMismatch(t *testing.T) {
+	span1 := testSpan()
+	span1.TraceID = 1
+
+	span2 := testSpan()
+	span2.TraceID = 2
+
+	trace := Trace{span1, span2}
+
+	_, err := NormalizeTrace(trace)
+	assert.NotNil(t, err)
+}
+
+func TestNormalizeTraceInvalidSpan(t *testing.T) {
+	span1 := testSpan()
+
+	span2 := testSpan()
+	span2.Name = "" // invalid
+
+	trace := Trace{span1, span2}
+
+	_, err := NormalizeTrace(trace)
+	assert.NotNil(t, err)
+}
+
+func TestNormalizeTrace(t *testing.T) {
+	span1 := testSpan()
+
+	span2 := testSpan()
+	span2.SpanID++
+
+	trace := Trace{span1, span2}
+
+	_, err := NormalizeTrace(trace)
+	assert.Nil(t, err)
+}
