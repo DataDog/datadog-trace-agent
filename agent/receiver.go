@@ -266,19 +266,22 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 
 // logStats periodically submits stats about the receiver to statsd
 func (r *HTTPReceiver) logStats() {
-	for range time.Tick(60 * time.Second) {
+	var accStats receiverStats
+	var lastLog time.Time
+
+	for now := range time.Tick(10 * time.Second) {
 		// Load counters and reset them for the next flush
-		spans := atomic.LoadInt64(&r.stats.SpansReceived)
-		r.stats.SpansReceived = 0
+		spans := atomic.SwapInt64(&r.stats.SpansReceived, 0)
+		accStats.SpansReceived += spans
 
-		traces := atomic.LoadInt64(&r.stats.TracesReceived)
-		r.stats.TracesReceived = 0
+		traces := atomic.SwapInt64(&r.stats.TracesReceived, 0)
+		accStats.TracesReceived += traces
 
-		sdropped := atomic.LoadInt64(&r.stats.SpansDropped)
-		r.stats.SpansDropped = 0
+		sdropped := atomic.SwapInt64(&r.stats.SpansDropped, 0)
+		accStats.SpansDropped += sdropped
 
-		tdropped := atomic.LoadInt64(&r.stats.TracesDropped)
-		r.stats.TracesDropped = 0
+		tdropped := atomic.SwapInt64(&r.stats.TracesDropped, 0)
+		accStats.TracesDropped += tdropped
 
 		statsd.Client.Gauge("trace_agent.heartbeat", 1, []string{fmt.Sprintf("version:%s", Version)}, 1)
 
@@ -287,8 +290,15 @@ func (r *HTTPReceiver) logStats() {
 		statsd.Client.Count("trace_agent.receiver.span_dropped", sdropped, nil, 1)
 		statsd.Client.Count("trace_agent.receiver.trace_dropped", tdropped, nil, 1)
 
-		log.Infof("receiver handled %d spans, dropped %d ; handled %d traces, dropped %d", spans, sdropped, traces, tdropped)
-		r.logger.Reset()
+		if now.Sub(lastLog) >= 60*time.Second {
+			log.Infof("receiver handled %d spans, dropped %d ; handled %d traces, dropped %d",
+				accStats.SpansReceived, accStats.SpansDropped,
+				accStats.TracesReceived, accStats.TracesDropped)
+			r.logger.Reset()
+
+			accStats = receiverStats{}
+			lastLog = now
+		}
 	}
 }
 
