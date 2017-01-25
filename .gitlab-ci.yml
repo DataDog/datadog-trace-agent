@@ -1,0 +1,2 @@
+test:
+  script: "$DD_TEST_CMD"
