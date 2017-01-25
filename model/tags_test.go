@@ -37,7 +37,7 @@ func TestSort(t *testing.T) {
 	assert.Equal(t, t1, t2)
 }
 
-func TestTagMerge(t *testing.T) {
+func TestMergeTagSets(t *testing.T) {
 	t1 := NewTagSetFromString("a:1,a:2")
 	t2 := NewTagSetFromString("a:2,a:3")
 	t3 := MergeTagSets(t1, t2)
@@ -53,6 +53,15 @@ func TestTagMerge(t *testing.T) {
 	t3 = MergeTagSets(t1, t2)
 	assert.Equal(t, t3, NewTagSetFromString("a:1,a:2,a:6"))
 
+	t1 = nil
+	t2 = NewTagSetFromString("a:6,a:2")
+	t3 = MergeTagSets(t1, t2)
+	assert.Equal(t, t3, t2)
+
+	t1 = NewTagSetFromString("a:2,a:1")
+	t2 = nil
+	t3 = MergeTagSets(t1, t2)
+	assert.Equal(t, t3, t1)
 }
 
 func TestSplitTag(t *testing.T) {
