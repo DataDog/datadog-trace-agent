@@ -56,9 +56,17 @@ func TestTagMerge(t *testing.T) {
 }
 
 func TestSplitTag(t *testing.T) {
-	k, v := SplitTag("k:v:w")
-	assert.Equal(t, k, "k")
-	assert.Equal(t, v, "v:w")
+	group, value := SplitTag("a:b")
+	assert.Equal(t, group, "a")
+	assert.Equal(t, value, "b")
+
+	group, value = SplitTag("k:v:w")
+	assert.Equal(t, group, "k")
+	assert.Equal(t, value, "v:w")
+
+	group, value = SplitTag("a")
+	assert.Equal(t, group, "")
+	assert.Equal(t, value, "a")
 }
 
 func TestTagColon(t *testing.T) {
