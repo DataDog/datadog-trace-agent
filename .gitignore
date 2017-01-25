@@ -10,6 +10,6 @@ venv/*
 stats/stats
 tracegen/tracegen
 agent/agent
-coverage.out
+*.coverage
 prof*
 *test
