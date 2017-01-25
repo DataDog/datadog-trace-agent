@@ -110,18 +110,26 @@ func TestFilterTags(t *testing.T) {
 	}
 
 }
-func TestUnset(t *testing.T) {
+func TestTagSetUnset(t *testing.T) {
 	assert := assert.New(t)
-	ts := NewTagSetFromString("service:mcnulty,resource:template,name:magicfunc")
-	ts2 := ts.Unset("name")
-	assert.Len(ts, 3)
-	assert.Equal("mcnulty", ts.Get("service").Value)
-	assert.Equal("template", ts.Get("resource").Value)
-	assert.Equal("magicfunc", ts.Get("name").Value)
+
+	ts1 := NewTagSetFromString("service:mcnulty,resource:template,custom:mymetadata")
+	assert.Len(ts1, 3)
+	assert.Equal("mcnulty", ts1.Get("service").Value)
+	assert.Equal("template", ts1.Get("resource").Value)
+	assert.Equal("mymetadata", ts1.Get("custom").Value)
+
+	ts2 := ts1.Unset("resource") // remove at the middle
 	assert.Len(ts2, 2)
 	assert.Equal("mcnulty", ts2.Get("service").Value)
-	assert.Equal("template", ts2.Get("resource").Value)
-	assert.Equal("", ts2.Get("name").Value)
+	assert.Equal("", ts2.Get("resource").Value)
+	assert.Equal("mymetadata", ts1.Get("custom").Value)
+
+	ts3 := ts2.Unset("custom") // remove at the end
+	assert.Len(ts3, 1)
+	assert.Equal("mcnulty", ts3.Get("service").Value)
+	assert.Equal("", ts3.Get("resource").Value)
+	assert.Equal("", ts3.Get("name").Value)
 }
 
 func TestTagSetKey(t *testing.T) {
