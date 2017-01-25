@@ -123,3 +123,8 @@ func TestUnset(t *testing.T) {
 	assert.Equal("template", ts2.Get("resource").Value)
 	assert.Equal("", ts2.Get("name").Value)
 }
+
+func TestTagSetKey(t *testing.T) {
+	ts := NewTagSetFromString("a:b,a:b:c,abc")
+	assert.Equal(t, ":abc,a:b,a:b:c", ts.Key())
+}
