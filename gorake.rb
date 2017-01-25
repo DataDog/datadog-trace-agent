@@ -52,6 +52,10 @@ def go_test(path)
   sh "go test #{path}"
 end
 
+def go_bench(path, output)
+  sh "go test -run=NONE -bench . -benchtime=3s #{path} > #{output}"
+end
+
 # return the dependencies of all the packages who start with the root path
 def go_pkg_deps(pkgs, root_path)
   deps = []
@@ -74,4 +78,3 @@ def go_fmt(path)
     fail
   end
 end
-
