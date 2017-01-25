@@ -121,6 +121,10 @@ func main() {
 
 	// Exit if tracing is not enabled
 	if !agentConf.Enabled {
+		// a sleep is necessary to ensure that supervisor registers this process as "STARTED"
+		// If the exit is "too quick", we enter a BACKOFF->FATAL loop even though this is an expected exit
+		// http://supervisord.org/subprocess.html#process-states
+		time.Sleep(5 * time.Second)
 		os.Exit(0)
 	}
 
