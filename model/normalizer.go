@@ -143,39 +143,27 @@ func (s *Span) Normalize() error {
 }
 
 // NormalizeTrace takes a trace and
-// * rejects the trace if there is a trace ID discrepancy in 2 spans
+// * rejects the trace if there is a trace ID discrepancy between 2 spans
 // * rejects spans that cannot be normalized
 // * rejects empty traces
-// * rejects traces where all spans cannot be normalized
+// * rejects traces where at least one span cannot be normalized
 // * return the normalized trace and an error:
 //   - nil if the trace can be accepted
 //   - an error string if the trace needs to be dropped
 func NormalizeTrace(t Trace) (Trace, error) {
-	var toRemove []int
-	var id uint64
+	if len(t) == 0 {
+		return t, errors.New("empty trace")
+	}
+
+	traceID := t[0].TraceID
 	for i, s := range t {
-		// we should drop "traces" that are not actually traces where several
-		// trace IDs are reported. (probably a bug in the client)
-		if i != 0 && s.TraceID != id {
-			return t, errors.New("trace ID mismatch")
+		if s.TraceID != traceID {
+			return t, errors.New("trace id mismatch")
 		}
-		id = s.TraceID
 
-		err := t[i].Normalize()
-		if err != nil {
-			toRemove = append(toRemove, i)
+		if err := t[i].Normalize(); err != nil {
+			return t, fmt.Errorf("invalid span %v: %v", s, err)
 		}
-	}
-
-	// empty traces or we remove everything
-	if len(toRemove) == len(t) {
-		return t, errors.New("empty trace, or all spans dropped")
-	}
-
-	for i := len(toRemove) - 1; i >= 0; i-- {
-		idx := toRemove[i]
-		t[idx] = t[len(t)-1]
-		t = t[:len(t)-1]
 	}
 
 	return t, nil
