@@ -180,8 +180,8 @@ APM_CONF:
 		goto ENV_CONF
 	}
 
-	if v, _ := conf.Get("trace.config", "enabled"); v != "" {
-		c.Enabled = v
+	if v, _ := conf.Get("trace.config", "enabled"); v == "true" {
+		c.Enabled = true
 	}
 
 	if v, _ := conf.Get("trace.config", "env"); v != "" {
