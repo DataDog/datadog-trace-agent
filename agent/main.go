@@ -22,12 +22,15 @@ import (
 // handleSignal closes a channel to exit cleanly from routines
 func handleSignal(exit chan struct{}) {
 	sigChan := make(chan os.Signal, 10)
-	signal.Notify(sigChan)
-	for signal := range sigChan {
-		switch signal {
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	for signo := range sigChan {
+		switch signo {
 		case syscall.SIGINT, syscall.SIGTERM:
-			log.Info("received interruption signal")
+			log.Infof("received signal %d (%v)", signo, signo)
 			close(exit)
+			return
+		default:
+			log.Warnf("unhandled signal %d (%v)", signo, signo)
 		}
 	}
 }
