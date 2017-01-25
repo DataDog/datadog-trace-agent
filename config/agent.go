@@ -15,6 +15,8 @@ import (
 // behaviors) is one place. It is also a simple structure to share across all
 // the Agent components, with 100% safe and reliable values.
 type AgentConfig struct {
+	Enabled bool
+
 	// Global
 	HostName   string
 	DefaultEnv string // the traces will default to this environment
@@ -50,6 +52,10 @@ type AgentConfig struct {
 
 // mergeEnv applies overrides from environment variables to the trace agent configuration
 func mergeEnv(c *AgentConfig) {
+	if v := os.Getenv("DD_APM_ENABLED"); v == "true" {
+		c.Enabled = true
+	}
+
 	if v := os.Getenv("DD_HOSTNAME"); v != "" {
 		c.HostName = v
 	}
@@ -172,6 +178,10 @@ APM_CONF:
 
 	if conf == nil {
 		goto ENV_CONF
+	}
+
+	if v, _ := conf.Get("trace.config", "enabled"); v != "" {
+		c.Enabled = v
 	}
 
 	if v, _ := conf.Get("trace.config", "env"); v != "" {
