@@ -76,8 +76,18 @@ func versionString() string {
 	return buf.String()
 }
 
+const agentDisabledMessage = `trace-agent not enabled.
+Set env var DD_APM_ENABLED=true or add
+apm_enabled: true
+to your datadog.conf file.
+Exiting.`
+
 // main is the entrypoint of our code
 func main() {
+	// configure a default logger before anything so we can observe initialization
+	config.NewLoggerLevelCustom("DEBUG", "/var/log/datadog/trace-agent.log")
+	defer log.Flush()
+
 	// command-line arguments
 	flag.StringVar(&opts.ddConfigFile, "ddconfig", "/etc/dd-agent/datadog.conf", "Classic agent config file location")
 	// FIXME: merge all APM configuration into dd-agent/datadog.conf and deprecate the below flag
@@ -103,7 +113,7 @@ func main() {
 
 	if opts.version {
 		fmt.Print(versionString())
-		os.Exit(0)
+		return
 	}
 
 	// Instantiate the config
@@ -119,17 +129,28 @@ func main() {
 		panic(err)
 	}
 
+	// Exit if tracing is not enabled
+	if !agentConf.Enabled {
+		log.Info(agentDisabledMessage)
+
+		// a sleep is necessary to ensure that supervisor registers this process as "STARTED"
+		// If the exit is "too quick", we enter a BACKOFF->FATAL loop even though this is an expected exit
+		// http://supervisord.org/subprocess.html#process-states
+		time.Sleep(5 * time.Second)
+		return
+	}
+
 	// Initialize logging
 	level := agentConf.LogLevel
 	if opts.debug {
 		level = "debug"
 	}
 
+	// replace the default logger
 	err = config.NewLoggerLevelCustom(level, agentConf.LogFilePath)
 	if err != nil {
 		panic(fmt.Errorf("error with logger: %v", err))
 	}
-	defer log.Flush()
 
 	// Initialize dogstatsd client
 	err = statsd.Configure(agentConf)
