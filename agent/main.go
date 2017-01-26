@@ -78,8 +78,7 @@ func versionString() string {
 
 const agentDisabledMessage = `trace-agent not enabled.
 Set env var DD_APM_ENABLED=true or add
-[trace.config]
-enabled: true
+apm_enabled: true
 to your datadog.conf file.
 Exiting.`
 
