@@ -48,8 +48,14 @@ def go_vet(path)
   sh "go vet #{path}"
 end
 
-def go_test(path)
-  sh "go test #{path}"
+def go_test(path, coverage_file: nil)
+  cmd = 'go test'
+  filter = ''
+  unless coverage_file.nil?
+    cmd += " -coverprofile=#{coverage_file} -coverpkg=./..."
+    filter = "2>&1 | grep -v 'warning: no packages being tested depend on'" # ugly hack
+  end
+  sh "#{cmd} #{path} #{filter}"
 end
 
 # return the dependencies of all the packages who start with the root path

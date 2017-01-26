@@ -44,6 +44,24 @@ task :test do
   PACKAGES.each { |pkg| go_test(pkg) }
 end
 
+desc "Test Datadog Trace agent"
+task :coverage do
+  files = []
+  i = 1
+  PACKAGES.each do |pkg|
+    file = "#{i}.coverage"
+    files << file
+    go_test(pkg, coverage_file: file)
+    i += 1
+  end
+  files.select! {|f| File.file? f}
+
+  sh "gocovmerge #{files.join(' ')} >|tests.coverage"
+  sh "rm #{files.join(' ')}"
+
+  sh 'go tool cover -html=tests.coverage'
+end
+
 desc "Run Datadog Trace agent"
 task :run do
   sh "./trace-agent -debug -config ./agent/trace-agent.ini"
