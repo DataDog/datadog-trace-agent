@@ -15,7 +15,7 @@ import (
 
 var testQuantiles = []float64{0, 0.1, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999, 0.9999, 1}
 
-func GenSummarySkiplist(n int, gen func(i int) float64) ([]float64, []uint64) {
+func GenSummarySkiplist(n int, gen func(i int) float64) []float64 {
 	s := NewSummary()
 
 	for i := 0; i < n; i++ {
@@ -23,17 +23,15 @@ func GenSummarySkiplist(n int, gen func(i int) float64) ([]float64, []uint64) {
 	}
 
 	vals := make([]float64, 0, len(testQuantiles))
-	samps := make([]uint64, 0, len(testQuantiles))
 	for _, q := range testQuantiles {
-		val, samp := s.Quantile(q)
+		val := s.Quantile(q)
 		vals = append(vals, val)
-		samps = append(samps, samp...)
 	}
 
-	return vals, samps
+	return vals
 }
 
-func GenSummarySlice(n int, gen func(i int) float64) ([]float64, []uint64) {
+func GenSummarySlice(n int, gen func(i int) float64) []float64 {
 	s := NewSliceSummary()
 
 	for i := 0; i < n; i++ {
@@ -41,14 +39,12 @@ func GenSummarySlice(n int, gen func(i int) float64) ([]float64, []uint64) {
 	}
 
 	vals := make([]float64, 0, len(testQuantiles))
-	samps := make([]uint64, 0, len(testQuantiles))
 	for _, q := range testQuantiles {
-		val, samp := s.Quantile(q)
+		val := s.Quantile(q)
 		vals = append(vals, val)
-		samps = append(samps, samp...)
 	}
 
-	return vals, samps
+	return vals
 }
 
 /* CONSTANT STREAMS
@@ -59,14 +55,14 @@ func ConstantGenerator(i int) float64 {
 }
 func SummarySkiplistConstantN(t *testing.T, n int) {
 	assert := assert.New(t)
-	vals, _ := GenSummarySkiplist(n, ConstantGenerator)
+	vals := GenSummarySkiplist(n, ConstantGenerator)
 	for _, v := range vals {
 		assert.Equal(42, v)
 	}
 }
 func SummarySliceConstantN(t *testing.T, n int) {
 	assert := assert.New(t)
-	vals, _ := GenSummarySlice(n, ConstantGenerator)
+	vals := GenSummarySlice(n, ConstantGenerator)
 	for _, v := range vals {
 		assert.Equal(42, v)
 	}
@@ -111,7 +107,7 @@ func UniformGenerator(i int) float64 {
 }
 func SummarySkiplistUniformN(t *testing.T, n int) {
 	assert := assert.New(t)
-	vals, _ := GenSummarySkiplist(n, UniformGenerator)
+	vals := GenSummarySkiplist(n, UniformGenerator)
 
 	for i, v := range vals {
 		var exp float64
@@ -128,7 +124,7 @@ func SummarySkiplistUniformN(t *testing.T, n int) {
 }
 func SummarySliceUniformN(t *testing.T, n int) {
 	assert := assert.New(t)
-	vals, _ := GenSummarySlice(n, UniformGenerator)
+	vals := GenSummarySlice(n, UniformGenerator)
 
 	for i, v := range vals {
 		var exp float64
@@ -220,7 +216,7 @@ func TestSummaryMerge(t *testing.T) {
 	}
 
 	for q, e := range expected {
-		v, _ := s1.Quantile(q)
+		v := s1.Quantile(q)
 		assert.Equal(e, v)
 	}
 }
@@ -249,7 +245,7 @@ func TestSummarySliceMerge(t *testing.T) {
 	}
 
 	for q, e := range expected {
-		v, _ := s1.Quantile(q)
+		v := s1.Quantile(q)
 		assert.Equal(e, v)
 	}
 }
@@ -266,7 +262,7 @@ func TestSummaryRemergeReal10000(t *testing.T) {
 	}
 
 	fmt.Println(s)
-	slices := s.BySlices(0)
+	slices := s.BySlices()
 	fmt.Println(slices)
 	total := 0
 	for _, s := range slices {
@@ -287,7 +283,7 @@ func TestSliceSummaryRemergeReal10000(t *testing.T) {
 	}
 
 	fmt.Println(s)
-	slices := s.BySlices(0)
+	slices := s.BySlices()
 	fmt.Println(slices)
 	total := 0
 	for _, s := range slices {
@@ -307,7 +303,7 @@ func TestSliceSummaryRemerge10000(t *testing.T) {
 	}
 
 	fmt.Println(s1)
-	slices := s1.BySlices(0)
+	slices := s1.BySlices()
 	fmt.Println(slices)
 	total := 0
 	for _, s := range slices {
@@ -326,7 +322,7 @@ func TestSummaryRemerge10000(t *testing.T) {
 	}
 
 	fmt.Println(s1)
-	slices := s1.BySlices(0)
+	slices := s1.BySlices()
 	fmt.Println(slices)
 	total := 0
 	for _, s := range slices {
@@ -345,7 +341,7 @@ func TestSummaryBySlices(t *testing.T) {
 	s.Insert(float64(5), uint64(42))
 	s.Insert(float64(5), uint64(53))
 
-	slices := s.BySlices(0)
+	slices := s.BySlices()
 	fmt.Println(slices)
 	assert.Equal(10, len(slices))
 	for i, sl := range slices {

@@ -39,10 +39,9 @@ func (s SliceSummary) String() string {
 // Insert inserts a new value v in the summary paired with t (the ID of the span it was reported from)
 func (s *SliceSummary) Insert(v float64, t uint64) {
 	newEntry := Entry{
-		V:       v,
-		G:       1,
-		Delta:   int(2 * EPSILON * float64(s.N)),
-		Samples: []uint64{t},
+		V:     v,
+		G:     1,
+		Delta: int(2 * EPSILON * float64(s.N)),
 	}
 
 	i := sort.Search(len(s.Entries), func(i int) bool { return v < s.Entries[i].V })
@@ -90,9 +89,9 @@ func (s *SliceSummary) compress() {
 }
 
 // Quantile returns an EPSILON estimate of the element at quantile 'q' (0 <= q <= 1)
-func (s *SliceSummary) Quantile(q float64) (float64, []uint64) {
+func (s *SliceSummary) Quantile(q float64) float64 {
 	if len(s.Entries) == 0 {
-		return 0, []uint64{}
+		return 0
 	}
 
 	// convert quantile to rank
@@ -109,13 +108,13 @@ func (s *SliceSummary) Quantile(q float64) (float64, []uint64) {
 
 		if r+epsN < rmin+n.G+n.Delta {
 			if r+epsN < rmin+n.G {
-				return t.V, t.Samples
+				return t.V
 			}
-			return n.V, n.Samples
+			return n.V
 		}
 	}
 
-	return s.Entries[len(s.Entries)-1].V, s.Entries[len(s.Entries)-1].Samples
+	return s.Entries[len(s.Entries)-1].V
 }
 
 // Merge two summaries entries together
@@ -175,7 +174,7 @@ func (s *SliceSummary) Copy() *SliceSummary {
 // data structure to ensure epsilon*s.N precision on quantiles, but it's bounded.
 // When the bounds of the interval are equal, the weight is the number of times
 // that exact value was inserted in the summary.
-func (s *SliceSummary) BySlices(maxSamples int) []SummarySlice {
+func (s *SliceSummary) BySlices() []SummarySlice {
 	var slices []SummarySlice
 
 	if len(s.Entries) == 0 {
