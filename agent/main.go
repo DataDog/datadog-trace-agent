@@ -107,10 +107,25 @@ func main() {
 	var agentConf *config.AgentConfig
 	var err error
 
-	// tolerate errors in reading the config files. some setups will use only environment variables
-	// which is OK
-	legacyConf, _ := config.New(opts.configFile)
-	conf, _ := config.New(opts.ddConfigFile)
+	// if a configuration file cannot be loaded, log an error but do not
+	// panic since the agent can be configured with environment variables
+	// only.
+	legacyConf, err := config.NewIfExists(opts.configFile)
+	if err != nil {
+		log.Errorf("%s: %v", opts.configFile, err)
+	}
+	if legacyConf != nil {
+		log.Infof("using legacy configuration from %s", opts.configFile)
+	}
+
+	conf, err := config.NewIfExists(opts.ddConfigFile)
+	if err != nil {
+		log.Errorf("%s: %v", opts.ddConfigFile, err)
+	}
+	if conf != nil {
+		log.Infof("using configuration from %s", opts.ddConfigFile)
+	}
+
 	agentConf, err = config.NewAgentConfig(conf, legacyConf)
 	if err != nil {
 		panic(err)
