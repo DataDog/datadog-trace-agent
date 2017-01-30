@@ -34,10 +34,9 @@ type Summary struct {
 
 // Entry is an element of the skiplist, see GK paper for description
 type Entry struct {
-	V       float64  `json:"v"`
-	G       int      `json:"g"`
-	Delta   int      `json:"delta"`
-	Samples []uint64 `json:"samples"` // Span IDs of traces representing this part of the spectrum
+	V     float64 `json:"v"`
+	G     int     `json:"g"`
+	Delta int     `json:"delta"`
 }
 
 // NewSummary returns a new approx-summary with accuracy EPSILON
@@ -146,10 +145,9 @@ func (s *Summary) GobDecode(data []byte) error {
 // Insert inserts a new value v in the summary paired with t (the ID of the span it was reported from)
 func (s *Summary) Insert(v float64, t uint64) {
 	e := Entry{
-		V:       v,
-		G:       1,
-		Delta:   0,
-		Samples: []uint64{t},
+		V:     v,
+		G:     1,
+		Delta: 0,
 	}
 
 	eptr := s.data.Insert(e)
@@ -174,24 +172,16 @@ func (s *Summary) compress() {
 		next := elt.next[0]
 		t := elt.value
 		nt := &next.value
-		// TODO[leo]: for now we keep only one sample, at random, figure it out
-		changeSample := rand.Intn(1) == 0
 
 		// value merging
 		if t.V == nt.V {
 			missing += nt.G
 			nt.Delta += missing
 			nt.G = t.G
-			if changeSample {
-				nt.Samples = t.Samples
-			}
 			s.data.Remove(elt)
 		} else if elt != s.data.head.next[0] && next != nil {
 			if t.G+nt.G+missing+nt.Delta < epsN {
 				nt.G += t.G + missing
-				if changeSample {
-					nt.Samples = t.Samples
-				}
 				missing = 0
 				s.data.Remove(elt)
 			} else {
@@ -205,7 +195,7 @@ func (s *Summary) compress() {
 }
 
 // Quantile returns an EPSILON estimate of the element at quantile 'q' (0 <= q <= 1)
-func (s *Summary) Quantile(q float64) (float64, []uint64) {
+func (s *Summary) Quantile(q float64) float64 {
 	// convert quantile to rank
 	r := int(q*float64(s.N) + 0.5)
 	epsN := int(EPSILON * float64(s.N))
@@ -217,14 +207,14 @@ func (s *Summary) Quantile(q float64) (float64, []uint64) {
 		n := elt.next[0]
 
 		if n == nil {
-			return t.V, t.Samples
+			return t.V
 		}
 
 		if r+epsN < rmin+n.value.G+n.value.Delta {
 			if r+epsN < rmin+n.value.G {
-				return t.V, t.Samples
+				return t.V
 			}
-			return n.value.V, n.value.Samples
+			return n.value.V
 		}
 	}
 
@@ -233,10 +223,9 @@ func (s *Summary) Quantile(q float64) (float64, []uint64) {
 
 // SummarySlice reprensents how many values are in a [Start, End] range
 type SummarySlice struct {
-	Start   float64
-	End     float64
-	Weight  int
-	Samples []uint64
+	Start  float64
+	End    float64
+	Weight int
 }
 
 // BySlices returns a slice of Summary slices that represents weighted ranges of
@@ -246,24 +235,17 @@ type SummarySlice struct {
 // The number of intervals is related to the precision kept in the internal
 // data structure to ensure epsilon*s.N precision on quantiles, but it's bounded.
 // The weights are not exact, they're only upper bounds (see GK paper).
-func (s *Summary) BySlices(maxSamples int) []SummarySlice {
+func (s *Summary) BySlices() []SummarySlice {
 	var slices []SummarySlice
 
 	last := s.data.head
 	cur := last.next[0]
 
 	for cur != nil {
-		var sliceSamples []uint64
-		if len(cur.value.Samples) > maxSamples {
-			sliceSamples = cur.value.Samples[:maxSamples]
-		} else {
-			sliceSamples = cur.value.Samples
-		}
 		ss := SummarySlice{
-			Start:   last.value.V,
-			End:     cur.value.V,
-			Weight:  cur.value.G,
-			Samples: sliceSamples,
+			Start:  last.value.V,
+			End:    cur.value.V,
+			Weight: cur.value.G,
 		}
 		slices = append(slices, ss)
 

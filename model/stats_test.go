@@ -271,10 +271,10 @@ func TestStatsBucketSublayers(t *testing.T) {
 	}
 
 	expectedDistributions := map[string][]quantile.Entry{
-		"A.foo|duration|env:default,resource:α,service:A":                                        []quantile.Entry{quantile.Entry{V: 100, G: 1, Delta: 0, Samples: []uint64{42}}},
-		"B.bar|duration|env:default,resource:α,service:B":                                        []quantile.Entry{quantile.Entry{V: 20, G: 1, Delta: 0, Samples: []uint64{100}}},
-		"sql.query|duration|env:default,resource:SELECT value FROM table,service:C":              []quantile.Entry{quantile.Entry{V: 5, G: 1, Delta: 0, Samples: []uint64{2000}}},
-		"sql.query|duration|env:default,resource:SELECT ololololo... value FROM table,service:C": []quantile.Entry{quantile.Entry{V: 3, G: 1, Delta: 0, Samples: []uint64{3000}}},
+		"A.foo|duration|env:default,resource:α,service:A":                                        []quantile.Entry{quantile.Entry{V: 100, G: 1, Delta: 0}},
+		"B.bar|duration|env:default,resource:α,service:B":                                        []quantile.Entry{quantile.Entry{V: 20, G: 1, Delta: 0}},
+		"sql.query|duration|env:default,resource:SELECT value FROM table,service:C":              []quantile.Entry{quantile.Entry{V: 5, G: 1, Delta: 0}},
+		"sql.query|duration|env:default,resource:SELECT ololololo... value FROM table,service:C": []quantile.Entry{quantile.Entry{V: 3, G: 1, Delta: 0}},
 	}
 
 	assert.Len(sb.Distributions, len(expectedDistributions), "Missing distributions!")
