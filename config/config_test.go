@@ -130,3 +130,22 @@ func TestDDAgentConfigWithNewOpts(t *testing.T) {
 	assert.Equal([]string{"resource", "error"}, agentConfig.ExtraAggregators)
 	assert.Equal(0.33, agentConfig.ExtraSampleRate)
 }
+
+func TestConfigNewIfExists(t *testing.T) {
+	// The file does not exist: no error returned
+	conf, err := NewIfExists("/does-not-exist")
+	assert.Nil(t, err)
+	assert.Nil(t, conf)
+
+	// The file exists but cannot be read for another reason: an error is
+	// returned.
+	filename := "/tmp/trace-agent-test-config.ini"
+	os.Remove(filename)
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0200) // write only
+	assert.Nil(t, err)
+	f.Close()
+	conf, err = NewIfExists(filename)
+	assert.NotNil(t, err)
+	assert.Nil(t, conf)
+	os.Remove(filename)
+}
