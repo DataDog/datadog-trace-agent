@@ -1,9 +1,10 @@
 package config
 
 import (
-	// stdlib
 	"fmt"
+	"os"
 	"strings"
+	"syscall"
 
 	"gopkg.in/ini.v1"
 )
@@ -23,10 +24,22 @@ type File struct {
 func New(configPath string) (*File, error) {
 	config, err := ini.Load(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read config file at %v, err=%v", configPath, err)
+		return nil, err
 	}
 	globalConfig = &File{instance: config, Path: configPath}
 	return globalConfig, nil
+}
+
+// NewIfExists works as New, but does not return an error if the file does not
+// exist. Instead, it returns a null File pointer.
+func NewIfExists(configPath string) (*File, error) {
+	config, err := New(configPath)
+	if terr, ok := err.(*os.PathError); ok {
+		if terr, ok := terr.Err.(syscall.Errno); ok && terr == syscall.ENOENT {
+			return nil, nil
+		}
+	}
+	return config, err
 }
 
 // Get returns the currently active global config (the previous config opened
