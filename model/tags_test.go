@@ -37,7 +37,7 @@ func TestSort(t *testing.T) {
 	assert.Equal(t, t1, t2)
 }
 
-func TestTagMerge(t *testing.T) {
+func TestMergeTagSets(t *testing.T) {
 	t1 := NewTagSetFromString("a:1,a:2")
 	t2 := NewTagSetFromString("a:2,a:3")
 	t3 := MergeTagSets(t1, t2)
@@ -53,12 +53,29 @@ func TestTagMerge(t *testing.T) {
 	t3 = MergeTagSets(t1, t2)
 	assert.Equal(t, t3, NewTagSetFromString("a:1,a:2,a:6"))
 
+	t1 = nil
+	t2 = NewTagSetFromString("a:6,a:2")
+	t3 = MergeTagSets(t1, t2)
+	assert.Equal(t, t3, t2)
+
+	t1 = NewTagSetFromString("a:2,a:1")
+	t2 = nil
+	t3 = MergeTagSets(t1, t2)
+	assert.Equal(t, t3, t1)
 }
 
 func TestSplitTag(t *testing.T) {
-	k, v := SplitTag("k:v:w")
-	assert.Equal(t, k, "k")
-	assert.Equal(t, v, "v:w")
+	group, value := SplitTag("a:b")
+	assert.Equal(t, group, "a")
+	assert.Equal(t, value, "b")
+
+	group, value = SplitTag("k:v:w")
+	assert.Equal(t, group, "k")
+	assert.Equal(t, value, "v:w")
+
+	group, value = SplitTag("a")
+	assert.Equal(t, group, "")
+	assert.Equal(t, value, "a")
 }
 
 func TestTagColon(t *testing.T) {
@@ -102,16 +119,29 @@ func TestFilterTags(t *testing.T) {
 	}
 
 }
-func TestUnset(t *testing.T) {
+func TestTagSetUnset(t *testing.T) {
 	assert := assert.New(t)
-	ts := NewTagSetFromString("service:mcnulty,resource:template,name:magicfunc")
-	ts2 := ts.Unset("name")
-	assert.Len(ts, 3)
-	assert.Equal("mcnulty", ts.Get("service").Value)
-	assert.Equal("template", ts.Get("resource").Value)
-	assert.Equal("magicfunc", ts.Get("name").Value)
+
+	ts1 := NewTagSetFromString("service:mcnulty,resource:template,custom:mymetadata")
+	assert.Len(ts1, 3)
+	assert.Equal("mcnulty", ts1.Get("service").Value)
+	assert.Equal("template", ts1.Get("resource").Value)
+	assert.Equal("mymetadata", ts1.Get("custom").Value)
+
+	ts2 := ts1.Unset("resource") // remove at the middle
 	assert.Len(ts2, 2)
 	assert.Equal("mcnulty", ts2.Get("service").Value)
-	assert.Equal("template", ts2.Get("resource").Value)
-	assert.Equal("", ts2.Get("name").Value)
+	assert.Equal("", ts2.Get("resource").Value)
+	assert.Equal("mymetadata", ts1.Get("custom").Value)
+
+	ts3 := ts2.Unset("custom") // remove at the end
+	assert.Len(ts3, 1)
+	assert.Equal("mcnulty", ts3.Get("service").Value)
+	assert.Equal("", ts3.Get("resource").Value)
+	assert.Equal("", ts3.Get("name").Value)
+}
+
+func TestTagSetKey(t *testing.T) {
+	ts := NewTagSetFromString("a:b,a:b:c,abc")
+	assert.Equal(t, ":abc,a:b,a:b:c", ts.Key())
 }
