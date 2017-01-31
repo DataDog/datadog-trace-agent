@@ -133,6 +133,7 @@ func main() {
 	legacyConf, err := config.NewIfExists(opts.configFile)
 	if err != nil {
 		log.Errorf("%s: %v", opts.configFile, err)
+		log.Warnf("ignoring %s", opts.configFile)
 	}
 	if legacyConf != nil {
 		log.Infof("using legacy configuration from %s", opts.configFile)
@@ -141,6 +142,7 @@ func main() {
 	conf, err := config.NewIfExists(opts.ddConfigFile)
 	if err != nil {
 		log.Errorf("%s: %v", opts.ddConfigFile, err)
+		log.Warnf("ignoring %s", opts.ddConfigFile)
 	}
 	if conf != nil {
 		log.Infof("using configuration from %s", opts.ddConfigFile)
