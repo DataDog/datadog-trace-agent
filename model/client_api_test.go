@@ -197,3 +197,17 @@ func TestPoolBorrowSize(t *testing.T) {
 	check := pool.Borrow("application/msgpack")
 	assert.Equal(check, decoder)
 }
+
+func TestPoolReleaseSizeMax(t *testing.T) {
+	assert := assert.New(t)
+	pool := NewDecoderPool(1)
+	decoder := newMsgpackDecoder()
+
+	// replace the internal buffer with a big one
+	decoder.buf = bytes.NewBuffer(make([]byte, 1, maxBufferSize+1))
+
+	// a decoder is discarded and not reused when the buffer size is too big
+	pool.Release(decoder)
+	anotherDecoder := pool.Borrow("application/msgpack")
+	assert.NotEqual(anotherDecoder, decoder)
+}

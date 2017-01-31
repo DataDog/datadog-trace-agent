@@ -12,7 +12,10 @@ import (
 // average size of a buffer; because usually the payloads are huge,
 // this value ensures that initialized buffers are big enough so that
 // the resize operation is not usually called while reading the response.
-const minBufferSize = 512
+const (
+	minBufferSize = 512
+	maxBufferSize = 10485760
+)
 
 // readAll reads from source until an error or EOF and writes to dest;
 // if the dest buffer contains data, it is truncated
@@ -42,6 +45,7 @@ type ClientDecoder interface {
 	Decode(body io.Reader, v interface{}) error
 	BufferReader() *bytes.Reader
 	ContentType() string
+	Cap() int
 }
 
 type jsonDecoder struct {
@@ -88,6 +92,10 @@ func (d *jsonDecoder) ContentType() string {
 	return d.contentType
 }
 
+func (d *jsonDecoder) Cap() int {
+	return d.buf.Cap()
+}
+
 func newMsgpackDecoder() *msgpackDecoder {
 	// sets the size of the buffer so that it usually doesn't need
 	// to be expanded or reallocated
@@ -123,6 +131,10 @@ func (d *msgpackDecoder) BufferReader() *bytes.Reader {
 
 func (d *msgpackDecoder) ContentType() string {
 	return d.contentType
+}
+
+func (d *msgpackDecoder) Cap() int {
+	return d.buf.Cap()
 }
 
 // DecoderPool is a pool meant to share buffers for traces and services decoding.
@@ -179,6 +191,11 @@ func (p *DecoderPool) Borrow(contentType string) ClientDecoder {
 // limit is reached, the decoder is discarded so that the call is not blocking.
 // This operation is thread-safe since channels are used.
 func (p *DecoderPool) Release(dec ClientDecoder) {
+	// dropping the decoder if it reaches the maxBufferSize
+	if dec.Cap() > maxBufferSize {
+		return
+	}
+
 	switch dec.ContentType() {
 	case "application/msgpack":
 		select {
