@@ -3,10 +3,11 @@
 The trace-agent sources configuration from the following locations:
 
 1. The path pointed to by the `-ddconfig` command line flag (default: `/etc/dd-agent/datadog.conf`)
-2. Environment variables: See full list below
+2. The path pointed to by the `-config` command line flag (default: `/etc/datadog/trace-agent.ini`)
+3. Environment variables: See full list below
 
 
-Configuration specified via environment variables will override configuration specified in `-ddconfig`
+Environment variables will override settings defined in configuration files.
 
 ## Classic configuration values, and how the trace-agent treats them
 Note that changing these will also change the behavior of the `datadog-agent` running on the same host.
@@ -15,6 +16,9 @@ In the file pointed to by `-ddconfig`
 
 ```
 [Main]
+# Enable the trace agent.
+apm_enabled = true
+
 # trace-agent will use this hostname when reporting to the Datadog backend.
 # default: stdout of `hostname`
 hostname = myhost
@@ -37,7 +41,7 @@ log_level = INFO
 ```
 
 ## APM-specific configuration values
-In the file pointed to by `-ddconfig`
+In the file pointed to by `-config`
 
 ```
 [trace.sampler]
@@ -65,6 +69,7 @@ We allow overriding a subset of configuration values from the environment. These
 can be useful when running the agent in a Docker container or in other situations
 where env vars are preferrable to static files
 
+- `DD_APM_ENABLED` - overrides `[Main] apm_enabled`
 - `DD_HOSTNAME` - overrides `[Main] hostname`
 - `DD_API_KEY` - overrides `[Main] api_key`
 - `DD_DOGSTATSD_PORT` - overrides `[Main] dogstatsd_port`
