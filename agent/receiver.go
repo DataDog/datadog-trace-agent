@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -47,6 +48,8 @@ func httpHandleWithVersion(v APIVersion, f func(APIVersion, http.ResponseWriter,
 // HTTPReceiver is a collector that uses HTTP protocol and just holds
 // a chan where the spans received are sent one by one
 type HTTPReceiver struct {
+	agent *Agent
+
 	traces      chan model.Trace
 	services    chan model.ServicesMetadata
 	decoderPool *model.DecoderPool
@@ -84,6 +87,7 @@ func (r *HTTPReceiver) Run() {
 	http.HandleFunc("/v0.2/services", httpHandleWithVersion(v02, r.handleServices))
 
 	// current collector API
+	http.HandleFunc("/v0.3/status", httpHandleWithVersion(v03, r.handleStatus))
 	http.HandleFunc("/v0.3/traces", httpHandleWithVersion(v03, r.handleTraces))
 	http.HandleFunc("/v0.3/services", httpHandleWithVersion(v03, r.handleServices))
 
@@ -108,6 +112,26 @@ func (r *HTTPReceiver) Run() {
 	go r.logStats()
 	go sl.Refresh(r.conf.ConnectionLimit)
 	go server.Serve(sl)
+
+	r.agent.status.Lock()
+	r.agent.status.Running = true
+	r.agent.status.Unlock()
+}
+
+// handleStatus responds with the current status of the agent.
+func (r *HTTPReceiver) handleStatus(v APIVersion, w http.ResponseWriter, req *http.Request) {
+	if req.Method != "GET" {
+		w.Header().Set("Allow", "GET")
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	r.agent.status.Lock()
+	defer r.agent.status.Unlock()
+	json.NewEncoder(w).Encode(r.agent.status)
 }
 
 // handleTraces knows how to handle a bunch of traces
