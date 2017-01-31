@@ -164,6 +164,14 @@ func NewAgentConfig(conf *File, legacyConf *File) (*AgentConfig, error) {
 			c.ReceiverHost = v
 		}
 
+		// non_local_traffic is a shorthand in dd-agent configuration that is
+		// equivalent to setting `bind_host: 0.0.0.0`. Respect this flag
+		// since it defaults to true in Docker and saves us a command-line param
+		if v := m.Key("non_local_traffic").MustString("").ToLower(); v == "yes" || v == "true" {
+			c.StatsdHost = "0.0.0.0"
+			c.ReceiverHost = "0.0.0.0"
+		}
+
 		if v := m.Key("dogstatsd_port").MustInt(-1); v != -1 {
 			c.StatsdPort = v
 		}
