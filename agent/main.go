@@ -157,6 +157,7 @@ func main() {
 	// Handle stops properly
 	go handleSignal(agent.exit)
 
+	log.Infof("trace-agent running on host %s", agentConf.HostName)
 	agent.Run()
 
 	// collect memory profile

@@ -51,6 +51,7 @@ type AgentConfig struct {
 // mergeEnv applies overrides from environment variables to the trace agent configuration
 func mergeEnv(c *AgentConfig) {
 	if v := os.Getenv("DD_HOSTNAME"); v != "" {
+		log.Info("overriding hostname from env DD_HOSTNAME value")
 		c.HostName = v
 	}
 
