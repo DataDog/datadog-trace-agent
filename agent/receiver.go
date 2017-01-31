@@ -112,6 +112,12 @@ func (r *HTTPReceiver) Run() {
 
 // handleTraces knows how to handle a bunch of traces
 func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *http.Request) {
+	if req.Method != "POST" {
+		w.Header().Set("Allow", "POST")
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
 	// we need an io.ReadSeeker if we want to be able to display
 	// error feedback to the user, otherwise r.Body is trash
 	// once it's been decoded
@@ -210,6 +216,11 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 
 // handleServices handle a request with a list of several services
 func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *http.Request) {
+	if req.Method != "POST" {
+		w.Header().Set("Allow", "POST")
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
 
 	// we need an io.ReadSeeker if we want to be able to display
 	// error feedback to the user, otherwise req.Body is trash
