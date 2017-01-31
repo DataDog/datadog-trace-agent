@@ -176,6 +176,7 @@ func main() {
 	// Seed rand
 	rand.Seed(time.Now().UTC().UnixNano())
 
+	updateConf(agentConf)
 	agent := NewAgent(agentConf)
 
 	// Handle stops properly

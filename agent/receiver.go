@@ -55,7 +55,7 @@ type HTTPReceiver struct {
 	// due to the high volume the receiver handles
 	// custom logger that rate-limits errors and track statistics
 	logger *errorLogger
-	stats  receiverStats
+	stats  ReceiverStats
 
 	exit chan struct{}
 }
@@ -86,6 +86,8 @@ func (r *HTTPReceiver) Run() {
 	// current collector API
 	http.HandleFunc("/v0.3/traces", httpHandleWithVersion(v03, r.handleTraces))
 	http.HandleFunc("/v0.3/services", httpHandleWithVersion(v03, r.handleServices))
+
+	// expvar implicitely publishes "/debug/vars" on the same port
 
 	addr := fmt.Sprintf("%s:%d", r.conf.ReceiverHost, r.conf.ReceiverPort)
 	log.Infof("listening for traces at http://%s/", addr)
@@ -277,7 +279,7 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 
 // logStats periodically submits stats about the receiver to statsd
 func (r *HTTPReceiver) logStats() {
-	var accStats receiverStats
+	var accStats ReceiverStats
 	var lastLog time.Time
 
 	for now := range time.Tick(10 * time.Second) {
@@ -301,21 +303,27 @@ func (r *HTTPReceiver) logStats() {
 		statsd.Client.Count("datadog.trace_agent.receiver.span_dropped", sdropped, nil, 1)
 		statsd.Client.Count("datadog.trace_agent.receiver.trace_dropped", tdropped, nil, 1)
 
-		if now.Sub(lastLog) >= 60*time.Second {
+		if now.Sub(lastLog) >= time.Minute {
+			updateReceiverStats(accStats)
 			log.Infof("receiver handled %d spans, dropped %d ; handled %d traces, dropped %d",
 				accStats.SpansReceived, accStats.SpansDropped,
 				accStats.TracesReceived, accStats.TracesDropped)
 			r.logger.Reset()
 
-			accStats = receiverStats{}
+			accStats = ReceiverStats{}
 			lastLog = now
 		}
 	}
 }
 
-type receiverStats struct {
-	SpansReceived  int64
+// ReceiverStats contains stats about the volume of data received
+type ReceiverStats struct {
+	// SpansReceived is the number of spans received, including the dropped ones
+	SpansReceived int64
+	// TracesReceived is the number of traces received, including the dropped ones
 	TracesReceived int64
-	SpansDropped   int64
-	TracesDropped  int64
+	// SpansDropped is the number of spans dropped
+	SpansDropped int64
+	// SpansReceived is the number of traces dropped
+	TracesDropped int64
 }
