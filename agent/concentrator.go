@@ -74,7 +74,7 @@ func (c *Concentrator) Flush() []model.StatsBucket {
 
 		log.Debugf("flushing bucket %d", ts)
 		for _, d := range bucket.Distributions {
-			statsd.Client.Histogram("trace_agent.distribution.len", float64(d.Summary.N), nil, 1)
+			statsd.Client.Histogram("datadog.trace_agent.distribution.len", float64(d.Summary.N), nil, 1)
 		}
 		sb = append(sb, bucket)
 		delete(c.buckets, ts)

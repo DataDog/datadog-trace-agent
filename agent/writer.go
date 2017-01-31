@@ -186,7 +186,7 @@ func (w *Writer) Flush() {
 
 			if now.Sub(p.creationDate) > payloadMaxAge {
 				// The payload is too old, let's drop it
-				statsd.Client.Count("trace_agent.writer.dropped_payload",
+				statsd.Client.Count("datadog.trace_agent.writer.dropped_payload",
 					int64(1), []string{"reason:too_old"}, 1)
 				continue
 			}
@@ -201,12 +201,12 @@ func (w *Writer) Flush() {
 	}
 
 	if nbSuccesses > 0 {
-		statsd.Client.Count("trace_agent.writer.flush",
+		statsd.Client.Count("datadog.trace_agent.writer.flush",
 			int64(nbSuccesses), []string{"status:success"}, 1)
 	}
 
 	if nbErrors > 0 {
-		statsd.Client.Count("trace_agent.writer.flush",
+		statsd.Client.Count("datadog.trace_agent.writer.flush",
 			int64(nbErrors), []string{"status:error"}, 1)
 	}
 
@@ -219,13 +219,13 @@ func (w *Writer) Flush() {
 
 	if nbDrops > 0 {
 		log.Infof("dropping %d payloads (payload buffer full)", nbDrops)
-		statsd.Client.Count("trace_agent.writer.dropped_payload",
+		statsd.Client.Count("datadog.trace_agent.writer.dropped_payload",
 			int64(nbDrops), []string{"reason:buffer_full"}, 1)
 
 		payloads = payloads[nbDrops:]
 	}
 
-	statsd.Client.Gauge("trace_agent.writer.payload_buffer_size",
+	statsd.Client.Gauge("datadog.trace_agent.writer.payload_buffer_size",
 		float64(bufSize), nil, 1)
 
 	w.payloadBuffer = payloads

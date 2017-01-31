@@ -269,7 +269,7 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 		return
 	}
 
-	statsd.Client.Count("trace_agent.receiver.service", int64(len(servicesMeta)), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.service", int64(len(servicesMeta)), nil, 1)
 	HTTPOK(w)
 
 	r.services <- servicesMeta
@@ -294,12 +294,12 @@ func (r *HTTPReceiver) logStats() {
 		tdropped := atomic.SwapInt64(&r.stats.TracesDropped, 0)
 		accStats.TracesDropped += tdropped
 
-		statsd.Client.Gauge("trace_agent.heartbeat", 1, []string{fmt.Sprintf("version:%s", Version)}, 1)
+		statsd.Client.Gauge("datadog.trace_agent.heartbeat", 1, []string{fmt.Sprintf("version:%s", Version)}, 1)
 
-		statsd.Client.Count("trace_agent.receiver.span", spans, nil, 1)
-		statsd.Client.Count("trace_agent.receiver.trace", traces, nil, 1)
-		statsd.Client.Count("trace_agent.receiver.span_dropped", sdropped, nil, 1)
-		statsd.Client.Count("trace_agent.receiver.trace_dropped", tdropped, nil, 1)
+		statsd.Client.Count("datadog.trace_agent.receiver.span", spans, nil, 1)
+		statsd.Client.Count("datadog.trace_agent.receiver.trace", traces, nil, 1)
+		statsd.Client.Count("datadog.trace_agent.receiver.span_dropped", sdropped, nil, 1)
+		statsd.Client.Count("datadog.trace_agent.receiver.trace_dropped", tdropped, nil, 1)
 
 		if now.Sub(lastLog) >= 60*time.Second {
 			log.Infof("receiver handled %d spans, dropped %d ; handled %d traces, dropped %d",
