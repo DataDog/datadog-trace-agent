@@ -35,6 +35,13 @@ func handleSignal(exit chan struct{}) {
 	}
 }
 
+// die logs an error message and makes the program exit immediately.
+func die(format string, args ...interface{}) {
+	log.Errorf(format, args...)
+	log.Flush()
+	os.Exit(1)
+}
+
 // opts are the command-line options
 var opts struct {
 	ddConfigFile string
@@ -141,7 +148,7 @@ func main() {
 
 	agentConf, err = config.NewAgentConfig(conf, legacyConf)
 	if err != nil {
-		panic(err)
+		die("%v", err)
 	}
 
 	// Exit if tracing is not enabled
@@ -164,13 +171,13 @@ func main() {
 	// replace the default logger
 	err = config.NewLoggerLevelCustom(level, agentConf.LogFilePath)
 	if err != nil {
-		panic(fmt.Errorf("error with logger: %v", err))
+		die("cannot create logger: %v", err)
 	}
 
 	// Initialize dogstatsd client
 	err = statsd.Configure(agentConf)
 	if err != nil {
-		fmt.Printf("Error configuring dogstatsd: %v", err)
+		die("cannot configure dogstatsd: %v", err)
 	}
 
 	// Seed rand

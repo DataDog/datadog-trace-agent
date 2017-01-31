@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -93,9 +92,7 @@ func (r *HTTPReceiver) Run() {
 
 	addr := fmt.Sprintf("%s:%d", r.conf.ReceiverHost, r.conf.ReceiverPort)
 	if err := r.Listen(addr); err != nil {
-		log.Error(err)
-		log.Flush()
-		os.Exit(1)
+		die("%v", err)
 	}
 
 	legacyAddr := fmt.Sprintf("%s:%d", r.conf.ReceiverHost, legacyReceiverPort)
