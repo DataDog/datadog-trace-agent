@@ -54,6 +54,8 @@ type AgentConfig struct {
 func mergeEnv(c *AgentConfig) {
 	if v := os.Getenv("DD_APM_ENABLED"); v == "true" {
 		c.Enabled = true
+	} else if v == "false" {
+		c.Enabled = false
 	}
 
 	if v := os.Getenv("DD_HOSTNAME"); v != "" {
