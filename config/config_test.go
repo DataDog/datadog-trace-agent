@@ -30,7 +30,7 @@ func TestDefaultConfig(t *testing.T) {
 
 	// assert that some sane defaults are set
 	assert.Equal(agentConfig.ReceiverHost, "localhost")
-	assert.Equal(agentConfig.ReceiverPort, 7777)
+	assert.Equal(agentConfig.ReceiverPort, 8126)
 
 	assert.Equal(agentConfig.StatsdHost, "localhost")
 	assert.Equal(agentConfig.StatsdPort, 8125)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -13,6 +14,10 @@ import (
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	log "github.com/cihub/seelog"
 )
+
+// The trace agent used to listen on port 7777, but now uses port 8126. Keep
+// listening on 7777 during the transition.
+const legacyReceiverPort = 7777
 
 // APIVersion is a dumb way to version our collector handlers
 type APIVersion int
@@ -87,29 +92,49 @@ func (r *HTTPReceiver) Run() {
 	http.HandleFunc("/v0.3/services", r.httpHandleWithVersion(v03, r.handleServices))
 
 	addr := fmt.Sprintf("%s:%d", r.conf.ReceiverHost, r.conf.ReceiverPort)
-	log.Infof("listening for traces at http://%s/", addr)
+	if err := r.Listen(addr); err != nil {
+		log.Error(err)
+		log.Flush()
+		os.Exit(1)
+	}
 
-	tcpL, err := net.Listen("tcp", addr)
+	legacyAddr := fmt.Sprintf("%s:%d", r.conf.ReceiverHost, legacyReceiverPort)
+	if err := r.Listen(legacyAddr); err != nil {
+		log.Error(err)
+	}
+
+	go r.logStats()
+}
+
+// Listen creates a new HTTP server listening on the provided address.
+func (r *HTTPReceiver) Listen(addr string) error {
+	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.Error("could not create TCP listener")
-		panic(err)
+		return fmt.Errorf("cannot listen on %s: %v", addr, err)
 	}
 
-	sl, err := NewStoppableListener(tcpL, r.exit, r.conf.ConnectionLimit)
-	// some clients might use keep-alive and keep open their connections too long
-	// avoid leaks
-	timeout := 5
-	if r.conf.ReceiverTimeout > 0 {
-		timeout = r.conf.ReceiverTimeout
+	stoppableListener, err := NewStoppableListener(listener, r.exit,
+		r.conf.ConnectionLimit)
+	if err != nil {
+		return fmt.Errorf("cannot create stoppable listener: %v", err)
 	}
+
+	timeout := 5 * time.Second
+	if r.conf.ReceiverTimeout > 0 {
+		timeout = time.Duration(r.conf.ReceiverTimeout) * time.Second
+	}
+
 	server := http.Server{
 		ReadTimeout:  time.Second * time.Duration(timeout),
 		WriteTimeout: time.Second * time.Duration(timeout),
 	}
 
-	go r.logStats()
-	go sl.Refresh(r.conf.ConnectionLimit)
-	go server.Serve(sl)
+	log.Infof("listening for traces at http://%s", addr)
+
+	go stoppableListener.Refresh(r.conf.ConnectionLimit)
+	go server.Serve(stoppableListener)
+
+	return nil
 }
 
 func (r *HTTPReceiver) httpHandle(fn http.HandlerFunc) http.HandlerFunc {

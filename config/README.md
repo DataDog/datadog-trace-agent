@@ -57,7 +57,7 @@ max_traces_per_second=10
 
 [trace.receiver]
 # the port that the Receiver should listen on
-receiver_port=7777
+receiver_port=8126
 # how many unique client connections to allow during one 30 second lease period
 connection_limit=2000
 
