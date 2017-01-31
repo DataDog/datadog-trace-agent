@@ -42,14 +42,15 @@ var opts struct {
 	debug        bool
 	logLevel     string
 	version      bool
+	info         bool
 }
 
 // version info sourced from build flags
 var (
 	Version   string
-	BuildDate string
 	GitCommit string
 	GitBranch string
+	BuildDate string
 	GoVersion string
 )
 
@@ -94,6 +95,7 @@ func main() {
 	flag.StringVar(&opts.configFile, "config", "/etc/datadog/trace-agent.ini", "Trace agent ini config file.")
 	flag.BoolVar(&opts.debug, "debug", false, "Turn on debug mode")
 	flag.BoolVar(&opts.version, "version", false, "Show version information and exit")
+	flag.BoolVar(&opts.info, "info", false, "Show info about running trace agent process and exit")
 
 	// profiling arguments
 	cpuprofile := flag.String("cpuprofile", "", "write cpu profile to file")
@@ -176,7 +178,16 @@ func main() {
 	// Seed rand
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	updateConf(agentConf)
+	_ = updateConf(agentConf) // for expvar & -info option
+	if opts.info {
+		if info, err := Info(agentConf); err == nil {
+			fmt.Print(info)
+		} else {
+			panic(err)
+		}
+		return
+	}
+
 	agent := NewAgent(agentConf)
 
 	// Handle stops properly
