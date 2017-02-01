@@ -17,7 +17,7 @@ import (
 var (
 	infoMu            sync.RWMutex
 	infoReceiverStats ReceiverStats // only for the last minute
-	infoJsonConfig    string
+	infoJSONConfig    string
 	infoStart         time.Time
 )
 
@@ -47,7 +47,7 @@ type infoConfig struct{}
 // String implements the expvar.Var interface
 func (infoConfig) String() string {
 	infoMu.RLock()
-	c := infoJsonConfig
+	c := infoJSONConfig
 	infoMu.RUnlock()
 	return c
 }
@@ -61,12 +61,21 @@ func updateConf(conf *config.AgentConfig) error {
 	if err != nil {
 		return err
 	}
-	infoJsonConfig = string(buf)
+	// We keep a static copy of the config, already marshalled and stored
+	// as a plain string. This saves the hassle of rebuilding it all the time
+	// and avoids race issues as the source object is never used again.
+	// Config is parsed at the beginning and never changed again, anyway.
+	infoJSONConfig = string(buf)
 	expvar.Publish("config", infoConfig{})
 	return nil
 }
 
 type infoVersion struct{}
+
+// Below are types used to simply implement expvar.Var interface
+// for config options. expvar.SetString does not make it easy to set
+// a value within a map, and we need the 5 version-related fields
+// to be in a same namespace (so in a Map).
 
 // String implements the expvar.Var interface
 func (infoVersion) String() string { return `"` + Version + `"` }
@@ -103,6 +112,10 @@ func init() {
 	expvar.Publish("receiver", expvar.Func(publishReceiverStats))
 }
 
+// StatusInfo is what we use to parse expvar response.
+// It does not need to contain all the fields, only those we need
+// to display when called with `-info` as JSON unmarshaller will
+// automatically ignore extra fields.
 type StatusInfo struct {
 	CmdLine  []string `json:"cmdline"`
 	Pid      int      `json:"pid"`
@@ -158,11 +171,13 @@ func Info(conf *config.AgentConfig) (string, error) {
 		"  Command line: " + strings.Join(info.CmdLine, " ") + "\n" +
 		"  Pid: " + strconv.Itoa(info.Pid) + "\n" +
 		"  Uptime: " + strconv.Itoa(info.Uptime) + "\n" +
+		"  Mem alloc: " + fmt.Sprintf("%d", info.MemStats.Alloc) + "\n" +
 		"  Hostname: " + info.Config.HostName + "\n" +
-		"  API Endpoints: " + strings.Join(info.Config.APIEndpoints, ", ") + "\n" +
 		"  Receiver Host: " + info.Config.ReceiverHost + "\n" +
 		"  Receiver port: " + strconv.Itoa(info.Config.ReceiverPort) + "\n" +
-		"  Mem alloc: " + fmt.Sprintf("%d", info.MemStats.Alloc) + "\n" +
+		"  Statsd Host: " + info.Config.StatsdHost + "\n" +
+		"  Statsd port: " + strconv.Itoa(info.Config.StatsdPort) + "\n" +
+		"  API Endpoints: " + strings.Join(info.Config.APIEndpoints, ", ") + "\n" +
 		"\n" +
 		"  Spans received (1 min): " + strconv.Itoa(int(info.Receiver.SpansReceived)) + "\n" +
 		"  Traces received (1 min): " + strconv.Itoa(int(info.Receiver.TracesReceived)) + "\n" +
