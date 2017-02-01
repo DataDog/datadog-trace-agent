@@ -164,7 +164,11 @@ func main() {
 		}
 		return
 	}
-	_ = updateConf(agentConf) // for expvar & -info option
+
+	err = initInfo(agentConf) // for expvar & -info option
+	if err != nil {
+		panic(err)
+	}
 
 	// Exit if tracing is not enabled
 	if !agentConf.Enabled {

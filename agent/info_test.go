@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"expvar"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -209,10 +210,10 @@ func TestInfoConfig(t *testing.T) {
 	conf.APIKeys = append(conf.APIKeys, "ooops")
 	assert.NotNil(conf.APIKeys, "API Keys should be defined in upstream conf")
 
-	err := updateConf(conf)
+	err := initInfo(conf)
 	assert.Nil(err)
 
-	js := infoConfig{}.String() // this is what expvar will call
+	js := expvar.Get("config").String() // this is what expvar will call
 	assert.NotEqual("", js)
 	var confCopy config.AgentConfig
 	err = json.Unmarshal([]byte(js), &confCopy)

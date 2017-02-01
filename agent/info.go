@@ -17,16 +17,12 @@ import (
 var (
 	infoMu            sync.RWMutex
 	infoReceiverStats ReceiverStats // only for the last minute
-	infoJSONConfig    string
-	infoStart         time.Time
+	infoStart         time.Time     = time.Now()
+	infoOnce          sync.Once
 )
 
-func init() {
-	infoStart = time.Now()
-}
-
 func publishUptime() interface{} {
-	return int(time.Now().Sub(infoStart) / time.Second)
+	return int(time.Since(infoStart) / time.Second)
 }
 
 func updateReceiverStats(rs ReceiverStats) {
@@ -42,74 +38,54 @@ func publishReceiverStats() interface{} {
 	return rs
 }
 
-type infoConfig struct{}
-
-// String implements the expvar.Var interface
-func (infoConfig) String() string {
-	infoMu.RLock()
-	c := infoJSONConfig
-	infoMu.RUnlock()
-	return c
+type infoVersion struct {
+	Version   string
+	GitCommit string
+	GitBranch string
+	BuildDate string
+	GoVersion string
 }
 
-func updateConf(conf *config.AgentConfig) error {
-	infoMu.Lock()
-	defer infoMu.Unlock()
-	c := *conf
-	c.APIKeys = nil // should not be exported by JSON, but just to make sure
-	buf, err := json.Marshal(&c)
-	if err != nil {
-		return err
+func publishVersion() interface{} {
+	return infoVersion{
+		Version:   Version,
+		GitCommit: GitCommit,
+		GitBranch: GitBranch,
+		BuildDate: BuildDate,
+		GoVersion: GoVersion,
 	}
-	// We keep a static copy of the config, already marshalled and stored
-	// as a plain string. This saves the hassle of rebuilding it all the time
-	// and avoids race issues as the source object is never used again.
-	// Config is parsed at the beginning and never changed again, anyway.
-	infoJSONConfig = string(buf)
-	expvar.Publish("config", infoConfig{})
-	return nil
 }
 
-type infoVersion struct{}
+type infoString string
 
-// Below are types used to simply implement expvar.Var interface
-// for config options. expvar.SetString does not make it easy to set
-// a value within a map, and we need the 5 version-related fields
-// to be in a same namespace (so in a Map).
+func (s infoString) String() string { return string(s) }
 
-// String implements the expvar.Var interface
-func (infoVersion) String() string { return `"` + Version + `"` }
+// This should be called only once
+func initInfo(conf *config.AgentConfig) error {
+	var err error
 
-type infoGitCommit struct{}
+	infoOnce.Do(func() {
+		expvar.NewInt("pid").Set(int64(os.Getpid()))
+		expvar.Publish("uptime", expvar.Func(publishUptime))
+		expvar.Publish("version", expvar.Func(publishVersion))
+		expvar.Publish("receiver", expvar.Func(publishReceiverStats))
 
-// String implements the expvar.Var interface
-func (infoGitCommit) String() string { return `"` + GitCommit + `"` }
+		c := *conf
+		c.APIKeys = nil // should not be exported by JSON, but just to make sure
+		var buf []byte
+		buf, err = json.Marshal(&c)
+		if err != nil {
+			return
+		}
 
-type infoGitBranch struct{}
+		// We keep a static copy of the config, already marshalled and stored
+		// as a plain string. This saves the hassle of rebuilding it all the time
+		// and avoids race issues as the source object is never used again.
+		// Config is parsed at the beginning and never changed again, anyway.
+		expvar.Publish("config", infoString(string(buf)))
+	})
 
-// String implements the expvar.Var interface
-func (infoGitBranch) String() string { return `"` + GitBranch + `"` }
-
-type infoBuildDate struct{}
-
-// String implements the expvar.Var interface
-func (infoBuildDate) String() string { return `"` + BuildDate + `"` }
-
-type infoGoVersion struct{}
-
-// String implements the expvar.Var interface
-func (infoGoVersion) String() string { return `"` + GoVersion + `"` }
-
-func init() {
-	expvar.NewInt("pid").Set(int64(os.Getpid()))
-	expvar.Publish("uptime", expvar.Func(publishUptime))
-	version := expvar.NewMap("version")
-	version.Set("Version", infoVersion{})
-	version.Set("GitCommit", infoGitCommit{})
-	version.Set("GitBranch", infoGitBranch{})
-	version.Set("BuildDate", infoBuildDate{})
-	version.Set("GoVersion", infoGoVersion{})
-	expvar.Publish("receiver", expvar.Func(publishReceiverStats))
+	return err
 }
 
 // StatusInfo is what we use to parse expvar response.
@@ -123,13 +99,7 @@ type StatusInfo struct {
 	MemStats struct {
 		Alloc uint64
 	} `json:"memstats"`
-	Version struct {
-		Version   string
-		GitCommit string
-		GitBranch string
-		BuildDate string
-		GoVersion string
-	} `json:"version"`
+	Version  infoVersion        `json:"version"`
 	Receiver ReceiverStats      `json:"receiver"`
 	Config   config.AgentConfig `json:"config"`
 }
