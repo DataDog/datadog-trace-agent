@@ -91,12 +91,12 @@ func (r *HTTPReceiver) Run() {
 	http.HandleFunc("/v0.3/services", r.httpHandleWithVersion(v03, r.handleServices))
 
 	addr := fmt.Sprintf("%s:%d", r.conf.ReceiverHost, r.conf.ReceiverPort)
-	if err := r.Listen(addr); err != nil {
+	if err := r.Listen(addr, ""); err != nil {
 		die("%v", err)
 	}
 
 	legacyAddr := fmt.Sprintf("%s:%d", r.conf.ReceiverHost, legacyReceiverPort)
-	if err := r.Listen(legacyAddr); err != nil {
+	if err := r.Listen(legacyAddr, " (legacy)"); err != nil {
 		log.Error(err)
 	}
 
@@ -104,7 +104,7 @@ func (r *HTTPReceiver) Run() {
 }
 
 // Listen creates a new HTTP server listening on the provided address.
-func (r *HTTPReceiver) Listen(addr string) error {
+func (r *HTTPReceiver) Listen(addr, logExtra string) error {
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("cannot listen on %s: %v", addr, err)
@@ -126,7 +126,7 @@ func (r *HTTPReceiver) Listen(addr string) error {
 		WriteTimeout: time.Second * time.Duration(timeout),
 	}
 
-	log.Infof("listening for traces at http://%s", addr)
+	log.Infof("listening for traces at http://%s%s", addr, logExtra)
 
 	go stoppableListener.Refresh(r.conf.ConnectionLimit)
 	go server.Serve(stoppableListener)
