@@ -60,8 +60,8 @@ func (s *Sampler) Flush() []model.Trace {
 	traceCount := s.traceCount
 	s.traceCount = 0
 
-	statsd.Client.Count("trace_agent.sampler.trace.kept", int64(len(traces)), nil, 1)
-	statsd.Client.Count("trace_agent.sampler.trace.total", int64(traceCount), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.sampler.trace.kept", int64(len(traces)), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.sampler.trace.total", int64(traceCount), nil, 1)
 	log.Debugf("flushed %d sampled traces out of %v", len(traces), traceCount)
 
 	return traces
