@@ -18,12 +18,28 @@ type processedTrace struct {
 	Sublayers []model.SublayerValue
 }
 
+// AgentStatus is used to store information about the agent and is used for
+// the response body in the /status handler.
+type AgentStatus struct {
+	Version   string `json:"version"`
+	BuildDate string `json:"build_date"`
+	GitCommit string `json:"git_commit"`
+	GitBranch string `json:"git_branch"`
+	GoVersion string `json:"go_version"`
+
+	Running bool `json:"running"`
+
+	*sync.Mutex
+}
+
 // Agent struct holds all the sub-routines structs and make the data flow between them
 type Agent struct {
 	Receiver     *HTTPReceiver
 	Concentrator *Concentrator
 	Sampler      *Sampler
 	Writer       *Writer
+
+	status AgentStatus
 
 	// config
 	conf *config.AgentConfig
@@ -46,14 +62,31 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 	w := NewWriter(conf)
 	w.inServices = r.services
 
-	return &Agent{
+	status := AgentStatus{
+		Version:   Version,
+		BuildDate: BuildDate,
+		GitCommit: GitCommit,
+		GitBranch: GitBranch,
+		GoVersion: GoVersion,
+
+		Mutex: &sync.Mutex{},
+	}
+
+	agent := &Agent{
 		Receiver:     r,
 		Concentrator: c,
 		Sampler:      s,
 		Writer:       w,
-		conf:         conf,
-		exit:         exit,
+
+		status: status,
+
+		conf: conf,
+		exit: exit,
 	}
+
+	r.agent = agent
+
+	return agent
 }
 
 // Run starts routers routines and individual pieces then stop them when the exit order is received

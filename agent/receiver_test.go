@@ -15,6 +15,35 @@ import (
 	"github.com/tinylib/msgp/msgp"
 )
 
+func TestReceiverStatus(t *testing.T) {
+	assert := assert.New(t)
+
+	conf := config.NewDefaultAgentConfig()
+	conf.APIKeys = []string{"test"}
+
+	agent := NewAgent(conf)
+	go agent.Run()
+	defer close(agent.exit)
+
+	url := fmt.Sprintf("http://%s:%d/v0.3/status",
+		conf.ReceiverHost, conf.ReceiverPort)
+	req, err := http.NewRequest("GET", url, nil)
+	assert.Nil(err)
+
+	client := &http.Client{}
+
+	resp, err := client.Do(req)
+	assert.Nil(err)
+	assert.Equal(200, resp.StatusCode)
+	assert.Equal("application/json", resp.Header.Get("Content-Type"))
+
+	var status AgentStatus
+	err = json.NewDecoder(resp.Body).Decode(&status)
+	assert.Nil(err)
+
+	assert.Equal(true, status.Running)
+}
+
 func TestLegacyReceiver(t *testing.T) {
 	// testing traces without content-type in agent endpoints, it should use JSON decoding
 	assert := assert.New(t)
