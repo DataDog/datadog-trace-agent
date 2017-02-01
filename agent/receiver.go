@@ -219,7 +219,7 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 			select {
 			case r.traces <- normTrace:
 			default:
-			    r.logger.Errorf(fmt.Sprintf("dropping trace reason: rate-limited")
+				r.logger.Errorf("dropping trace reason: rate-limited")
 			}
 		}
 
