@@ -32,7 +32,7 @@ func (h *testServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 "pid": 38149,
 "receiver": {"SpansReceived":100,"TracesReceived":10,"SpansDropped":1,"TracesDropped":3},
 "uptime": 15,
-"version": {"BuildDate": "Wed Feb  1 10:04:29 CET 2017", "GitBranch": "ufoot/statusinfo", "GitCommit": "396a217", "GoVersion": "go version go1.7 darwin/amd64", "Version": "0.99.0"}
+"version": {"BuildDate": "2017-02-01T14:28:10+0100", "GitBranch": "ufoot/statusinfo", "GitCommit": "396a217", "GoVersion": "go version go1.7 darwin/amd64", "Version": "0.99.0"}
 }`))
 		if err != nil {
 			h.t.Errorf("error serving %s: %v", r.URL.Path, err)
@@ -85,7 +85,7 @@ func TestInfo(t *testing.T) {
 	assert.Equal("  Version: 0.99.0", lines[4])
 	assert.Equal("  Git hash: 396a217", lines[5])
 	assert.Equal("  Git branch: ufoot/statusinfo", lines[6])
-	assert.Equal("  Build date: Wed Feb  1 10:04:29 CET 2017", lines[7])
+	assert.Equal("  Build date: 2017-02-01T14:28:10+0100", lines[7])
 	assert.Equal("  Go Version: go version go1.7 darwin/amd64", lines[8])
 	assert.Equal("", lines[9])
 	assert.Regexp(regexp.MustCompile(`^  Command line: .*agent`), lines[10])
