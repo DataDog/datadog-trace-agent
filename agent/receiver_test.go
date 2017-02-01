@@ -15,6 +15,36 @@ import (
 	"github.com/tinylib/msgp/msgp"
 )
 
+func TestReceiverRequestBodyLength(t *testing.T) {
+	assert := assert.New(t)
+
+	conf := config.NewDefaultAgentConfig()
+	conf.APIKeys = []string{"test"}
+
+	receiver := NewHTTPReceiver(conf)
+	receiver.maxRequestBodyLength = 2
+	go receiver.Run()
+	defer close(receiver.exit)
+
+	url := fmt.Sprintf("http://%s:%d/v0.3/traces",
+		conf.ReceiverHost, conf.ReceiverPort)
+
+	testBody := func(expectedStatus int, bodyData string) {
+		client := &http.Client{}
+
+		body := bytes.NewBufferString(bodyData)
+		req, err := http.NewRequest("POST", url, body)
+		assert.Nil(err)
+
+		resp, err := client.Do(req)
+		assert.Nil(err)
+		assert.Equal(expectedStatus, resp.StatusCode)
+	}
+
+	testBody(http.StatusOK, "[]")
+	testBody(http.StatusRequestEntityTooLarge, " []")
+}
+
 func TestLegacyReceiver(t *testing.T) {
 	// testing traces without content-type in agent endpoints, it should use JSON decoding
 	assert := assert.New(t)
@@ -34,7 +64,7 @@ func TestLegacyReceiver(t *testing.T) {
 		t.Run(fmt.Sprintf(tc.name), func(t *testing.T) {
 			// start testing server
 			server := httptest.NewServer(
-				http.HandlerFunc(httpHandleWithVersion(tc.apiVersion, tc.r.handleTraces)),
+				http.HandlerFunc(tc.r.httpHandleWithVersion(tc.apiVersion, tc.r.handleTraces)),
 			)
 
 			// send traces to that endpoint without a content-type
@@ -94,7 +124,7 @@ func TestReceiverJSONDecoder(t *testing.T) {
 		t.Run(fmt.Sprintf(tc.name), func(t *testing.T) {
 			// start testing server
 			server := httptest.NewServer(
-				http.HandlerFunc(httpHandleWithVersion(tc.apiVersion, tc.r.handleTraces)),
+				http.HandlerFunc(tc.r.httpHandleWithVersion(tc.apiVersion, tc.r.handleTraces)),
 			)
 
 			// send traces to that endpoint without a content-type
@@ -152,7 +182,7 @@ func TestReceiverMsgpackDecoder(t *testing.T) {
 		t.Run(fmt.Sprintf(tc.name), func(t *testing.T) {
 			// start testing server
 			server := httptest.NewServer(
-				http.HandlerFunc(httpHandleWithVersion(tc.apiVersion, tc.r.handleTraces)),
+				http.HandlerFunc(tc.r.httpHandleWithVersion(tc.apiVersion, tc.r.handleTraces)),
 			)
 
 			// send traces to that endpoint using the msgpack content-type
@@ -223,7 +253,7 @@ func TestReceiverServiceJSONDecoder(t *testing.T) {
 		t.Run(fmt.Sprintf(tc.name), func(t *testing.T) {
 			// start testing server
 			server := httptest.NewServer(
-				http.HandlerFunc(httpHandleWithVersion(tc.apiVersion, tc.r.handleServices)),
+				http.HandlerFunc(tc.r.httpHandleWithVersion(tc.apiVersion, tc.r.handleServices)),
 			)
 
 			// send service to that endpoint using the JSON content-type
@@ -288,7 +318,7 @@ func TestReceiverServiceMsgpackDecoder(t *testing.T) {
 		t.Run(fmt.Sprintf(tc.name), func(t *testing.T) {
 			// start testing server
 			server := httptest.NewServer(
-				http.HandlerFunc(httpHandleWithVersion(tc.apiVersion, tc.r.handleServices)),
+				http.HandlerFunc(tc.r.httpHandleWithVersion(tc.apiVersion, tc.r.handleServices)),
 			)
 
 			// send service to that endpoint using the JSON content-type
@@ -353,7 +383,7 @@ func BenchmarkHandleTraces(b *testing.B) {
 	receiver := NewHTTPReceiver(config)
 
 	// response recorder
-	handler := http.HandlerFunc(httpHandleWithVersion(v03, receiver.handleTraces))
+	handler := http.HandlerFunc(receiver.httpHandleWithVersion(v03, receiver.handleTraces))
 
 	// benchmark
 	b.ResetTimer()
