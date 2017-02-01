@@ -14,7 +14,7 @@ import (
 // the resize operation is not usually called while reading the response.
 const (
 	minBufferSize = 512
-	maxBufferSize = 10485760
+	maxBufferSize = 1e7
 )
 
 // readAll reads from source until an error or EOF and writes to dest;
