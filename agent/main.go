@@ -153,6 +153,19 @@ func main() {
 		panic(err)
 	}
 
+	if opts.info {
+		if info, running, err := Info(agentConf); err == nil {
+			fmt.Print(info)
+			if !running {
+				os.Exit(1)
+			}
+		} else {
+			panic(err)
+		}
+		return
+	}
+	_ = updateConf(agentConf) // for expvar & -info option
+
 	// Exit if tracing is not enabled
 	if !agentConf.Enabled {
 		log.Info(agentDisabledMessage)
@@ -184,19 +197,6 @@ func main() {
 
 	// Seed rand
 	rand.Seed(time.Now().UTC().UnixNano())
-
-	_ = updateConf(agentConf) // for expvar & -info option
-	if opts.info {
-		if info, running, err := Info(agentConf); err == nil {
-			fmt.Print(info)
-			if !running {
-				os.Exit(1)
-			}
-		} else {
-			panic(err)
-		}
-		return
-	}
 
 	agent := NewAgent(agentConf)
 
