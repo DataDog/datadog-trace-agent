@@ -212,7 +212,15 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 			r.logger.Errorf(errorMsg)
 		} else {
 			atomic.AddInt64(&r.stats.SpansDropped, int64(spans-len(normTrace)))
-			r.traces <- normTrace
+
+			// if our downstream consumer is slow, we drop the trace on the floor
+			// this is a safety net against us using too much memory
+			// when clients flood us
+			select {
+			case r.traces <- normTrace:
+			default:
+			    r.logger.Errorf(fmt.Sprintf("dropping trace reason: rate-limited")
+			}
 		}
 
 		atomic.AddInt64(&r.stats.TracesReceived, 1)
