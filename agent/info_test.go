@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -54,6 +55,7 @@ func TestInfo(t *testing.T) {
 
 	server := testServer(t)
 	assert.NotNil(server)
+	defer server.Close()
 
 	url, err := url.Parse(server.URL)
 	assert.NotNil(url)
@@ -65,8 +67,9 @@ func TestInfo(t *testing.T) {
 	assert.Nil(err)
 	conf.ReceiverPort = port
 
-	info, err := Info(conf)
+	info, running, err := Info(conf)
 	assert.Nil(err)
+	assert.Equal(true, running)
 
 	t.Logf("Info:\n%s\n", info)
 
@@ -101,6 +104,45 @@ func TestInfo(t *testing.T) {
 	assert.Equal("  Traces dropped (1 min): 3", lines[24])
 	assert.Equal("", lines[25])
 	assert.Equal("", lines[26])
+}
+
+func TestNotRunning(t *testing.T) {
+	assert := assert.New(t)
+	conf := config.NewDefaultAgentConfig()
+	assert.NotNil(conf)
+
+	server := testServer(t)
+	assert.NotNil(server)
+
+	url, err := url.Parse(server.URL)
+	assert.NotNil(url)
+	assert.Nil(err)
+
+	server.Close()
+
+	hostPort := strings.Split(url.Host, ":")
+	assert.Equal(2, len(hostPort))
+	port, err := strconv.Atoi(hostPort[1])
+	assert.Nil(err)
+	conf.ReceiverPort = port
+
+	info, running, err := Info(conf)
+	assert.Nil(err)
+	assert.Equal(false, running)
+
+	t.Logf("Info:\n%s\n", info)
+
+	lines := strings.Split(info, "\n")
+	assert.Equal(7, len(lines))
+	assert.Regexp(regexp.MustCompile(`^={10,100}$`), lines[0])
+	assert.Regexp(regexp.MustCompile(`^Trace Agent \(v.*\)$`), lines[1])
+	assert.Regexp(regexp.MustCompile(`^={10,100}$`), lines[2])
+	assert.Equal(len(lines[1]), len(lines[0]))
+	assert.Equal(len(lines[1]), len(lines[2]))
+	assert.Equal("", lines[3])
+	assert.Equal(fmt.Sprintf("  Not running (port %d)", port), lines[4])
+	assert.Equal("", lines[5])
+	assert.Equal("", lines[6])
 }
 
 func TestInfoReceiverStats(t *testing.T) {

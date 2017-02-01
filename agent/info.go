@@ -135,7 +135,19 @@ type StatusInfo struct {
 }
 
 // Info returns a printable string, suitable for the `-info` option.
-func Info(conf *config.AgentConfig) (string, error) {
+// It returns an error if it could not generate a proper string.
+// But no error does not mean the program we want to query is running.
+// Eg:
+// - if network port is unreachable with HTTP, return a pretty-printed
+//   message, false, and no error.
+// - if we can successfully get JSON through HTTP, and parse it, return
+//   a pretty-printed message, true, and no error
+// - if we can make an HTTP all, but get inconsitent data, return no
+//   message, false, and an error.
+func Info(conf *config.AgentConfig) (string, bool, error) {
+	program := fmt.Sprintf("Trace Agent (v %s)", Version)
+	banner := strings.Repeat("=", len(program))
+
 	host := conf.ReceiverHost
 	if host == "0.0.0.0" {
 		host = "127.0.0.1" // [FIXME:christian] not fool-proof
@@ -143,21 +155,28 @@ func Info(conf *config.AgentConfig) (string, error) {
 	url := "http://localhost:" + strconv.Itoa(conf.ReceiverPort) + "/debug/vars"
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", fmt.Errorf("unable to contact Datadog Trace Agent on '%s', not running\nERROR: %v\n", url, err)
+		// OK, here, we can't even make an http call on the agent port,
+		// so we can assume it's not even running, or at least, not with
+		// these parameters. We display the port as a hint on where to
+		// debug further, this is where the expvar JSON should come from.
+		return (banner + "\n" +
+			program + "\n" +
+			banner + "\n" +
+			"\n" +
+			"  Not running (port " + strconv.Itoa(conf.ReceiverPort) + ")\n" +
+			"\n"), false, nil
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("unable to read response from Datadog Trace Agent on '%s'\nERROR: %v\n", url, err)
+		return "", false, fmt.Errorf("unable to read response from Datadog Trace Agent on '%s'\nERROR: %v\n", url, err)
 	}
 
 	var info StatusInfo
 	err = json.Unmarshal(body, &info)
 	if err != nil {
-		return "", fmt.Errorf("unable to parse response from Datadog Trace Agent on '%s'\nERROR: %v\n", url, err)
+		return "", false, fmt.Errorf("unable to parse response from Datadog Trace Agent on '%s'\nERROR: %v\n", url, err)
 	}
-	program := fmt.Sprintf("Trace Agent (v %s)", Version)
-	banner := strings.Repeat("=", len(program))
 	return (banner + "\n" +
 		program + "\n" +
 		banner + "\n" +
@@ -183,5 +202,5 @@ func Info(conf *config.AgentConfig) (string, error) {
 		"  Traces received (1 min): " + strconv.Itoa(int(info.Receiver.TracesReceived)) + "\n" +
 		"  Spans dropped (1 min): " + strconv.Itoa(int(info.Receiver.SpansDropped)) + "\n" +
 		"  Traces dropped (1 min): " + strconv.Itoa(int(info.Receiver.TracesDropped)) + "\n" +
-		"\n"), nil
+		"\n"), true, nil
 }

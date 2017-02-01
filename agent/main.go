@@ -187,8 +187,11 @@ func main() {
 
 	_ = updateConf(agentConf) // for expvar & -info option
 	if opts.info {
-		if info, err := Info(agentConf); err == nil {
+		if info, running, err := Info(agentConf); err == nil {
 			fmt.Print(info)
+			if !running {
+				os.Exit(1)
+			}
 		} else {
 			panic(err)
 		}
