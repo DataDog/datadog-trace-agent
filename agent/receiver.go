@@ -102,7 +102,10 @@ func (r *HTTPReceiver) Run() {
 	if r.conf.ReceiverTimeout > 0 {
 		timeout = r.conf.ReceiverTimeout
 	}
-	server := http.Server{ReadTimeout: time.Second * time.Duration(timeout)}
+	server := http.Server{
+		ReadTimeout:  time.Second * time.Duration(timeout),
+		WriteTimeout: time.Second * time.Duration(timeout),
+	}
 
 	go r.logStats()
 	go sl.Refresh(r.conf.ConnectionLimit)
