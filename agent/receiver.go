@@ -18,9 +18,10 @@ import (
 type APIVersion int
 
 const (
-	decoderSize       = 10 // Max size of decoders pool
-	tagTraceHandler   = "handler:traces"
-	tagServiceHandler = "handler:services"
+	decoderSize          = 10 // Max size of decoders pool
+	maxRequestBodyLength = 10 * 1024 * 1024
+	tagTraceHandler      = "handler:traces"
+	tagServiceHandler    = "handler:services"
 )
 
 const (
@@ -38,12 +39,6 @@ const (
 	v03
 )
 
-func httpHandleWithVersion(v APIVersion, f func(APIVersion, http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		f(v, w, r)
-	}
-}
-
 // HTTPReceiver is a collector that uses HTTP protocol and just holds
 // a chan where the spans received are sent one by one
 type HTTPReceiver struct {
@@ -58,6 +53,8 @@ type HTTPReceiver struct {
 	stats  receiverStats
 
 	exit chan struct{}
+
+	maxRequestBodyLength int64
 }
 
 // NewHTTPReceiver returns a pointer to a new HTTPReceiver
@@ -70,22 +67,24 @@ func NewHTTPReceiver(conf *config.AgentConfig) *HTTPReceiver {
 		conf:        conf,
 		logger:      &errorLogger{},
 		exit:        make(chan struct{}),
+
+		maxRequestBodyLength: maxRequestBodyLength,
 	}
 }
 
 // Run starts doing the HTTP server and is ready to receive traces
 func (r *HTTPReceiver) Run() {
 	// FIXME[1.x]: remove all those legacy endpoints + code that goes with it
-	http.HandleFunc("/spans", httpHandleWithVersion(v01, r.handleTraces))
-	http.HandleFunc("/services", httpHandleWithVersion(v01, r.handleServices))
-	http.HandleFunc("/v0.1/spans", httpHandleWithVersion(v01, r.handleTraces))
-	http.HandleFunc("/v0.1/services", httpHandleWithVersion(v01, r.handleServices))
-	http.HandleFunc("/v0.2/traces", httpHandleWithVersion(v02, r.handleTraces))
-	http.HandleFunc("/v0.2/services", httpHandleWithVersion(v02, r.handleServices))
+	http.HandleFunc("/spans", r.httpHandleWithVersion(v01, r.handleTraces))
+	http.HandleFunc("/services", r.httpHandleWithVersion(v01, r.handleServices))
+	http.HandleFunc("/v0.1/spans", r.httpHandleWithVersion(v01, r.handleTraces))
+	http.HandleFunc("/v0.1/services", r.httpHandleWithVersion(v01, r.handleServices))
+	http.HandleFunc("/v0.2/traces", r.httpHandleWithVersion(v02, r.handleTraces))
+	http.HandleFunc("/v0.2/services", r.httpHandleWithVersion(v02, r.handleServices))
 
 	// current collector API
-	http.HandleFunc("/v0.3/traces", httpHandleWithVersion(v03, r.handleTraces))
-	http.HandleFunc("/v0.3/services", httpHandleWithVersion(v03, r.handleServices))
+	http.HandleFunc("/v0.3/traces", r.httpHandleWithVersion(v03, r.handleTraces))
+	http.HandleFunc("/v0.3/services", r.httpHandleWithVersion(v03, r.handleServices))
 
 	addr := fmt.Sprintf("%s:%d", r.conf.ReceiverHost, r.conf.ReceiverPort)
 	log.Infof("listening for traces at http://%s/", addr)
@@ -110,6 +109,21 @@ func (r *HTTPReceiver) Run() {
 	go server.Serve(sl)
 }
 
+func (r *HTTPReceiver) httpHandle(fn http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		req.Body = http.MaxBytesReader(w, req.Body, r.maxRequestBodyLength)
+		defer req.Body.Close()
+
+		fn(w, req)
+	}
+}
+
+func (r *HTTPReceiver) httpHandleWithVersion(v APIVersion, f func(APIVersion, http.ResponseWriter, *http.Request)) http.HandlerFunc {
+	return r.httpHandle(func(w http.ResponseWriter, req *http.Request) {
+		f(v, w, req)
+	})
+}
+
 // handleTraces knows how to handle a bunch of traces
 func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *http.Request) {
 	if req.Method != "POST" {
@@ -117,14 +131,6 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-
-	// we need an io.ReadSeeker if we want to be able to display
-	// error feedback to the user, otherwise r.Body is trash
-	// once it's been decoded
-	if req.Body == nil {
-		return
-	}
-	defer req.Body.Close()
 
 	var traces model.Traces
 	contentType := req.Header.Get("Content-Type")
@@ -221,14 +227,6 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-
-	// we need an io.ReadSeeker if we want to be able to display
-	// error feedback to the user, otherwise req.Body is trash
-	// once it's been decoded
-	if req.Body == nil {
-		return
-	}
-	defer req.Body.Close()
 
 	var servicesMeta model.ServicesMetadata
 	contentType := req.Header.Get("Content-Type")
