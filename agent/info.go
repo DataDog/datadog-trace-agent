@@ -5,20 +5,60 @@ import (
 	"expvar" // automatically publish `/debug/vars` on HTTP port
 	"fmt"
 	"github.com/DataDog/datadog-trace-agent/config"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
 )
 
 var (
-	infoMu            sync.RWMutex
-	infoReceiverStats ReceiverStats // only for the last minute
-	infoStart         time.Time     = time.Now()
-	infoOnce          sync.Once
+	infoMu             sync.RWMutex
+	infoReceiverStats  ReceiverStats // only for the last minute
+	infoStart          = time.Now()
+	infoOnce           sync.Once
+	infoTmpl           *template.Template
+	infoNotRunningTmpl *template.Template
+)
+
+const (
+	infoTmplSrc = `{{.Banner}}
+{{.Program}}
+{{.Banner}}
+
+  Version: {{.Status.Version.Version}}
+  Git hash: {{.Status.Version.GitCommit}}
+  Git branch: {{.Status.Version.GitBranch}}
+  Build date: {{.Status.Version.BuildDate}}
+  Go Version: {{.Status.Version.GoVersion}}
+
+  Command line: {{.CmdLine}}
+  Pid: {{.Status.Pid}}
+  Uptime: {{.Status.Uptime}}
+  Mem alloc: {{.Status.MemStats.Alloc}}
+  Hostname: {{.Status.Config.HostName}}
+  Receiver host: {{.Status.Config.ReceiverHost}}
+  Receiver port: {{.Status.Config.ReceiverPort}}
+  Statsd host: {{.Status.Config.StatsdHost}}
+  Statsd port: {{.Status.Config.StatsdPort}}
+  API Endpoints: {{.APIEndpoints}}
+
+  Spans received (1 min): {{.Status.Receiver.SpansReceived}}
+  Traces received (1 min): {{.Status.Receiver.TracesReceived}}
+  Spans dropped (1 min): {{.Status.Receiver.SpansDropped}}
+  Traces dropped (1 min): {{.Status.Receiver.TracesDropped}}
+
+`
+	infoNotRunningTmplSrc = `{{.Banner}}
+{{.Program}}
+{{.Banner}}
+
+  Not running (port {{.ReceiverPort}})
+
+`
 )
 
 func publishUptime() interface{} {
@@ -83,6 +123,16 @@ func initInfo(conf *config.AgentConfig) error {
 		// and avoids race issues as the source object is never used again.
 		// Config is parsed at the beginning and never changed again, anyway.
 		expvar.Publish("config", infoString(string(buf)))
+
+		infoTmpl, err = template.New("info").Parse(infoTmplSrc)
+		if err != nil {
+			return
+		}
+
+		infoNotRunningTmpl, err = template.New("infoNotRunning").Parse(infoNotRunningTmplSrc)
+		if err != nil {
+			return
+		}
 	})
 
 	return err
@@ -104,17 +154,20 @@ type StatusInfo struct {
 	Config   config.AgentConfig `json:"config"`
 }
 
-// Info returns a printable string, suitable for the `-info` option.
+// Info writes a standard info message describing the running agent.
+// This is not the current program, but an already running program,
+// which we query with an HTTP request.
+//
 // It returns an error if it could not generate a proper string.
 // But no error does not mean the program we want to query is running.
 // Eg:
-// - if network port is unreachable with HTTP, return a pretty-printed
-//   message, false, and no error.
-// - if we can successfully get JSON through HTTP, and parse it, return
-//   a pretty-printed message, true, and no error
-// - if we can make an HTTP all, but get inconsitent data, return no
-//   message, false, and an error.
-func Info(conf *config.AgentConfig) (string, bool, error) {
+// - if network port is unreachable with HTTP, write a pretty-printed
+//   message, return false, and no error.
+// - if we can successfully get JSON through HTTP, and parse it, write
+//   a pretty-printed message, return true, and no error
+// - if we can make an HTTP all, but get inconsitent data, write nothing,
+//   return false, and an error.
+func Info(w io.Writer, conf *config.AgentConfig) (bool, error) {
 	program := fmt.Sprintf("Trace Agent (v %s)", Version)
 	banner := strings.Repeat("=", len(program))
 
@@ -129,48 +182,35 @@ func Info(conf *config.AgentConfig) (string, bool, error) {
 		// so we can assume it's not even running, or at least, not with
 		// these parameters. We display the port as a hint on where to
 		// debug further, this is where the expvar JSON should come from.
-		return (banner + "\n" +
-			program + "\n" +
-			banner + "\n" +
-			"\n" +
-			"  Not running (port " + strconv.Itoa(conf.ReceiverPort) + ")\n" +
-			"\n"), false, nil
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", false, fmt.Errorf("unable to read response from Datadog Trace Agent on '%s'\nERROR: %v\n", url, err)
+		err = infoNotRunningTmpl.Execute(w, struct {
+			Banner       string
+			Program      string
+			ReceiverPort int
+		}{
+			Banner:       banner,
+			Program:      program,
+			ReceiverPort: conf.ReceiverPort,
+		})
+		return false, err
 	}
 
 	var info StatusInfo
-	err = json.Unmarshal(body, &info)
-	if err != nil {
-		return "", false, fmt.Errorf("unable to parse response from Datadog Trace Agent on '%s'\nERROR: %v\n", url, err)
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		return false, fmt.Errorf("unable to read response from Datadog Trace Agent on '%s'\nERROR: %v\n", url, err)
 	}
-	return (banner + "\n" +
-		program + "\n" +
-		banner + "\n" +
-		"\n" +
-		"  Version: " + info.Version.Version + "\n" +
-		"  Git hash: " + info.Version.GitCommit + "\n" +
-		"  Git branch: " + info.Version.GitBranch + "\n" +
-		"  Build date: " + info.Version.BuildDate + "\n" +
-		"  Go Version: " + info.Version.GoVersion + "\n" +
-		"\n" +
-		"  Command line: " + strings.Join(info.CmdLine, " ") + "\n" +
-		"  Pid: " + strconv.Itoa(info.Pid) + "\n" +
-		"  Uptime: " + strconv.Itoa(info.Uptime) + "\n" +
-		"  Mem alloc: " + fmt.Sprintf("%d", info.MemStats.Alloc) + "\n" +
-		"  Hostname: " + info.Config.HostName + "\n" +
-		"  Receiver Host: " + info.Config.ReceiverHost + "\n" +
-		"  Receiver port: " + strconv.Itoa(info.Config.ReceiverPort) + "\n" +
-		"  Statsd Host: " + info.Config.StatsdHost + "\n" +
-		"  Statsd port: " + strconv.Itoa(info.Config.StatsdPort) + "\n" +
-		"  API Endpoints: " + strings.Join(info.Config.APIEndpoints, ", ") + "\n" +
-		"\n" +
-		"  Spans received (1 min): " + strconv.Itoa(int(info.Receiver.SpansReceived)) + "\n" +
-		"  Traces received (1 min): " + strconv.Itoa(int(info.Receiver.TracesReceived)) + "\n" +
-		"  Spans dropped (1 min): " + strconv.Itoa(int(info.Receiver.SpansDropped)) + "\n" +
-		"  Traces dropped (1 min): " + strconv.Itoa(int(info.Receiver.TracesDropped)) + "\n" +
-		"\n"), true, nil
+
+	err = infoTmpl.Execute(w, struct {
+		Banner       string
+		Program      string
+		CmdLine      string
+		APIEndpoints string
+		Status       *StatusInfo
+	}{
+		Banner:       banner,
+		Program:      program,
+		CmdLine:      strings.Join(info.CmdLine, " "), // [FIXME:christian] find a way to do this in text/template
+		APIEndpoints: strings.Join(info.Config.APIEndpoints, ", "),
+		Status:       &info,
+	})
+	return true, err
 }

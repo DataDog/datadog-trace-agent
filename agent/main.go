@@ -153,9 +153,13 @@ func main() {
 		panic(err)
 	}
 
+	err = initInfo(agentConf) // for expvar & -info option
+	if err != nil {
+		panic(err)
+	}
+
 	if opts.info {
-		if info, running, err := Info(agentConf); err == nil {
-			fmt.Print(info)
+		if running, err := Info(os.Stdout, agentConf); err == nil {
 			if !running {
 				os.Exit(1)
 			}
@@ -163,11 +167,6 @@ func main() {
 			panic(err)
 		}
 		return
-	}
-
-	err = initInfo(agentConf) // for expvar & -info option
-	if err != nil {
-		panic(err)
 	}
 
 	// Exit if tracing is not enabled

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"expvar"
 	"fmt"
@@ -49,9 +50,24 @@ func testServer(t *testing.T) *httptest.Server {
 	return server
 }
 
-func TestInfo(t *testing.T) {
+// run this at the beginning of each test, this is because we *really*
+// need to have initInfo be called before doing anything
+func testInit(t *testing.T) *config.AgentConfig {
 	assert := assert.New(t)
 	conf := config.NewDefaultAgentConfig()
+	assert.NotNil(conf)
+
+	conf.APIKeys = append(conf.APIKeys, "ooops")
+	assert.NotNil(conf.APIKeys, "API Keys should be defined in upstream conf")
+	err := initInfo(conf)
+	assert.Nil(err)
+
+	return conf
+}
+
+func TestInfo(t *testing.T) {
+	assert := assert.New(t)
+	conf := testInit(t)
 	assert.NotNil(conf)
 
 	server := testServer(t)
@@ -68,9 +84,11 @@ func TestInfo(t *testing.T) {
 	assert.Nil(err)
 	conf.ReceiverPort = port
 
-	info, running, err := Info(conf)
+	var buf bytes.Buffer
+	running, err := Info(&buf, conf)
 	assert.Nil(err)
 	assert.Equal(true, running)
+	info := buf.String()
 
 	t.Logf("Info:\n%s\n", info)
 
@@ -93,9 +111,9 @@ func TestInfo(t *testing.T) {
 	assert.Equal("  Uptime: 15", lines[12])
 	assert.Equal("  Mem alloc: 773552", lines[13])
 	assert.Equal("  Hostname: localhost.localdomain", lines[14])
-	assert.Equal("  Receiver Host: localhost", lines[15])
+	assert.Equal("  Receiver host: localhost", lines[15])
 	assert.Regexp(regexp.MustCompile(`^  Receiver port: \d+`), lines[16])
-	assert.Equal("  Statsd Host: localhost", lines[17])
+	assert.Equal("  Statsd host: localhost", lines[17])
 	assert.Equal("  Statsd port: 8125", lines[18])
 	assert.Equal("  API Endpoints: https://trace.agent.datadoghq.com", lines[19])
 	assert.Equal("", lines[20])
@@ -109,7 +127,7 @@ func TestInfo(t *testing.T) {
 
 func TestNotRunning(t *testing.T) {
 	assert := assert.New(t)
-	conf := config.NewDefaultAgentConfig()
+	conf := testInit(t)
 	assert.NotNil(conf)
 
 	server := testServer(t)
@@ -127,9 +145,11 @@ func TestNotRunning(t *testing.T) {
 	assert.Nil(err)
 	conf.ReceiverPort = port
 
-	info, running, err := Info(conf)
+	var buf bytes.Buffer
+	running, err := Info(&buf, conf)
 	assert.Nil(err)
 	assert.Equal(false, running)
+	info := buf.String()
 
 	t.Logf("Info:\n%s\n", info)
 
@@ -148,6 +168,9 @@ func TestNotRunning(t *testing.T) {
 
 func TestInfoReceiverStats(t *testing.T) {
 	assert := assert.New(t)
+	conf := testInit(t)
+	assert.NotNil(conf)
+
 	stats := ReceiverStats{
 		SpansReceived:  1000,
 		TracesReceived: 100,
@@ -205,18 +228,13 @@ func TestInfoReceiverStats(t *testing.T) {
 
 func TestInfoConfig(t *testing.T) {
 	assert := assert.New(t)
-	conf := config.NewDefaultAgentConfig()
+	conf := testInit(t)
 	assert.NotNil(conf)
-	conf.APIKeys = append(conf.APIKeys, "ooops")
-	assert.NotNil(conf.APIKeys, "API Keys should be defined in upstream conf")
-
-	err := initInfo(conf)
-	assert.Nil(err)
 
 	js := expvar.Get("config").String() // this is what expvar will call
 	assert.NotEqual("", js)
 	var confCopy config.AgentConfig
-	err = json.Unmarshal([]byte(js), &confCopy)
+	err := json.Unmarshal([]byte(js), &confCopy)
 	assert.Nil(err)
 	assert.Nil(confCopy.APIKeys, "API Keys should *NEVER* be exported")
 	conf.APIKeys = nil            // patch upstream source so that we can use equality testing
