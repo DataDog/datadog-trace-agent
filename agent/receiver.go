@@ -111,7 +111,7 @@ func (r *HTTPReceiver) Run() {
 
 func (r *HTTPReceiver) httpHandle(fn http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		req.Body = http.MaxBytesReader(w, req.Body, r.maxRequestBodyLength)
+		req.Body = model.NewLimitedReader(req.Body, r.maxRequestBodyLength)
 		defer req.Body.Close()
 
 		fn(w, req)
@@ -146,11 +146,10 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		// in v01 we actually get spans that we have to transform in traces
 		var spans []model.Span
 		dec := r.decoderPool.Borrow(contentType)
-		err := dec.Decode(req.Body, &spans)
-		if err != nil {
+		if err := dec.Decode(req.Body, &spans); err != nil {
 			r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
 			r.decoderPool.Release(dec)
-			HTTPDecodingError([]string{tagTraceHandler, fmt.Sprintf("v:%d", v)}, w)
+			HTTPDecodingError(err, []string{tagTraceHandler, fmt.Sprintf("v:%d", v)}, w)
 			return
 		}
 
@@ -164,11 +163,10 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		}
 
 		dec := r.decoderPool.Borrow(contentType)
-		err := dec.Decode(req.Body, &traces)
-		if err != nil {
+		if err := dec.Decode(req.Body, &traces); err != nil {
 			r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
 			r.decoderPool.Release(dec)
-			HTTPDecodingError([]string{tagTraceHandler, fmt.Sprintf("v:%d", v)}, w)
+			HTTPDecodingError(err, []string{tagTraceHandler, fmt.Sprintf("v:%d", v)}, w)
 			return
 		}
 
@@ -176,15 +174,14 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 	case v03:
 		// select the right Decoder based on the given content-type header
 		dec := r.decoderPool.Borrow(contentType)
-		err := dec.Decode(req.Body, &traces)
-		if err != nil {
+		if err := dec.Decode(req.Body, &traces); err != nil {
 			if strings.Contains(contentType, "json") {
 				r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
 			} else {
 				r.logger.Errorf("error when decoding msgpack traces")
 			}
 			r.decoderPool.Release(dec)
-			HTTPDecodingError([]string{tagTraceHandler, fmt.Sprintf("v:%d", v)}, w)
+			HTTPDecodingError(err, []string{tagTraceHandler, fmt.Sprintf("v:%d", v)}, w)
 			return
 		}
 
@@ -243,23 +240,21 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 
 		// select the right Decoder based on the given content-type header
 		dec := r.decoderPool.Borrow(contentType)
-		err := dec.Decode(req.Body, &servicesMeta)
-		if err != nil {
+		if err := dec.Decode(req.Body, &servicesMeta); err != nil {
 			r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
-			HTTPDecodingError([]string{tagServiceHandler, fmt.Sprintf("v:%d", v)}, w)
+			HTTPDecodingError(err, []string{tagServiceHandler, fmt.Sprintf("v:%d", v)}, w)
 			return
 		}
 	case v03:
 		// select the right Decoder based on the given content-type header
 		dec := r.decoderPool.Borrow(contentType)
-		err := dec.Decode(req.Body, &servicesMeta)
-		if err != nil {
+		if err := dec.Decode(req.Body, &servicesMeta); err != nil {
 			if strings.Contains(contentType, "json") {
 				r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
 			} else {
 				r.logger.Errorf("error when decoding msgpack traces")
 			}
-			HTTPDecodingError([]string{tagServiceHandler, fmt.Sprintf("v:%d", v)}, w)
+			HTTPDecodingError(err, []string{tagServiceHandler, fmt.Sprintf("v:%d", v)}, w)
 			return
 		}
 	default:

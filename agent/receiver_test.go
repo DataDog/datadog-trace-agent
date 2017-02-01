@@ -42,7 +42,7 @@ func TestReceiverRequestBodyLength(t *testing.T) {
 	}
 
 	testBody(http.StatusOK, "[]")
-	testBody(http.StatusBadRequest, " []")
+	testBody(http.StatusRequestEntityTooLarge, " []")
 }
 
 func TestLegacyReceiver(t *testing.T) {
