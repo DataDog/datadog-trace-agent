@@ -17,7 +17,7 @@ import (
 
 var (
 	infoMu             sync.RWMutex
-	infoReceiverStats  ReceiverStats // only for the last minute
+	infoReceiverStats  receiverStats // only for the last minute
 	infoStart          = time.Now()
 	infoOnce           sync.Once
 	infoTmpl           *template.Template
@@ -65,7 +65,7 @@ func publishUptime() interface{} {
 	return int(time.Since(infoStart) / time.Second)
 }
 
-func updateReceiverStats(rs ReceiverStats) {
+func updateReceiverStats(rs receiverStats) {
 	infoMu.Lock()
 	infoReceiverStats = rs
 	infoMu.Unlock()
@@ -150,7 +150,7 @@ type StatusInfo struct {
 		Alloc uint64
 	} `json:"memstats"`
 	Version  infoVersion        `json:"version"`
-	Receiver ReceiverStats      `json:"receiver"`
+	Receiver receiverStats      `json:"receiver"`
 	Config   config.AgentConfig `json:"config"`
 }
 

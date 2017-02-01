@@ -55,7 +55,7 @@ type HTTPReceiver struct {
 	// due to the high volume the receiver handles
 	// custom logger that rate-limits errors and track statistics
 	logger *errorLogger
-	stats  ReceiverStats
+	stats  receiverStats
 
 	exit chan struct{}
 }
@@ -279,7 +279,7 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 
 // logStats periodically submits stats about the receiver to statsd
 func (r *HTTPReceiver) logStats() {
-	var accStats ReceiverStats
+	var accStats receiverStats
 	var lastLog time.Time
 
 	for now := range time.Tick(10 * time.Second) {
@@ -310,14 +310,14 @@ func (r *HTTPReceiver) logStats() {
 				accStats.TracesReceived, accStats.TracesDropped)
 			r.logger.Reset()
 
-			accStats = ReceiverStats{}
+			accStats = receiverStats{}
 			lastLog = now
 		}
 	}
 }
 
-// ReceiverStats contains stats about the volume of data received
-type ReceiverStats struct {
+// receiverStats contains stats about the volume of data received
+type receiverStats struct {
 	// SpansReceived is the number of spans received, including the dropped ones
 	SpansReceived int64
 	// TracesReceived is the number of traces received, including the dropped ones
