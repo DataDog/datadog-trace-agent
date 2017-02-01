@@ -55,6 +55,7 @@ type HTTPReceiver struct {
 	exit chan struct{}
 
 	maxRequestBodyLength int64
+	debug                bool
 }
 
 // NewHTTPReceiver returns a pointer to a new HTTPReceiver
@@ -69,6 +70,7 @@ func NewHTTPReceiver(conf *config.AgentConfig) *HTTPReceiver {
 		exit:        make(chan struct{}),
 
 		maxRequestBodyLength: maxRequestBodyLength,
+		debug:                strings.ToLower(conf.LogLevel) == "debug",
 	}
 }
 
@@ -201,9 +203,8 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 			atomic.AddInt64(&r.stats.TracesDropped, 1)
 			atomic.AddInt64(&r.stats.SpansDropped, int64(spans))
 
-			// this is a potentially very spammy log message, so extra care
 			errorMsg := fmt.Sprintf("dropping trace reason: %s (debug for more info), %v", err, normTrace)
-			if len(errorMsg) > 150 {
+			if len(errorMsg) > 150 && r.debug {
 				errorMsg = errorMsg[:150] + "..."
 			}
 			r.logger.Errorf(errorMsg)
