@@ -92,7 +92,7 @@ func (a APIEndpoint) Write(p model.AgentPayload) (int, error) {
 		return 0, err
 	}
 	payloadSize := len(data)
-	statsd.Client.Count("trace_agent.writer.payload_bytes", int64(payloadSize), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.writer.payload_bytes", int64(payloadSize), nil, 1)
 
 	endpointErr := newAPIError()
 
@@ -138,7 +138,7 @@ func (a APIEndpoint) Write(p model.AgentPayload) (int, error) {
 
 		flushTime := time.Since(startFlush)
 		log.Infof("flushed payload to the API, time:%s, size:%d", flushTime, len(data))
-		statsd.Client.Gauge("trace_agent.writer.flush_duration",
+		statsd.Client.Gauge("datadog.trace_agent.writer.flush_duration",
 			flushTime.Seconds(), nil, 1)
 	}
 
