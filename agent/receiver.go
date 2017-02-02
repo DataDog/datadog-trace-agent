@@ -61,7 +61,7 @@ type HTTPReceiver struct {
 func NewHTTPReceiver(conf *config.AgentConfig) *HTTPReceiver {
 	// use buffered channels so that handlers are not waiting on downstream processing
 	return &HTTPReceiver{
-		traces:      make(chan model.Trace, 50),
+		traces:      make(chan model.Trace, 5000), // about 1000 traces/sec for 5 sec
 		services:    make(chan model.ServicesMetadata, 50),
 		decoderPool: model.NewDecoderPool(decoderSize),
 		conf:        conf,
@@ -102,7 +102,10 @@ func (r *HTTPReceiver) Run() {
 	if r.conf.ReceiverTimeout > 0 {
 		timeout = r.conf.ReceiverTimeout
 	}
-	server := http.Server{ReadTimeout: time.Second * time.Duration(timeout)}
+	server := http.Server{
+		ReadTimeout:  time.Second * time.Duration(timeout),
+		WriteTimeout: time.Second * time.Duration(timeout),
+	}
 
 	go r.logStats()
 	go sl.Refresh(r.conf.ConnectionLimit)
@@ -209,7 +212,18 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 			r.logger.Errorf(errorMsg)
 		} else {
 			atomic.AddInt64(&r.stats.SpansDropped, int64(spans-len(normTrace)))
-			r.traces <- normTrace
+
+			// if our downstream consumer is slow, we drop the trace on the floor
+			// this is a safety net against us using too much memory
+			// when clients flood us
+			select {
+			case r.traces <- normTrace:
+			default:
+				atomic.AddInt64(&r.stats.TracesDropped, 1)
+				atomic.AddInt64(&r.stats.SpansDropped, int64(spans))
+
+				r.logger.Errorf("dropping trace reason: rate-limited")
+			}
 		}
 
 		atomic.AddInt64(&r.stats.TracesReceived, 1)
