@@ -61,7 +61,7 @@ type HTTPReceiver struct {
 func NewHTTPReceiver(conf *config.AgentConfig) *HTTPReceiver {
 	// use buffered channels so that handlers are not waiting on downstream processing
 	return &HTTPReceiver{
-		traces:      make(chan model.Trace, 50),
+		traces:      make(chan model.Trace, 5000), // about 1000 traces/sec for 5 sec
 		services:    make(chan model.ServicesMetadata, 50),
 		decoderPool: model.NewDecoderPool(decoderSize),
 		conf:        conf,
@@ -219,6 +219,9 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 			select {
 			case r.traces <- normTrace:
 			default:
+				atomic.AddInt64(&r.stats.TracesDropped, 1)
+				atomic.AddInt64(&r.stats.SpansDropped, int64(spans))
+
 				r.logger.Errorf("dropping trace reason: rate-limited")
 			}
 		}
