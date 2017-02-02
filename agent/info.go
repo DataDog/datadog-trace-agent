@@ -175,6 +175,48 @@ func getProgramBanner(version string) (string, string) {
 //
 // If error is nil, means the program is running.
 // If not, it displays a pretty-printed message anyway (for support)
+//
+// Typical output of 'trace-agent -info' when agent is running:
+//
+// ======================
+// Trace Agent (v 0.99.0)
+// ======================
+//
+//   Command line: ./trace-agent
+//   Pid: 65365
+//   Uptime: 3
+//   Mem alloc: 779104
+//   Hostname: localhost.localdomain
+//   Receiver host: localhost
+//   Receiver port: 7777
+//   Statsd host: localhost
+//   Statsd port: 8125
+//   API Endpoints: https://trace.agent.datadoghq.com
+//
+//   Spans received (1 min): 0
+//   Traces received (1 min): 0
+//   Spans dropped (1 min): 0
+//   Traces dropped (1 min): 0
+//
+// Typical output of 'trace-agent -info' when agent is not running:
+//
+// ======================
+// Trace Agent (v 0.99.0)
+// ======================
+//
+//   Not running (port 7777)
+//
+// Typical output of 'trace-agent -info' when something unexpected happened,
+// for instance we're connecting to an HTTP server that serves an inadequate
+// response, or there's a bug, or... :
+//
+// ======================
+// Trace Agent (v 0.99.0)
+// ======================
+//
+//   Error: json: cannot unmarshal number into Go value of type main.StatusInfo
+//   URL: http://localhost:7777/debug/vars
+//
 func Info(w io.Writer, conf *config.AgentConfig) error {
 	host := conf.ReceiverHost
 	if host == "0.0.0.0" {
