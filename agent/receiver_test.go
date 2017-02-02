@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/fixtures"
@@ -28,6 +29,22 @@ func TestReceiverRequestBodyLength(t *testing.T) {
 
 	url := fmt.Sprintf("http://%s:%d/v0.3/traces",
 		conf.ReceiverHost, conf.ReceiverPort)
+
+	// Before going further, make sure receiver is started
+	// since it's running in another goroutine
+	for i := 0; i < 10; i++ {
+		client := &http.Client{}
+
+		body := bytes.NewBufferString("[]")
+		req, err := http.NewRequest("POST", url, body)
+		assert.Nil(err)
+
+		resp, err := client.Do(req)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 
 	testBody := func(expectedStatus int, bodyData string) {
 		client := &http.Client{}
