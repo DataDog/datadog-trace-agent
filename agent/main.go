@@ -45,14 +45,17 @@ var opts struct {
 	configFile   string
 	logLevel     string
 	version      bool
+	info         bool
+	cpuprofile   string
+	memprofile   string
 }
 
 // version info sourced from build flags
 var (
 	Version   string
-	BuildDate string
 	GitCommit string
 	GitBranch string
+	BuildDate string
 	GoVersion string
 )
 
@@ -79,22 +82,40 @@ func versionString() string {
 	return buf.String()
 }
 
-// main is the entrypoint of our code
-func main() {
+const agentDisabledMessage = `trace-agent not enabled.
+Set env var DD_APM_ENABLED=true or add
+apm_enabled: true
+to your datadog.conf file.
+Exiting.`
+
+func init() {
 	// command-line arguments
 	flag.StringVar(&opts.ddConfigFile, "ddconfig", "/etc/dd-agent/datadog.conf", "Classic agent config file location")
 	// FIXME: merge all APM configuration into dd-agent/datadog.conf and deprecate the below flag
 	flag.StringVar(&opts.configFile, "config", "/etc/datadog/trace-agent.ini", "Trace agent ini config file.")
 	flag.BoolVar(&opts.version, "version", false, "Show version information and exit")
+	flag.BoolVar(&opts.info, "info", false, "Show info about running trace agent process and exit")
 
 	// profiling arguments
-	cpuprofile := flag.String("cpuprofile", "", "write cpu profile to file")
-	memprofile := flag.String("memprofile", "", "write memory profile to `file`")
+	flag.StringVar(&opts.cpuprofile, "cpuprofile", "", "Write cpu profile to file")
+	flag.StringVar(&opts.memprofile, "memprofile", "", "Write memory profile to `file`")
+
 	flag.Parse()
+}
+
+// main is the entrypoint of our code
+func main() {
+	// configure a default logger before anything so we can observe initialization
+	if opts.info || opts.version {
+		log.UseLogger(log.Disabled)
+	} else {
+		config.NewLoggerLevelCustom("DEBUG", "/var/log/datadog/trace-agent.log")
+		defer log.Flush()
+	}
 
 	// start CPU profiling
-	if *cpuprofile != "" {
-		f, err := os.Create(*cpuprofile)
+	if opts.cpuprofile != "" {
+		f, err := os.Create(opts.cpuprofile)
 		if err != nil {
 			log.Critical(err)
 		}
@@ -138,6 +159,19 @@ func main() {
 		die("%v", err)
 	}
 
+	err = initInfo(agentConf) // for expvar & -info option
+	if err != nil {
+		panic(err)
+	}
+
+	if opts.info {
+		if err := Info(os.Stdout, agentConf); err != nil {
+			// need not display the error, Info should do it already
+			os.Exit(1)
+		}
+		return
+	}
+
 	// Exit if tracing is not enabled
 	if !agentConf.Enabled {
 		log.Info(agentDisabledMessage)
@@ -174,8 +208,8 @@ func main() {
 	agent.Run()
 
 	// collect memory profile
-	if *memprofile != "" {
-		f, err := os.Create(*memprofile)
+	if opts.memprofile != "" {
+		f, err := os.Create(opts.memprofile)
 		if err != nil {
 			log.Critical("could not create memory profile: ", err)
 		}
