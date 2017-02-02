@@ -64,7 +64,7 @@ end
 
 desc "Run Datadog Trace agent"
 task :run do
-  sh "./trace-agent -debug -config ./agent/trace-agent.ini"
+  sh "./trace-agent -config ./agent/trace-agent.ini"
 end
 
 desc "Build deb from current agent source"

@@ -46,7 +46,6 @@ func die(format string, args ...interface{}) {
 var opts struct {
 	ddConfigFile string
 	configFile   string
-	debug        bool
 	logLevel     string
 	version      bool
 }
@@ -99,7 +98,6 @@ func main() {
 	flag.StringVar(&opts.ddConfigFile, "ddconfig", "/etc/dd-agent/datadog.conf", "Classic agent config file location")
 	// FIXME: merge all APM configuration into dd-agent/datadog.conf and deprecate the below flag
 	flag.StringVar(&opts.configFile, "config", "/etc/datadog/trace-agent.ini", "Trace agent ini config file.")
-	flag.BoolVar(&opts.debug, "debug", false, "Turn on debug mode")
 	flag.BoolVar(&opts.version, "version", false, "Show version information and exit")
 
 	// profiling arguments
@@ -164,14 +162,8 @@ func main() {
 		return
 	}
 
-	// Initialize logging
-	level := agentConf.LogLevel
-	if opts.debug {
-		level = "debug"
-	}
-
-	// replace the default logger
-	err = config.NewLoggerLevelCustom(level, agentConf.LogFilePath)
+	// Initialize logging (replacing the default logger)
+	err = config.NewLoggerLevelCustom(agentConf.LogLevel, agentConf.LogFilePath)
 	if err != nil {
 		die("cannot create logger: %v", err)
 	}
