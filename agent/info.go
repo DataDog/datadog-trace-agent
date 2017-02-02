@@ -223,7 +223,8 @@ func Info(w io.Writer, conf *config.AgentConfig) error {
 		host = "127.0.0.1" // [FIXME:christian] not fool-proof
 	}
 	url := "http://localhost:" + strconv.Itoa(conf.ReceiverPort) + "/debug/vars"
-	resp, err := http.Get(url)
+	client := http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get(url)
 	if err != nil {
 		// OK, here, we can't even make an http call on the agent port,
 		// so we can assume it's not even running, or at least, not with
