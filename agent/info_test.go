@@ -17,6 +17,25 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type testServerErrorHandler struct {
+	t *testing.T
+}
+
+func (h *testServerErrorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
+	switch r.URL.Path {
+	case "/debug/vars":
+		h.t.Logf("serving fake (static) info data for %s", r.URL.Path)
+		_, err := w.Write([]byte(`this is *NOT* a valid JSON, no way...`))
+		if err != nil {
+			h.t.Errorf("error serving %s: %v", r.URL.Path, err)
+		}
+	default:
+		h.t.Logf("answering 404 for %s", r.URL.Path)
+		w.WriteHeader(http.StatusNotFound)
+	}
+}
+
 type testServerHandler struct {
 	t *testing.T
 }
@@ -46,7 +65,13 @@ func (h *testServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func testServer(t *testing.T) *httptest.Server {
 	server := httptest.NewServer(&testServerHandler{t: t})
-	t.Logf("test server listening on %s", server.URL)
+	t.Logf("test server (serving fake yet valid data) listening on %s", server.URL)
+	return server
+}
+
+func testServerError(t *testing.T) *httptest.Server {
+	server := httptest.NewServer(&testServerErrorHandler{t: t})
+	t.Logf("test server (serving bad data to trigger errors) listening on %s", server.URL)
 	return server
 }
 
@@ -156,6 +181,46 @@ func TestNotRunning(t *testing.T) {
 	assert.Equal(fmt.Sprintf("  Not running (port %d)", port), lines[4])
 	assert.Equal("", lines[5])
 	assert.Equal("", lines[6])
+}
+
+func TestError(t *testing.T) {
+	assert := assert.New(t)
+	conf := testInit(t)
+	assert.NotNil(conf)
+
+	server := testServerError(t)
+	assert.NotNil(server)
+	defer server.Close()
+
+	url, err := url.Parse(server.URL)
+	assert.NotNil(url)
+	assert.Nil(err)
+
+	hostPort := strings.Split(url.Host, ":")
+	assert.Equal(2, len(hostPort))
+	port, err := strconv.Atoi(hostPort[1])
+	assert.Nil(err)
+	conf.ReceiverPort = port
+
+	var buf bytes.Buffer
+	err = Info(&buf, conf)
+	assert.NotNil(err)
+	info := buf.String()
+
+	t.Logf("Info:\n%s\n", info)
+
+	lines := strings.Split(info, "\n")
+	assert.Equal(8, len(lines))
+	assert.Regexp(regexp.MustCompile(`^={10,100}$`), lines[0])
+	assert.Regexp(regexp.MustCompile(`^Trace Agent \(v.*\)$`), lines[1])
+	assert.Regexp(regexp.MustCompile(`^={10,100}$`), lines[2])
+	assert.Equal(len(lines[1]), len(lines[0]))
+	assert.Equal(len(lines[1]), len(lines[2]))
+	assert.Equal("", lines[3])
+	assert.Regexp(regexp.MustCompile(`^  Error: .*$`), lines[4])
+	assert.Equal(fmt.Sprintf("  URL: http://localhost:%d/debug/vars", port), lines[5])
+	assert.Equal("", lines[6])
+	assert.Equal("", lines[7])
 }
 
 func TestInfoReceiverStats(t *testing.T) {

@@ -163,7 +163,6 @@ func main() {
 	if opts.info {
 		if err := Info(os.Stdout, agentConf); err != nil {
 			// need not display the error, Info should do it already
-			os.Stdout.Sync()
 			os.Exit(1)
 		}
 		return
