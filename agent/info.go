@@ -18,6 +18,7 @@ import (
 var (
 	infoMu             sync.RWMutex
 	infoReceiverStats  receiverStats // only for the last minute
+	infoEndpointStats  endpointStats // only for the last minute
 	infoStart          = time.Now()
 	infoOnce           sync.Once
 	infoTmpl           *template.Template
@@ -32,20 +33,25 @@ const (
 
   Command line:{{range .Status.CmdLine}} {{.}}{{end}}
   Pid: {{.Status.Pid}}
-  Uptime: {{.Status.Uptime}}
-  Mem alloc: {{.Status.MemStats.Alloc}}
+  Uptime (seconds): {{.Status.Uptime}}
+  Mem alloc (bytes): {{.Status.MemStats.Alloc}}
+
   Hostname: {{.Status.Config.HostName}}
-  Receiver host: {{.Status.Config.ReceiverHost}}
-  Receiver port: {{.Status.Config.ReceiverPort}}
-  Statsd host: {{.Status.Config.StatsdHost}}
-  Statsd port: {{.Status.Config.StatsdPort}}
+  Receiver: {{.Status.Config.ReceiverHost}}:{{.Status.Config.ReceiverPort}}
   API Endpoints:{{range .Status.Config.APIEndpoints}} {{.}}{{end}}
 
-  Spans received (1 min): {{.Status.Receiver.SpansReceived}}
+  Bytes received (traces, 1 min): {{.Status.Receiver.TracesBytes}}
   Traces received (1 min): {{.Status.Receiver.TracesReceived}}
-  Spans dropped (1 min): {{.Status.Receiver.SpansDropped}}
-  Traces dropped (1 min): {{.Status.Receiver.TracesDropped}}
-
+  Spans received (1 min): {{.Status.Receiver.SpansReceived}}
+{{if gt .Status.Receiver.TracesDropped 0}}  WARNING: Traces dropped (1 min): {{.Status.Receiver.TracesDropped}}
+{{end}}{{if gt .Status.Receiver.SpansDropped 0}}  WARNING: Spans dropped (1 min): {{.Status.Receiver.SpansDropped}}
+{{end}}
+  Bytes sent (traces, 1 min): {{.Status.Endpoint.TracesBytes}}
+  Traces sent (1 min): {{.Status.Endpoint.TracesCount}}
+  Stats sent (1 min): {{.Status.Endpoint.TracesStats}}
+{{if gt .Status.Endpoint.TracesPayloadError 0}}  WARNING: Traces API errors (1 min): {{.Status.Endpoint.TracesPayloadError}}
+{{end}}{{if gt .Status.Endpoint.ServicesPayloadError 0}}  WARNING: Services API errors (1 min): {{.Status.Endpoint.ServicesPayloadError}}
+{{end}}
 `
 	infoNotRunningTmplSrc = `{{.Banner}}
 {{.Program}}
@@ -81,6 +87,19 @@ func publishReceiverStats() interface{} {
 	return rs
 }
 
+func updateEndpointStats(es endpointStats) {
+	infoMu.Lock()
+	infoEndpointStats = es
+	infoMu.Unlock()
+}
+
+func publishEndpointStats() interface{} {
+	infoMu.RLock()
+	es := infoEndpointStats
+	infoMu.RUnlock()
+	return es
+}
+
 type infoVersion struct {
 	Version   string
 	GitCommit string
@@ -112,6 +131,7 @@ func initInfo(conf *config.AgentConfig) error {
 		expvar.Publish("uptime", expvar.Func(publishUptime))
 		expvar.Publish("version", expvar.Func(publishVersion))
 		expvar.Publish("receiver", expvar.Func(publishReceiverStats))
+		expvar.Publish("endpoint", expvar.Func(publishEndpointStats))
 
 		c := *conf
 		c.APIKeys = nil // should not be exported by JSON, but just to make sure
@@ -159,6 +179,7 @@ type StatusInfo struct {
 	} `json:"memstats"`
 	Version  infoVersion        `json:"version"`
 	Receiver receiverStats      `json:"receiver"`
+	Endpoint endpointStats      `json:"endpoint"`
 	Config   config.AgentConfig `json:"config"`
 }
 
@@ -178,44 +199,60 @@ func getProgramBanner(version string) (string, string) {
 //
 // Typical output of 'trace-agent -info' when agent is running:
 //
+// -----8<-------------------------------------------------------
 // ======================
 // Trace Agent (v 0.99.0)
 // ======================
 //
 //   Command line: ./trace-agent
-//   Pid: 65365
-//   Uptime: 3
-//   Mem alloc: 779104
+//   Pid: 38149
+//   Uptime (seconds): 15
+//   Mem alloc (bytes): 773552
+//
 //   Hostname: localhost.localdomain
-//   Receiver host: localhost
-//   Receiver port: 7777
-//   Statsd host: localhost
-//   Statsd port: 8125
+//   Receiver: localhost:8126
 //   API Endpoints: https://trace.agent.datadoghq.com
 //
-//   Spans received (1 min): 0
-//   Traces received (1 min): 0
-//   Spans dropped (1 min): 0
-//   Traces dropped (1 min): 0
+//   Bytes received (traces, 1 min): 10000
+//   Traces received (1 min): 240
+//   Spans received (1 min): 360
+//   WARNING: Traces dropped (1 min): 5
+//   WARNING: Spans dropped (1 min): 10
+//
+//   Bytes sent (traces, 1 min): 3245
+//   Traces sent (1 min): 6
+//   Stats sent (1 min): 60
+//   WARNING: Traces API errors (1 min): 3
+//   WARNING: Services API errors (1 min): 1
+//
+// -----8<-------------------------------------------------------
+//
+// The "WARNING:" lines are hidden if there's nothing dropped or no errors.
 //
 // Typical output of 'trace-agent -info' when agent is not running:
 //
+// -----8<-------------------------------------------------------
 // ======================
 // Trace Agent (v 0.99.0)
 // ======================
 //
-//   Not running (port 7777)
+//   Not running (port 8126)
+//
+// -----8<-------------------------------------------------------
 //
 // Typical output of 'trace-agent -info' when something unexpected happened,
 // for instance we're connecting to an HTTP server that serves an inadequate
 // response, or there's a bug, or... :
 //
+// -----8<-------------------------------------------------------
 // ======================
 // Trace Agent (v 0.99.0)
 // ======================
 //
 //   Error: json: cannot unmarshal number into Go value of type main.StatusInfo
-//   URL: http://localhost:7777/debug/vars
+//   URL: http://localhost:8126/debug/vars
+//
+// -----8<-------------------------------------------------------
 //
 func Info(w io.Writer, conf *config.AgentConfig) error {
 	host := conf.ReceiverHost

@@ -183,7 +183,7 @@ receivingLoop:
 	assert.Equal(1, len(w.payloadBuffer))
 
 	p0 := w.payloadBuffer[0]
-	endpoint := p0.endpoint.(APIEndpoint)
+	endpoint := p0.endpoint.(*APIEndpoint)
 	assert.Equal(1, len(endpoint.apiKeys))
 	assert.Equal("key500", endpoint.apiKeys[0])
 }

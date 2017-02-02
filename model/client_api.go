@@ -42,7 +42,7 @@ func readAll(source io.Reader, dest *bytes.Buffer) (err error) {
 
 // ClientDecoder is the common interface that all decoders should honor
 type ClientDecoder interface {
-	Decode(body io.Reader, v interface{}) error
+	Decode(body io.Reader, v interface{}) (int, error)
 	BufferReader() *bytes.Reader
 	ContentType() string
 	Cap() int
@@ -73,15 +73,16 @@ func newJSONDecoder() *jsonDecoder {
 	}
 }
 
-func (d *jsonDecoder) Decode(body io.Reader, v interface{}) error {
+func (d *jsonDecoder) Decode(body io.Reader, v interface{}) (int, error) {
 	// read the response into the buffer
 	err := readAll(body, d.buf)
 	if err != nil {
-		return err
+		return 0, err
 	}
+	l := d.buf.Len()
 
 	// decode the payload to the given interface
-	return d.decoder.Decode(v)
+	return l, d.decoder.Decode(v)
 }
 
 func (d *jsonDecoder) BufferReader() *bytes.Reader {
@@ -107,21 +108,22 @@ func newMsgpackDecoder() *msgpackDecoder {
 	}
 }
 
-func (d *msgpackDecoder) Decode(body io.Reader, v interface{}) error {
+func (d *msgpackDecoder) Decode(body io.Reader, v interface{}) (int, error) {
 	// read the response into the buffer
 	err := readAll(body, d.buf)
 	if err != nil {
-		return err
+		return 0, err
 	}
+	l := d.buf.Len()
 
 	// decode the payload to the given interface
 	switch t := v.(type) {
 	case *Traces:
-		return msgp.Decode(d.buf, t)
+		return l, msgp.Decode(d.buf, t)
 	case *ServicesMetadata:
-		return msgp.Decode(d.buf, t)
+		return l, msgp.Decode(d.buf, t)
 	default:
-		return errors.New("No implementation for this interface")
+		return l, errors.New("No implementation for this interface")
 	}
 }
 

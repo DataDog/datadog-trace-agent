@@ -69,9 +69,10 @@ func TestDecoders(t *testing.T) {
 
 	for _, tc := range testCases {
 		var traces Traces
-		err := tc.decoder.Decode(tc.payload, &traces)
+		l, err := tc.decoder.Decode(tc.payload, &traces)
 
 		assert.Nil(err)
+		assert.NotEqual(0, l)
 		assert.Len(traces, 1)
 		trace := traces[0]
 		assert.Len(trace, 1)
@@ -101,13 +102,15 @@ func TestDecodersReusable(t *testing.T) {
 	for _, tc := range testCases {
 		// first decoding
 		var firstTraces Traces
-		err := tc.decoder.Decode(tc.firstPayload, &firstTraces)
+		l, err := tc.decoder.Decode(tc.firstPayload, &firstTraces)
 		assert.Nil(err)
+		assert.NotEqual(0, l)
 
 		// second decoding
 		var secondTraces Traces
-		err = tc.decoder.Decode(tc.secondPayload, &secondTraces)
+		l, err = tc.decoder.Decode(tc.secondPayload, &secondTraces)
 		assert.Nil(err)
+		assert.NotEqual(0, l)
 
 		assert.Len(secondTraces, 1)
 		trace := secondTraces[0]
