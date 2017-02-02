@@ -11,7 +11,7 @@ def go_build(program, opts={})
   dd = 'main'
   commit = `git rev-parse --short HEAD`.strip
   branch = `git rev-parse --abbrev-ref HEAD`.strip
-  date = `date`.strip
+  date = `date +%FT%T%z`.strip
   goversion = `go version`.strip
   agentversion = ENV["TRACE_AGENT_VERSION"] || "0.99.0"
 

@@ -92,6 +92,8 @@ func (r *HTTPReceiver) Run() {
 	http.HandleFunc("/v0.3/traces", r.httpHandleWithVersion(v03, r.handleTraces))
 	http.HandleFunc("/v0.3/services", r.httpHandleWithVersion(v03, r.handleServices))
 
+	// expvar implicitely publishes "/debug/vars" on the same port
+
 	addr := fmt.Sprintf("%s:%d", r.conf.ReceiverHost, r.conf.ReceiverPort)
 	if err := r.Listen(addr, ""); err != nil {
 		die("%v", err)
@@ -331,7 +333,8 @@ func (r *HTTPReceiver) logStats() {
 		statsd.Client.Count("datadog.trace_agent.receiver.span_dropped", sdropped, nil, 1)
 		statsd.Client.Count("datadog.trace_agent.receiver.trace_dropped", tdropped, nil, 1)
 
-		if now.Sub(lastLog) >= 60*time.Second {
+		if now.Sub(lastLog) >= time.Minute {
+			updateReceiverStats(accStats)
 			log.Infof("receiver handled %d spans, dropped %d ; handled %d traces, dropped %d",
 				accStats.SpansReceived, accStats.SpansDropped,
 				accStats.TracesReceived, accStats.TracesDropped)
@@ -343,9 +346,14 @@ func (r *HTTPReceiver) logStats() {
 	}
 }
 
+// receiverStats contains stats about the volume of data received
 type receiverStats struct {
-	SpansReceived  int64
+	// SpansReceived is the number of spans received, including the dropped ones
+	SpansReceived int64
+	// TracesReceived is the number of traces received, including the dropped ones
 	TracesReceived int64
-	SpansDropped   int64
-	TracesDropped  int64
+	// SpansDropped is the number of spans dropped
+	SpansDropped int64
+	// SpansReceived is the number of traces dropped
+	TracesDropped int64
 }

@@ -12,8 +12,10 @@ import (
 )
 
 // AgentConfig handles the interpretation of the configuration (with default
-// behaviors) is one place. It is also a simple structure to share across all
+// behaviors) in one place. It is also a simple structure to share across all
 // the Agent components, with 100% safe and reliable values.
+// It is exposed with expvar, so make sure to exclude any sensible field
+// from JSON encoding.
 type AgentConfig struct {
 	Enabled bool
 
@@ -23,7 +25,7 @@ type AgentConfig struct {
 
 	// API
 	APIEndpoints            []string
-	APIKeys                 []string
+	APIKeys                 []string `json:"-"` // never publish this
 	APIEnabled              bool
 	APIPayloadBufferMaxSize int
 
