@@ -43,7 +43,6 @@ func die(format string, args ...interface{}) {
 var opts struct {
 	ddConfigFile string
 	configFile   string
-	debug        bool
 	logLevel     string
 	version      bool
 }
@@ -86,7 +85,6 @@ func main() {
 	flag.StringVar(&opts.ddConfigFile, "ddconfig", "/etc/dd-agent/datadog.conf", "Classic agent config file location")
 	// FIXME: merge all APM configuration into dd-agent/datadog.conf and deprecate the below flag
 	flag.StringVar(&opts.configFile, "config", "/etc/datadog/trace-agent.ini", "Trace agent ini config file.")
-	flag.BoolVar(&opts.debug, "debug", false, "Turn on debug mode")
 	flag.BoolVar(&opts.version, "version", false, "Show version information and exit")
 
 	// profiling arguments
@@ -140,13 +138,19 @@ func main() {
 		die("%v", err)
 	}
 
-	// Initialize logging
-	level := agentConf.LogLevel
-	if opts.debug {
-		level = "debug"
+	// Exit if tracing is not enabled
+	if !agentConf.Enabled {
+		log.Info(agentDisabledMessage)
+
+		// a sleep is necessary to ensure that supervisor registers this process as "STARTED"
+		// If the exit is "too quick", we enter a BACKOFF->FATAL loop even though this is an expected exit
+		// http://supervisord.org/subprocess.html#process-states
+		time.Sleep(5 * time.Second)
+		return
 	}
 
-	err = config.NewLoggerLevelCustom(level, agentConf.LogFilePath)
+	// Initialize logging (replacing the default logger)
+	err = config.NewLoggerLevelCustom(agentConf.LogLevel, agentConf.LogFilePath)
 	if err != nil {
 		die("cannot create logger: %v", err)
 	}
