@@ -8,6 +8,6 @@ RUN echo "deb http://apt-trace.datad0g.com.s3.amazonaws.com/ stable main" > /etc
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-EXPOSE 7777/tcp
+EXPOSE 7777/tcp 8126/tcp
 
 ENTRYPOINT ["/opt/datadog-agent/bin/trace-agent"]
