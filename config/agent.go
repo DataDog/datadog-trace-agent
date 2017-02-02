@@ -119,7 +119,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 		MaxTPS:          10,
 
 		ReceiverHost:    "localhost",
-		ReceiverPort:    7777,
+		ReceiverPort:    8126,
 		ConnectionLimit: 2000,
 
 		StatsdHost: "localhost",

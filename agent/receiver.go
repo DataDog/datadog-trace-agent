@@ -14,6 +14,10 @@ import (
 	log "github.com/cihub/seelog"
 )
 
+// The trace agent used to listen on port 7777, but now uses port 8126. Keep
+// listening on 7777 during the transition.
+const legacyReceiverPort = 7777
+
 // APIVersion is a dumb way to version our collector handlers
 type APIVersion int
 
@@ -88,26 +92,46 @@ func (r *HTTPReceiver) Run() {
 	http.HandleFunc("/v0.3/services", httpHandleWithVersion(v03, r.handleServices))
 
 	addr := fmt.Sprintf("%s:%d", r.conf.ReceiverHost, r.conf.ReceiverPort)
-	log.Infof("listening for traces at http://%s/", addr)
-
-	tcpL, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Error("could not create TCP listener")
-		panic(err)
+	if err := r.Listen(addr, ""); err != nil {
+		die("%v", err)
 	}
 
-	sl, err := NewStoppableListener(tcpL, r.exit, r.conf.ConnectionLimit)
-	// some clients might use keep-alive and keep open their connections too long
-	// avoid leaks
-	timeout := 5
-	if r.conf.ReceiverTimeout > 0 {
-		timeout = r.conf.ReceiverTimeout
+	legacyAddr := fmt.Sprintf("%s:%d", r.conf.ReceiverHost, legacyReceiverPort)
+	if err := r.Listen(legacyAddr, " (legacy)"); err != nil {
+		log.Error(err)
 	}
-	server := http.Server{ReadTimeout: time.Second * time.Duration(timeout)}
 
 	go r.logStats()
-	go sl.Refresh(r.conf.ConnectionLimit)
-	go server.Serve(sl)
+}
+
+// Listen creates a new HTTP server listening on the provided address.
+func (r *HTTPReceiver) Listen(addr, logExtra string) error {
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("cannot listen on %s: %v", addr, err)
+	}
+
+	stoppableListener, err := NewStoppableListener(listener, r.exit,
+		r.conf.ConnectionLimit)
+	if err != nil {
+		return fmt.Errorf("cannot create stoppable listener: %v", err)
+	}
+
+	timeout := 5 * time.Second
+	if r.conf.ReceiverTimeout > 0 {
+		timeout = time.Duration(r.conf.ReceiverTimeout) * time.Second
+	}
+	server := http.Server{
+		ReadTimeout:  time.Second * time.Duration(timeout),
+		WriteTimeout: time.Second * time.Duration(timeout),
+	}
+
+	log.Infof("listening for traces at http://%s%s", addr, logExtra)
+
+	go stoppableListener.Refresh(r.conf.ConnectionLimit)
+	go server.Serve(stoppableListener)
+
+	return nil
 }
 
 // handleTraces knows how to handle a bunch of traces

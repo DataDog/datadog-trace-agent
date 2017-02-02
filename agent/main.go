@@ -32,6 +32,13 @@ func handleSignal(exit chan struct{}) {
 	}
 }
 
+// die logs an error message and makes the program exit immediately.
+func die(format string, args ...interface{}) {
+	log.Errorf(format, args...)
+	log.Flush()
+	os.Exit(1)
+}
+
 // opts are the command-line options
 var opts struct {
 	ddConfigFile string
@@ -113,6 +120,7 @@ func main() {
 	legacyConf, err := config.NewIfExists(opts.configFile)
 	if err != nil {
 		log.Errorf("%s: %v", opts.configFile, err)
+		log.Warnf("ignoring %s", opts.configFile)
 	}
 	if legacyConf != nil {
 		log.Infof("using legacy configuration from %s", opts.configFile)
@@ -121,6 +129,7 @@ func main() {
 	conf, err := config.NewIfExists(opts.ddConfigFile)
 	if err != nil {
 		log.Errorf("%s: %v", opts.ddConfigFile, err)
+		log.Warnf("ignoring %s", opts.ddConfigFile)
 	}
 	if conf != nil {
 		log.Infof("using configuration from %s", opts.ddConfigFile)
@@ -128,7 +137,7 @@ func main() {
 
 	agentConf, err = config.NewAgentConfig(conf, legacyConf)
 	if err != nil {
-		panic(err)
+		die("%v", err)
 	}
 
 	// Initialize logging
@@ -139,14 +148,14 @@ func main() {
 
 	err = config.NewLoggerLevelCustom(level, agentConf.LogFilePath)
 	if err != nil {
-		panic(fmt.Errorf("error with logger: %v", err))
+		die("cannot create logger: %v", err)
 	}
 	defer log.Flush()
 
 	// Initialize dogstatsd client
 	err = statsd.Configure(agentConf)
 	if err != nil {
-		fmt.Printf("Error configuring dogstatsd: %v", err)
+		die("cannot configure dogstatsd: %v", err)
 	}
 
 	// Seed rand
