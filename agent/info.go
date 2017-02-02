@@ -22,18 +22,13 @@ var (
 	infoOnce           sync.Once
 	infoTmpl           *template.Template
 	infoNotRunningTmpl *template.Template
+	infoErrorTmpl      *template.Template
 )
 
 const (
 	infoTmplSrc = `{{.Banner}}
 {{.Program}}
 {{.Banner}}
-
-  Version: {{.Status.Version.Version}}
-  Git hash: {{.Status.Version.GitCommit}}
-  Git branch: {{.Status.Version.GitBranch}}
-  Build date: {{.Status.Version.BuildDate}}
-  Go Version: {{.Status.Version.GoVersion}}
 
   Command line:{{range .Status.CmdLine}} {{.}}{{end}}
   Pid: {{.Status.Pid}}
@@ -57,6 +52,14 @@ const (
 {{.Banner}}
 
   Not running (port {{.ReceiverPort}})
+
+`
+	infoErrorTmplSrc = `{{.Banner}}
+{{.Program}}
+{{.Banner}}
+
+  Error: {{.Error}}
+  URL: {{.URL}}
 
 `
 )
@@ -133,6 +136,11 @@ func initInfo(conf *config.AgentConfig) error {
 		if err != nil {
 			return
 		}
+
+		infoErrorTmpl, err = template.New("infoError").Parse(infoErrorTmplSrc)
+		if err != nil {
+			return
+		}
 	})
 
 	return err
@@ -154,36 +162,33 @@ type StatusInfo struct {
 	Config   config.AgentConfig `json:"config"`
 }
 
+func getProgramBanner(version string) (string, string) {
+	program := fmt.Sprintf("Trace Agent (v %s)", version)
+	banner := strings.Repeat("=", len(program))
+
+	return program, banner
+}
+
 // Info writes a standard info message describing the running agent.
 // This is not the current program, but an already running program,
 // which we query with an HTTP request.
 //
-// It returns an error if it could not generate a proper string.
-// But no error does not mean the program we want to query is running.
-// Eg:
-// - if network port is unreachable with HTTP, write a pretty-printed
-//   message, return false, and no error.
-// - if we can successfully get JSON through HTTP, and parse it, write
-//   a pretty-printed message, return true, and no error
-// - if we can make an HTTP all, but get inconsitent data, write nothing,
-//   return false, and an error.
-func Info(w io.Writer, conf *config.AgentConfig) (bool, error) {
-	program := fmt.Sprintf("Trace Agent (v %s)", Version)
-	banner := strings.Repeat("=", len(program))
-
+// If error is nil, means the program is running.
+// If not, it displays a pretty-printed message anyway (for support)
+func Info(w io.Writer, conf *config.AgentConfig) error {
 	host := conf.ReceiverHost
 	if host == "0.0.0.0" {
 		host = "127.0.0.1" // [FIXME:christian] not fool-proof
 	}
 	url := "http://localhost:" + strconv.Itoa(conf.ReceiverPort) + "/debug/vars"
 	resp, err := http.Get(url)
-
 	if err != nil {
 		// OK, here, we can't even make an http call on the agent port,
 		// so we can assume it's not even running, or at least, not with
 		// these parameters. We display the port as a hint on where to
 		// debug further, this is where the expvar JSON should come from.
-		err = infoNotRunningTmpl.Execute(w, struct {
+		program, banner := getProgramBanner(Version)
+		_ = infoNotRunningTmpl.Execute(w, struct {
 			Banner       string
 			Program      string
 			ReceiverPort int
@@ -192,16 +197,30 @@ func Info(w io.Writer, conf *config.AgentConfig) (bool, error) {
 			Program:      program,
 			ReceiverPort: conf.ReceiverPort,
 		})
-		return false, err
+		return err
 	}
 
 	defer resp.Body.Close() // OK to defer, this is not on hot path
 
 	var info StatusInfo
 	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
-		return false, fmt.Errorf("unable to read response from Datadog Trace Agent on '%s'\nERROR: %v\n", url, err)
+		program, banner := getProgramBanner(Version)
+		_ = infoErrorTmpl.Execute(w, struct {
+			Banner  string
+			Program string
+			Error   error
+			URL     string
+		}{
+			Banner:  banner,
+			Program: program,
+			Error:   err,
+			URL:     url,
+		})
+		return err
 	}
 
+	// display the remote program version, now that we know it
+	program, banner := getProgramBanner(info.Version.Version)
 	err = infoTmpl.Execute(w, struct {
 		Banner  string
 		Program string
@@ -211,5 +230,5 @@ func Info(w io.Writer, conf *config.AgentConfig) (bool, error) {
 		Program: program,
 		Status:  &info,
 	})
-	return true, err
+	return nil
 }

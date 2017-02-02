@@ -104,7 +104,9 @@ func init() {
 // main is the entrypoint of our code
 func main() {
 	// configure a default logger before anything so we can observe initialization
-	if !opts.info && !opts.version {
+	if opts.info || opts.version {
+		log.UseLogger(log.Disabled)
+	} else {
 		config.NewLoggerLevelCustom("DEBUG", "/var/log/datadog/trace-agent.log")
 		defer log.Flush()
 	}
@@ -159,12 +161,10 @@ func main() {
 	}
 
 	if opts.info {
-		if running, err := Info(os.Stdout, agentConf); err == nil {
-			if !running {
-				os.Exit(1)
-			}
-		} else {
-			panic(err)
+		if err := Info(os.Stdout, agentConf); err != nil {
+			// need not display the error, Info should do it already
+			os.Stdout.Sync()
+			os.Exit(1)
 		}
 		return
 	}
