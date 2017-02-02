@@ -177,6 +177,7 @@ func Info(w io.Writer, conf *config.AgentConfig) (bool, error) {
 	}
 	url := "http://localhost:" + strconv.Itoa(conf.ReceiverPort) + "/debug/vars"
 	resp, err := http.Get(url)
+
 	if err != nil {
 		// OK, here, we can't even make an http call on the agent port,
 		// so we can assume it's not even running, or at least, not with
@@ -193,6 +194,8 @@ func Info(w io.Writer, conf *config.AgentConfig) (bool, error) {
 		})
 		return false, err
 	}
+
+	defer resp.Body.Close() // OK to defer, this is not on hot path
 
 	var info StatusInfo
 	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
