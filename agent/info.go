@@ -35,7 +35,7 @@ const (
   Build date: {{.Status.Version.BuildDate}}
   Go Version: {{.Status.Version.GoVersion}}
 
-  Command line: {{.CmdLine}}
+  Command line:{{range .Status.CmdLine}} {{.}}{{end}}
   Pid: {{.Status.Pid}}
   Uptime: {{.Status.Uptime}}
   Mem alloc: {{.Status.MemStats.Alloc}}
@@ -44,7 +44,7 @@ const (
   Receiver port: {{.Status.Config.ReceiverPort}}
   Statsd host: {{.Status.Config.StatsdHost}}
   Statsd port: {{.Status.Config.StatsdPort}}
-  API Endpoints: {{.APIEndpoints}}
+  API Endpoints:{{range .Status.Config.APIEndpoints}} {{.}}{{end}}
 
   Spans received (1 min): {{.Status.Receiver.SpansReceived}}
   Traces received (1 min): {{.Status.Receiver.TracesReceived}}
@@ -203,17 +203,13 @@ func Info(w io.Writer, conf *config.AgentConfig) (bool, error) {
 	}
 
 	err = infoTmpl.Execute(w, struct {
-		Banner       string
-		Program      string
-		CmdLine      string
-		APIEndpoints string
-		Status       *StatusInfo
+		Banner  string
+		Program string
+		Status  *StatusInfo
 	}{
-		Banner:       banner,
-		Program:      program,
-		CmdLine:      strings.Join(info.CmdLine, " "), // [FIXME:christian] find a way to do this in text/template
-		APIEndpoints: strings.Join(info.Config.APIEndpoints, ", "),
-		Status:       &info,
+		Banner:  banner,
+		Program: program,
+		Status:  &info,
 	})
 	return true, err
 }
