@@ -17,6 +17,8 @@ import (
 // It is exposed with expvar, so make sure to exclude any sensible field
 // from JSON encoding.
 type AgentConfig struct {
+	Enabled bool
+
 	// Global
 	HostName   string
 	DefaultEnv string // the traces will default to this environment

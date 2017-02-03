@@ -293,7 +293,10 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 
 // logStats periodically submits stats about the receiver to statsd
 func (r *HTTPReceiver) logStats() {
-	for range time.Tick(60 * time.Second) {
+	var accStats receiverStats
+	var lastLog time.Time
+
+	for now := range time.Tick(60 * time.Second) {
 		// Load counters and reset them for the next flush
 		spans := atomic.LoadInt64(&r.stats.SpansReceived)
 		r.stats.SpansReceived = 0
