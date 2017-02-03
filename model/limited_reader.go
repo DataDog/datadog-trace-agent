@@ -38,6 +38,13 @@ func (r *LimitedReader) Read(buf []byte) (n int, err error) {
 	}
 	n, err = r.r.Read(buf)
 
+	// Some libraries (e.g. msgp) will ignore read data if err is not nil.
+	// We reset err if something was read, and the next read will return
+	// io.EOF with no data.
+	if err == io.EOF && n > 0 {
+		err = nil
+	}
+
 	r.limit -= int64(n)
 	return
 }
