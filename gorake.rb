@@ -5,7 +5,8 @@ def go_build(program, opts={})
     default_cmd = "go build -i"
   end
   opts = {
-    :cmd => default_cmd
+    :cmd => default_cmd,
+    :race => false
   }.merge(opts)
 
   dd = 'main'
@@ -30,6 +31,8 @@ def go_build(program, opts={})
   end.join ' '
 
   cmd = opts[:cmd]
+  cmd += ' -race' if opts[:race]
+
   sh "#{cmd} -ldflags \"#{ldflags}\" #{program}"
 end
 

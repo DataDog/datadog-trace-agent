@@ -31,7 +31,10 @@ task :default => [:ci]
 
 desc "Build Datadog Trace agent"
 task :build do
-  go_build("github.com/DataDog/datadog-trace-agent/agent", :cmd => "go build -a -o trace-agent")
+  go_build("github.com/DataDog/datadog-trace-agent/agent", {
+    :cmd => "go build -a -o trace-agent",
+    :race => ENV['GO_RACE'] == 'true'
+  })
 end
 
 desc "Install Datadog Trace agent"
