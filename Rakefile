@@ -51,7 +51,7 @@ task :coverage do
   PACKAGES.each do |pkg|
     file = "#{i}.coverage"
     files << file
-    go_test(pkg, coverage_file: file)
+    go_test(pkg, {:coverage_file => file})
     i += 1
   end
   files.select! {|f| File.file? f}
