@@ -17,6 +17,7 @@ var ErrLimitedReaderLimitReached = errors.New("read limit reached")
 type LimitedReader struct {
 	r     io.ReadCloser
 	limit int64
+	Count int64
 }
 
 // NewLimitedReader creates a new LimitedReader.
@@ -46,6 +47,7 @@ func (r *LimitedReader) Read(buf []byte) (n int, err error) {
 	}
 
 	r.limit -= int64(n)
+	r.Count += int64(n)
 	return
 }
 

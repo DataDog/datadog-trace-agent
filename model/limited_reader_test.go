@@ -52,16 +52,19 @@ func TestLimitedReader(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 1, n)
 	assert.Equal(t, []byte("f"), tmp)
+	assert.Equal(t, 1, lr.Count)
 
 	tmp = make([]byte, 4)
 	n, err = lr.Read(tmp)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, n)
 	assert.Equal(t, []byte("oo\x00\x00"), tmp)
+	assert.Equal(t, 3, lr.Count)
 
 	tmp = make([]byte, 1)
 	n, err = lr.Read(tmp)
 	assert.Equal(t, ErrLimitedReaderLimitReached, err)
+	assert.Equal(t, 3, lr.Count)
 }
 
 func TestLimitedReaderEOFBuffer(t *testing.T) {
@@ -74,11 +77,13 @@ func TestLimitedReaderEOFBuffer(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 6, n)
 	assert.Equal(t, []byte("foobar"), tmp)
+	assert.Equal(t, 6, lr.Count)
 
 	tmp = make([]byte, 6)
 	n, err = lr.Read(tmp)
 	assert.Equal(t, io.EOF, err)
 	assert.Equal(t, 0, n)
+	assert.Equal(t, 6, lr.Count)
 }
 
 func TestLimitedReaderEOFMockFile(t *testing.T) {
@@ -90,9 +95,11 @@ func TestLimitedReaderEOFMockFile(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 6, n)
 	assert.Equal(t, []byte("foobar"), tmp)
+	assert.Equal(t, 6, lr.Count)
 
 	tmp = make([]byte, 6)
 	n, err = lr.Read(tmp)
 	assert.Equal(t, io.EOF, err)
 	assert.Equal(t, 0, n)
+	assert.Equal(t, 6, lr.Count)
 }
