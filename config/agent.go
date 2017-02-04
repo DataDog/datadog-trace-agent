@@ -193,6 +193,10 @@ APM_CONF:
 		goto ENV_CONF
 	}
 
+	if v, _ := conf.Get("Main", "apm_enabled"); v == "true" {
+		c.Enabled = true
+	}
+
 	if v, _ := conf.Get("trace.config", "env"); v != "" {
 		c.DefaultEnv = v
 	}
