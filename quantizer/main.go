@@ -2,7 +2,6 @@ package quantizer
 
 import (
 	"regexp"
-	"strings"
 
 	"github.com/DataDog/datadog-trace-agent/model"
 )
@@ -25,26 +24,14 @@ type QuantizeFunction func(model.Span) model.Span
 func Quantize(span model.Span) model.Span {
 	switch span.Type {
 	case sqlType:
-		fallthrough
+		return QuantizeSQL(span)
 	case cassandraType:
 		return QuantizeSQL(span)
-
 	case redisType:
 		return QuantizeRedis(span)
-
 	default:
 		return span
 	}
-}
-
-// compactAllSpaces transforms any sequence of space-like characters (including line breaks) into a single standard space
-// Also right trims spaces.
-func compactAllSpaces(text string) string {
-	return compactAllSpacesWithoutRegexp(text)
-}
-
-func compactAllSpacesWithRegexp(text string) string {
-	return strings.Trim(nonUniformSpacesRegexp.ReplaceAllString(text, " "), " ")
 }
 
 func isGenericSpace(char uint8) bool {
@@ -55,7 +42,9 @@ func isWhitespace(char uint8) bool {
 	return char == spaceCode
 }
 
-func compactAllSpacesWithoutRegexp(t string) string {
+// compactAllSpaces transforms any sequence of space-like characters (including line breaks) into a single standard space
+// Also right trims spaces.
+func compactAllSpaces(t string) string {
 	// Algorithm:
 	//  - Iterate over the input string (of length n), char by char (cursor `i`), looking for spaces
 	//  - When a spaces if found:

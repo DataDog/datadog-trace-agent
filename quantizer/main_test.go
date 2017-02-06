@@ -51,21 +51,12 @@ func TestCompactAllSpaces(t *testing.T) {
 	}
 
 	for _, testCase := range resultsToExpect {
-		assert.Equal(testCase.after, compactAllSpacesWithRegexp(testCase.before))
-	}
-	for _, testCase := range resultsToExpect {
-		assert.Equal(testCase.after, compactAllSpacesWithoutRegexp(testCase.before))
+		assert.Equal(testCase.after, compactAllSpaces(testCase.before))
 	}
 }
 
 func BenchmarkCompactAllSpacesWithRegexp(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		compactAllSpacesWithRegexp("SELECT org_id,metric_key \n		FROM metrics_metadata \n		WHERE org_id = %(org_id)s 	AND 	metric_key = ANY(array[21, 25, 32])")
-	}
-}
-
-func BenchmarkCompactAllSpacesWithoutRegexp(b *testing.B) {
-	for n := 0; n < b.N; n++ {
-		compactAllSpacesWithoutRegexp("SELECT org_id,metric_key \n		FROM metrics_metadata \n		WHERE org_id = %(org_id)s 	AND 	metric_key = ANY(array[21, 25, 32])")
+		compactAllSpaces("SELECT org_id,metric_key \n		FROM metrics_metadata \n		WHERE org_id = %(org_id)s 	AND 	metric_key = ANY(array[21, 25, 32])")
 	}
 }
