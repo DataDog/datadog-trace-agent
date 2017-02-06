@@ -33,7 +33,7 @@ func NewStoppableListener(l net.Listener, exit chan struct{}, conns int) (*Stopp
 func (sl *StoppableListener) Refresh(conns int) {
 	for range time.Tick(30 * time.Second) {
 		atomic.StoreInt32(&sl.connLease, int32(conns))
-		log.Debugf("Refreshed the connection lease: %d conns available", sl.connLease)
+		log.Debugf("Refreshed the connection lease: %d conns available", conns)
 	}
 }
 
@@ -52,7 +52,7 @@ func (e *RateLimitedError) Timeout() bool { return false }
 
 // Accept reimplements the regular Accept but adds a check on the exit channel and returns if needed
 func (sl *StoppableListener) Accept() (net.Conn, error) {
-	if sl.connLease <= 0 {
+	if atomic.LoadInt32(&sl.connLease) <= 0 {
 		// we've reached our cap for this lease period, reject the request
 		return nil, &RateLimitedError{}
 	}
