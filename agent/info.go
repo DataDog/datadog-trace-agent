@@ -49,8 +49,8 @@ const (
   Bytes sent (traces, 1 min): {{.Status.Endpoint.TracesBytes}}
   Traces sent (1 min): {{.Status.Endpoint.TracesCount}}
   Stats sent (1 min): {{.Status.Endpoint.TracesStats}}
-{{if gt .Status.Endpoint.TracesPayloadError 0}}  WARNING: Traces API errors (1 min): {{.Status.Endpoint.TracesPayloadError}}
-{{end}}{{if gt .Status.Endpoint.ServicesPayloadError 0}}  WARNING: Services API errors (1 min): {{.Status.Endpoint.ServicesPayloadError}}
+{{if gt .Status.Endpoint.TracesPayloadError 0}}  WARNING: Traces API errors (1 min): {{.Status.Endpoint.TracesPayloadError}}/{{.Status.Endpoint.TracesPayload}}
+{{end}}{{if gt .Status.Endpoint.ServicesPayloadError 0}}  WARNING: Services API errors (1 min): {{.Status.Endpoint.ServicesPayloadError}}/{{.Status.Endpoint.ServicesPayload}}
 {{end}}
 `
 	infoNotRunningTmplSrc = `{{.Banner}}
@@ -222,8 +222,8 @@ func getProgramBanner(version string) (string, string) {
 //   Bytes sent (traces, 1 min): 3245
 //   Traces sent (1 min): 6
 //   Stats sent (1 min): 60
-//   WARNING: Traces API errors (1 min): 3
-//   WARNING: Services API errors (1 min): 1
+//   WARNING: Traces API errors (1 min): 1/3
+//   WARNING: Services API errors (1 min): 1/1
 //
 // -----8<-------------------------------------------------------
 //

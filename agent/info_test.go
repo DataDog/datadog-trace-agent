@@ -231,8 +231,8 @@ func TestWarning(t *testing.T) {
 	assert.Equal("  Bytes sent (traces, 1 min): 3245", lines[19])
 	assert.Equal("  Traces sent (1 min): 6", lines[20])
 	assert.Equal("  Stats sent (1 min): 60", lines[21])
-	assert.Equal("  WARNING: Traces API errors (1 min): 3", lines[22])
-	assert.Equal("  WARNING: Services API errors (1 min): 1", lines[23])
+	assert.Equal("  WARNING: Traces API errors (1 min): 3/4", lines[22])
+	assert.Equal("  WARNING: Services API errors (1 min): 1/2", lines[23])
 	assert.Equal("", lines[24])
 	assert.Equal("", lines[25])
 }
