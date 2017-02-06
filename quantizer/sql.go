@@ -51,6 +51,8 @@ func (f *ReplaceFilter) Filter(token, lastToken int, buffer []byte) (int, []byte
 		return Filtered, []byte("?")
 	case Limit:
 		return token, buffer
+	case As:
+		return token, []byte("?")
 	}
 
 	switch token {
