@@ -1,6 +1,8 @@
 package main
 
 import (
+	"sync"
+
 	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/datadog-trace-agent/config"
@@ -11,10 +13,9 @@ import (
 
 // Sampler chooses wich spans to write to the API
 type Sampler struct {
+	mu            sync.Mutex
 	sampledTraces []model.Trace
-
-	// statistics
-	traceCount int
+	traceCount    int
 
 	samplerEngine SamplerEngine
 }
@@ -42,10 +43,12 @@ func (s *Sampler) Run() {
 
 // Add samples a trace then keep it until the next flush
 func (s *Sampler) Add(t processedTrace) {
+	s.mu.Lock()
 	s.traceCount++
 	if s.samplerEngine.Sample(t.Trace, t.Root, t.Env) {
 		s.sampledTraces = append(s.sampledTraces, t.Trace)
 	}
+	s.mu.Unlock()
 }
 
 // Stop stops the sampler
@@ -55,10 +58,12 @@ func (s *Sampler) Stop() {
 
 // Flush returns representative spans based on GetSamples and reset its internal memory
 func (s *Sampler) Flush() []model.Trace {
+	s.mu.Lock()
 	traces := s.sampledTraces
 	s.sampledTraces = []model.Trace{}
 	traceCount := s.traceCount
 	s.traceCount = 0
+	s.mu.Unlock()
 
 	statsd.Client.Count("datadog.trace_agent.sampler.trace.kept", int64(len(traces)), nil, 1)
 	statsd.Client.Count("datadog.trace_agent.sampler.trace.total", int64(traceCount), nil, 1)
