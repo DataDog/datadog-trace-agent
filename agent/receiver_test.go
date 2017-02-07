@@ -22,10 +22,21 @@ func TestReceiverRequestBodyLength(t *testing.T) {
 	conf := config.NewDefaultAgentConfig()
 	conf.APIKeys = []string{"test"}
 
+	// save the global mux aside, we don't want to break other tests
+	defaultMux := http.DefaultServeMux
+	http.DefaultServeMux = http.NewServeMux()
+
 	receiver := NewHTTPReceiver(conf)
 	receiver.maxRequestBodyLength = 2
 	go receiver.Run()
-	defer close(receiver.exit)
+
+	defer func() {
+		close(receiver.exit)
+		// we need to wait more than on second (time for StoppableListener.Accept
+		// to acknowledge the connection has been closed)
+		time.Sleep(2 * time.Second)
+		http.DefaultServeMux = defaultMux
+	}()
 
 	url := fmt.Sprintf("http://%s:%d/v0.3/traces",
 		conf.ReceiverHost, conf.ReceiverPort)

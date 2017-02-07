@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"runtime"
 	"strings"
 	"testing"
@@ -19,7 +20,23 @@ func TestWatchdog(t *testing.T) {
 	conf.APIKeys = append(conf.APIKeys, "apikey_2")
 	conf.MaxMemory = 1e7
 	conf.WatchdogInterval = time.Millisecond
+
+	// save the global mux aside, we don't want to break other tests
+	defaultMux := http.DefaultServeMux
+	http.DefaultServeMux = http.NewServeMux()
+
 	agent := NewAgent(conf)
+
+	defer func() {
+		close(agent.exit)
+		// We need to manually close the receiver as the Run() func
+		// should have been broken and interrupted by the watchdog panic
+		close(agent.Receiver.exit)
+		// we need to wait more than on second (time for StoppableListener.Accept
+		// to acknowledge the connection has been closed)
+		time.Sleep(2 * time.Second)
+		http.DefaultServeMux = defaultMux
+	}()
 
 	defer func() {
 		if r := recover(); r != nil {
