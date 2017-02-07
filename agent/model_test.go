@@ -22,8 +22,9 @@ func BenchmarkHandleSpanRandom(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		trace := fixtures.RandomTrace(10, 8)
+		root := trace.GetRoot()
 		for _, span := range trace {
-			sb.HandleSpan(span, defaultEnv, aggr, nil)
+			sb.HandleSpan(span, defaultEnv, aggr, root.Weight(), nil)
 		}
 	}
 }

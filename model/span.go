@@ -5,6 +5,11 @@ import (
 	"math/rand"
 )
 
+const (
+	// SpanSampleRateMetricKey is the metric key holding the sample rate
+	SpanSampleRateMetricKey = "_sample_rate"
+)
+
 // Span is the common struct we use to represent a dapper-like span
 type Span struct {
 	// Mandatory
@@ -58,4 +63,15 @@ func NewFlushMarker() Span {
 // End returns the end time of the span.
 func (s *Span) End() int64 {
 	return s.Start + s.Duration
+}
+
+// Weight returns the weight of the span as defined for sampling, i.e. the
+// inverse of the sampling rate.
+func (s *Span) Weight() float64 {
+	sampleRate, ok := s.Metrics[SpanSampleRateMetricKey]
+	if !ok || sampleRate <= 0.0 || sampleRate > 1.0 {
+		return 1.0
+	}
+
+	return 1.0 / sampleRate
 }

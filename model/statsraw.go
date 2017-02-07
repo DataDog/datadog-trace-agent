@@ -12,9 +12,9 @@ import (
 
 type groupedStats struct {
 	tags                 TagSet
-	hits                 int64
-	errors               int64
-	duration             int64
+	hits                 float64
+	errors               float64
+	duration             float64
 	durationDistribution *quantile.SliceSummary
 }
 
@@ -163,7 +163,7 @@ func assembleGrain(b *bytes.Buffer, env, resource, service string, m map[string]
 }
 
 // HandleSpan adds the span to this bucket stats, aggregated with the finest grain matching given aggregators
-func (sb *StatsRawBucket) HandleSpan(s Span, env string, aggregators []string, sublayers *[]SublayerValue) {
+func (sb *StatsRawBucket) HandleSpan(s Span, env string, aggregators []string, weight float64, sublayers *[]SublayerValue) {
 	if env == "" {
 		panic("env should never be empty")
 	}
@@ -179,7 +179,7 @@ func (sb *StatsRawBucket) HandleSpan(s Span, env string, aggregators []string, s
 	}
 
 	grain, tags := assembleGrain(&sb.keyBuf, env, s.Resource, s.Service, m)
-	sb.add(s, grain, tags)
+	sb.add(s, weight, grain, tags)
 
 	// sublayers - special case
 	if sublayers != nil {
@@ -189,7 +189,7 @@ func (sb *StatsRawBucket) HandleSpan(s Span, env string, aggregators []string, s
 	}
 }
 
-func (sb *StatsRawBucket) add(s Span, aggr string, tags TagSet) {
+func (sb *StatsRawBucket) add(s Span, weight float64, aggr string, tags TagSet) {
 	var gs groupedStats
 	var ok bool
 
@@ -198,11 +198,11 @@ func (sb *StatsRawBucket) add(s Span, aggr string, tags TagSet) {
 		gs = newGroupedStats(tags)
 	}
 
-	gs.hits++
+	gs.hits += weight
 	if s.Error != 0 {
-		gs.errors++
+		gs.errors += weight
 	}
-	gs.duration += s.Duration
+	gs.duration += float64(s.Duration) * weight
 
 	// TODO add for s.Metrics ability to define arbitrary counts and distros, check some config?
 	// alter resolution of duration distro
