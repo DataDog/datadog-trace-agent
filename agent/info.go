@@ -31,7 +31,6 @@ const (
 {{.Program}}
 {{.Banner}}
 
-  Command line:{{range .Status.CmdLine}} {{.}}{{end}}
   Pid: {{.Status.Pid}}
   Uptime: {{.Status.Uptime}} seconds
   Mem alloc: {{.Status.MemStats.Alloc}} bytes
@@ -210,7 +209,6 @@ func getProgramBanner(version string) (string, string) {
 // Trace Agent (v 0.99.0)
 // ======================
 //
-//   Command line: ./trace-agent
 //   Pid: 38149
 //   Uptime: 15 seconds
 //   Mem alloc: 773552 bytes
