@@ -33,20 +33,20 @@ const (
 
   Command line:{{range .Status.CmdLine}} {{.}}{{end}}
   Pid: {{.Status.Pid}}
-  Uptime (seconds): {{.Status.Uptime}}
-  Mem alloc (bytes): {{.Status.MemStats.Alloc}}
+  Uptime: {{.Status.Uptime}} seconds
+  Mem alloc: {{.Status.MemStats.Alloc}} bytes
 
   Hostname: {{.Status.Config.HostName}}
   Receiver: {{.Status.Config.ReceiverHost}}:{{.Status.Config.ReceiverPort}}
   API Endpoints:{{range .Status.Config.APIEndpoints}} {{.}}{{end}}
 
-  Bytes received (traces, 1 min): {{.Status.Receiver.TracesBytes}}
+  Bytes received (1 min): {{add .Status.Receiver.TracesBytes .Status.Receiver.ServicesBytes}}
   Traces received (1 min): {{.Status.Receiver.TracesReceived}}
   Spans received (1 min): {{.Status.Receiver.SpansReceived}}
 {{if gt .Status.Receiver.TracesDropped 0}}  WARNING: Traces dropped (1 min): {{.Status.Receiver.TracesDropped}}
 {{end}}{{if gt .Status.Receiver.SpansDropped 0}}  WARNING: Spans dropped (1 min): {{.Status.Receiver.SpansDropped}}
 {{end}}
-  Bytes sent (traces, 1 min): {{.Status.Endpoint.TracesBytes}}
+  Bytes sent (1 min): {{add .Status.Endpoint.TracesBytes .Status.Endpoint.ServicesBytes}}
   Traces sent (1 min): {{.Status.Endpoint.TracesCount}}
   Stats sent (1 min): {{.Status.Endpoint.TracesStats}}
 {{if gt .Status.Endpoint.TracesPayloadError 0}}  WARNING: Traces API errors (1 min): {{.Status.Endpoint.TracesPayloadError}}/{{.Status.Endpoint.TracesPayload}}
@@ -126,6 +126,12 @@ func (s infoString) String() string { return string(s) }
 func initInfo(conf *config.AgentConfig) error {
 	var err error
 
+	funcMap := template.FuncMap{
+		"add": func(a, b int64) int64 {
+			return a + b
+		},
+	}
+
 	infoOnce.Do(func() {
 		expvar.NewInt("pid").Set(int64(os.Getpid()))
 		expvar.Publish("uptime", expvar.Func(publishUptime))
@@ -147,7 +153,7 @@ func initInfo(conf *config.AgentConfig) error {
 		// Config is parsed at the beginning and never changed again, anyway.
 		expvar.Publish("config", infoString(string(buf)))
 
-		infoTmpl, err = template.New("info").Parse(infoTmplSrc)
+		infoTmpl, err = template.New("info").Funcs(funcMap).Parse(infoTmplSrc)
 		if err != nil {
 			return
 		}
@@ -206,20 +212,20 @@ func getProgramBanner(version string) (string, string) {
 //
 //   Command line: ./trace-agent
 //   Pid: 38149
-//   Uptime (seconds): 15
-//   Mem alloc (bytes): 773552
+//   Uptime: 15 seconds
+//   Mem alloc: 773552 bytes
 //
 //   Hostname: localhost.localdomain
 //   Receiver: localhost:8126
 //   API Endpoints: https://trace.agent.datadoghq.com
 //
-//   Bytes received (traces, 1 min): 10000
+//   Bytes received (1 min): 10000
 //   Traces received (1 min): 240
 //   Spans received (1 min): 360
 //   WARNING: Traces dropped (1 min): 5
 //   WARNING: Spans dropped (1 min): 10
 //
-//   Bytes sent (traces, 1 min): 3245
+//   Bytes sent (1 min): 3245
 //   Traces sent (1 min): 6
 //   Stats sent (1 min): 60
 //   WARNING: Traces API errors (1 min): 1/3
