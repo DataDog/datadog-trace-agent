@@ -25,8 +25,8 @@ const (
 	SampleRateMetricKey = "_sample_rate"
 
 	// Sampler parameters not (yet?) configurable
-	defaultDecayPeriod          time.Duration = 30 * time.Second
 	defaultSignatureScoreOffset float64       = 1
+	defaultDecayPeriod          time.Duration = 5 * time.Second
 	defaultSignatureScoreSlope  float64       = 3
 )
 
