@@ -38,3 +38,25 @@ func TestSpanFlushMarker(t *testing.T) {
 	s := NewFlushMarker()
 	assert.True(s.IsFlushMarker())
 }
+
+func TestSpanWeight(t *testing.T) {
+	assert := assert.New(t)
+
+	span := testSpan()
+	assert.Equal(1.0, span.Weight())
+
+	span.Metrics[SpanSampleRateMetricKey] = -1.0
+	assert.Equal(1.0, span.Weight())
+
+	span.Metrics[SpanSampleRateMetricKey] = 0.0
+	assert.Equal(1.0, span.Weight())
+
+	span.Metrics[SpanSampleRateMetricKey] = 0.25
+	assert.Equal(4.0, span.Weight())
+
+	span.Metrics[SpanSampleRateMetricKey] = 1.0
+	assert.Equal(1.0, span.Weight())
+
+	span.Metrics[SpanSampleRateMetricKey] = 1.5
+	assert.Equal(1.0, span.Weight())
+}

@@ -45,11 +45,16 @@ func (c *Concentrator) Add(t processedTrace) {
 			c.buckets[btime] = b
 		}
 
+		weight := 1.0
+		if t.Root != nil {
+			weight = t.Root.Weight()
+		}
+
 		if t.Root != nil && s.SpanID == t.Root.SpanID && t.Sublayers != nil {
 			// handle sublayers
-			b.HandleSpan(s, t.Env, c.aggregators, &t.Sublayers)
+			b.HandleSpan(s, t.Env, c.aggregators, weight, &t.Sublayers)
 		} else {
-			b.HandleSpan(s, t.Env, c.aggregators, nil)
+			b.HandleSpan(s, t.Env, c.aggregators, weight, nil)
 		}
 	}
 

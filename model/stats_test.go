@@ -34,10 +34,17 @@ func testTrace() Trace {
 	// B   |----------------------|                                        duration: 20
 	// C     |-----| |---|                                                 duration: 5+3
 	return Trace{
-		Span{TraceID: 42, SpanID: 42, ParentID: 0, Service: "A", Name: "A.foo", Type: "web", Resource: "α", Start: 0, Duration: 100},
-		Span{TraceID: 42, SpanID: 100, ParentID: 42, Service: "B", Name: "B.bar", Type: "web", Resource: "α", Start: 1, Duration: 20},
-		Span{TraceID: 42, SpanID: 2000, ParentID: 100, Service: "C", Name: "sql.query", Type: "sql", Resource: "SELECT value FROM table", Start: 2, Duration: 5},
-		Span{TraceID: 42, SpanID: 3000, ParentID: 100, Service: "C", Name: "sql.query", Type: "sql", Resource: "SELECT ololololo... value FROM table", Start: 10, Duration: 3, Error: 1},
+		Span{TraceID: 42, SpanID: 42, ParentID: 0, Service: "A",
+			Name: "A.foo", Type: "web", Resource: "α", Start: 0, Duration: 100,
+			Metrics: map[string]float64{SpanSampleRateMetricKey: 0.5}},
+		Span{TraceID: 42, SpanID: 100, ParentID: 42, Service: "B",
+			Name: "B.bar", Type: "web", Resource: "α", Start: 1, Duration: 20},
+		Span{TraceID: 42, SpanID: 2000, ParentID: 100, Service: "C",
+			Name: "sql.query", Type: "sql", Resource: "SELECT value FROM table",
+			Start: 2, Duration: 5},
+		Span{TraceID: 42, SpanID: 3000, ParentID: 100, Service: "C",
+			Name: "sql.query", Type: "sql", Resource: "SELECT ololololo... value FROM table",
+			Start: 10, Duration: 3, Error: 1},
 	}
 }
 
@@ -55,7 +62,7 @@ func TestStatsBucketDefault(t *testing.T) {
 	// No custom aggregators only the defaults
 	aggr := []string{}
 	for _, s := range testSpans() {
-		srb.HandleSpan(s, defaultEnv, aggr, nil)
+		srb.HandleSpan(s, defaultEnv, aggr, 1.0, nil)
 	}
 	sb := srb.Export()
 
@@ -123,7 +130,7 @@ func TestStatsBucketExtraAggregators(t *testing.T) {
 	// one custom aggregator
 	aggr := []string{"version"}
 	for _, s := range testSpans() {
-		srb.HandleSpan(s, defaultEnv, aggr, nil)
+		srb.HandleSpan(s, defaultEnv, aggr, 1.0, nil)
 	}
 	sb := srb.Export()
 
@@ -182,7 +189,7 @@ func TestStatsBucketMany(t *testing.T) {
 		s := templateSpan
 		s.Resource = "α" + strconv.Itoa(i)
 		srbCopy := *srb
-		srbCopy.HandleSpan(s, defaultEnv, aggr, nil)
+		srbCopy.HandleSpan(s, defaultEnv, aggr, 1.0, nil)
 	}
 	sb := srb.Export()
 
@@ -215,7 +222,7 @@ func TestStatsBucketSublayers(t *testing.T) {
 	// No custom aggregators only the defaults
 	aggr := []string{}
 	for _, s := range tr {
-		srb.HandleSpan(s, defaultEnv, aggr, &sublayers)
+		srb.HandleSpan(s, defaultEnv, aggr, root.Weight(), &sublayers)
 	}
 	sb := srb.Export()
 
@@ -226,18 +233,18 @@ func TestStatsBucketSublayers(t *testing.T) {
 		"A.foo|_sublayers.duration.by_type|env:default,resource:α,service:A,sublayer_type:sql":                                            8,
 		"A.foo|_sublayers.duration.by_type|env:default,resource:α,service:A,sublayer_type:web":                                            92,
 		"A.foo|_sublayers.span_count|env:default,resource:α,service:A,:":                                                                  4,
-		"A.foo|duration|env:default,resource:α,service:A":                                                                                 100,
+		"A.foo|duration|env:default,resource:α,service:A":                                                                                 200,
 		"A.foo|errors|env:default,resource:α,service:A":                                                                                   0,
-		"A.foo|hits|env:default,resource:α,service:A":                                                                                     1,
+		"A.foo|hits|env:default,resource:α,service:A":                                                                                     2,
 		"B.bar|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:A":                                        80,
 		"B.bar|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:B":                                        12,
 		"B.bar|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:C":                                        8,
 		"B.bar|_sublayers.duration.by_type|env:default,resource:α,service:B,sublayer_type:sql":                                            8,
 		"B.bar|_sublayers.duration.by_type|env:default,resource:α,service:B,sublayer_type:web":                                            92,
 		"B.bar|_sublayers.span_count|env:default,resource:α,service:B,:":                                                                  4,
-		"B.bar|duration|env:default,resource:α,service:B":                                                                                 20,
+		"B.bar|duration|env:default,resource:α,service:B":                                                                                 40,
 		"B.bar|errors|env:default,resource:α,service:B":                                                                                   0,
-		"B.bar|hits|env:default,resource:α,service:B":                                                                                     1,
+		"B.bar|hits|env:default,resource:α,service:B":                                                                                     2,
 		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT ololololo... value FROM table,service:C,sublayer_service:A": 80,
 		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT ololololo... value FROM table,service:C,sublayer_service:B": 12,
 		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT ololololo... value FROM table,service:C,sublayer_service:C": 8,
@@ -250,12 +257,12 @@ func TestStatsBucketSublayers(t *testing.T) {
 		"sql.query|_sublayers.duration.by_type|env:default,resource:SELECT value FROM table,service:C,sublayer_type:web":                  92,
 		"sql.query|_sublayers.span_count|env:default,resource:SELECT ololololo... value FROM table,service:C,:":                           4,
 		"sql.query|_sublayers.span_count|env:default,resource:SELECT value FROM table,service:C,:":                                        4,
-		"sql.query|duration|env:default,resource:SELECT ololololo... value FROM table,service:C":                                          3,
-		"sql.query|duration|env:default,resource:SELECT value FROM table,service:C":                                                       5,
-		"sql.query|errors|env:default,resource:SELECT ololololo... value FROM table,service:C":                                            1,
+		"sql.query|duration|env:default,resource:SELECT ololololo... value FROM table,service:C":                                          6,
+		"sql.query|duration|env:default,resource:SELECT value FROM table,service:C":                                                       10,
+		"sql.query|errors|env:default,resource:SELECT ololololo... value FROM table,service:C":                                            2,
 		"sql.query|errors|env:default,resource:SELECT value FROM table,service:C":                                                         0,
-		"sql.query|hits|env:default,resource:SELECT ololololo... value FROM table,service:C":                                              1,
-		"sql.query|hits|env:default,resource:SELECT value FROM table,service:C":                                                           1,
+		"sql.query|hits|env:default,resource:SELECT ololololo... value FROM table,service:C":                                              2,
+		"sql.query|hits|env:default,resource:SELECT value FROM table,service:C":                                                           2,
 	}
 
 	assert.Len(sb.Counts, len(expectedCounts), "Missing counts!")
@@ -324,7 +331,7 @@ func BenchmarkHandleSpan(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		for _, s := range testSpans() {
-			srb.HandleSpan(s, defaultEnv, aggr, nil)
+			srb.HandleSpan(s, defaultEnv, aggr, 1.0, nil)
 		}
 	}
 }
@@ -343,7 +350,7 @@ func BenchmarkHandleSpanSublayers(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		for _, s := range tr {
-			srb.HandleSpan(s, defaultEnv, aggr, &sublayers)
+			srb.HandleSpan(s, defaultEnv, aggr, root.Weight(), &sublayers)
 		}
 	}
 }

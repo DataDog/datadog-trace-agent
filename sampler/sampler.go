@@ -21,9 +21,6 @@ import (
 )
 
 const (
-	// SampleRateMetricKey is the metric key holding the sample rate
-	SampleRateMetricKey = "_sample_rate"
-
 	// Sampler parameters not (yet?) configurable
 	defaultDecayPeriod          time.Duration = 30 * time.Second
 	defaultSignatureScoreOffset float64       = 1
@@ -154,7 +151,7 @@ func ApplySampleRate(root *model.Span, sampleRate float64) bool {
 
 // GetTraceAppliedSampleRate gets the sample rate the sample rate applied earlier in the pipeline.
 func GetTraceAppliedSampleRate(root *model.Span) float64 {
-	if rate, ok := root.Metrics[SampleRateMetricKey]; ok {
+	if rate, ok := root.Metrics[model.SpanSampleRateMetricKey]; ok {
 		return rate
 	}
 
@@ -166,8 +163,5 @@ func SetTraceAppliedSampleRate(root *model.Span, sampleRate float64) {
 	if root.Metrics == nil {
 		root.Metrics = make(map[string]float64)
 	}
-	if _, ok := root.Metrics[SampleRateMetricKey]; !ok {
-		root.Metrics[SampleRateMetricKey] = 1.0
-	}
-	root.Metrics[SampleRateMetricKey] = sampleRate
+	root.Metrics[model.SpanSampleRateMetricKey] = sampleRate
 }
