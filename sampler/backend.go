@@ -13,6 +13,8 @@ import (
 type Backend struct {
 	// Score per signature
 	scores map[Signature]float64
+	// Score of all traces (equals the sum of all signature scores)
+	totalScore float64
 	// Score of sampled traces
 	sampledScore float64
 	mu           sync.Mutex
@@ -72,6 +74,7 @@ func (b *Backend) Stop() {
 func (b *Backend) CountSignature(signature Signature) {
 	b.mu.Lock()
 	b.scores[signature]++
+	b.totalScore++
 	b.mu.Unlock()
 }
 
@@ -101,6 +104,15 @@ func (b *Backend) GetSampledScore() float64 {
 	return score
 }
 
+// GetSampledScore returns the global score of all sampled traces.
+func (b *Backend) GetTotalScore() float64 {
+	b.mu.Lock()
+	score := b.totalScore / b.countScaleFactor
+	b.mu.Unlock()
+
+	return score
+}
+
 // DecayScore applies the decay to the rolling counters
 func (b *Backend) DecayScore() {
 	b.mu.Lock()
@@ -113,6 +125,7 @@ func (b *Backend) DecayScore() {
 			delete(b.scores, sig)
 		}
 	}
+	b.totalScore /= b.decayFactor
 	b.sampledScore /= b.decayFactor
 	b.mu.Unlock()
 }
