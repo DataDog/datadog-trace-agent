@@ -7,10 +7,15 @@ import (
 	"time"
 
 	log "github.com/cihub/seelog"
+	"github.com/shirou/gopsutil/net"
 	"github.com/shirou/gopsutil/process"
 )
 
-// CPUInfo contains very basic CPU information
+const (
+	cacheDelay = time.Second
+)
+
+// CPUInfo contains basic CPU info
 type CPUInfo struct {
 	// UserAvg is the average of the user CPU usage since last time
 	// it was polled. 0 means "not used at all" and 1 means "1 CPU was
@@ -19,7 +24,7 @@ type CPUInfo struct {
 	UserAvg float64
 }
 
-// MemInfo contains very basic memory information
+// MemInfo contains basic memory info
 type MemInfo struct {
 	// Alloc is the number of bytes allocated and not yet freed
 	// as described in runtime.MemStats.Alloc
@@ -29,11 +34,28 @@ type MemInfo struct {
 	AllocPerSec float64
 }
 
-// ProcessInfo is used to query CPU and Mem info, it keeps data from
+// NetInfo contains basic networking info
+type NetInfo struct {
+	// Connections is the number of connections opened by this process.
+	Connections int32
+}
+
+// Info contains all the watchdog infos, to be published by expvar
+type Info struct {
+	// CPU contains basic CPU info
+	CPU CPUInfo
+	// Mem contains basic Mem info
+	Mem MemInfo
+	// Net contains basic Net info
+	Net NetInfo
+}
+
+// CurrentInfo is used to query CPU and Mem info, it keeps data from
 // the previous calls to calculate averages. It is not thread safe.
-type ProcessInfo struct {
-	p  *process.Process
-	mu sync.Mutex
+type CurrentInfo struct {
+	p          *process.Process
+	mu         sync.Mutex
+	cacheDelay time.Duration
 
 	lastCPUTime time.Time
 	lastCPUUser float64
@@ -42,46 +64,54 @@ type ProcessInfo struct {
 	lastMemTime       time.Time
 	lastMemTotalAlloc uint64
 	lastMem           MemInfo
+
+	lastNetTime time.Time
+	lastNet     NetInfo
 }
 
-// globalProcessInfo is a global default object one can safely use
+// globalCurrentInfo is a global default object one can safely use
 // if only one goroutine is polling for CPU() and Mem()
-var globalProcessInfo *ProcessInfo
+var globalCurrentInfo *CurrentInfo
 
 func init() {
 	var err error
-	globalProcessInfo, err = NewProcessInfo()
+	globalCurrentInfo, err = NewCurrentInfo()
 	if err != nil {
 		log.Errorf("unable to create global Process: %v", err)
 	}
 }
 
-// NewProcessInfo creates a new ProcessInfo referring to the current running program.
-func NewProcessInfo() (*ProcessInfo, error) {
+// NewCurrentInfo creates a new CurrentInfo referring to the current running program.
+func NewCurrentInfo() (*CurrentInfo, error) {
 	p, err := process.NewProcess(int32(os.Getpid()))
 	if err != nil {
 		log.Debugf("unable to create Process: %v", err)
 		return nil, err
 	}
-	return &ProcessInfo{p: p}, nil
+	return &CurrentInfo{
+		p:          p,
+		cacheDelay: cacheDelay,
+	}, nil
 }
 
-// CPU returns basic CPU info
-func (pi *ProcessInfo) CPU() CPUInfo {
+// CPU returns basic CPU info.
+func (pi *CurrentInfo) CPU() CPUInfo {
 	pi.mu.Lock()
 	defer pi.mu.Unlock()
 
 	now := time.Now()
 	dt := now.Sub(pi.lastCPUTime)
-	if dt <= 0 {
-		return pi.lastCPU // shouldn't happen unless time decreases or back to back calls
+	if dt <= pi.cacheDelay {
+		return pi.lastCPU // don't query too often, cache a little bit
 	}
+	pi.lastCPUTime = now
+
 	times, err := pi.p.Times()
 	if err != nil {
 		log.Debugf("unable to get CPU times: %v", err)
 		return pi.lastCPU
 	}
-	pi.lastCPUTime = now
+
 	dua := times.User - pi.lastCPUUser
 	pi.lastCPUUser = times.User
 	if dua <= 0 {
@@ -94,21 +124,22 @@ func (pi *ProcessInfo) CPU() CPUInfo {
 	return pi.lastCPU
 }
 
-// Mem returns basic memory information
-func (pi *ProcessInfo) Mem() MemInfo {
+// Mem returns basic memory info.
+func (pi *CurrentInfo) Mem() MemInfo {
 	pi.mu.Lock()
 	defer pi.mu.Unlock()
+
+	now := time.Now()
+	dt := now.Sub(pi.lastMemTime)
+	if dt <= pi.cacheDelay {
+		return pi.lastMem // don't query too often, cache a little bit
+	}
+	pi.lastMemTime = now
 
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
 	ret := MemInfo{Alloc: ms.Alloc, AllocPerSec: pi.lastMem.AllocPerSec}
 
-	now := time.Now()
-	dt := now.Sub(pi.lastMemTime)
-	if dt <= 0 {
-		return pi.lastMem // shouldn't happen unless time decreases or back to back calls
-	}
-	pi.lastMemTime = now
 	dta := int64(ms.TotalAlloc) - int64(pi.lastMemTotalAlloc)
 	pi.lastMemTotalAlloc = ms.TotalAlloc
 	if dta <= 0 {
@@ -121,18 +152,49 @@ func (pi *ProcessInfo) Mem() MemInfo {
 	return ret
 }
 
-// CPU returns basic CPU info.
-func CPU() CPUInfo {
-	if globalProcessInfo == nil {
-		return CPUInfo{}
+// Net returns basic network info.
+func (pi *CurrentInfo) Net() NetInfo {
+	pi.mu.Lock()
+	defer pi.mu.Unlock()
+
+	now := time.Now()
+	dt := now.Sub(pi.lastNetTime)
+	if dt <= pi.cacheDelay {
+		return pi.lastNet // don't query too often, cache a little bit
 	}
-	return globalProcessInfo.CPU()
+	pi.lastNetTime = now
+
+	connections, err := net.ConnectionsPid("tcp", int32(os.Getpid()))
+	if err != nil {
+		log.Debugf("unable to get Net connections: %v", err)
+		return pi.lastNet
+	}
+
+	pi.lastNet.Connections = int32(len(connections))
+
+	return pi.lastNet
 }
 
-// Mem returns basic memory information
+// CPU returns basic CPU info.
+func CPU() CPUInfo {
+	if globalCurrentInfo == nil {
+		return CPUInfo{}
+	}
+	return globalCurrentInfo.CPU()
+}
+
+// Mem returns basic memory info.
 func Mem() MemInfo {
-	if globalProcessInfo == nil {
+	if globalCurrentInfo == nil {
 		return MemInfo{}
 	}
-	return globalProcessInfo.Mem()
+	return globalCurrentInfo.Mem()
+}
+
+// Net returns basic network info.
+func Net() NetInfo {
+	if globalCurrentInfo == nil {
+		return NetInfo{}
+	}
+	return globalCurrentInfo.Net()
 }

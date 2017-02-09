@@ -8,7 +8,6 @@ import (
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/quantizer"
-	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 	log "github.com/cihub/seelog"
 )
@@ -157,14 +156,16 @@ func (a *Agent) Process(t model.Trace) {
 }
 
 func (a *Agent) watchdog() {
-	tags := []string{"version:" + Version, "go_version:" + GoVersion}
-	c := watchdog.CPU()
-	statsd.Client.Gauge("trace_agent.process.cpu.pct", c.UserAvg*100.0, tags, 1)
-	m := watchdog.Mem()
-	statsd.Client.Gauge("trace_agent.process.mem.alloc", float64(m.Alloc), tags, 1)
-	statsd.Client.Gauge("trace_agent.process.mem.alloc_per_sec", m.AllocPerSec, tags, 1)
+	var wi watchdog.Info
+	wi.CPU = watchdog.CPU()
+	wi.Mem = watchdog.Mem()
+	wi.Net = watchdog.Net()
 
-	if float64(m.Alloc) > a.conf.MaxMemory {
-		a.die("exceeded max memory (current=%d, max=%d)", m.Alloc, int64(a.conf.MaxMemory))
+	if float64(wi.Mem.Alloc) > a.conf.MaxMemory {
+		a.die("exceeded max memory (current=%d, max=%d)", wi.Mem.Alloc, a.conf.MaxMemory)
 	}
+	if int(wi.Net.Connections) > a.conf.MaxConnections {
+		a.die("exceeded max connections (current=%d, max=%d)", wi.Net.Connections, a.conf.MaxConnections)
+	}
+	updateWatchdogInfo(wi)
 }

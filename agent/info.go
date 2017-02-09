@@ -5,6 +5,7 @@ import (
 	"expvar" // automatically publish `/debug/vars` on HTTP port
 	"fmt"
 	"github.com/DataDog/datadog-trace-agent/config"
+	"github.com/DataDog/datadog-trace-agent/watchdog"
 	"io"
 	"net/http"
 	"os"
@@ -19,6 +20,7 @@ var (
 	infoMu             sync.RWMutex
 	infoReceiverStats  receiverStats // only for the last minute
 	infoEndpointStats  endpointStats // only for the last minute
+	infoWatchdogInfo   watchdog.Info
 	infoStart          = time.Now()
 	infoOnce           sync.Once
 	infoTmpl           *template.Template
@@ -99,6 +101,19 @@ func publishEndpointStats() interface{} {
 	return es
 }
 
+func updateWatchdogInfo(wi watchdog.Info) {
+	infoMu.Lock()
+	infoWatchdogInfo = wi
+	infoMu.Unlock()
+}
+
+func publishWatchdogInfo() interface{} {
+	infoMu.RLock()
+	wi := infoWatchdogInfo
+	infoMu.RUnlock()
+	return wi
+}
+
 type infoVersion struct {
 	Version   string
 	GitCommit string
@@ -137,6 +152,7 @@ func initInfo(conf *config.AgentConfig) error {
 		expvar.Publish("version", expvar.Func(publishVersion))
 		expvar.Publish("receiver", expvar.Func(publishReceiverStats))
 		expvar.Publish("endpoint", expvar.Func(publishEndpointStats))
+		expvar.Publish("watchdog", expvar.Func(publishWatchdogInfo))
 
 		c := *conf
 		c.APIKeys = nil // should not be exported by JSON, but just to make sure
@@ -185,6 +201,7 @@ type StatusInfo struct {
 	Version  infoVersion        `json:"version"`
 	Receiver receiverStats      `json:"receiver"`
 	Endpoint endpointStats      `json:"endpoint"`
+	Watchdog watchdog.Info      `json:"watchdog"`
 	Config   config.AgentConfig `json:"config"`
 }
 
