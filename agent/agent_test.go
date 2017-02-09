@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"runtime"
 	"strings"
@@ -56,6 +57,11 @@ func TestWatchdog(t *testing.T) {
 	buf := make([]byte, 2*int64(conf.MaxMemory))
 	buf[0] = 1
 	buf[len(buf)-1] = 1
+
+	// override the default die, else our test would stop, use a plain panic() instead
+	agent.die = func(format string, args ...interface{}) {
+		panic(fmt.Sprintf(format, args...))
+	}
 
 	// after some time, the watchdog should kill this
 	agent.Run()

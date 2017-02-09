@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -42,6 +41,8 @@ type Agent struct {
 
 	// Used to synchronize on a clean exit
 	exit chan struct{}
+
+	die func(format string, args ...interface{})
 }
 
 // NewAgent returns a new Agent object, ready to be started
@@ -65,6 +66,7 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 		Writer:       w,
 		conf:         conf,
 		exit:         exit,
+		die:          die,
 	}
 }
 
@@ -163,8 +165,6 @@ func (a *Agent) watchdog() {
 	statsd.Client.Gauge("trace_agent.process.mem.alloc_per_sec", m.AllocPerSec, tags, 1)
 
 	if float64(m.Alloc) > a.conf.MaxMemory {
-		msg := fmt.Sprintf("exceeded max memory (current=%d, max=%d)", m.Alloc, int64(a.conf.MaxMemory))
-		log.Error(msg)
-		panic(msg)
+		a.die("exceeded max memory (current=%d, max=%d)", m.Alloc, int64(a.conf.MaxMemory))
 	}
 }
