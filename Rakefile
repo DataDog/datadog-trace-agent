@@ -67,6 +67,7 @@ end
 
 desc "Run Datadog Trace agent"
 task :run do
+  ENV['DD_APM_ENABLED'] = 'true'
   sh "./trace-agent -config ./agent/trace-agent.ini"
 end
 
