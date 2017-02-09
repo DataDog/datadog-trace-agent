@@ -73,6 +73,10 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 func (a *Agent) Run() {
 	flushTicker := time.NewTicker(a.conf.BucketInterval)
 	defer flushTicker.Stop()
+
+	// it's really important to use a ticker for this, and with a not too short
+	// interval, for this is our garantee that the process won't start and kill
+	// itself too fast (nightmare loop)
 	watchdogTicker := time.NewTicker(a.conf.WatchdogInterval)
 	defer watchdogTicker.Stop()
 
@@ -167,5 +171,6 @@ func (a *Agent) watchdog() {
 	if int(wi.Net.Connections) > a.conf.MaxConnections {
 		a.die("exceeded max connections (current=%d, max=%d)", wi.Net.Connections, a.conf.MaxConnections)
 	}
+
 	updateWatchdogInfo(wi)
 }
