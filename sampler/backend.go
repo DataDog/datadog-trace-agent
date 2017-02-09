@@ -104,13 +104,19 @@ func (b *Backend) GetSampledScore() float64 {
 	return score
 }
 
-// GetSampledScore returns the global score of all sampled traces.
+// GetTotalScore returns the global score of all sampled traces.
 func (b *Backend) GetTotalScore() float64 {
 	b.mu.Lock()
 	score := b.totalScore / b.countScaleFactor
 	b.mu.Unlock()
 
 	return score
+}
+
+// GetUpperSampledScore returns a certain upper bound of the global count of all sampled traces.
+func (b *Backend) GetUpperSampledScore() float64 {
+	// Overestimate the real score with the high limit of the backend bias.
+	return b.GetSampledScore() * b.decayFactor
 }
 
 // DecayScore applies the decay to the rolling counters

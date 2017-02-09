@@ -17,7 +17,10 @@ import (
 	"math"
 	"time"
 
+	log "github.com/cihub/seelog"
+
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/statsd"
 )
 
 const (
@@ -25,8 +28,9 @@ const (
 	SampleRateMetricKey = "_sample_rate"
 
 	// Sampler parameters not (yet?) configurable
-	defaultSignatureScoreOffset float64       = 1
 	defaultDecayPeriod          time.Duration = 5 * time.Second
+	initialSignatureScoreOffset float64       = 1
+	minSignatureScoreOffset     float64       = 0.01
 	defaultSignatureScoreSlope  float64       = 3
 )
 
@@ -47,12 +51,14 @@ type Sampler struct {
 	signatureScoreSlope float64
 	// signatureScoreCoefficient = math.Pow(signatureScoreSlope, math.Log10(scoreSamplingOffset))
 	signatureScoreCoefficient float64
+
+	exit chan struct{}
 }
 
 // NewSampler returns an initialized Sampler
 func NewSampler(extraRate float64, maxTPS float64) *Sampler {
 	decayPeriod := defaultDecayPeriod
-	signatureScoreOffset := defaultSignatureScoreOffset
+	signatureScoreOffset := initialSignatureScoreOffset
 	signatureScoreSlope := defaultSignatureScoreSlope
 
 	return &Sampler{
@@ -63,7 +69,28 @@ func NewSampler(extraRate float64, maxTPS float64) *Sampler {
 		signatureScoreOffset:      signatureScoreOffset,
 		signatureScoreSlope:       signatureScoreSlope,
 		signatureScoreCoefficient: math.Pow(signatureScoreSlope, math.Log10(signatureScoreOffset)),
+
+		exit: make(chan struct{}),
 	}
+}
+
+// SetSignatureOffset updates the offset coefficient of the signature scoring
+func (s *Sampler) SetSignatureOffset(offset float64) {
+	s.signatureScoreOffset = offset
+	s.signatureScoreCoefficient = math.Pow(s.signatureScoreSlope, math.Log10(offset))
+}
+
+// logState is a debug logging of the sampler internals, to check its adaptative behavior
+// This is mainly for dev purpose to watch over the adaptative behavior
+// TODO: remove (or clean it) in a real released build
+func (s *Sampler) logState() {
+	log.Infof("inTPS: %f, outTPS: %f, maxTPS: %f, offset: %f, slope: %f",
+		s.Backend.GetTotalScore(), s.Backend.GetSampledScore(), s.maxTPS, s.signatureScoreOffset, s.signatureScoreSlope)
+	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.offset", s.signatureScoreOffset, nil, 1)
+	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.slope", s.signatureScoreSlope, nil, 1)
+	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.in_tps", s.Backend.GetTotalScore(), nil, 1)
+	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.out_tps", s.Backend.GetSampledScore(), nil, 1)
+	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.max_tps", s.maxTPS, nil, 1)
 }
 
 // UpdateExtraRate updates the extra sample rate
@@ -78,12 +105,62 @@ func (s *Sampler) UpdateMaxTPS(maxTPS float64) {
 
 // Run runs and block on the Sampler main loop
 func (s *Sampler) Run() {
-	s.Backend.Run()
+	go s.Backend.Run()
+	s.RunAdjustScoring()
 }
 
 // Stop stops the main Run loop
 func (s *Sampler) Stop() {
 	s.Backend.Stop()
+	close(s.exit)
+}
+
+// RunAdjustScoring is the sampler feedback loop to adjust the scoring coefficients
+func (s *Sampler) RunAdjustScoring() {
+	t := time.NewTicker(2 * s.Backend.decayPeriod)
+	defer t.Stop()
+
+	for {
+		select {
+		case <-t.C:
+			s.AdjustScoring()
+		case <-s.exit:
+			return
+		}
+	}
+}
+
+// AdjustScoring modifies sampler coefficients to fit better the `maxTPS` condition
+func (s *Sampler) AdjustScoring() {
+	// See how far we are from our maxTPS limit and make signature sampler harder/softer accordingly
+	currentTPS := s.Backend.GetSampledScore()
+	TPSratio := currentTPS / s.maxTPS
+	offset := s.signatureScoreOffset
+
+	coefficient := 1.0
+
+	if offset < minSignatureScoreOffset {
+		// Safeguard to prevent from too-small offset which would result in no trace at all
+	} else if TPSratio > 1 {
+		// If above, reduce the offset
+		coefficient = 0.8
+		// If we keep 3x too many traces, reduce the offset even more
+		if TPSratio > 3 {
+			coefficient = 0.5
+		}
+	} else if TPSratio < 0.8 {
+		// If below, increase the offset
+		// Don't do it if we already keep all traces or if offset above maxTPS
+		if currentTPS < s.Backend.GetTotalScore() && s.signatureScoreOffset < s.maxTPS {
+			coefficient = 1.1
+			if TPSratio < 0.5 {
+				coefficient = 1.3
+			}
+		}
+	}
+	s.SetSignatureOffset(offset * coefficient)
+
+	s.logState()
 }
 
 // Sample counts an incoming trace and tells if it is a sample which has to be kept
@@ -130,8 +207,7 @@ func (s *Sampler) GetMaxTPSSampleRate() float64 {
 	// When above maxTPS, apply an additional sample rate to statistically respect the limit
 	maxTPSrate := 1.0
 	if s.maxTPS > 0 {
-		// Overestimate the real score with the high limit of the backend bias.
-		currentTPS := s.Backend.GetSampledScore() * s.Backend.decayFactor
+		currentTPS := s.Backend.GetUpperSampledScore()
 		if currentTPS > s.maxTPS {
 			maxTPSrate = s.maxTPS / currentTPS
 		}
