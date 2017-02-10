@@ -34,7 +34,7 @@ func NewConcentrator(aggregators []string, bsize int64) *Concentrator {
 }
 
 // Add appends to the proper stats bucket this trace's statistics
-func (c *Concentrator) Add(t processedTrace) {
+func (c *Concentrator) Add(t processedTrace, weight float64) {
 	c.mu.Lock()
 
 	for _, s := range t.Trace {
@@ -43,11 +43,6 @@ func (c *Concentrator) Add(t processedTrace) {
 		if !ok {
 			b = model.NewStatsRawBucket(btime, c.bsize)
 			c.buckets[btime] = b
-		}
-
-		weight := 1.0
-		if t.Root != nil {
-			weight = t.Root.Weight()
 		}
 
 		if t.Root != nil && s.SpanID == t.Root.SpanID && t.Sublayers != nil {
