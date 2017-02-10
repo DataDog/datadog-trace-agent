@@ -1,5 +1,7 @@
 raclette
 trace-agent
+trace-agent-windows-386.exe
+trace-agent-windows-amd64.exe
 generator
 *.swp
 python/raclette.egg-info
