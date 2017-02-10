@@ -134,8 +134,10 @@ func (s *Sampler) AdjustScoring() {
 		}
 	} else if TPSratio < 0.8 {
 		// If below, increase the offset
-		// Don't do it if we already keep all traces or if offset above maxTPS
-		if currentTPS < s.Backend.GetTotalScore() && s.signatureScoreOffset < s.maxTPS {
+		// Don't do it if:
+		//  - we already keep all traces (with a 1% margin because of stats imprecision)
+		//  - offset above maxTPS
+		if currentTPS < 0.99*s.Backend.GetTotalScore() && s.signatureScoreOffset < s.maxTPS {
 			coefficient = 1.1
 			if TPSratio < 0.5 {
 				coefficient = 1.3
