@@ -22,6 +22,7 @@ func TestCPULow(t *testing.T) {
 	runtime.GC()
 
 	c := CPU()
+	globalCurrentInfo.cacheDelay = testDuration
 	time.Sleep(testDuration)
 	c = CPU()
 	t.Logf("CPU (sleep): %v", c)
@@ -38,6 +39,7 @@ func doTestCPUHigh(t *testing.T, n int) {
 
 	done := make(chan struct{}, 1)
 	c := CPU()
+	globalCurrentInfo.cacheDelay = testDuration
 	for i := 0; i < n; i++ {
 		go func() {
 			j := 0
@@ -80,6 +82,7 @@ func TestMemLow(t *testing.T) {
 	runtime.GC()
 
 	oldM := Mem()
+	globalCurrentInfo.cacheDelay = testDuration
 	time.Sleep(testDuration)
 	m := Mem()
 	t.Logf("Mem (sleep): %v", m)
@@ -99,6 +102,7 @@ func doTestMemHigh(t *testing.T, n int) {
 	done := make(chan struct{}, 1)
 	data := make(chan []byte, 1)
 	oldM := Mem()
+	globalCurrentInfo.cacheDelay = testDuration
 	go func() {
 		a := make([]byte, n)
 		a[0] = 1
