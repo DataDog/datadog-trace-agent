@@ -206,7 +206,7 @@ func TestReceiverMsgpackDecoder(t *testing.T) {
 			var buf bytes.Buffer
 			err := msgp.Encode(&buf, tc.traces)
 			assert.Nil(err)
-			req, err := http.NewRequest("POST", server.URL, bytes.NewReader(buf.Bytes()))
+			req, err := http.NewRequest("POST", server.URL, &buf)
 			assert.Nil(err)
 			req.Header.Set("Content-Type", tc.contentType)
 
@@ -354,7 +354,7 @@ func TestReceiverServiceMsgpackDecoder(t *testing.T) {
 			var buf bytes.Buffer
 			err := msgp.Encode(&buf, services)
 			assert.Nil(err)
-			req, err := http.NewRequest("POST", server.URL, bytes.NewReader(buf.Bytes()))
+			req, err := http.NewRequest("POST", server.URL, &buf)
 			assert.Nil(err)
 			req.Header.Set("Content-Type", tc.contentType)
 
