@@ -17,10 +17,7 @@ import (
 	"math"
 	"time"
 
-	log "github.com/cihub/seelog"
-
 	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/DataDog/datadog-trace-agent/statsd"
 )
 
 const (
@@ -78,19 +75,6 @@ func NewSampler(extraRate float64, maxTPS float64) *Sampler {
 func (s *Sampler) SetSignatureOffset(offset float64) {
 	s.signatureScoreOffset = offset
 	s.signatureScoreCoefficient = math.Pow(s.signatureScoreSlope, math.Log10(offset))
-}
-
-// logState is a debug logging of the sampler internals, to check its adaptative behavior
-// This is mainly for dev purpose to watch over the adaptative behavior
-// TODO: remove (or clean it) in a real released build
-func (s *Sampler) logState() {
-	log.Infof("inTPS: %f, outTPS: %f, maxTPS: %f, offset: %f, slope: %f",
-		s.Backend.GetTotalScore(), s.Backend.GetSampledScore(), s.maxTPS, s.signatureScoreOffset, s.signatureScoreSlope)
-	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.offset", s.signatureScoreOffset, nil, 1)
-	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.slope", s.signatureScoreSlope, nil, 1)
-	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.in_tps", s.Backend.GetTotalScore(), nil, 1)
-	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.out_tps", s.Backend.GetSampledScore(), nil, 1)
-	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.max_tps", s.maxTPS, nil, 1)
 }
 
 // UpdateExtraRate updates the extra sample rate
@@ -159,8 +143,6 @@ func (s *Sampler) AdjustScoring() {
 		}
 	}
 	s.SetSignatureOffset(offset * coefficient)
-
-	s.logState()
 }
 
 // Sample counts an incoming trace and tells if it is a sample which has to be kept

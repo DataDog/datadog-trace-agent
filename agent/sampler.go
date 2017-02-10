@@ -65,9 +65,24 @@ func (s *Sampler) Flush() []model.Trace {
 	s.traceCount = 0
 	s.mu.Unlock()
 
+	s.logState()
 	statsd.Client.Count("datadog.trace_agent.sampler.trace.kept", int64(len(traces)), nil, 1)
 	statsd.Client.Count("datadog.trace_agent.sampler.trace.total", int64(traceCount), nil, 1)
 	log.Debugf("flushed %d sampled traces out of %v", len(traces), traceCount)
 
 	return traces
+}
+
+// logState is a debug logging of the sampler internals, to check its adaptative behavior
+// This is mainly for dev purpose to watch over the adaptative behavior
+// TODO: remove (or clean it) in a real released build
+func (s *Sampler) logState() {
+	state := s.samplerEngine.(*sampler.Sampler).GetState()
+	log.Infof("inTPS: %f, outTPS: %f, maxTPS: %f, offset: %f, slope: %f",
+		state.InTPS, state.OutTPS, state.MaxTPS, state.Offset, state.Slope)
+	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.offset", state.Offset, nil, 1)
+	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.slope", state.Slope, nil, 1)
+	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.in_tps", state.InTPS, nil, 1)
+	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.out_tps", state.OutTPS, nil, 1)
+	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.max_tps", state.MaxTPS, nil, 1)
 }
