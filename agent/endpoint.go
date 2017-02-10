@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/model"
@@ -16,11 +17,11 @@ import (
 // each error.
 type apiError struct {
 	errs     []error // the errors, one for each endpoint
-	endpoint APIEndpoint
+	endpoint *APIEndpoint
 }
 
 func newAPIError() *apiError {
-	return &apiError{}
+	return &apiError{endpoint: &APIEndpoint{}}
 }
 
 func (err *apiError) IsEmpty() bool {
@@ -64,12 +65,13 @@ type AgentEndpoint interface {
 type APIEndpoint struct {
 	apiKeys []string
 	urls    []string
+	stats   endpointStats
 }
 
 // NewAPIEndpoint returns a new APIEndpoint from a given config
 // of URLs (such as https://trace.agent.datadoghq.com) and API
 // keys.
-func NewAPIEndpoint(urls, apiKeys []string) APIEndpoint {
+func NewAPIEndpoint(urls, apiKeys []string) *APIEndpoint {
 	if len(apiKeys) == 0 {
 		panic(fmt.Errorf("No API key"))
 	}
@@ -78,14 +80,16 @@ func NewAPIEndpoint(urls, apiKeys []string) APIEndpoint {
 		panic(fmt.Errorf("APIEndpoint should be initialized with same number of url/api keys"))
 	}
 
-	return APIEndpoint{
+	a := APIEndpoint{
 		apiKeys: apiKeys,
 		urls:    urls,
 	}
+	go a.logStats()
+	return &a
 }
 
 // Write writes the bucket to the API collector endpoint.
-func (a APIEndpoint) Write(p model.AgentPayload) (int, error) {
+func (a *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 	data, err := model.EncodeAgentPayload(p)
 	if err != nil {
 		log.Errorf("encoding issue: %v", err)
@@ -93,10 +97,15 @@ func (a APIEndpoint) Write(p model.AgentPayload) (int, error) {
 	}
 	payloadSize := len(data)
 	statsd.Client.Count("datadog.trace_agent.writer.payload_bytes", int64(payloadSize), nil, 1)
+	atomic.AddInt64(&a.stats.TracesBytes, int64(payloadSize))
+	atomic.AddInt64(&a.stats.TracesCount, int64(len(p.Traces)))
+	atomic.AddInt64(&a.stats.TracesStats, int64(len(p.Stats)))
 
 	endpointErr := newAPIError()
 
 	for i := range a.urls {
+		atomic.AddInt64(&a.stats.TracesPayload, 1)
+
 		startFlush := time.Now()
 
 		url := a.urls[i] + model.AgentPayloadAPIPath()
@@ -106,6 +115,7 @@ func (a APIEndpoint) Write(p model.AgentPayload) (int, error) {
 			// in trying again later, it will always yield the
 			// same result.
 			log.Errorf("could not create request for endpoint %s: %v", url, err)
+			atomic.AddInt64(&a.stats.TracesPayloadError, 1)
 			continue
 		}
 
@@ -117,6 +127,7 @@ func (a APIEndpoint) Write(p model.AgentPayload) (int, error) {
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			log.Errorf("error when requesting to endpoint %s: %v", url, err)
+			atomic.AddInt64(&a.stats.TracesPayloadError, 1)
 			endpointErr.Append(a.urls[i], a.apiKeys[i], err)
 			continue
 		}
@@ -125,6 +136,7 @@ func (a APIEndpoint) Write(p model.AgentPayload) (int, error) {
 		if resp.StatusCode/100 != 2 {
 			err := fmt.Errorf("request to %s responded with %s", url, resp.Status)
 			log.Error(err)
+			atomic.AddInt64(&a.stats.TracesPayloadError, 1)
 
 			// Only retry for 5xx (server) errors; for 4xx errors,
 			// something is wrong with the request and there is
@@ -153,18 +165,23 @@ func (a APIEndpoint) Write(p model.AgentPayload) (int, error) {
 // WriteServices writes services to the services endpoint
 // This function very loosely logs and returns if any error happens.
 // See comment above.
-func (a APIEndpoint) WriteServices(s model.ServicesMetadata) {
+func (a *APIEndpoint) WriteServices(s model.ServicesMetadata) {
 	data, err := model.EncodeServicesPayload(s)
 	if err != nil {
 		log.Errorf("encoding issue: %v", err)
 		return
 	}
+	payloadSize := len(data)
+	atomic.AddInt64(&a.stats.ServicesBytes, int64(payloadSize))
 
 	for i := range a.urls {
+		atomic.AddInt64(&a.stats.ServicesPayload, 1)
+
 		url := a.urls[i] + model.ServicesPayloadAPIPath()
 		req, err := http.NewRequest("POST", url, bytes.NewBuffer(data))
 		if err != nil {
 			log.Errorf("could not create request for endpoint %s: %v", url, err)
+			atomic.AddInt64(&a.stats.ServicesPayloadError, 1)
 			continue
 		}
 
@@ -176,12 +193,14 @@ func (a APIEndpoint) WriteServices(s model.ServicesMetadata) {
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			log.Errorf("error when requesting to endpoint %s: %v", url, err)
+			atomic.AddInt64(&a.stats.ServicesPayloadError, 1)
 			continue
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode/100 != 2 {
 			log.Errorf("request to %s responded with %s", url, resp.Status)
+			atomic.AddInt64(&a.stats.ServicesPayloadError, 1)
 			continue
 		}
 
@@ -202,4 +221,51 @@ func (ne NullEndpoint) Write(p model.AgentPayload) (int, error) {
 // WriteServices just logs and stops
 func (ne NullEndpoint) WriteServices(s model.ServicesMetadata) {
 	log.Debugf("null endpoint: dropping services update %v", s)
+}
+
+// logStats periodically submits stats about the endpoint to statsd
+func (a *APIEndpoint) logStats() {
+	var accStats endpointStats
+
+	for range time.Tick(time.Minute) {
+		// Load counters and reset them for the next flush
+		accStats.TracesPayload = atomic.SwapInt64(&a.stats.TracesPayload, 0)
+		accStats.TracesPayloadError = atomic.SwapInt64(&a.stats.TracesPayloadError, 0)
+		accStats.TracesBytes = atomic.SwapInt64(&a.stats.TracesBytes, 0)
+		accStats.TracesCount = atomic.SwapInt64(&a.stats.TracesCount, 0)
+		accStats.TracesStats = atomic.SwapInt64(&a.stats.TracesStats, 0)
+		accStats.ServicesPayload = atomic.SwapInt64(&a.stats.ServicesPayload, 0)
+		accStats.ServicesPayloadError = atomic.SwapInt64(&a.stats.ServicesPayloadError, 0)
+		accStats.ServicesBytes = atomic.SwapInt64(&a.stats.ServicesBytes, 0)
+		updateEndpointStats(accStats)
+	}
+}
+
+// endpointStats contains stats about the volume of data written
+type endpointStats struct {
+	// TracesPayload is the number of traces payload sent, including errors.
+	// If several URLs are given, each URL counts for one.
+	TracesPayload int64
+	// TracesPayloadError is the number of traces payload sent with an error.
+	// If several URLs are given, each URL counts for one.
+	TracesPayloadError int64
+	// TracesBytes is the size of the traces payload data sent, including errors.
+	// If several URLs are given, it does not change the size (shared for all).
+	// This is the raw data, encoded, compressed.
+	TracesBytes int64
+	// TracesCount is the number of traces in the traces payload data sent, including errors.
+	// If several URLs are given, it does not change the size (shared for all).
+	TracesCount int64
+	// TracesStats is the number of stats in the traces payload data sent, including errors.
+	// If several URLs are given, it does not change the size (shared for all).
+	TracesStats int64
+	// TracesPayload is the number of services payload sent, including errors.
+	// If several URLs are given, each URL counts for one.
+	ServicesPayload int64
+	// ServicesPayloadError is the number of services payload sent with an error.
+	// If several URLs are given, each URL counts for one.
+	ServicesPayloadError int64
+	// TracesBytes is the size of the services payload data sent, including errors.
+	// If several URLs are given, it does not change the size (shared for all).
+	ServicesBytes int64
 }

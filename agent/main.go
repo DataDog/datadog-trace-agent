@@ -37,8 +37,14 @@ func handleSignal(exit chan struct{}) {
 
 // die logs an error message and makes the program exit immediately.
 func die(format string, args ...interface{}) {
-	log.Errorf(format, args...)
-	log.Flush()
+	if opts.info || opts.version {
+		// here, we've silenced the logger, and just want plain console output
+		fmt.Printf(format, args...)
+		fmt.Print("")
+	} else {
+		log.Errorf(format, args...)
+		log.Flush()
+	}
 	os.Exit(1)
 }
 

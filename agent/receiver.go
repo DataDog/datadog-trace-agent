@@ -157,6 +157,8 @@ func (r *HTTPReceiver) httpHandleWithVersion(v APIVersion, f func(APIVersion, ht
 func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *http.Request) {
 	var traces model.Traces
 	contentType := req.Header.Get("Content-Type")
+	var contentLength int
+	var err error
 
 	switch v {
 	case v01:
@@ -169,7 +171,8 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		// in v01 we actually get spans that we have to transform in traces
 		var spans []model.Span
 		dec := r.decoderPool.Borrow(contentType)
-		if err := dec.Decode(req.Body, &spans); err != nil {
+		contentLength, err = dec.Decode(req.Body, &spans)
+		if err != nil {
 			r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
 			r.decoderPool.Release(dec)
 			HTTPDecodingError(err, []string{tagTraceHandler, fmt.Sprintf("v:%s", v)}, w)
@@ -186,7 +189,8 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		}
 
 		dec := r.decoderPool.Borrow(contentType)
-		if err := dec.Decode(req.Body, &traces); err != nil {
+		contentLength, err = dec.Decode(req.Body, &traces)
+		if err != nil {
 			r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
 			r.decoderPool.Release(dec)
 			HTTPDecodingError(err, []string{tagTraceHandler, fmt.Sprintf("v:%s", v)}, w)
@@ -197,7 +201,8 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 	case v03:
 		// select the right Decoder based on the given content-type header
 		dec := r.decoderPool.Borrow(contentType)
-		if err := dec.Decode(req.Body, &traces); err != nil {
+		contentLength, err = dec.Decode(req.Body, &traces)
+		if err != nil {
 			if strings.Contains(contentType, "json") {
 				r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
 			} else {
@@ -215,6 +220,10 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 	}
 
 	HTTPOK(w)
+
+	if contentLength > 0 {
+		atomic.AddInt64(&r.stats.TracesBytes, int64(contentLength))
+	}
 
 	// normalize data
 	for i := range traces {
@@ -255,6 +264,8 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 
 	var servicesMeta model.ServicesMetadata
 	contentType := req.Header.Get("Content-Type")
+	var contentLength int
+	var err error
 
 	switch v {
 	case v01:
@@ -268,7 +279,8 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 
 		// select the right Decoder based on the given content-type header
 		dec := r.decoderPool.Borrow(contentType)
-		if err := dec.Decode(req.Body, &servicesMeta); err != nil {
+		contentLength, err = dec.Decode(req.Body, &servicesMeta)
+		if err != nil {
 			r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
 			HTTPDecodingError(err, []string{tagServiceHandler, fmt.Sprintf("v:%s", v)}, w)
 			return
@@ -276,7 +288,8 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 	case v03:
 		// select the right Decoder based on the given content-type header
 		dec := r.decoderPool.Borrow(contentType)
-		if err := dec.Decode(req.Body, &servicesMeta); err != nil {
+		contentLength, err = dec.Decode(req.Body, &servicesMeta)
+		if err != nil {
 			if strings.Contains(contentType, "json") {
 				r.logger.Errorf(model.HumanReadableJSONError(dec.BufferReader(), err))
 			} else {
@@ -293,6 +306,10 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 	statsd.Client.Count("datadog.trace_agent.receiver.service", int64(len(servicesMeta)), nil, 1)
 	HTTPOK(w)
 
+	if contentLength > 0 {
+		atomic.AddInt64(&r.stats.ServicesBytes, int64(contentLength))
+	}
+
 	r.services <- servicesMeta
 }
 
@@ -303,6 +320,12 @@ func (r *HTTPReceiver) logStats() {
 
 	for now := range time.Tick(10 * time.Second) {
 		// Load counters and reset them for the next flush
+		tracesBytes := atomic.SwapInt64(&r.stats.TracesBytes, 0)
+		accStats.TracesBytes += tracesBytes
+
+		servicesBytes := atomic.SwapInt64(&r.stats.ServicesBytes, 0)
+		accStats.ServicesBytes += servicesBytes
+
 		spans := atomic.SwapInt64(&r.stats.SpansReceived, 0)
 		accStats.SpansReceived += spans
 
@@ -317,6 +340,8 @@ func (r *HTTPReceiver) logStats() {
 
 		statsd.Client.Gauge("datadog.trace_agent.heartbeat", 1, []string{fmt.Sprintf("version:%s", Version)}, 1)
 
+		statsd.Client.Count("datadog.trace_agent.receiver.traces", tracesBytes, []string{"endpoint:traces"}, 1)
+		statsd.Client.Count("datadog.trace_agent.receiver.services", servicesBytes, []string{"endpoint:services"}, 1)
 		statsd.Client.Count("datadog.trace_agent.receiver.span", spans, nil, 1)
 		statsd.Client.Count("datadog.trace_agent.receiver.trace", traces, nil, 1)
 		statsd.Client.Count("datadog.trace_agent.receiver.span_dropped", sdropped, nil, 1)
@@ -337,6 +362,10 @@ func (r *HTTPReceiver) logStats() {
 
 // receiverStats contains stats about the volume of data received
 type receiverStats struct {
+	// TracesBytes is the amount of data received on the traces endpoint (raw data, encoded, compressed).
+	TracesBytes int64
+	// ServicesBytes is the amount of data received on the services endpoint (raw data, encoded, compressed).
+	ServicesBytes int64
 	// SpansReceived is the number of spans received, including the dropped ones
 	SpansReceived int64
 	// TracesReceived is the number of traces received, including the dropped ones
