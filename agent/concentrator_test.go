@@ -64,7 +64,7 @@ func TestConcentratorStatsCounts(t *testing.T) {
 		},
 	}
 
-	c.Add(testTrace)
+	c.Add(testTrace, testTrace.weight())
 	stats := c.Flush()
 
 	if !assert.Equal(2, len(stats), "We should get exactly 2 StatsBucket") {

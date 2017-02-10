@@ -18,6 +18,13 @@ type processedTrace struct {
 	Sublayers []model.SublayerValue
 }
 
+func (pt *processedTrace) weight() float64 {
+	if pt.Root == nil {
+		return 1.0
+	}
+	return pt.Root.Weight()
+}
+
 // Agent struct holds all the sub-routines structs and make the data flow between them
 type Agent struct {
 	Receiver     *HTTPReceiver
@@ -133,8 +140,7 @@ func (a *Agent) Process(t model.Trace) {
 		pt.Env = tenv
 	}
 
-	// NOTE: right now we don't use the .Metrics map in the concentrator
-	// but if we did, it would be racy with the Sampler that edits it
-	go a.Concentrator.Add(pt)
+	weight := pt.weight() // need to do this now because sampler edits .Metrics map
+	go a.Concentrator.Add(pt, weight)
 	go a.Sampler.Add(pt)
 }
