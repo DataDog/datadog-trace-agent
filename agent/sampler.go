@@ -78,10 +78,11 @@ func (s *Sampler) Flush() []model.Trace {
 // TODO: remove (or clean it) in a real released build
 func (s *Sampler) logState() {
 	state := s.samplerEngine.(*sampler.Sampler).GetState()
-	log.Infof("inTPS: %f, outTPS: %f, maxTPS: %f, offset: %f, slope: %f",
-		state.InTPS, state.OutTPS, state.MaxTPS, state.Offset, state.Slope)
+	log.Infof("inTPS: %f, outTPS: %f, maxTPS: %f, offset: %f, slope: %f, cardinality: %d",
+		state.InTPS, state.OutTPS, state.MaxTPS, state.Offset, state.Slope, state.Cardinality)
 	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.offset", state.Offset, nil, 1)
 	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.slope", state.Slope, nil, 1)
+	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.cardinality", float64(state.Cardinality), nil, 1)
 	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.in_tps", state.InTPS, nil, 1)
 	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.out_tps", state.OutTPS, nil, 1)
 	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.max_tps", state.MaxTPS, nil, 1)

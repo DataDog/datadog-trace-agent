@@ -119,6 +119,15 @@ func (b *Backend) GetUpperSampledScore() float64 {
 	return b.GetSampledScore() * b.decayFactor
 }
 
+// GetCardinality returns the number of different signatures seen recently.
+func (b *Backend) GetCardinality() int64 {
+	b.mu.Lock()
+	cardinality := int64(len(b.scores))
+	b.mu.Unlock()
+
+	return cardinality
+}
+
 // DecayScore applies the decay to the rolling counters
 func (b *Backend) DecayScore() {
 	b.mu.Lock()
