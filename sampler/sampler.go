@@ -124,9 +124,7 @@ func (s *Sampler) AdjustScoring() {
 
 	coefficient := 1.0
 
-	if offset < minSignatureScoreOffset {
-		// Safeguard to prevent from too-small offset which would result in no trace at all
-	} else if TPSratio > 1 {
+	if TPSratio > 1 {
 		// If above, reduce the offset
 		coefficient = 0.8
 		// If we keep 3x too many traces, reduce the offset even more
@@ -146,19 +144,26 @@ func (s *Sampler) AdjustScoring() {
 		}
 	}
 
+	newOffset := coefficient * offset
+
+	// Safeguard to avoid too small offset (for guaranteed very-low volume sampling)
+	if newOffset < minSignatureScoreOffset {
+		newOffset = minSignatureScoreOffset
+	}
+
 	// Default slope value
-	slope := defaultSignatureScoreSlope
+	newSlope := defaultSignatureScoreSlope
 
 	// TODO: explain why this formula
 	if offset < totalTPS {
-		slope = math.Pow(10, math.Log10(cardinality*totalTPS/s.maxTPS)/math.Log10(totalTPS/minSignatureScoreOffset))
+		newSlope = math.Pow(10, math.Log10(cardinality*totalTPS/s.maxTPS)/math.Log10(totalTPS/minSignatureScoreOffset))
 		// That's the max value we should allow. When slope == 10, we basically keep only `offset` traces per signature
-		if slope > 10 {
-			slope = 10
+		if newSlope > 10 {
+			newSlope = 10
 		}
 	}
 
-	s.SetSignatureCoefficients(offset*coefficient, slope)
+	s.SetSignatureCoefficients(newOffset, newSlope)
 }
 
 // Sample counts an incoming trace and tells if it is a sample which has to be kept
