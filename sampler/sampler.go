@@ -46,8 +46,8 @@ type Sampler struct {
 	signatureScoreOffset float64
 	// Logarithm slope for the scoring function
 	signatureScoreSlope float64
-	// signatureScoreCoefficient = math.Pow(signatureScoreSlope, math.Log10(scoreSamplingOffset))
-	signatureScoreCoefficient float64
+	// signatureScoreFactor = math.Pow(signatureScoreSlope, math.Log10(scoreSamplingOffset))
+	signatureScoreFactor float64
 
 	exit chan struct{}
 }
@@ -55,26 +55,25 @@ type Sampler struct {
 // NewSampler returns an initialized Sampler
 func NewSampler(extraRate float64, maxTPS float64) *Sampler {
 	decayPeriod := defaultDecayPeriod
-	signatureScoreOffset := initialSignatureScoreOffset
-	signatureScoreSlope := defaultSignatureScoreSlope
 
-	return &Sampler{
+	s := &Sampler{
 		Backend:   NewBackend(decayPeriod),
 		extraRate: extraRate,
 		maxTPS:    maxTPS,
 
-		signatureScoreOffset:      signatureScoreOffset,
-		signatureScoreSlope:       signatureScoreSlope,
-		signatureScoreCoefficient: math.Pow(signatureScoreSlope, math.Log10(signatureScoreOffset)),
-
 		exit: make(chan struct{}),
 	}
+
+	s.SetSignatureCoefficients(initialSignatureScoreOffset, defaultSignatureScoreSlope)
+
+	return s
 }
 
-// SetSignatureOffset updates the offset coefficient of the signature scoring
-func (s *Sampler) SetSignatureOffset(offset float64) {
+// SetSignatureCoefficients updates the internal scoring coefficients used by the signature scoring
+func (s *Sampler) SetSignatureCoefficients(offset float64, slope float64) {
 	s.signatureScoreOffset = offset
-	s.signatureScoreCoefficient = math.Pow(s.signatureScoreSlope, math.Log10(offset))
+	s.signatureScoreSlope = slope
+	s.signatureScoreFactor = math.Pow(slope, math.Log10(offset))
 }
 
 // UpdateExtraRate updates the extra sample rate
