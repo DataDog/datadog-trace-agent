@@ -117,8 +117,10 @@ func (s *Sampler) RunAdjustScoring() {
 func (s *Sampler) AdjustScoring() {
 	// See how far we are from our maxTPS limit and make signature sampler harder/softer accordingly
 	currentTPS := s.Backend.GetSampledScore()
+	totalTPS := s.Backend.GetTotalScore()
 	TPSratio := currentTPS / s.maxTPS
 	offset := s.signatureScoreOffset
+	cardinality := float64(s.Backend.GetCardinality())
 
 	coefficient := 1.0
 
@@ -136,14 +138,27 @@ func (s *Sampler) AdjustScoring() {
 		// Don't do it if:
 		//  - we already keep all traces (with a 1% margin because of stats imprecision)
 		//  - offset above maxTPS
-		if currentTPS < 0.99*s.Backend.GetTotalScore() && s.signatureScoreOffset < s.maxTPS {
+		if currentTPS < 0.99*totalTPS && s.signatureScoreOffset < s.maxTPS {
 			coefficient = 1.1
 			if TPSratio < 0.5 {
 				coefficient = 1.3
 			}
 		}
 	}
-	s.SetSignatureOffset(offset * coefficient)
+
+	// Default slope value
+	slope := defaultSignatureScoreSlope
+
+	// TODO: explain why this formula
+	if offset < totalTPS {
+		slope = math.Pow(10, math.Log10(cardinality*totalTPS/s.maxTPS)/math.Log10(totalTPS/minSignatureScoreOffset))
+		// That's the max value we should allow. When slope == 10, we basically keep only `offset` traces per signature
+		if slope > 10 {
+			slope = 10
+		}
+	}
+
+	s.SetSignatureCoefficients(offset*coefficient, slope)
 }
 
 // Sample counts an incoming trace and tells if it is a sample which has to be kept
