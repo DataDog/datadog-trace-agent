@@ -26,6 +26,7 @@ const (
 
 	// Sampler parameters not (yet?) configurable
 	defaultDecayPeriod          time.Duration = 5 * time.Second
+	adjustPeriod                time.Duration = 10 * time.Second
 	initialSignatureScoreOffset float64       = 1
 	minSignatureScoreOffset     float64       = 0.01
 	defaultSignatureScoreSlope  float64       = 3
@@ -100,7 +101,7 @@ func (s *Sampler) Stop() {
 
 // RunAdjustScoring is the sampler feedback loop to adjust the scoring coefficients
 func (s *Sampler) RunAdjustScoring() {
-	t := time.NewTicker(2 * s.Backend.decayPeriod)
+	t := time.NewTicker(adjustPeriod)
 	defer t.Stop()
 
 	for {
@@ -111,59 +112,6 @@ func (s *Sampler) RunAdjustScoring() {
 			return
 		}
 	}
-}
-
-// AdjustScoring modifies sampler coefficients to fit better the `maxTPS` condition
-func (s *Sampler) AdjustScoring() {
-	// See how far we are from our maxTPS limit and make signature sampler harder/softer accordingly
-	currentTPS := s.Backend.GetSampledScore()
-	totalTPS := s.Backend.GetTotalScore()
-	TPSratio := currentTPS / s.maxTPS
-	offset := s.signatureScoreOffset
-	cardinality := float64(s.Backend.GetCardinality())
-
-	coefficient := 1.0
-
-	if TPSratio > 1 {
-		// If above, reduce the offset
-		coefficient = 0.8
-		// If we keep 3x too many traces, reduce the offset even more
-		if TPSratio > 3 {
-			coefficient = 0.5
-		}
-	} else if TPSratio < 0.8 {
-		// If below, increase the offset
-		// Don't do it if:
-		//  - we already keep all traces (with a 1% margin because of stats imprecision)
-		//  - offset above maxTPS
-		if currentTPS < 0.99*totalTPS && s.signatureScoreOffset < s.maxTPS {
-			coefficient = 1.1
-			if TPSratio < 0.5 {
-				coefficient = 1.3
-			}
-		}
-	}
-
-	newOffset := coefficient * offset
-
-	// Safeguard to avoid too small offset (for guaranteed very-low volume sampling)
-	if newOffset < minSignatureScoreOffset {
-		newOffset = minSignatureScoreOffset
-	}
-
-	// Default slope value
-	newSlope := defaultSignatureScoreSlope
-
-	// TODO: explain why this formula
-	if offset < totalTPS {
-		newSlope = math.Pow(10, math.Log10(cardinality*totalTPS/s.maxTPS)/math.Log10(totalTPS/minSignatureScoreOffset))
-		// That's the max value we should allow. When slope == 10, we basically keep only `offset` traces per signature
-		if newSlope > 10 {
-			newSlope = 10
-		}
-	}
-
-	s.SetSignatureCoefficients(newOffset, newSlope)
 }
 
 // Sample counts an incoming trace and tells if it is a sample which has to be kept
