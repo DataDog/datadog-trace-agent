@@ -13,6 +13,8 @@ import (
 type Backend struct {
 	// Score per signature
 	scores map[Signature]float64
+	// Score of all traces (equals the sum of all signature scores)
+	totalScore float64
 	// Score of sampled traces
 	sampledScore float64
 	mu           sync.Mutex
@@ -72,6 +74,7 @@ func (b *Backend) Stop() {
 func (b *Backend) CountSignature(signature Signature) {
 	b.mu.Lock()
 	b.scores[signature]++
+	b.totalScore++
 	b.mu.Unlock()
 }
 
@@ -101,18 +104,43 @@ func (b *Backend) GetSampledScore() float64 {
 	return score
 }
 
+// GetTotalScore returns the global score of all sampled traces.
+func (b *Backend) GetTotalScore() float64 {
+	b.mu.Lock()
+	score := b.totalScore / b.countScaleFactor
+	b.mu.Unlock()
+
+	return score
+}
+
+// GetUpperSampledScore returns a certain upper bound of the global count of all sampled traces.
+func (b *Backend) GetUpperSampledScore() float64 {
+	// Overestimate the real score with the high limit of the backend bias.
+	return b.GetSampledScore() * b.decayFactor
+}
+
+// GetCardinality returns the number of different signatures seen recently.
+func (b *Backend) GetCardinality() int64 {
+	b.mu.Lock()
+	cardinality := int64(len(b.scores))
+	b.mu.Unlock()
+
+	return cardinality
+}
+
 // DecayScore applies the decay to the rolling counters
 func (b *Backend) DecayScore() {
 	b.mu.Lock()
 	for sig := range b.scores {
 		score := b.scores[sig]
-		if score > 2 {
+		if score > b.decayFactor*minSignatureScoreOffset {
 			b.scores[sig] /= b.decayFactor
 		} else {
 			// When the score is too small, we can optimize by simply dropping the entry
 			delete(b.scores, sig)
 		}
 	}
+	b.totalScore /= b.decayFactor
 	b.sampledScore /= b.decayFactor
 	b.mu.Unlock()
 }

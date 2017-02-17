@@ -39,5 +39,5 @@ func (s *Sampler) GetSignatureSampleRate(signature Signature) float64 {
 func (s *Sampler) GetCountScore(signature Signature) float64 {
 	score := s.Backend.GetSignatureScore(signature)
 
-	return s.signatureScoreCoefficient / math.Pow(s.signatureScoreSlope, math.Log10(score))
+	return s.signatureScoreFactor / math.Pow(s.signatureScoreSlope, math.Log10(score))
 }

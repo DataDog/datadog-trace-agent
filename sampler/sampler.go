@@ -22,8 +22,10 @@ import (
 
 const (
 	// Sampler parameters not (yet?) configurable
-	defaultDecayPeriod          time.Duration = 30 * time.Second
-	defaultSignatureScoreOffset float64       = 1
+	defaultDecayPeriod          time.Duration = 5 * time.Second
+	adjustPeriod                time.Duration = 10 * time.Second
+	initialSignatureScoreOffset float64       = 1
+	minSignatureScoreOffset     float64       = 0.01
 	defaultSignatureScoreSlope  float64       = 3
 )
 
@@ -42,25 +44,34 @@ type Sampler struct {
 	signatureScoreOffset float64
 	// Logarithm slope for the scoring function
 	signatureScoreSlope float64
-	// signatureScoreCoefficient = math.Pow(signatureScoreSlope, math.Log10(scoreSamplingOffset))
-	signatureScoreCoefficient float64
+	// signatureScoreFactor = math.Pow(signatureScoreSlope, math.Log10(scoreSamplingOffset))
+	signatureScoreFactor float64
+
+	exit chan struct{}
 }
 
 // NewSampler returns an initialized Sampler
 func NewSampler(extraRate float64, maxTPS float64) *Sampler {
 	decayPeriod := defaultDecayPeriod
-	signatureScoreOffset := defaultSignatureScoreOffset
-	signatureScoreSlope := defaultSignatureScoreSlope
 
-	return &Sampler{
+	s := &Sampler{
 		Backend:   NewBackend(decayPeriod),
 		extraRate: extraRate,
 		maxTPS:    maxTPS,
 
-		signatureScoreOffset:      signatureScoreOffset,
-		signatureScoreSlope:       signatureScoreSlope,
-		signatureScoreCoefficient: math.Pow(signatureScoreSlope, math.Log10(signatureScoreOffset)),
+		exit: make(chan struct{}),
 	}
+
+	s.SetSignatureCoefficients(initialSignatureScoreOffset, defaultSignatureScoreSlope)
+
+	return s
+}
+
+// SetSignatureCoefficients updates the internal scoring coefficients used by the signature scoring
+func (s *Sampler) SetSignatureCoefficients(offset float64, slope float64) {
+	s.signatureScoreOffset = offset
+	s.signatureScoreSlope = slope
+	s.signatureScoreFactor = math.Pow(slope, math.Log10(offset))
 }
 
 // UpdateExtraRate updates the extra sample rate
@@ -75,12 +86,29 @@ func (s *Sampler) UpdateMaxTPS(maxTPS float64) {
 
 // Run runs and block on the Sampler main loop
 func (s *Sampler) Run() {
-	s.Backend.Run()
+	go s.Backend.Run()
+	s.RunAdjustScoring()
 }
 
 // Stop stops the main Run loop
 func (s *Sampler) Stop() {
 	s.Backend.Stop()
+	close(s.exit)
+}
+
+// RunAdjustScoring is the sampler feedback loop to adjust the scoring coefficients
+func (s *Sampler) RunAdjustScoring() {
+	t := time.NewTicker(adjustPeriod)
+	defer t.Stop()
+
+	for {
+		select {
+		case <-t.C:
+			s.AdjustScoring()
+		case <-s.exit:
+			return
+		}
+	}
 }
 
 // Sample counts an incoming trace and tells if it is a sample which has to be kept
@@ -127,8 +155,7 @@ func (s *Sampler) GetMaxTPSSampleRate() float64 {
 	// When above maxTPS, apply an additional sample rate to statistically respect the limit
 	maxTPSrate := 1.0
 	if s.maxTPS > 0 {
-		// Overestimate the real score with the high limit of the backend bias.
-		currentTPS := s.Backend.GetSampledScore() * s.Backend.decayFactor
+		currentTPS := s.Backend.GetUpperSampledScore()
 		if currentTPS > s.maxTPS {
 			maxTPSrate = s.maxTPS / currentTPS
 		}

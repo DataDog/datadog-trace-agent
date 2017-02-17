@@ -89,7 +89,7 @@ func TestMaxTPS(t *testing.T) {
 	tracesPerPeriod := tps * periodSeconds
 	// Set signature score offset high enough not to kick in during the test.
 	s.signatureScoreOffset = 2 * tps
-	s.signatureScoreCoefficient = math.Pow(s.signatureScoreSlope, math.Log10(s.signatureScoreOffset))
+	s.signatureScoreFactor = math.Pow(s.signatureScoreSlope, math.Log10(s.signatureScoreOffset))
 
 	sampledCount := 0
 
