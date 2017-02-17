@@ -133,7 +133,7 @@ func (b *Backend) DecayScore() {
 	b.mu.Lock()
 	for sig := range b.scores {
 		score := b.scores[sig]
-		if score > 2 {
+		if score > b.decayFactor*minSignatureScoreOffset {
 			b.scores[sig] /= b.decayFactor
 		} else {
 			// When the score is too small, we can optimize by simply dropping the entry
