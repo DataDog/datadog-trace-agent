@@ -158,7 +158,7 @@ func NormalizeTrace(t Trace) (Trace, error) {
 	traceID := t[0].TraceID
 	for i, s := range t {
 		if s.TraceID != traceID {
-			return t, errors.New("trace id mismatch")
+			return t, fmt.Errorf("trace id mismatch %s:%x != %s:%x", t[0].Name, t[0].TraceID, s.Name, s.TraceID)
 		}
 
 		if err := t[i].Normalize(); err != nil {
