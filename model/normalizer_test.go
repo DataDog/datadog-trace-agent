@@ -3,6 +3,7 @@ package model
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -123,6 +124,12 @@ func TestNormalizeStartTooSmall(t *testing.T) {
 	s := testSpan()
 	s.Start = 42
 	assert.NotNil(t, s.Normalize())
+}
+
+func TestNormalizeStartTooLarge(t *testing.T) {
+	s := testSpan()
+	s.Start = time.Now().Add(15 * time.Minute).UnixNano()
+	assert.Error(t, s.Normalize())
 }
 
 func TestNormalizeDurationPassThru(t *testing.T) {
