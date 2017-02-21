@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/model"
+
 	log "github.com/cihub/seelog"
 	"gopkg.in/ini.v1"
 )
@@ -198,7 +200,7 @@ APM_CONF:
 	}
 
 	if v, _ := conf.Get("trace.config", "env"); v != "" {
-		c.DefaultEnv = v
+		c.DefaultEnv = model.NormalizeTag(v)
 	}
 
 	if v, _ := conf.Get("trace.config", "log_level"); v != "" {

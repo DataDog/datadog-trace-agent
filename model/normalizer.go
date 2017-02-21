@@ -139,6 +139,11 @@ func (s *Span) Normalize() error {
 		return fmt.Errorf("span.normalize: `Type` too long (max %d chars): %s", MaxTypeLen, s.Type)
 	}
 
+	// Environment
+	if env, ok := s.Meta["env"]; ok {
+		s.Meta["env"] = NormalizeTag(env)
+	}
+
 	return nil
 }
 

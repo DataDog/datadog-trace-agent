@@ -217,6 +217,13 @@ func TestNormalizeServiceTag(t *testing.T) {
 	assert.Equal(t, "retargeting_api-staging", s.Service)
 }
 
+func TestNormalizeEnv(t *testing.T) {
+	s := testSpan()
+	s.Meta["env"] = "DEVELOPMENT"
+	s.Normalize()
+	assert.Equal(t, "development", s.Meta["env"])
+}
+
 func TestSpecialZipkinRootSpan(t *testing.T) {
 	s := testSpan()
 	s.ParentID = 42
