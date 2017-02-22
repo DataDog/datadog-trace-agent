@@ -76,10 +76,12 @@ def go_pkg_deps(pkgs, root_path)
 end
 
 def go_fmt(path)
-  out = `go fmt ./...`
+  out = `go fmt #{path}`
   errors = out.split("\n")
   if errors.length > 0
-    puts out
+    errors.each do |error|
+      $stderr.puts error
+    end
     fail
   end
 end
