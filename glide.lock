@@ -7,14 +7,14 @@ imports:
   version: a9c7a9896c1847c9cc2b068a2ae68e9d74540a5d
   subpackages:
   - statsd
+- name: github.com/go-ini/ini
+  version: 74bdc99692c3408cb103221e38675ce8fda0a718
 - name: github.com/philhofer/fwd
   version: 98c11a7a6ec829d672b03833c3d69a7fae1ca972
 - name: github.com/tinylib/msgp
   version: 362bfb3384d53ae4d5dd745983a4d70b6d23628c
   subpackages:
   - msgp
-- name: gopkg.in/ini.v1
-  version: 12f418cc7edc5a618a51407b7ac1f1f512139df3
 testImports:
 - name: github.com/davecgh/go-spew
   version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9

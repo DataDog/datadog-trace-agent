@@ -10,7 +10,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/model"
 
 	log "github.com/cihub/seelog"
-	"gopkg.in/ini.v1"
+	"github.com/go-ini/ini"
 )
 
 // AgentConfig handles the interpretation of the configuration (with default

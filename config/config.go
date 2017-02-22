@@ -6,7 +6,7 @@ import (
 	"strings"
 	"syscall"
 
-	"gopkg.in/ini.v1"
+	"github.com/go-ini/ini"
 )
 
 var globalConfig *File
