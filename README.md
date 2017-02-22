@@ -12,7 +12,9 @@ Pre-requisites:
 
 
 Hacking:
-- Sync your Go dependencies with `rake restore`. This uses [glock](https://github.com/robfig/glock) to sync all deps listed in the [GLOCKFILE](GLOCKFILE)
+- Import dependencies with `rake restore`. This task uses
+  [glide](https://github.com/Masterminds/glide) to import all dependencies
+  listed in `glide.yaml` in the `vendor` directory with the right version.
 - Run `rake build` to build the `trace-agent` binary from current source
 - Or run `rake install` to install `trace-agent` to your $GOPATH
 

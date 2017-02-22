@@ -1,0 +1,22 @@
+hash: 2e812f387b250edd41743d6381aec820bbe4ab85664a400cefd07e554ab85564
+updated: 2017-02-22T13:39:50.368682306+01:00
+imports:
+- name: github.com/cihub/seelog
+  version: d2c6e5aa9fbfdd1c624e140287063c7730654115
+- name: github.com/DataDog/datadog-go
+  version: a9c7a9896c1847c9cc2b068a2ae68e9d74540a5d
+  subpackages:
+  - statsd
+- name: github.com/philhofer/fwd
+  version: 98c11a7a6ec829d672b03833c3d69a7fae1ca972
+- name: github.com/tinylib/msgp
+  version: 362bfb3384d53ae4d5dd745983a4d70b6d23628c
+  subpackages:
+  - msgp
+- name: gopkg.in/ini.v1
+  version: 12f418cc7edc5a618a51407b7ac1f1f512139df3
+testImports:
+- name: github.com/stretchr/testify
+  version: 8ce79b9f0b77745113f82c17d0756771456ccbd3
+  subpackages:
+  - assert

@@ -10,7 +10,7 @@ RUN curl -sL -o /usr/local/bin/gimme https://raw.githubusercontent.com/travis-ci
 ENV GOPATH=/go
 ENV PATH=/go/bin:$PATH
 RUN gimme 1.7.1
-RUN eval $(gimme 1.7.1) && go get github.com/robfig/glock
+RUN eval $(gimme 1.7.1) && go get github.com/Masterminds/glide
 
 
 VOLUME ["/go/src/github.com/DataDog/datadog-trace-agent"]
