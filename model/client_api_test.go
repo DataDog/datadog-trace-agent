@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/config"
+	log "github.com/cihub/seelog"
 	"github.com/stretchr/testify/assert"
 	"github.com/tinylib/msgp/msgp"
 )
@@ -52,7 +52,7 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 
 	// neutralize logs for tests
-	config.NewLoggerLevelCustom("critical", "")
+	log.UseLogger(log.Disabled)
 
 	os.Exit(m.Run())
 }
