@@ -3,13 +3,14 @@ package model
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNormalizeOK(t *testing.T) {
 	s := testSpan()
-	assert.Nil(t, s.Normalize())
+	assert.NoError(t, s.Normalize())
 }
 
 func TestNormalizeServicePassThru(t *testing.T) {
@@ -22,13 +23,13 @@ func TestNormalizeServicePassThru(t *testing.T) {
 func TestNormalizeEmptyService(t *testing.T) {
 	s := testSpan()
 	s.Service = ""
-	assert.NotNil(t, s.Normalize())
+	assert.Error(t, s.Normalize())
 }
 
 func TestNormalizeLongService(t *testing.T) {
 	s := testSpan()
 	s.Service = strings.Repeat("CAMEMBERT", 100)
-	assert.NotNil(t, s.Normalize())
+	assert.Error(t, s.Normalize())
 }
 
 func TestNormalizeNamePassThru(t *testing.T) {
@@ -41,13 +42,13 @@ func TestNormalizeNamePassThru(t *testing.T) {
 func TestNormalizeEmptyName(t *testing.T) {
 	s := testSpan()
 	s.Name = ""
-	assert.NotNil(t, s.Normalize())
+	assert.Error(t, s.Normalize())
 }
 
 func TestNormalizeLongName(t *testing.T) {
 	s := testSpan()
 	s.Name = strings.Repeat("CAMEMBERT", 100)
-	assert.NotNil(t, s.Normalize())
+	assert.Error(t, s.Normalize())
 }
 
 func TestNormalizeName(t *testing.T) {
@@ -59,7 +60,7 @@ func TestNormalizeName(t *testing.T) {
 	s := testSpan()
 	for name, expName := range expNames {
 		s.Name = name
-		assert.Nil(t, s.Normalize())
+		assert.NoError(t, s.Normalize())
 		assert.Equal(t, expName, s.Name)
 	}
 }
@@ -74,13 +75,13 @@ func TestNormalizeResourcePassThru(t *testing.T) {
 func TestNormalizeEmptyResource(t *testing.T) {
 	s := testSpan()
 	s.Resource = ""
-	assert.NotNil(t, s.Normalize())
+	assert.Error(t, s.Normalize())
 }
 
 func TestNormalizeLongResource(t *testing.T) {
 	s := testSpan()
 	s.Resource = strings.Repeat("SELECT ", 5000)
-	assert.Nil(t, s.Normalize())
+	assert.NoError(t, s.Normalize())
 	assert.Equal(t, 5000, len(s.Resource))
 }
 
@@ -122,7 +123,13 @@ func TestNormalizeStartPassThru(t *testing.T) {
 func TestNormalizeStartTooSmall(t *testing.T) {
 	s := testSpan()
 	s.Start = 42
-	assert.NotNil(t, s.Normalize())
+	assert.Error(t, s.Normalize())
+}
+
+func TestNormalizeStartTooLarge(t *testing.T) {
+	s := testSpan()
+	s.Start = time.Now().Add(15 * time.Minute).UnixNano()
+	assert.Error(t, s.Normalize())
 }
 
 func TestNormalizeDurationPassThru(t *testing.T) {
@@ -135,7 +142,7 @@ func TestNormalizeDurationPassThru(t *testing.T) {
 func TestNormalizeEmptyDuration(t *testing.T) {
 	s := testSpan()
 	s.Duration = 0
-	assert.NotNil(t, s.Normalize())
+	assert.Error(t, s.Normalize())
 }
 
 func TestNormalizeErrorPassThru(t *testing.T) {
@@ -156,7 +163,7 @@ func TestNormalizeMetricsKeyTooLong(t *testing.T) {
 	s := testSpan()
 	key := strings.Repeat("TOOLONG", 1000)
 	s.Metrics[key] = 42
-	assert.Nil(t, s.Normalize())
+	assert.NoError(t, s.Normalize())
 	for k := range s.Metrics {
 		assert.True(t, len(k) < MaxMetricsKeyLen+4)
 	}
@@ -173,7 +180,7 @@ func TestNormalizeMetaKeyTooLong(t *testing.T) {
 	s := testSpan()
 	key := strings.Repeat("TOOLONG", 1000)
 	s.Meta[key] = "foo"
-	assert.Nil(t, s.Normalize())
+	assert.NoError(t, s.Normalize())
 	for k := range s.Meta {
 		assert.True(t, len(k) < MaxMetaKeyLen+4)
 	}
@@ -183,7 +190,7 @@ func TestNormalizeMetaValueTooLong(t *testing.T) {
 	s := testSpan()
 	val := strings.Repeat("TOOLONG", 5000)
 	s.Meta["foo"] = val
-	assert.Nil(t, s.Normalize())
+	assert.NoError(t, s.Normalize())
 	for _, v := range s.Meta {
 		assert.True(t, len(v) < MaxMetaValLen+4)
 	}
@@ -207,7 +214,7 @@ func TestNormalizeTypeTooLong(t *testing.T) {
 	s := testSpan()
 	s.Type = strings.Repeat("sql", 1000)
 	s.Normalize()
-	assert.NotNil(t, s.Normalize())
+	assert.Error(t, s.Normalize())
 }
 
 func TestNormalizeServiceTag(t *testing.T) {
@@ -241,7 +248,7 @@ func TestNormalizeTraceEmpty(t *testing.T) {
 	trace := Trace{}
 
 	_, err := NormalizeTrace(trace)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 }
 
 func TestNormalizeTraceTraceIdMismatch(t *testing.T) {
@@ -254,7 +261,7 @@ func TestNormalizeTraceTraceIdMismatch(t *testing.T) {
 	trace := Trace{span1, span2}
 
 	_, err := NormalizeTrace(trace)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 }
 
 func TestNormalizeTraceInvalidSpan(t *testing.T) {
@@ -266,7 +273,7 @@ func TestNormalizeTraceInvalidSpan(t *testing.T) {
 	trace := Trace{span1, span2}
 
 	_, err := NormalizeTrace(trace)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 }
 
 func TestNormalizeTrace(t *testing.T) {
@@ -278,5 +285,5 @@ func TestNormalizeTrace(t *testing.T) {
 	trace := Trace{span1, span2}
 
 	_, err := NormalizeTrace(trace)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }

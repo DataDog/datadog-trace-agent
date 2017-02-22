@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io"
 	"math"
 	"os"
@@ -11,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/config"
+	log "github.com/cihub/seelog"
 	"github.com/stretchr/testify/assert"
 	"github.com/tinylib/msgp/msgp"
 )
@@ -52,7 +53,12 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 
 	// neutralize logs for tests
-	config.NewLoggerLevelCustom("critical", "")
+	logger, err := log.LoggerFromConfigAsString(`<seelog minlevel="critical" />`)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "cannot create logger: %v\n", err)
+		os.Exit(1)
+	}
+	log.ReplaceLogger(logger)
 
 	os.Exit(m.Run())
 }

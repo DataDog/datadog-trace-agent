@@ -195,7 +195,10 @@ func RandomSpanID() uint64 {
 
 // RandomSpanStart generates a span start timestamp
 func RandomSpanStart() int64 {
-	return randomTime().UnixNano()
+	// Make sure spans end in the past
+	maxDuration := time.Duration(durations[len(durations)-1])
+	offset := time.Duration(rand.Intn(10)) * time.Second
+	return time.Now().Add(-1 * maxDuration).Add(-1 * offset).UnixNano()
 }
 
 // RandomSpanTraceID generates a random trace ID

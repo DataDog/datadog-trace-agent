@@ -23,6 +23,9 @@ const (
 	MaxMetaValLen = 5000
 	// MaxMetricsKeyLen the maximum length of a metric name key
 	MaxMetricsKeyLen = MaxMetaKeyLen
+	// MaxEndDateOffset the maximum amount of time in the future we
+	// tolerate for span end dates
+	MaxEndDateOffset = 10 * time.Minute
 )
 
 var (
@@ -92,6 +95,11 @@ func (s *Span) Normalize() error {
 	// (or it is "le bug de l'an 2000")
 	if s.Start < Year2000NanosecTS {
 		return fmt.Errorf("span.normalize: invalid `Start` (must be nanosecond epoch): %d", s.Start)
+	}
+
+	// If the end date is too far away in the future, it's probably a mistake.
+	if s.Start+s.Duration > time.Now().Add(MaxEndDateOffset).UnixNano() {
+		return fmt.Errorf("span.normalize: more than %v in the future", MaxEndDateOffset)
 	}
 
 	if s.Duration == 0 {
