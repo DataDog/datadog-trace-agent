@@ -138,7 +138,7 @@ func TestSQLQuantizer(t *testing.T) {
 			"UPDATE user_dash_pref SET json_prefs = ? modified = ? WHERE user_id = ? AND url = ?"},
 		{
 			"SELECT DISTINCT host.id AS host_id FROM host JOIN host_alias ON host_alias.host_id = host.id WHERE host.org_id = %(org_id_1)s AND host.name NOT IN (%(name_1)s) AND host.name IN (%(name_2)s, %(name_3)s, %(name_4)s, %(name_5)s)",
-			"SELECT DISTINCT host.id AS host_id FROM host JOIN host_alias ON host_alias.host_id = host.id WHERE host.org_id = ? AND host.name NOT IN ( ? ) AND host.name IN ( ? )",
+			"SELECT DISTINCT host.id FROM host JOIN host_alias ON host_alias.host_id = host.id WHERE host.org_id = ? AND host.name NOT IN ( ? ) AND host.name IN ( ? )",
 		},
 		{
 			"SELECT org_id, metric_key FROM metrics_metadata WHERE org_id = %(org_id)s AND metric_key = ANY(array[75])",
@@ -186,7 +186,7 @@ func TestSQLQuantizer(t *testing.T) {
 		},
 		{
 			"SELECT date(created_at) as ordered_date, sum(price) as total_price FROM orders GROUP BY date(created_at) HAVING sum(price) > 100",
-			"SELECT date ( created_at ) as ordered_date, sum ( price ) as total_price FROM orders GROUP BY date ( created_at ) HAVING sum ( price ) > ?",
+			"SELECT date ( created_at ), sum ( price ) FROM orders GROUP BY date ( created_at ) HAVING sum ( price ) > ?",
 		},
 		{
 			"SELECT * FROM articles WHERE id > 10 ORDER BY id asc LIMIT 20",
@@ -222,7 +222,7 @@ func TestSQLQuantizer(t *testing.T) {
 		},
 		{
 			"SELECT server_table.host AS host_id FROM table#.host_tags as server_table WHERE server_table.host_id = 50",
-			"SELECT server_table.host AS host_id FROM table#.host_tags as server_table WHERE server_table.host_id = ?",
+			"SELECT server_table.host FROM table#.host_tags WHERE server_table.host_id = ?",
 		},
 		{
 			`INSERT INTO delayed_jobs (attempts, created_at, failed_at, handler, last_error, locked_at, locked_by, priority, queue, run_at, updated_at) VALUES (0, '2016-12-04 17:09:59', NULL, '--- !ruby/object:Delayed::PerformableMethod\nobject: !ruby/object:Item\n  store:\n  - a simple string\n  - an \'escaped \' string\n  - another \'escaped\' string\n  - 42\n  string: a string with many \\\\\'escapes\\\\\'\nmethod_name: :show_store\nargs: []\n', NULL, NULL, NULL, 0, NULL, '2016-12-04 17:09:59', '2016-12-04 17:09:59')`,
@@ -238,11 +238,15 @@ func TestSQLQuantizer(t *testing.T) {
 		},
 		{
 			"CREATE FUNCTION add(integer, integer) RETURNS integer\n AS 'select $1 + $2;'\n LANGUAGE SQL\n IMMUTABLE\n RETURNS NULL ON NULL INPUT;",
-			"CREATE FUNCTION add ( integer, integer ) RETURNS integer AS ? LANGUAGE SQL IMMUTABLE RETURNS ? ON ? INPUT",
+			"CREATE FUNCTION add ( integer, integer ) RETURNS integer LANGUAGE SQL IMMUTABLE RETURNS ? ON ? INPUT",
 		},
 		{
 			"SELECT * FROM public.table ( array [ ROW ( array [ 'magic', 'foo',",
 			"SELECT * FROM public.table ( array [ ROW ( array [ ?",
+		},
+		{
+			"SELECT pg_try_advisory_lock (123) AS t46eef3f025cc27feb31ca5a2d668a09a",
+			"SELECT pg_try_advisory_lock ( ? )",
 		},
 	}
 

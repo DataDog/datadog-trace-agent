@@ -29,7 +29,18 @@ type DiscardFilter struct{}
 // Filter the given token so that a `nil` slice is returned if the token
 // is in the token filtered list.
 func (f *DiscardFilter) Filter(token, lastToken int, buffer []byte) (int, []byte) {
+	// filters based on previous token
+	switch lastToken {
+	case As:
+		// prevent the next comma from being part of a GroupingFilter
+		return FilteredComma, nil
+	}
+
+	// filters based on the current token; if the next token should be ignored,
+	// return the same token value (not Filtered) and nil
 	switch token {
+	case As:
+		return As, nil
 	case Comment, ';':
 		return Filtered, nil
 	default:

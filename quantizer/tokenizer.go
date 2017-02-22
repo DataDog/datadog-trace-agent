@@ -36,6 +36,8 @@ const (
 	GE                = 57362
 	NE                = 57363
 	Filtered          = 57364
+	As                = 57365
+	FilteredComma     = 57366
 )
 
 // Tokenizer is the struct used to generate SQL
@@ -66,6 +68,7 @@ var keywords = map[string]int{
 	"FALSE":     BooleanLiteral,
 	"SAVEPOINT": Savepoint,
 	"LIMIT":     Limit,
+	"AS":        As,
 }
 
 // Scan scans the tokenizer for the next token and returns
