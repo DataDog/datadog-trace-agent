@@ -266,7 +266,7 @@ ENV_CONF:
 
 	// check for api-endpoint parity after all possible overrides have been applied
 	if len(c.APIKeys) == 0 {
-		return c, errors.New("You must specify an API Key, either via a configuration file or the DD_API_KEY env var.")
+		return c, errors.New("you must specify an API Key, either via a configuration file or the DD_API_KEY env var")
 	}
 
 	if len(c.APIKeys) != len(c.APIEndpoints) {
