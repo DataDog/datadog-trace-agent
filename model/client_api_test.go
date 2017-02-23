@@ -85,7 +85,7 @@ func TestDecoders(t *testing.T) {
 		span := trace[0]
 		assert.Equal(uint64(math.MaxUint64), span.TraceID)
 		assert.Equal(uint64(math.MaxUint64), span.SpanID)
-		assert.Equal(int64(math.MaxInt64), span.Duration)
+		assert.Equal(math.MaxInt64, span.Duration)
 		assert.Equal("fennel_IS amazing!", span.Service)
 		assert.Equal("something &&<@# that should be a metric!", span.Name)
 		assert.Equal("NOT touched because it is going to be hashed", span.Resource)
@@ -124,7 +124,7 @@ func TestDecodersReusable(t *testing.T) {
 		span := trace[0]
 		assert.Equal(uint64(math.MaxUint64), span.TraceID)
 		assert.Equal(uint64(math.MaxUint64), span.SpanID)
-		assert.Equal(int64(math.MaxInt64), span.Duration)
+		assert.Equal(math.MaxInt64, span.Duration)
 		assert.Equal("fennel_IS amazing!", span.Service)
 		assert.Equal("something &&<@# that should be a metric!", span.Name)
 		assert.Equal("NOT touched because it is going to be hashed", span.Resource)

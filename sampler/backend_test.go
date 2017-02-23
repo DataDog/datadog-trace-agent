@@ -26,8 +26,8 @@ func TestBasicNewBackend(t *testing.T) {
 	sign := randomSignature()
 	backend.CountSignature(sign)
 
-	assert.True(backend.GetSignatureScore(sign) > 0.0)
-	assert.Equal(0.0, backend.GetSignatureScore(randomSignature()))
+	assert.True(backend.GetSignatureScore(sign) > 0)
+	assert.Equal(backend.GetSignatureScore(randomSignature()), 0)
 }
 
 func TestCountScoreConvergence(t *testing.T) {

@@ -23,15 +23,15 @@ func TestSampleRateManyTraces(t *testing.T) {
 	// Test with multiple sample rates
 	assert := assert.New(t)
 
-	times := 1000000
+	times := 1e6
 
-	for _, rate := range []float64{1.0, 0.1, 0.5, 0.99} {
+	for _, rate := range []float64{0.0, 1, 0.1, 0.5, 0.99} {
 		sampled := 0
-		for i := 0; i < times; i++ {
+		for i := 0; i < int(times); i++ {
 			if SampleByRate(randomTraceID(), rate) {
 				sampled++
 			}
 		}
-		assert.InEpsilon(float64(sampled), float64(times)*rate, 0.01)
+		assert.InEpsilon(sampled, times*rate, 0.01)
 	}
 }

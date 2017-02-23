@@ -57,14 +57,14 @@ func SummarySkiplistConstantN(t *testing.T, n int) {
 	assert := assert.New(t)
 	vals := GenSummarySkiplist(n, ConstantGenerator)
 	for _, v := range vals {
-		assert.Equal(42.0, v)
+		assert.Equal(42, v)
 	}
 }
 func SummarySliceConstantN(t *testing.T, n int) {
 	assert := assert.New(t)
 	vals := GenSummarySlice(n, ConstantGenerator)
 	for _, v := range vals {
-		assert.Equal(42.0, v)
+		assert.Equal(42, v)
 	}
 }
 func TestSummarySkiplistConstant10(t *testing.T) {
@@ -206,7 +206,7 @@ func TestSummaryMerge(t *testing.T) {
 
 	s1.Merge(s2)
 
-	expected := map[float64]float64{
+	expected := map[float64]int{
 		0.0: 0,
 		0.2: 15,
 		0.4: 30,
@@ -235,7 +235,7 @@ func TestSummarySliceMerge(t *testing.T) {
 
 	s1.Merge(s2)
 
-	expected := map[float64]float64{
+	expected := map[float64]int{
 		0.0: 0,
 		0.2: 15,
 		0.4: 30,
@@ -345,8 +345,8 @@ func TestSummaryBySlices(t *testing.T) {
 	fmt.Println(slices)
 	assert.Equal(10, len(slices))
 	for i, sl := range slices {
-		assert.Equal(float64(i+1), sl.Start)
-		assert.Equal(float64(i+1), sl.End)
+		assert.Equal(i+1, sl.Start)
+		assert.Equal(i+1, sl.End)
 		if i == 4 {
 			assert.Equal(3, sl.Weight)
 		} else {

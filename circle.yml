@@ -3,7 +3,7 @@ machine:
     GODIST: "go1.7.1.linux-amd64.tar.gz"
     GOPATH: /home/ubuntu/.go_workspace
     IMPORT_PATH: "github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
-    GLIDE_PATH: "$GOPATH/src/github.com/Masterminds/glide"
+    GLOCK_PATH: "$GOPATH/src/github.com/robfig/glock"
   post:
     - mkdir -p download
     - test -e download/$GODIST || curl -o download/$GODIST https://storage.googleapis.com/golang/$GODIST
@@ -14,10 +14,11 @@ dependencies:
   override:
     - mkdir -p "$GOPATH/src/$IMPORT_PATH"
     - rsync -azC --delete ./ "$GOPATH/src/$IMPORT_PATH/"
-    - go get -d github.com/Masterminds/glide
-    - cd $GLIDE_PATH && git checkout v0.12.3 && go install
-    - cd "$GOPATH/src/$IMPORT_PATH" && rake restore
+    - go get -d github.com/robfig/glock
+    - cd $GLOCK_PATH && git checkout 7bc8ce51048e2adc11733f90a87b1c02fb7feebe && cd "$GOPATH/src/$IMPORT_PATH"
+    - pwd
+    - rake restore
 
 test:
   override:
-    - cd "$GOPATH/src/$IMPORT_PATH" && rake ci
+    - rake ci

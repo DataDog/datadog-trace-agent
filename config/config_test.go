@@ -8,7 +8,7 @@ import (
 
 	"testing"
 
-	"github.com/go-ini/ini"
+	"gopkg.in/ini.v1"
 )
 
 func TestGetStrArray(t *testing.T) {
