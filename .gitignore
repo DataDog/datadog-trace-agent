@@ -13,3 +13,4 @@ agent/agent
 *.coverage
 prof*
 *test
+/vendor

@@ -66,7 +66,7 @@ func TestStatsBucketDefault(t *testing.T) {
 	}
 	sb := srb.Export()
 
-	expectedCounts := map[string]int64{
+	expectedCounts := map[string]float64{
 		"A.foo|duration|env:default,resource:α,service:A":     1,
 		"A.foo|duration|env:default,resource:β,service:A":     2,
 		"B.foo|duration|env:default,resource:γ,service:B":     3,
@@ -134,7 +134,7 @@ func TestStatsBucketExtraAggregators(t *testing.T) {
 	}
 	sb := srb.Export()
 
-	expectedCounts := map[string]int64{
+	expectedCounts := map[string]float64{
 		"A.foo|duration|env:default,resource:α,service:A":                 1,
 		"A.foo|duration|env:default,resource:β,service:A":                 2,
 		"B.foo|duration|env:default,resource:γ,service:B":                 3,
@@ -196,13 +196,13 @@ func TestStatsBucketMany(t *testing.T) {
 	assert.Len(sb.Counts, 3*n, "Missing counts %d != %d", len(sb.Counts), 3*n)
 	for ckey, c := range sb.Counts {
 		if strings.Contains(ckey, "|duration|") {
-			assert.Equal(7, c.Value, "duration %s wrong value", ckey)
+			assert.Equal(7.0, c.Value, "duration %s wrong value", ckey)
 		}
 		if strings.Contains(ckey, "|errors|") {
-			assert.Equal(0, c.Value, "errors %s wrong value", ckey)
+			assert.Equal(0.0, c.Value, "errors %s wrong value", ckey)
 		}
 		if strings.Contains(ckey, "|hits|") {
-			assert.Equal(1, c.Value, "hits %s wrong value", ckey)
+			assert.Equal(1.0, c.Value, "hits %s wrong value", ckey)
 		}
 	}
 }
@@ -226,7 +226,7 @@ func TestStatsBucketSublayers(t *testing.T) {
 	}
 	sb := srb.Export()
 
-	expectedCounts := map[string]int64{
+	expectedCounts := map[string]float64{
 		"A.foo|_sublayers.duration.by_service|env:default,resource:α,service:A,sublayer_service:A":                                        80,
 		"A.foo|_sublayers.duration.by_service|env:default,resource:α,service:A,sublayer_service:B":                                        12,
 		"A.foo|_sublayers.duration.by_service|env:default,resource:α,service:A,sublayer_service:C":                                        8,

@@ -1,0 +1,21 @@
+package: github.com/DataDog/datadog-trace-agent
+
+import:
+- package: github.com/DataDog/datadog-go
+  version: a9c7a9896c1847c9cc2b068a2ae68e9d74540a5d
+  subpackages:
+  - statsd
+- package: github.com/cihub/seelog
+  version: v2.6
+- package: github.com/tinylib/msgp
+  version: 362bfb3384d53ae4d5dd745983a4d70b6d23628c
+  subpackages:
+  - msgp
+- package: github.com/go-ini/ini
+  version: v1.25.2
+
+testImport:
+- package: github.com/stretchr/testify
+  version: v1.1.4
+  subpackages:
+  - assert

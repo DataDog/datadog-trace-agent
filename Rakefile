@@ -2,12 +2,27 @@ require "./gorake.rb"
 
 desc 'Bootstrap CI environment'
 task :bootstrap do
-  sh 'go get github.com/robfig/glock'
+  sh 'go get github.com/Masterminds/glide'
+
+  tools = {
+    'github.com/golang/lint' => {
+      :version => 'b8599f7d71e7fead76b25aeb919c0e2558672f4a',
+      :main_pkg => './golint'
+    }
+  }
+
+  tools.each do |pkg, info|
+    path = "#{ENV['GOPATH']}/src/#{pkg}"
+    FileUtils.rm_rf(path)
+
+    sh "go get #{pkg}"
+    sh "cd #{path} && git reset --hard #{info[:version]} && go install #{info[:main_pkg]}"
+  end
 end
 
-desc 'Restore from glockfile'
+desc 'Restore code workspace to known state from locked versions'
 task :restore => [:bootstrap] do
-  sh 'glock sync github.com/DataDog/datadog-trace-agent'
+  sh 'glide install'
 end
 
 PACKAGES = %w(
