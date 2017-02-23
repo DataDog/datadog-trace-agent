@@ -13,6 +13,14 @@ import:
   - msgp
 - package: github.com/go-ini/ini
   version: v1.25.2
+- package: github.com/golang/tools
+  version: 219e654bb7266d3b73c4610ed24c33d12560826a
+  subpackages:
+  - go/gcexportdata
+- package: github.com/shirou/gopsutil
+  version: v2.17.01
+  subpackages:
+  - cpu
 
 testImport:
 - package: github.com/stretchr/testify
