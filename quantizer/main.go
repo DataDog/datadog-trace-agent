@@ -10,6 +10,7 @@ const (
 	sqlType       = "sql"
 	redisType     = "redis"
 	cassandraType = "cassandra"
+	httpType      = "http"
 	tabCode       = uint8(9)
 	newLineCode   = uint8(10)
 	spaceCode     = uint8(32)
@@ -29,6 +30,8 @@ func Quantize(span model.Span) model.Span {
 		return QuantizeSQL(span)
 	case redisType:
 		return QuantizeRedis(span)
+	case httpType:
+		return QuantizeHTTP(span)
 	default:
 		return span
 	}
