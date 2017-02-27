@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -61,6 +63,9 @@ type HTTPReceiver struct {
 
 	exit chan struct{}
 
+	preSampleRate  float64
+	preSampleMutex sync.RWMutex
+
 	maxRequestBodyLength int64
 	debug                bool
 }
@@ -75,6 +80,7 @@ func NewHTTPReceiver(conf *config.AgentConfig) *HTTPReceiver {
 		logger:   &errorLogger{},
 		exit:     make(chan struct{}),
 
+		preSampleRate:        1.0,
 		maxRequestBodyLength: maxRequestBodyLength,
 		debug:                strings.ToLower(conf.LogLevel) == "debug",
 	}
@@ -169,8 +175,37 @@ func (r *HTTPReceiver) httpHandleWithVersion(v APIVersion, f func(APIVersion, ht
 	})
 }
 
+// SetPreSampleRate set the pre-sample rate, thread-safe.
+func (r *HTTPReceiver) SetPreSampleRate(rate float64) {
+	r.preSampleMutex.Lock()
+	r.preSampleRate = rate
+	r.preSampleMutex.Unlock()
+}
+
+// PreSampleRate returns the current pre-sample rate, thread-safe.
+func (r *HTTPReceiver) PreSampleRate() float64 {
+	r.preSampleMutex.RLock()
+	rate := r.preSampleRate
+	r.preSampleMutex.RUnlock()
+	return rate
+}
+
+// PreSampleKeep tells wether a given request should be kept.
+func (r *HTTPReceiver) PreSampleKeep(req *http.Request) bool {
+	// [TODO:christian] figure out a way to keep the right traces,
+	// here we blindly dump anything.
+	v := rand.New(rand.NewSource(time.Now().UnixNano())).Float64()
+	return v <= r.PreSampleRate()
+}
+
 // handleTraces knows how to handle a bunch of traces
 func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *http.Request) {
+	if !r.PreSampleKeep(req) {
+		// [TODO:christian] keep a trace of this, update weights accordingly
+		HTTPOK(w)
+		return
+	}
+
 	var traces model.Traces
 	contentType := req.Header.Get("Content-Type")
 
