@@ -119,6 +119,8 @@ func (ps *PreSampler) Sample(req *http.Request) bool {
 		return true // no sensible value in traceCount, disable pre-sampling
 	}
 
+	keep := true
+
 	ps.mu.Lock()
 
 	if ps.stats.PayloadsSeen >= preSamplerResetPayloads {
@@ -128,23 +130,22 @@ func (ps *PreSampler) Sample(req *http.Request) bool {
 		ps.stats.TracesDropped = 0
 	}
 
-	// Copy the stats now, before incrementing the counters, else
-	// we would end up dropping the first payload all the time
-	// whenever rate is < 1.0.
-	stats := ps.stats
+	if ps.stats.RealRate() > ps.stats.Rate {
+		// Too many things processed, drop the current payload.
+		keep = false
+		ps.stats.TracesDropped += traceCount
+	}
 
+	// This should be done *after* testing RealRate() against Rate,
+	// else we could end up systematically dropping the first payload.
 	ps.stats.PayloadsSeen++
 	ps.stats.TracesSeen += traceCount
 
 	ps.mu.Unlock()
 
-	if stats.RealRate() <= stats.Rate { // <= and not <
-		return true
+	if !keep {
+		ps.logger.Errorf("pre-sampling at rate %f dropped payload with %d traces", traceCount)
 	}
 
-	ps.mu.Lock()
-	ps.stats.TracesDropped += traceCount
-	ps.mu.Unlock()
-
-	return false
+	return keep
 }
