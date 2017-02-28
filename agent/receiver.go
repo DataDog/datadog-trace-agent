@@ -4,11 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
 	"net"
 	"net/http"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -17,6 +15,7 @@ import (
 
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
@@ -58,13 +57,10 @@ type HTTPReceiver struct {
 
 	// due to the high volume the receiver handles
 	// custom logger that rate-limits errors and track statistics
-	logger *errorLogger
-	stats  receiverStats
-
-	exit chan struct{}
-
-	preSampleRate  float64
-	preSampleMutex sync.RWMutex
+	logger     *errorLogger
+	stats      receiverStats
+	preSampler *sampler.PreSampler
+	exit       chan struct{}
 
 	maxRequestBodyLength int64
 	debug                bool
@@ -73,14 +69,15 @@ type HTTPReceiver struct {
 // NewHTTPReceiver returns a pointer to a new HTTPReceiver
 func NewHTTPReceiver(conf *config.AgentConfig) *HTTPReceiver {
 	// use buffered channels so that handlers are not waiting on downstream processing
+	logger := &errorLogger{}
 	return &HTTPReceiver{
-		traces:   make(chan model.Trace, 5000), // about 1000 traces/sec for 5 sec
-		services: make(chan model.ServicesMetadata, 50),
-		conf:     conf,
-		logger:   &errorLogger{},
-		exit:     make(chan struct{}),
+		traces:     make(chan model.Trace, 5000), // about 1000 traces/sec for 5 sec
+		services:   make(chan model.ServicesMetadata, 50),
+		conf:       conf,
+		logger:     logger,
+		preSampler: sampler.NewPreSampler(1.0, logger),
+		exit:       make(chan struct{}),
 
-		preSampleRate:        1.0,
 		maxRequestBodyLength: maxRequestBodyLength,
 		debug:                strings.ToLower(conf.LogLevel) == "debug",
 	}
@@ -175,32 +172,9 @@ func (r *HTTPReceiver) httpHandleWithVersion(v APIVersion, f func(APIVersion, ht
 	})
 }
 
-// SetPreSampleRate set the pre-sample rate, thread-safe.
-func (r *HTTPReceiver) SetPreSampleRate(rate float64) {
-	r.preSampleMutex.Lock()
-	r.preSampleRate = rate
-	r.preSampleMutex.Unlock()
-}
-
-// PreSampleRate returns the current pre-sample rate, thread-safe.
-func (r *HTTPReceiver) PreSampleRate() float64 {
-	r.preSampleMutex.RLock()
-	rate := r.preSampleRate
-	r.preSampleMutex.RUnlock()
-	return rate
-}
-
-// PreSampleKeep tells wether a given request should be kept.
-func (r *HTTPReceiver) PreSampleKeep(req *http.Request) bool {
-	// [TODO:christian] figure out a way to keep the right traces,
-	// here we blindly dump anything.
-	v := rand.New(rand.NewSource(time.Now().UnixNano())).Float64()
-	return v <= r.PreSampleRate()
-}
-
 // handleTraces knows how to handle a bunch of traces
 func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *http.Request) {
-	if !r.PreSampleKeep(req) {
+	if !r.preSampler.Sample(req) {
 		// [TODO:christian] keep a trace of this, update weights accordingly
 		HTTPOK(w)
 		return
