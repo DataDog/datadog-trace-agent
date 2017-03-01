@@ -5,12 +5,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	log "github.com/cihub/seelog"
+
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/quantizer"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
-	log "github.com/cihub/seelog"
 )
 
 const processStatsInterval = time.Minute
@@ -185,6 +186,13 @@ func (a *Agent) watchdog() {
 		a.die("exceeded max connections (current=%d, max=%d)", wi.Net.Connections, a.conf.MaxConnections)
 	}
 
+	// Adjust pre-sampling dynamically
+	rate := sampler.CalcPreSampleRate(a.conf.MaxCPU/100, wi.CPU.UserAvg, a.Receiver.preSampler.RealRate())
+	if rate > a.conf.PreSampleRate {
+		rate = a.conf.PreSampleRate
+	}
+	a.Receiver.preSampler.SetRate(rate)
+
 	if watchdogCount > 0 { // skip display the first time, the numbers are wrong (need warm up)
 		rs := publishReceiverStats().(receiverStats)
 		es := publishEndpointStats().(endpointStats)
@@ -193,7 +201,7 @@ func (a *Agent) watchdog() {
 		log.Infof("========================================================================================")
 		log.Infof("watchdog: %d   extraRate: %f   preRate: %f   in: %f TPS   out: %f TPS   CPU.UserAvg: %f   Mem.AllocsPerSec: %f",
 			watchdogCount,
-			a.conf.ExtraSampleRate, a.conf.PreSampleRate,
+			a.conf.ExtraSampleRate, rate,
 			in, out,
 			wi.CPU.UserAvg, wi.Mem.AllocPerSec)
 		log.Infof("========================================================================================")
