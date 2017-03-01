@@ -66,7 +66,7 @@ func (ps *PreSampler) SetRate(rate float64) {
 	ps.mu.Unlock()
 }
 
-// TargetRate returns the current target pre-sample rate, thread-safe.
+// Rate returns the current target pre-sample rate, thread-safe.
 // The target pre-sample rate is the value set with SetRate, ideally this
 // is the sample rate, but depending on what is received, the real rate
 // might defer.
@@ -95,6 +95,7 @@ func (stats *PreSamplerStats) RealRate() float64 {
 	return 1 - (float64(stats.TracesDropped) / float64(stats.TracesSeen))
 }
 
+// Stats returns a copy of the currrent pre-sampler stats.
 func (ps *PreSampler) Stats() *PreSamplerStats {
 	ps.mu.RLock()
 	stats := ps.stats
