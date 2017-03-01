@@ -75,7 +75,7 @@ func NewHTTPReceiver(conf *config.AgentConfig) *HTTPReceiver {
 		services:   make(chan model.ServicesMetadata, 50),
 		conf:       conf,
 		logger:     logger,
-		preSampler: sampler.NewPreSampler(1.0, logger),
+		preSampler: sampler.NewPreSampler(conf.PreSampleRate, logger),
 		exit:       make(chan struct{}),
 
 		maxRequestBodyLength: maxRequestBodyLength,
