@@ -171,8 +171,6 @@ func (a *Agent) Process(t model.Trace) {
 	})
 }
 
-var watchdogCount int
-
 func (a *Agent) watchdog() {
 	var wi watchdog.Info
 	wi.CPU = watchdog.CPU()
@@ -186,30 +184,14 @@ func (a *Agent) watchdog() {
 		a.die("exceeded max connections (current=%d, max=%d)", wi.Net.Connections, a.conf.MaxConnections)
 	}
 
+	updateWatchdogInfo(wi)
+
 	// Adjust pre-sampling dynamically
-	log.Infof("========================================================================================")
-	log.Infof("presampler: maxUserAvg: %f   currentUserAvg: %f   currentRate: %f", a.conf.MaxCPU, wi.CPU.UserAvg, a.Receiver.preSampler.RealRate())
-	log.Infof("========================================================================================")
 	rate := sampler.CalcPreSampleRate(a.conf.MaxCPU, wi.CPU.UserAvg, a.Receiver.preSampler.RealRate())
 	if rate > a.conf.PreSampleRate {
 		rate = a.conf.PreSampleRate
 	}
 	a.Receiver.preSampler.SetRate(rate)
 
-	if watchdogCount > 0 { // skip display the first time, the numbers are wrong (need warm up)
-		rs := publishReceiverStats().(receiverStats)
-		es := publishEndpointStats().(endpointStats)
-		in := float64(rs.TracesReceived) / 60
-		out := float64(es.TracesCount) / 60
-		log.Infof("========================================================================================")
-		log.Infof("watchdog: %d   extraRate: %f   preRate: %f   in: %f TPS   out: %f TPS   CPU.UserAvg: %f   Mem.AllocsPerSec: %f",
-			watchdogCount,
-			a.conf.ExtraSampleRate, rate,
-			in, out,
-			wi.CPU.UserAvg, wi.Mem.AllocPerSec)
-		log.Infof("========================================================================================")
-	}
-	watchdogCount++
-
-	updateWatchdogInfo(wi)
+	updatePreSamplerStats(*a.Receiver.preSampler.Stats())
 }
