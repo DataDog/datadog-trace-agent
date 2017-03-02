@@ -50,7 +50,7 @@ func TestPreSamplerRace(t *testing.T) {
 
 	const N = 1000
 	ps := NewPreSampler(1.0, newTestLogger())
-	wg.Add(4)
+	wg.Add(5)
 
 	go func() {
 		for i := 0; i < N; i++ {
@@ -80,6 +80,13 @@ func TestPreSamplerRace(t *testing.T) {
 		}
 		wg.Done()
 	}()
+	go func() {
+		for i := 0; i < N; i++ {
+			ps.DecayScore()
+			time.Sleep(time.Microsecond)
+		}
+		wg.Done()
+	}()
 	wg.Wait()
 }
 
@@ -90,32 +97,27 @@ func TestPreSamplerSampleWithCount(t *testing.T) {
 	ps.SetRate(0.2)
 	assert.Equal(0.2, ps.RealRate(), "by default, RealRate returns wished rate")
 	assert.True(ps.sampleWithCount(100), "always accept first payload")
+	ps.DecayScore()
 	assert.False(ps.sampleWithCount(10), "refuse as this accepting this would make 100%")
-	assert.Equal(0.9090909090909091, ps.RealRate())
-	assert.False(ps.sampleWithCount(290), "still refuse, still at 25%")
+	ps.DecayScore()
+	assert.Equal(0.898876404494382, ps.RealRate())
+	assert.False(ps.sampleWithCount(290), "still refuse")
+	ps.DecayScore()
 	assert.False(ps.sampleWithCount(99), "just below the limit")
-	assert.False(ps.sampleWithCount(1), "just below the limit")
-	assert.Equal(0.19999999999999996, ps.RealRate(), "just below 20%")
-	assert.True(ps.sampleWithCount(1), "reached the limit, 20%")
-	assert.Equal(0.20159680638722555, ps.RealRate(), "rate increases as we accept payloads")
-	assert.False(ps.sampleWithCount(1), "passed the limit, below 20%")
-	assert.Equal(0.20119521912350602, ps.RealRate(), "rate increases as we accept payloads")
-	assert.False(ps.sampleWithCount(1000000), "rejecting payload with many traces")
-	assert.True(ps.sampleWithCount(100000), "accepting again as the previous one did lower the real rate")
-	assert.Equal(0.0909593985290349, ps.RealRate(), "real rate should be now around 10%")
+	ps.DecayScore()
+	assert.True(ps.sampleWithCount(1), "should there be no decay, this one would be dropped, but with decay, the rate decreased as the recently dropped gain importance over the old initially accepted")
+	ps.DecayScore()
+	assert.Equal(0.16365162139216005, ps.RealRate(), "well below 20%, again, decay speaks")
+	assert.True(ps.sampleWithCount(1000000), "accepting payload with many traces")
+	ps.DecayScore()
+	assert.Equal(0.9997119577953764, ps.RealRate(), "real rate is almost 1, as we accepted a hudge payload")
+	assert.False(ps.sampleWithCount(100000), "rejecting, real rate is too high now")
+	ps.DecayScore()
+	assert.Equal(0.8986487877795845, ps.RealRate(), "real rate should be now around 90%")
 	assert.Equal(PreSamplerStats{
-		Rate:          0.2,
-		PayloadsSeen:  9,
-		TracesSeen:    1100502,
-		TracesDropped: 1000401,
+		Rate:                0.2,
+		RecentPayloadsSeen:  4.492300911839488, // seen more than this... but decay in action
+		RecentTracesSeen:    879284.5615616576,
+		RecentTracesDropped: 89116.55620097058,
 	}, ps.stats)
-	for i := ps.stats.PayloadsSeen; i <= preSamplerResetPayloads; i++ {
-		ps.sampleWithCount(1)
-	}
-	assert.Equal(PreSamplerStats{
-		Rate:          0.2,
-		PayloadsSeen:  1,
-		TracesSeen:    1,
-		TracesDropped: 0,
-	}, ps.stats, "stats should have been reset")
 }

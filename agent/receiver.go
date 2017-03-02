@@ -108,6 +108,7 @@ func (r *HTTPReceiver) Run() {
 		log.Error(err)
 	}
 
+	go r.preSampler.Run()
 	go r.logStats()
 }
 

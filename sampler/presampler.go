@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 
 	log "github.com/cihub/seelog"
 )
@@ -28,21 +29,24 @@ const (
 type PreSamplerStats struct {
 	// Rate is the target pre-sampling rate.
 	Rate float64
-	// PayloadsSeen is the number of payloads that passed by.
-	PayloadsSeen int64
-	// TracesSeen is the number of traces that passed by.
-	TracesSeen int64
-	// TracesDropped is the number of traces that were dropped.
-	TracesDropped int64
+	// RecentPayloadsSeen is the number of payloads that passed by.
+	RecentPayloadsSeen float64
+	// RecentTracesSeen is the number of traces that passed by.
+	RecentTracesSeen float64
+	// RecentTracesDropped is the number of traces that were dropped.
+	RecentTracesDropped float64
 }
 
 // PreSampler tries to tell wether we should keep a payload, even
 // before fully processing it. Its only clues are the unparsed payload
 // and the HTTP headers. It should remain very light and fast.
 type PreSampler struct {
-	stats  PreSamplerStats
-	logger Logger
-	mu     sync.RWMutex // needed since many requests can run in parallel
+	stats       PreSamplerStats
+	decayPeriod time.Duration
+	decayFactor float64
+	logger      Logger
+	mu          sync.RWMutex // needed since many requests can run in parallel
+	exit        chan struct{}
 }
 
 // Logger is an interface used internally in the agent receiver.
@@ -53,12 +57,36 @@ type Logger interface {
 
 // NewPreSampler returns an initialized presampler
 func NewPreSampler(rate float64, logger Logger) *PreSampler {
+	decayFactor := 9.0 / 8.0
 	return &PreSampler{
 		stats: PreSamplerStats{
 			Rate: rate,
 		},
-		logger: logger,
+		decayPeriod: defaultDecayPeriod,
+		decayFactor: decayFactor,
+		logger:      logger,
+		exit:        make(chan struct{}),
 	}
+}
+
+// Run runs and block on the Sampler main loop
+func (ps *PreSampler) Run() {
+	t := time.NewTicker(ps.decayPeriod)
+	defer t.Stop()
+
+	for {
+		select {
+		case <-t.C:
+			ps.DecayScore()
+		case <-ps.exit:
+			return
+		}
+	}
+}
+
+// Stop stops the main Run loop
+func (ps *PreSampler) Stop() {
+	close(ps.exit)
 }
 
 // SetRate set the pre-sample rate, thread-safe.
@@ -91,10 +119,10 @@ func (ps *PreSampler) RealRate() float64 {
 // RealRate calcuates the current real pre-sample rate from
 // the stats data. If no data is available, returns the target rate.
 func (stats *PreSamplerStats) RealRate() float64 {
-	if stats.TracesSeen <= 0 { // careful with div by 0
+	if stats.RecentTracesSeen <= 0 { // careful with div by 0
 		return stats.Rate
 	}
-	return 1 - (float64(stats.TracesDropped) / float64(stats.TracesSeen))
+	return 1 - (stats.RecentTracesDropped / stats.RecentTracesSeen)
 }
 
 // Stats returns a copy of the currrent pre-sampler stats.
@@ -114,23 +142,16 @@ func (ps *PreSampler) sampleWithCount(traceCount int64) bool {
 
 	ps.mu.Lock()
 
-	if ps.stats.PayloadsSeen >= preSamplerResetPayloads {
-		// Reset the stats so that we compute a new rate for the next round.
-		ps.stats.PayloadsSeen = 0
-		ps.stats.TracesSeen = 0
-		ps.stats.TracesDropped = 0
-	}
-
 	if ps.stats.RealRate() > ps.stats.Rate {
 		// Too many things processed, drop the current payload.
 		keep = false
-		ps.stats.TracesDropped += traceCount
+		ps.stats.RecentTracesDropped += float64(traceCount)
 	}
 
 	// This should be done *after* testing RealRate() against Rate,
 	// else we could end up systematically dropping the first payload.
-	ps.stats.PayloadsSeen++
-	ps.stats.TracesSeen += traceCount
+	ps.stats.RecentPayloadsSeen++
+	ps.stats.RecentTracesSeen += float64(traceCount)
 
 	ps.mu.Unlock()
 
@@ -155,6 +176,17 @@ func (ps *PreSampler) Sample(req *http.Request) bool {
 	}
 
 	return ps.sampleWithCount(traceCount)
+}
+
+// DecayScore applies the decay to the rolling counters
+func (ps *PreSampler) DecayScore() {
+	ps.mu.Lock()
+
+	ps.stats.RecentPayloadsSeen /= ps.decayFactor
+	ps.stats.RecentTracesSeen /= ps.decayFactor
+	ps.stats.RecentTracesDropped /= ps.decayFactor
+
+	ps.mu.Unlock()
 }
 
 // CalcPreSampleRate gives the new sample rate to apply for a given max user CPU average.
