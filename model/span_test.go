@@ -60,3 +60,20 @@ func TestSpanWeight(t *testing.T) {
 	span.Metrics[SpanSampleRateMetricKey] = 1.5
 	assert.Equal(1.0, span.Weight())
 }
+
+func TestSpanApplyRate(t *testing.T) {
+	assert := assert.New(t)
+
+	span := testSpan()
+	expectedSpan := testSpan()
+	expectedSpan.Metrics["_sample_rate"] = 0.3
+	span.ApplyRate(0.3)
+	assert.Equal(expectedSpan, span)
+
+	span = testSpan()
+	span.Metrics["_sample_rate"] = 0.2
+	expectedSpan = testSpan()
+	expectedSpan.Metrics["_sample_rate"] = 0.06
+	span.ApplyRate(0.3)
+	assert.Equal(expectedSpan, span)
+}

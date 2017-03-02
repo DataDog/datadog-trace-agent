@@ -179,8 +179,6 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		return
 	}
 
-	preRate := r.preSampler.Rate()
-
 	var traces model.Traces
 	contentType := req.Header.Get("Content-Type")
 
@@ -227,8 +225,6 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 
 	// normalize data
 	for i := range traces {
-		traces[i].ApplyRate(preRate)
-
 		spans := len(traces[i])
 		normTrace, err := model.NormalizeTrace(traces[i])
 		if err != nil {
