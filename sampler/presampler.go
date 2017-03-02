@@ -105,19 +105,7 @@ func (ps *PreSampler) Stats() *PreSamplerStats {
 	return &stats
 }
 
-// Sample tells wether a given request should be kept (true means: "yes, keep it").
-// Calling this alters the statistics, it affects the result of RealRate() so
-// only call it once per payload.
-func (ps *PreSampler) Sample(req *http.Request) bool {
-	traceCount := int64(0)
-	if traceCountStr := req.Header.Get(TraceCountHeader); traceCountStr != "" {
-		var err error
-		traceCount, err = strconv.ParseInt(traceCountStr, 10, 64)
-		if err != nil {
-			ps.logger.Errorf("unable to parse HTTP header %s: %s", TraceCountHeader, traceCountStr)
-		}
-	}
-
+func (ps *PreSampler) sampleWithCount(traceCount int64) bool {
 	if traceCount <= 0 {
 		return true // no sensible value in traceCount, disable pre-sampling
 	}
@@ -151,6 +139,22 @@ func (ps *PreSampler) Sample(req *http.Request) bool {
 	}
 
 	return keep
+}
+
+// Sample tells wether a given request should be kept (true means: "yes, keep it").
+// Calling this alters the statistics, it affects the result of RealRate() so
+// only call it once per payload.
+func (ps *PreSampler) Sample(req *http.Request) bool {
+	traceCount := int64(0)
+	if traceCountStr := req.Header.Get(TraceCountHeader); traceCountStr != "" {
+		var err error
+		traceCount, err = strconv.ParseInt(traceCountStr, 10, 64)
+		if err != nil {
+			ps.logger.Errorf("unable to parse HTTP header %s: %s", TraceCountHeader, traceCountStr)
+		}
+	}
+
+	return ps.sampleWithCount(traceCount)
 }
 
 // CalcPreSampleRate gives the new sample rate to apply for a given max user CPU average.
