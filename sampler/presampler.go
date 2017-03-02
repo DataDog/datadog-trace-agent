@@ -169,7 +169,7 @@ func CalcPreSampleRate(maxUserAvg, currentUserAvg, currentRate float64) float64 
 		// pre-sampling rate. If set to 0.3, for example, the new rate must be
 		// either over 130% or below 70% of the previous value, before we actually
 		// adjust the sampling rate. This is to avoid over-adapting and jittering.
-		deltaMin = float64(0.3) // +/- 30% change
+		deltaMin = float64(0.3) // -30% change
 		// rateMin is an absolute minimum rate, never sample more than this, it is
 		// inefficient, the cost handling the payloads without even reading them
 		// is too high anyway.
@@ -200,7 +200,7 @@ func CalcPreSampleRate(maxUserAvg, currentUserAvg, currentRate float64) float64 
 		return 1 // again, in doubt, disable pre-sampling
 	}
 
-	delta := 2 * (newRate - currentRate) / (newRate + currentRate)
+	delta := (newRate - currentRate) / currentRate
 	if delta > -deltaMin && delta < 0 {
 		return currentRate
 	}
