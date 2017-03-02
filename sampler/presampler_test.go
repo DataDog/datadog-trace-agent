@@ -1,7 +1,9 @@
 package sampler
 
 import (
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -35,4 +37,48 @@ func TestCalcPreSampleRate(t *testing.T) {
 		r := CalcPreSampleRate(k[0], k[1], k[2])
 		assert.Equal(v, r, "bad pre sample rate for maxUserAvg=%f currentUserAvg=%f, currentRate=%f, got %v, expected %v", k[0], k[1], k[2], r, v)
 	}
+}
+
+type testLogger struct{}
+
+func (*testLogger) Errorf(format string, params ...interface{}) {}
+
+func newTestLogger() *testLogger { return &testLogger{} }
+
+func TestPreSamplerRace(t *testing.T) {
+	var wg sync.WaitGroup
+
+	const N = 1000
+	ps := NewPreSampler(1.0, newTestLogger())
+	wg.Add(4)
+
+	go func() {
+		for i := 0; i < N; i++ {
+			ps.SetRate(0.5)
+			time.Sleep(time.Microsecond)
+		}
+		wg.Done()
+	}()
+	go func() {
+		for i := 0; i < N; i++ {
+			_ = ps.Rate()
+			time.Sleep(time.Microsecond)
+		}
+		wg.Done()
+	}()
+	go func() {
+		for i := 0; i < N; i++ {
+			_ = ps.RealRate()
+			time.Sleep(time.Microsecond)
+		}
+		wg.Done()
+	}()
+	go func() {
+		for i := 0; i < N; i++ {
+			_ = ps.sampleWithCount(42)
+			time.Sleep(time.Microsecond)
+		}
+		wg.Done()
+	}()
+	wg.Wait()
 }
