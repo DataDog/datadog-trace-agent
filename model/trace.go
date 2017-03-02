@@ -70,14 +70,3 @@ func (t Trace) GetRoot() *Span {
 func NewTraceFlushMarker() Trace {
 	return []Span{NewFlushMarker()}
 }
-
-// ApplyRate applies a given rate over the existing one.
-func (t Trace) ApplyRate(rate float64) {
-	// 0 rate is error-prone, 1 means nothing to do
-	if rate <= 0 || rate >= 1 {
-		return
-	}
-	for i := range t {
-		t[i].ApplyRate(rate)
-	}
-}

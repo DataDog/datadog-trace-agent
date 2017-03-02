@@ -137,6 +137,7 @@ func (a *Agent) Process(t model.Trace) {
 		return
 	}
 
+	root.ApplyRate(a.Receiver.preSampler.Rate()) // sampling rate is on root span only
 	sublayers := model.ComputeSublayers(&t)
 	model.SetSublayersOnSpan(root, sublayers)
 
