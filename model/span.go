@@ -75,17 +75,3 @@ func (s *Span) Weight() float64 {
 
 	return 1.0 / sampleRate
 }
-
-// ApplyRate applies a given rate over the existing one.
-func (s *Span) ApplyRate(rate float64) {
-	// 0 rate is error-prone, 1 means nothing to do
-	if rate <= 0 || rate >= 1 {
-		return
-	}
-	currentRate, ok := s.Metrics[SpanSampleRateMetricKey]
-	if !ok || currentRate <= 0.0 || currentRate > 1.0 {
-		currentRate = 1.0
-	}
-
-	s.Metrics[SpanSampleRateMetricKey] = currentRate * rate
-}
