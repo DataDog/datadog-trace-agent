@@ -89,7 +89,6 @@ func init() {
 func NewCurrentInfo() (*CurrentInfo, error) {
 	p, err := process.NewProcess(int32(os.Getpid()))
 	if err != nil {
-		log.Debugf("unable to create Process: %v", err)
 		return nil, err
 	}
 	return &CurrentInfo{
