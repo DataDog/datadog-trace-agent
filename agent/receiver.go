@@ -168,7 +168,6 @@ func (r *HTTPReceiver) httpHandleWithVersion(v APIVersion, f func(APIVersion, ht
 // handleTraces knows how to handle a bunch of traces
 func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *http.Request) {
 	if !r.preSampler.Sample(req) {
-		// [TODO:christian] keep a trace of this, update weights accordingly
 		HTTPOK(w)
 		return
 	}
