@@ -82,3 +82,40 @@ func TestPreSamplerRace(t *testing.T) {
 	}()
 	wg.Wait()
 }
+
+func TestPreSamplerSampleWithCount(t *testing.T) {
+	assert := assert.New(t)
+
+	ps := NewPreSampler(1.0, newTestLogger())
+	ps.SetRate(0.2)
+	assert.Equal(0.2, ps.RealRate(), "by default, RealRate returns wished rate")
+	assert.True(ps.sampleWithCount(100), "always accept first payload")
+	assert.False(ps.sampleWithCount(10), "refuse as this accepting this would make 100%")
+	assert.Equal(0.9090909090909091, ps.RealRate())
+	assert.False(ps.sampleWithCount(290), "still refuse, still at 25%")
+	assert.False(ps.sampleWithCount(99), "just below the limit")
+	assert.False(ps.sampleWithCount(1), "just below the limit")
+	assert.Equal(0.19999999999999996, ps.RealRate(), "just below 20%")
+	assert.True(ps.sampleWithCount(1), "reached the limit, 20%")
+	assert.Equal(0.20159680638722555, ps.RealRate(), "rate increases as we accept payloads")
+	assert.False(ps.sampleWithCount(1), "passed the limit, below 20%")
+	assert.Equal(0.20119521912350602, ps.RealRate(), "rate increases as we accept payloads")
+	assert.False(ps.sampleWithCount(1000000), "rejecting payload with many traces")
+	assert.True(ps.sampleWithCount(100000), "accepting again as the previous one did lower the real rate")
+	assert.Equal(0.0909593985290349, ps.RealRate(), "real rate should be now around 10%")
+	assert.Equal(PreSamplerStats{
+		Rate:          0.2,
+		PayloadsSeen:  9,
+		TracesSeen:    1100502,
+		TracesDropped: 1000401,
+	}, ps.stats)
+	for i := ps.stats.PayloadsSeen; i <= preSamplerResetPayloads; i++ {
+		ps.sampleWithCount(1)
+	}
+	assert.Equal(PreSamplerStats{
+		Rate:          0.2,
+		PayloadsSeen:  1,
+		TracesSeen:    1,
+		TracesDropped: 0,
+	}, ps.stats, "stats should have been reset")
+}
