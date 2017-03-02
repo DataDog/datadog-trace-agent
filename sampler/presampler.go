@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+
+	log "github.com/cihub/seelog"
 )
 
 const (
@@ -145,7 +147,7 @@ func (ps *PreSampler) Sample(req *http.Request) bool {
 	ps.mu.Unlock()
 
 	if !keep {
-		ps.logger.Errorf("pre-sampling at rate %f dropped payload with %d traces", ps.Rate(), traceCount) // [FIXME:christian] this is not an error...
+		log.Debugf("pre-sampling at rate %f dropped payload with %d traces", ps.Rate(), traceCount)
 	}
 
 	return keep
