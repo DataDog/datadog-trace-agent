@@ -16,12 +16,6 @@ const (
 	// TraceCountHeader is the header client implementation should fill
 	// with the number of traces contained in the payload.
 	TraceCountHeader = "X-Datadog-Trace-Count"
-
-	// Every 100 payload, reset counters. This means that we can not
-	// go below 1% pre-sampling, as the first payload will always be
-	// accepted, since by default the RealRate is the Rate when there
-	// is no data.
-	preSamplerResetPayloads = 100
 )
 
 // PreSamplerStats contains pre-sampler data. The public content
