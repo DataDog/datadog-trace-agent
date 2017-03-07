@@ -6,7 +6,8 @@ def go_build(program, opts={})
   end
   opts = {
     :cmd => default_cmd,
-    :race => false
+    :race => false,
+    :add_build_vars => true
   }.merge(opts)
 
   dd = 'main'
@@ -16,24 +17,21 @@ def go_build(program, opts={})
   goversion = `go version`.strip
   agentversion = ENV["TRACE_AGENT_VERSION"] || "0.99.0"
 
-  ldflags = {
-    "#{dd}.BuildDate" => "#{date}",
-    "#{dd}.GitCommit" => "#{commit}",
-    "#{dd}.GitBranch" => "#{branch}",
-    "#{dd}.GoVersion" => "#{goversion}",
-    "#{dd}.Version" => "#{agentversion}",
-  }.map do |k,v|
-    if goversion.include?("1.4")
-      "-X #{k} '#{v}'"
-    else
-      "-X '#{k}=#{v}'"
-    end
-  end.join ' '
+  vars = {}
+  vars["#{dd}.Version"] = agentversion
+  if opts[:add_build_vars]
+    vars["#{dd}.BuildDate"] = date
+    vars["#{dd}.GitCommit"] = commit
+    vars["#{dd}.GitBranch"] = branch
+    vars["#{dd}.GoVersion"] = goversion
+  end
+
+  ldflags = vars.map { |name, value| "-X '#{name}=#{value}'" }
 
   cmd = opts[:cmd]
   cmd += ' -race' if opts[:race]
 
-  sh "#{cmd} -ldflags \"#{ldflags}\" #{program}"
+  sh "#{cmd} -ldflags \"#{ldflags.join(' ')}\" #{program}"
 end
 
 

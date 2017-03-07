@@ -48,7 +48,8 @@ desc "Build Datadog Trace agent"
 task :build do
   go_build("github.com/DataDog/datadog-trace-agent/agent", {
     :cmd => "go build -a -o trace-agent",
-    :race => ENV['GO_RACE'] == 'true'
+    :race => ENV['GO_RACE'] == 'true',
+    :add_build_vars => ENV['TRACE_AGENT_ADD_BUILD_VARS'] != 'false'
   })
 end
 
