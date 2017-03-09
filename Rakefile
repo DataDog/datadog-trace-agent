@@ -114,7 +114,7 @@ task :lint do
       filename = line.split(':')[0]
       EXCLUDE_LINT.include?(filename)
     end
-    if output.length > 0
+    if !output.empty?
       puts output
       error = true
     end
