@@ -166,7 +166,7 @@ func (a *Agent) watchdog() {
 	wi.Net = watchdog.Net()
 
 	if float64(wi.Mem.Alloc) > a.conf.MaxMemory && a.conf.MaxMemory > 0 {
-		a.die("exceeded max memory (current=%d, max=%d)", wi.Mem.Alloc, a.conf.MaxMemory)
+		a.die("exceeded max memory (current=%d, max=%d)", wi.Mem.Alloc, int64(a.conf.MaxMemory))
 	}
 	if int(wi.Net.Connections) > a.conf.MaxConnections && a.conf.MaxConnections > 0 {
 		a.die("exceeded max connections (current=%d, max=%d)", wi.Net.Connections, a.conf.MaxConnections)
