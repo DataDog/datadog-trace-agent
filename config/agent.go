@@ -1,8 +1,10 @@
 package config
 
 import (
+	"bytes"
 	"errors"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -104,9 +106,38 @@ func mergeEnv(c *AgentConfig) {
 	}
 }
 
+// getHostname shells out to obtain the hostname used by the infra agent
+// falling back to os.Hostname() if it is unavailable
+func getHostname() (string, error) {
+	ddAgentPy := "/opt/datadog-agent/embedded/bin/python"
+	getHostnameCmd := "from utils.hostname import get_hostname; print get_hostname()"
+
+	cmd := exec.Command(ddAgentPy, "-c", getHostnameCmd)
+	cmd.Env = []string{"PYTHONPATH=/opt/datadog-agent/agent"}
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		log.Infof("error retrieving dd-agent hostname, falling back to os.Hostname(): %s", stderr)
+		return os.Hostname()
+	}
+
+	hostname := strings.TrimSpace(stdout.String())
+
+	if hostname == "" {
+		log.Infof("error retrieving dd-agent hostname, falling back to os.Hostname(): %s", stderr)
+		return os.Hostname()
+	}
+
+	return hostname, err
+}
+
 // NewDefaultAgentConfig returns a configuration with the default values
 func NewDefaultAgentConfig() *AgentConfig {
-	hostname, err := os.Hostname()
+	hostname, err := getHostname()
 	if err != nil {
 		hostname = ""
 	}

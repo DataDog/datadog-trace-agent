@@ -149,3 +149,9 @@ func TestConfigNewIfExists(t *testing.T) {
 	assert.Nil(t, conf)
 	os.Remove(filename)
 }
+
+func TestGetHostname(t *testing.T) {
+	h, err := getHostname()
+	assert.Nil(t, err)
+	assert.NotEqual(t, "", h)
+}
