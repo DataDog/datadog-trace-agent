@@ -8,8 +8,11 @@ import (
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/quantizer"
+	"github.com/DataDog/datadog-trace-agent/watchdog"
 	log "github.com/cihub/seelog"
 )
+
+const processStatsInterval = time.Minute
 
 type processedTrace struct {
 	Trace     model.Trace
@@ -37,6 +40,8 @@ type Agent struct {
 
 	// Used to synchronize on a clean exit
 	exit chan struct{}
+
+	die func(format string, args ...interface{})
 }
 
 // NewAgent returns a new Agent object, ready to be started
@@ -60,6 +65,7 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 		Writer:       w,
 		conf:         conf,
 		exit:         exit,
+		die:          die,
 	}
 }
 
@@ -67,6 +73,12 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 func (a *Agent) Run() {
 	flushTicker := time.NewTicker(a.conf.BucketInterval)
 	defer flushTicker.Stop()
+
+	// it's really important to use a ticker for this, and with a not too short
+	// interval, for this is our garantee that the process won't start and kill
+	// itself too fast (nightmare loop)
+	watchdogTicker := time.NewTicker(a.conf.WatchdogInterval)
+	defer watchdogTicker.Stop()
 
 	a.Receiver.Run()
 	a.Writer.Run()
@@ -95,6 +107,8 @@ func (a *Agent) Run() {
 			wg.Wait()
 
 			a.Writer.inPayloads <- p
+		case <-watchdogTicker.C:
+			a.watchdog()
 		case <-a.exit:
 			log.Info("exiting")
 			close(a.Receiver.exit)
@@ -143,4 +157,20 @@ func (a *Agent) Process(t model.Trace) {
 	weight := pt.weight() // need to do this now because sampler edits .Metrics map
 	go a.Concentrator.Add(pt, weight)
 	go a.Sampler.Add(pt)
+}
+
+func (a *Agent) watchdog() {
+	var wi watchdog.Info
+	wi.CPU = watchdog.CPU()
+	wi.Mem = watchdog.Mem()
+	wi.Net = watchdog.Net()
+
+	if float64(wi.Mem.Alloc) > a.conf.MaxMemory && a.conf.MaxMemory > 0 {
+		a.die("exceeded max memory (current=%d, max=%d)", wi.Mem.Alloc, int64(a.conf.MaxMemory))
+	}
+	if int(wi.Net.Connections) > a.conf.MaxConnections && a.conf.MaxConnections > 0 {
+		a.die("exceeded max connections (current=%d, max=%d)", wi.Net.Connections, a.conf.MaxConnections)
+	}
+
+	updateWatchdogInfo(wi)
 }

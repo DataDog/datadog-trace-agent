@@ -1,5 +1,5 @@
-hash: 82b158363973fe2a76243c75d649380286b2dd97e6f263789a3217f0f503316e
-updated: 2017-02-22T16:29:03.841539063+01:00
+hash: 6ee4eb022b387621ddb234375954dc60256fc2df4dcf2099dfb2f55f645756e4
+updated: 2017-02-23T15:00:26.163727755+01:00
 imports:
 - name: github.com/cihub/seelog
   version: d2c6e5aa9fbfdd1c624e140287063c7730654115
@@ -9,8 +9,29 @@ imports:
   - statsd
 - name: github.com/go-ini/ini
   version: 74bdc99692c3408cb103221e38675ce8fda0a718
+- name: github.com/go-ole/go-ole
+  version: de8695c8edbf8236f30d6e1376e20b198a028d42
+  subpackages:
+  - oleutil
+- name: github.com/golang/tools
+  version: 219e654bb7266d3b73c4610ed24c33d12560826a
+  subpackages:
+  - go/gcexportdata
 - name: github.com/philhofer/fwd
   version: 98c11a7a6ec829d672b03833c3d69a7fae1ca972
+- name: github.com/shirou/gopsutil
+  version: 70a1b78fe69202d93d6718fc9e3a4d6f81edfd58
+  subpackages:
+  - cpu
+  - host
+  - internal/common
+  - mem
+  - net
+  - process
+- name: github.com/shirou/w32
+  version: bb4de0191aa41b5507caa14b0650cdbddcd9280b
+- name: github.com/StackExchange/wmi
+  version: e542ed97d15e640bdc14b5c12162d59e8fc67324
 - name: github.com/tinylib/msgp
   version: 362bfb3384d53ae4d5dd745983a4d70b6d23628c
   subpackages:

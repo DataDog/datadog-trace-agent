@@ -67,6 +67,7 @@ func (sl *StoppableListener) Accept() (net.Conn, error) {
 		select {
 		case <-sl.exit:
 			log.Debug("stopping listener")
+			sl.TCPListener.Close()
 			return nil, errors.New("listener stopped")
 		default:
 			//If the channel is still open, continue as normal

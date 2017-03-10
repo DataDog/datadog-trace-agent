@@ -2,22 +2,34 @@ require "./gorake.rb"
 
 desc 'Bootstrap CI environment'
 task :bootstrap do
-  sh 'go get github.com/Masterminds/glide'
-
   tools = {
     'github.com/golang/lint' => {
-      :version => 'b8599f7d71e7fead76b25aeb919c0e2558672f4a',
-      :main_pkg => './golint'
+      version: 'b8599f7d71e7fead76b25aeb919c0e2558672f4a',
+      main_pkg: './golint',
+      check_cmd: 'golint',
+      clean_cmd: "rm -rf #{ENV['GOPATH']}/src/golang.org/x"
     }
   }
 
   tools.each do |pkg, info|
+    if info[:check_cmd]
+      has_cmd = false
+      begin
+        sh "which #{info[:check_cmd]}"
+        has_cmd = true
+      rescue
+        sh info[:clean_cmd] if info[:clean_cmd]
+      end
+      next if has_cmd
+    end
     path = "#{ENV['GOPATH']}/src/#{pkg}"
     FileUtils.rm_rf(path)
 
     sh "go get #{pkg}"
     sh "cd #{path} && git reset --hard #{info[:version]} && go install #{info[:main_pkg]}"
   end
+
+  sh 'go get github.com/Masterminds/glide'
 end
 
 desc 'Restore code workspace to known state from locked versions'
@@ -34,6 +46,7 @@ PACKAGES = %w(
   ./quantizer
   ./sampler
   ./statsd
+  ./watchdog
 )
 
 EXCLUDE_LINT = [
@@ -101,7 +114,7 @@ task :lint do
       filename = line.split(':')[0]
       EXCLUDE_LINT.include?(filename)
     end
-    if output.length > 0
+    if !output.empty?
       puts output
       error = true
     end
