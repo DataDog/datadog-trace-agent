@@ -1,9 +1,0 @@
-#!/bin/sh
-
-set -e
-
-echo "Running dd-trace-agent pre-install with arguments: $@ ..."
-#DEBHELPER#
-
-echo "Pre-install done"
-exit 0
