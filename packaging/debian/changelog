@@ -1,5 +1,0 @@
-dd-trace-agent (0.99.0) UNRELEASED; urgency=medium
-
-  * Introduce dd-trace-agent package.
-
- -- Datadog, Inc <package@datadoghq.com>  Thu, 12 May 2016 14:32:02 +0200
