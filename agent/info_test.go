@@ -227,7 +227,7 @@ func TestWarning(t *testing.T) {
 	assert.Equal("  Spans received (1 min): 360", lines[14])
 	assert.Equal("  WARNING: Traces dropped (1 min): 5", lines[15])
 	assert.Equal("  WARNING: Spans dropped (1 min): 10", lines[16])
-	assert.Equal("  WARNING: Pre-sampling traces: 42 %", lines[17])
+	assert.Equal("  WARNING: Pre-sampling traces: 42.1 %", lines[17])
 	assert.Equal("", lines[18])
 	assert.Equal("  Bytes sent (1 min): 3591", lines[19])
 	assert.Equal("  Traces sent (1 min): 6", lines[20])

@@ -175,8 +175,8 @@ func initInfo(conf *config.AgentConfig) error {
 		"add": func(a, b int64) int64 {
 			return a + b
 		},
-		"percent": func(v float64) int64 {
-			return int64(v * 100)
+		"percent": func(v float64) string {
+			return fmt.Sprintf("%02.1f", v*100)
 		},
 	}
 
@@ -276,7 +276,7 @@ func getProgramBanner(version string) (string, string) {
 //   Spans received (1 min): 360
 //   WARNING: Traces dropped (1 min): 5
 //   WARNING: Spans dropped (1 min): 10
-//   WARNING: Pre-sampling traces: 26 %
+//   WARNING: Pre-sampling traces: 26.0 %
 //
 //   Bytes sent (1 min): 3245
 //   Traces sent (1 min): 6
