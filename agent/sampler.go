@@ -8,7 +8,6 @@ import (
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/sampler"
-	"github.com/DataDog/datadog-trace-agent/statsd"
 )
 
 // Sampler chooses wich spans to write to the API
@@ -18,6 +17,21 @@ type Sampler struct {
 	traceCount    int
 
 	samplerEngine SamplerEngine
+}
+
+// samplerStats contains sampler statistics
+type samplerStats struct {
+	// TracesKept is the number of traces kept (last flush only)
+	TracesKept int
+	// TracesTotal is the total number of traces (last flush only)
+	TracesTotal int
+}
+
+type samplerInfo struct {
+	// Stats contains statistics about what the sampler is doing.
+	Stats samplerStats
+	// State is the internal state of the sampler (for debugging mostly)
+	State sampler.InternalState
 }
 
 // SamplerEngine cares about telling if a trace is a proper sample or not
@@ -65,25 +79,19 @@ func (s *Sampler) Flush() []model.Trace {
 	s.traceCount = 0
 	s.mu.Unlock()
 
-	s.logState()
-	statsd.Client.Count("datadog.trace_agent.sampler.trace.kept", int64(len(traces)), nil, 1)
-	statsd.Client.Count("datadog.trace_agent.sampler.trace.total", int64(traceCount), nil, 1)
+	state := s.samplerEngine.(*sampler.Sampler).GetState()
+
 	log.Debugf("flushed %d sampled traces out of %v", len(traces), traceCount)
+	log.Debugf("inTPS: %f, outTPS: %f, maxTPS: %f, offset: %f, slope: %f, cardinality: %d",
+		state.InTPS, state.OutTPS, state.MaxTPS, state.Offset, state.Slope, state.Cardinality)
+
+	// publish through expvar
+	updateSamplerInfo(samplerInfo{
+		Stats: samplerStats{
+			TracesKept:  len(traces),
+			TracesTotal: traceCount,
+		},
+		State: state})
 
 	return traces
-}
-
-// logState is a debug logging of the sampler internals, to check its adaptative behavior
-// This is mainly for dev purpose to watch over the adaptative behavior
-// TODO: remove (or clean it) in a real released build
-func (s *Sampler) logState() {
-	state := s.samplerEngine.(*sampler.Sampler).GetState()
-	log.Infof("inTPS: %f, outTPS: %f, maxTPS: %f, offset: %f, slope: %f, cardinality: %d",
-		state.InTPS, state.OutTPS, state.MaxTPS, state.Offset, state.Slope, state.Cardinality)
-	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.offset", state.Offset, nil, 1)
-	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.slope", state.Slope, nil, 1)
-	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.cardinality", float64(state.Cardinality), nil, 1)
-	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.in_tps", state.InTPS, nil, 1)
-	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.out_tps", state.OutTPS, nil, 1)
-	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.max_tps", state.MaxTPS, nil, 1)
 }
