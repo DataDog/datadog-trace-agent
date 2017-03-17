@@ -24,7 +24,11 @@ func QuantizeHTTP(span model.Span) model.Span {
 	u, err := url.Parse(rawurl)
 	if err != nil || (u.Scheme == "" && u.Host == "") {
 		span.Resource = "Non-parsable URL"
-		span.Meta[httpQuantizeError] = "Problem when parsing URL"
+		if err != nil {
+			span.Meta[httpQuantizeError] = "cannot parse URL: " + err.Error()
+		} else {
+			span.Meta[httpQuantizeError] = "Problem when parsing URL"
+		}
 		return span
 	}
 
