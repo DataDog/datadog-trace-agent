@@ -126,14 +126,14 @@ func getHostname() (string, error) {
 
 	err := cmd.Run()
 	if err != nil {
-		log.Infof("error retrieving dd-agent hostname, falling back to os.Hostname(): %s", stderr)
+		log.Infof("error retrieving dd-agent hostname, falling back to os.Hostname(): %v", err)
 		return os.Hostname()
 	}
 
 	hostname := strings.TrimSpace(stdout.String())
 
 	if hostname == "" {
-		log.Infof("error retrieving dd-agent hostname, falling back to os.Hostname(): %s", stderr)
+		log.Infof("error retrieving dd-agent hostname, falling back to os.Hostname(): %s", stderr.String())
 		return os.Hostname()
 	}
 
