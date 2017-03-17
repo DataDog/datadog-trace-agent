@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
@@ -23,7 +22,7 @@ var (
 	infoReceiverStats  receiverStats // only for the last minute
 	infoEndpointStats  endpointStats // only for the last minute
 	infoWatchdogInfo   watchdog.Info
-	infoSamplerState   sampler.InternalState
+	infoSamplerInfo    samplerInfo
 	infoStart          = time.Now()
 	infoOnce           sync.Once
 	infoTmpl           *template.Template
@@ -104,15 +103,15 @@ func publishEndpointStats() interface{} {
 	return es
 }
 
-func updateSamplerState(ss sampler.InternalState) {
+func updateSamplerInfo(ss samplerInfo) {
 	infoMu.Lock()
-	infoSamplerState = ss
+	infoSamplerInfo = ss
 	infoMu.Unlock()
 }
 
-func publishSamplerState() interface{} {
+func publishSamplerInfo() interface{} {
 	infoMu.RLock()
-	ss := infoSamplerState
+	ss := infoSamplerInfo
 	infoMu.RUnlock()
 	return ss
 }
@@ -168,7 +167,7 @@ func initInfo(conf *config.AgentConfig) error {
 		expvar.Publish("version", expvar.Func(publishVersion))
 		expvar.Publish("receiver", expvar.Func(publishReceiverStats))
 		expvar.Publish("endpoint", expvar.Func(publishEndpointStats))
-		expvar.Publish("sampler", expvar.Func(publishSamplerState))
+		expvar.Publish("sampler", expvar.Func(publishSamplerInfo))
 		expvar.Publish("watchdog", expvar.Func(publishWatchdogInfo))
 
 		c := *conf
