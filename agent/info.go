@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"expvar" // automatically publish `/debug/vars` on HTTP port
 	"fmt"
-	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/watchdog"
 	"io"
 	"net/http"
 	"os"
@@ -14,6 +12,10 @@ import (
 	"sync"
 	"text/template"
 	"time"
+
+	"github.com/DataDog/datadog-trace-agent/config"
+	"github.com/DataDog/datadog-trace-agent/sampler"
+	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
 var (
@@ -21,6 +23,7 @@ var (
 	infoReceiverStats  receiverStats // only for the last minute
 	infoEndpointStats  endpointStats // only for the last minute
 	infoWatchdogInfo   watchdog.Info
+	infoSamplerState   sampler.InternalState
 	infoStart          = time.Now()
 	infoOnce           sync.Once
 	infoTmpl           *template.Template
@@ -101,6 +104,19 @@ func publishEndpointStats() interface{} {
 	return es
 }
 
+func updateSamplerState(ss sampler.InternalState) {
+	infoMu.Lock()
+	infoSamplerState = ss
+	infoMu.Unlock()
+}
+
+func publishSamplerState() interface{} {
+	infoMu.RLock()
+	ss := infoSamplerState
+	infoMu.RUnlock()
+	return ss
+}
+
 func updateWatchdogInfo(wi watchdog.Info) {
 	infoMu.Lock()
 	infoWatchdogInfo = wi
@@ -152,6 +168,7 @@ func initInfo(conf *config.AgentConfig) error {
 		expvar.Publish("version", expvar.Func(publishVersion))
 		expvar.Publish("receiver", expvar.Func(publishReceiverStats))
 		expvar.Publish("endpoint", expvar.Func(publishEndpointStats))
+		expvar.Publish("sampler", expvar.Func(publishSamplerState))
 		expvar.Publish("watchdog", expvar.Func(publishWatchdogInfo))
 
 		c := *conf
