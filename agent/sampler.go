@@ -82,11 +82,4 @@ func (s *Sampler) logState() {
 		state.InTPS, state.OutTPS, state.MaxTPS, state.Offset, state.Slope, state.Cardinality)
 
 	updateSamplerState(state) // publish through expvar
-
-	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.offset", state.Offset, nil, 1)
-	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.slope", state.Slope, nil, 1)
-	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.cardinality", float64(state.Cardinality), nil, 1)
-	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.in_tps", state.InTPS, nil, 1)
-	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.out_tps", state.OutTPS, nil, 1)
-	statsd.Client.Gauge("datadog.trace_agent.sampler.scoring.max_tps", state.MaxTPS, nil, 1)
 }
