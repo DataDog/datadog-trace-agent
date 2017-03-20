@@ -2,6 +2,7 @@ package main
 
 import (
 	"sync"
+	"time"
 
 	log "github.com/cihub/seelog"
 
@@ -15,16 +16,17 @@ type Sampler struct {
 	mu            sync.Mutex
 	sampledTraces []model.Trace
 	traceCount    int
+	lastFlush     time.Time
 
 	samplerEngine SamplerEngine
 }
 
 // samplerStats contains sampler statistics
 type samplerStats struct {
-	// TracesKept is the number of traces kept (last flush only)
-	TracesKept int
-	// TracesTotal is the total number of traces (last flush only)
-	TracesTotal int
+	// TracesKept is the number of traces kept (average per second for last flush)
+	TracesKept float64
+	// TracesTotal is the total number of traces (average per second for last flush)
+	TracesTotal float64
 }
 
 type samplerInfo struct {
@@ -73,25 +75,31 @@ func (s *Sampler) Stop() {
 // Flush returns representative spans based on GetSamples and reset its internal memory
 func (s *Sampler) Flush() []model.Trace {
 	s.mu.Lock()
+
 	traces := s.sampledTraces
 	s.sampledTraces = []model.Trace{}
 	traceCount := s.traceCount
 	s.traceCount = 0
+
+	now := time.Now()
+	duration := now.Sub(s.lastFlush)
+	s.lastFlush = now
+
 	s.mu.Unlock()
 
 	state := s.samplerEngine.(*sampler.Sampler).GetState()
+	var stats samplerStats
+	if duration > 0 {
+		stats.TracesKept = float64(len(traces)) * float64(time.Second) / float64(duration)
+		stats.TracesTotal = float64(traceCount) * float64(time.Second) / float64(duration)
+	}
 
-	log.Debugf("flushed %d sampled traces out of %v", len(traces), traceCount)
+	log.Debugf("flushed %d sampled traces out of %d", len(traces), traceCount)
 	log.Debugf("inTPS: %f, outTPS: %f, maxTPS: %f, offset: %f, slope: %f, cardinality: %d",
 		state.InTPS, state.OutTPS, state.MaxTPS, state.Offset, state.Slope, state.Cardinality)
 
 	// publish through expvar
-	updateSamplerInfo(samplerInfo{
-		Stats: samplerStats{
-			TracesKept:  len(traces),
-			TracesTotal: traceCount,
-		},
-		State: state})
+	updateSamplerInfo(samplerInfo{Stats: stats, State: state})
 
 	return traces
 }
