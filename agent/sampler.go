@@ -90,8 +90,8 @@ func (s *Sampler) Flush() []model.Trace {
 	state := s.samplerEngine.(*sampler.Sampler).GetState()
 	var stats samplerStats
 	if duration > 0 {
-		stats.KeptTPS = float64(len(traces)) * float64(time.Second) / float64(duration)
-		stats.TotalTPS = float64(traceCount) * float64(time.Second) / float64(duration)
+		stats.KeptTPS = float64(len(traces)) / duration.Seconds()
+		stats.TotalTPS = float64(traceCount) / duration.Seconds()
 	}
 
 	log.Debugf("flushed %d sampled traces out of %d", len(traces), traceCount)
