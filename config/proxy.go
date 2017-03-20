@@ -4,6 +4,7 @@ import (
 	"github.com/go-ini/ini"
 )
 
+// mirror default behavior of the infra agent
 const DefaultProxyPort = 3128
 
 type ProxySettings struct {
