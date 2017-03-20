@@ -5,8 +5,9 @@ import (
 )
 
 // mirror default behavior of the infra agent
-const DefaultProxyPort = 3128
+const defaultProxyPort = 3128
 
+// ProxySettings contains configuration for http/https proxying
 type ProxySettings struct {
 	User     string
 	Password string
@@ -15,7 +16,7 @@ type ProxySettings struct {
 }
 
 func getProxySettings(m *ini.Section) *ProxySettings {
-	p := ProxySettings{Port: DefaultProxyPort}
+	p := ProxySettings{Port: defaultProxyPort}
 
 	if v := m.Key("proxy_host").MustString(""); v != "" {
 		p.Host = v

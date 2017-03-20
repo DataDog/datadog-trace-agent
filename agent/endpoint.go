@@ -92,6 +92,7 @@ func NewAPIEndpoint(urls, apiKeys []string) *APIEndpoint {
 	return &a
 }
 
+// SetProxy updates the http client used by APIEndpoint to report via the given proxy
 func (a *APIEndpoint) SetProxy(settings *config.ProxySettings) {
 	// construct user:pass@host:port
 	var userpass string
