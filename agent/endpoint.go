@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
-	"net/url"
 	"sync/atomic"
 	"time"
 
@@ -94,20 +93,11 @@ func NewAPIEndpoint(urls, apiKeys []string) *APIEndpoint {
 
 // SetProxy updates the http client used by APIEndpoint to report via the given proxy
 func (a *APIEndpoint) SetProxy(settings *config.ProxySettings) {
-	// construct user:pass@host:port
-	var userpass string
-	if settings.User != "" {
-		if settings.Password != "" {
-			userpass = fmt.Sprintf("%s:%s@", settings.User, settings.Password)
-		}
-	}
-
-	proxyPath, err := url.Parse(fmt.Sprintf("%s%s:%s", userpass, settings.Host, settings.Port))
+	proxyPath, err := settings.URL()
 	if err != nil {
 		log.Errorf("failed to configure proxy: %v", err)
 		return
 	}
-
 	a.client = &http.Client{
 		Transport: &http.Transport{
 			Proxy: http.ProxyURL(proxyPath),
