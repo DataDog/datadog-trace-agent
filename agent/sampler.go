@@ -23,10 +23,10 @@ type Sampler struct {
 
 // samplerStats contains sampler statistics
 type samplerStats struct {
-	// TracesKept is the number of traces kept (average per second for last flush)
-	TracesKept float64
-	// TracesTotal is the total number of traces (average per second for last flush)
-	TracesTotal float64
+	// KeptTPS is the number of traces kept (average per second for last flush)
+	KeptTPS float64
+	// TotalTPS is the total number of traces (average per second for last flush)
+	TotalTPS float64
 }
 
 type samplerInfo struct {
@@ -90,8 +90,8 @@ func (s *Sampler) Flush() []model.Trace {
 	state := s.samplerEngine.(*sampler.Sampler).GetState()
 	var stats samplerStats
 	if duration > 0 {
-		stats.TracesKept = float64(len(traces)) * float64(time.Second) / float64(duration)
-		stats.TracesTotal = float64(traceCount) * float64(time.Second) / float64(duration)
+		stats.KeptTPS = float64(len(traces)) * float64(time.Second) / float64(duration)
+		stats.TotalTPS = float64(traceCount) * float64(time.Second) / float64(duration)
 	}
 
 	log.Debugf("flushed %d sampled traces out of %d", len(traces), traceCount)
