@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	log "github.com/cihub/seelog"
@@ -66,6 +67,7 @@ type APIEndpoint struct {
 	apiKeys []string
 	urls    []string
 	stats   endpointStats
+	client  *http.Client
 }
 
 // NewAPIEndpoint returns a new APIEndpoint from a given config
@@ -83,9 +85,24 @@ func NewAPIEndpoint(urls, apiKeys []string) *APIEndpoint {
 	a := APIEndpoint{
 		apiKeys: apiKeys,
 		urls:    urls,
+		client:  http.DefaultClient,
 	}
 	go a.logStats()
 	return &a
+}
+
+// SetProxy updates the http client used by APIEndpoint to report via the given proxy
+func (a *APIEndpoint) SetProxy(settings *config.ProxySettings) {
+	proxyPath, err := settings.URL()
+	if err != nil {
+		log.Errorf("failed to configure proxy: %v", err)
+		return
+	}
+	a.client = &http.Client{
+		Transport: &http.Transport{
+			Proxy: http.ProxyURL(proxyPath),
+		},
+	}
 }
 
 // Write writes the bucket to the API collector endpoint.
@@ -124,7 +141,7 @@ func (a *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 		req.URL.RawQuery = queryParams.Encode()
 		model.SetAgentPayloadHeaders(req.Header)
 
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := a.client.Do(req)
 		if err != nil {
 			log.Errorf("error when requesting to endpoint %s: %v", url, err)
 			atomic.AddInt64(&a.stats.TracesPayloadError, 1)
@@ -190,7 +207,7 @@ func (a *APIEndpoint) WriteServices(s model.ServicesMetadata) {
 		req.URL.RawQuery = queryParams.Encode()
 		model.SetServicesPayloadHeaders(req.Header)
 
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := a.client.Do(req)
 		if err != nil {
 			log.Errorf("error when requesting to endpoint %s: %v", url, err)
 			atomic.AddInt64(&a.stats.ServicesPayloadError, 1)

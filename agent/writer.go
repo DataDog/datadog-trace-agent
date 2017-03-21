@@ -66,6 +66,11 @@ func NewWriter(conf *config.AgentConfig) *Writer {
 
 	if conf.APIEnabled {
 		endpoint = NewAPIEndpoint(conf.APIEndpoints, conf.APIKeys)
+		if conf.Proxy != nil {
+			// we have some kind of proxy configured.
+			// make sure our http client uses it
+			endpoint.(*APIEndpoint).SetProxy(conf.Proxy)
+		}
 	} else {
 		log.Info("API interface is disabled, flushing to /dev/null instead")
 		endpoint = NullEndpoint{}
