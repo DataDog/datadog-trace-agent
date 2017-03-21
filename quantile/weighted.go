@@ -1,17 +1,48 @@
 package quantile
 
+import (
+	"math"
+	"math/rand"
+)
+
 type WeightedSliceSummary struct {
 	Weight float64
 	*SliceSummary
 }
 
-func weighSummary(s *SliceSummary, w float64) *SliceSummary {
-	sw := s.Copy()
-	for i := range sw.Entries {
-		sw.Entries[i].G = int(w * float64(sw.Entries[i].G)) // +1 ?
+func init() {
+	rand.Seed(7337)
+}
+
+func probabilisticRound(g int, weight float64) int {
+	raw := weight * float64(g)
+	decimal := raw - math.Floor(raw)
+	limit := rand.Float64()
+
+	if limit <= decimal {
+		return int(raw)
+	} else {
+		return int(raw) + 1
+	}
+}
+
+func weighSummary(s *SliceSummary, weight float64) *SliceSummary {
+	sw := NewSliceSummary()
+	sw.Entries = make([]Entry, 0, len(s.Entries))
+
+	gsum := 0
+	for _, e := range s.Entries {
+		newg := probabilisticRound(e.G, weight)
+		// if an entry is down to 0 delete it
+		if newg != 0 {
+			sw.Entries = append(sw.Entries,
+				Entry{V: e.V, G: newg, Delta: e.Delta},
+			)
+			gsum += newg
+		}
 	}
 
-	sw.N = int(w * float64(sw.N))
+	sw.N = gsum
 	return sw
 }
 
