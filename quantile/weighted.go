@@ -10,11 +10,10 @@ type WeightedSliceSummary struct {
 	*SliceSummary
 }
 
-func init() {
-	rand.Seed(7337)
-}
-
 func probabilisticRound(g int, weight float64) int {
+	// deterministic seed
+	rand.Seed(7337)
+
 	raw := weight * float64(g)
 	decimal := raw - math.Floor(raw)
 	limit := rand.Float64()
