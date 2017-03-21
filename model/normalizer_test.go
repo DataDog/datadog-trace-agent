@@ -145,6 +145,12 @@ func TestNormalizeEmptyDuration(t *testing.T) {
 	assert.Error(t, s.Normalize())
 }
 
+func TestNormalizeNegativeDuration(t *testing.T) {
+	s := testSpan()
+	s.Duration = -50
+	assert.Error(t, s.Normalize())
+}
+
 func TestNormalizeErrorPassThru(t *testing.T) {
 	s := testSpan()
 	before := s.Error

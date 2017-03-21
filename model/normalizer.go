@@ -102,8 +102,8 @@ func (s *Span) Normalize() error {
 		return fmt.Errorf("span.normalize: more than %v in the future", MaxEndDateOffset)
 	}
 
-	if s.Duration == 0 {
-		return errors.New("span.normalize: spans with zeroed `Duration` are discarded, use annotations")
+	if s.Duration <= 0 {
+		return errors.New("span.normalize: durations need to be strictly positive")
 	}
 
 	// Error - Nothing to do
