@@ -48,12 +48,21 @@ func getProxySettings(m *ini.Section) *ProxySettings {
 // URL turns ProxySettings into an idiomatic URL struct
 func (p *ProxySettings) URL() (*url.URL, error) {
 	// construct scheme://user:pass@host:port
-	var userpass string
+	var userpass *url.Userinfo
 	if p.User != "" {
 		if p.Password != "" {
-			userpass = fmt.Sprintf("%s:%s@", p.User, p.Password)
+			userpass = url.UserPassword(p.User, p.Password)
+		} else {
+			userpass = url.User(p.User)
 		}
 	}
 
-	return url.Parse(fmt.Sprintf("%s://%s%s:%v", p.Scheme, userpass, p.Host, p.Port))
+	var path string
+	if userpass != nil {
+		path = fmt.Sprintf("%s://%s@%s:%v", p.Scheme, userpass.String(), p.Host, p.Port)
+	} else {
+		path = fmt.Sprintf("%s://%s:%v", p.Scheme, p.Host, p.Port)
+	}
+
+	return url.Parse(path)
 }
