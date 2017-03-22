@@ -25,7 +25,7 @@ func probabilisticRound(g int, weight float64) int {
 	}
 }
 
-func weighSummary(s *SliceSummary, weight float64) *SliceSummary {
+func WeighSummary(s *SliceSummary, weight float64) *SliceSummary {
 	sw := NewSliceSummary()
 	sw.Entries = make([]Entry, 0, len(s.Entries))
 
@@ -52,10 +52,10 @@ func BySlicesWeighted(summaries ...WeightedSliceSummary) []SummarySlice {
 		return []SummarySlice{}
 	}
 
-	mergeSummary := weighSummary(summaries[0].SliceSummary, summaries[0].Weight)
+	mergeSummary := WeighSummary(summaries[0].SliceSummary, summaries[0].Weight)
 	if len(summaries) > 1 {
 		for _, s := range summaries[1:] {
-			sw := weighSummary(s.SliceSummary, s.Weight)
+			sw := WeighSummary(s.SliceSummary, s.Weight)
 			mergeSummary.Merge(sw)
 		}
 	}
