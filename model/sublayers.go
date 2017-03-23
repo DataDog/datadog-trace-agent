@@ -1,7 +1,5 @@
 package model
 
-import "bytes"
-
 // SublayerValue is just a span-metric placeholder for a given
 // sublayer val
 type SublayerValue struct {
@@ -38,23 +36,19 @@ func ComputeSublayers(t *Trace) []SublayerValue {
 }
 
 // SetSublayersOnSpan takes some sublayers and pins them on the given span.Metrics
-func SetSublayersOnSpan(span *Span, sv []SublayerValue) {
-	var b bytes.Buffer
-
+func SetSublayersOnSpan(span *Span, values []SublayerValue) {
 	if span.Metrics == nil {
-		span.Metrics = make(map[string]float64, len(sv))
+		span.Metrics = make(map[string]float64, len(values))
 	}
 
-	for _, s := range sv {
-		b.WriteString(s.Metric)
-		if s.Tag.Name != "" {
-			b.WriteRune('.')
-			b.WriteString(s.Tag.Name)
-			b.WriteRune(':')
-			b.WriteString(s.Tag.Value)
+	for _, value := range values {
+		name := value.Metric
+
+		if value.Tag.Name != "" {
+			name = name + "." + value.Tag.Name + ":" + value.Tag.Value
 		}
-		span.Metrics[b.String()] = s.Value
-		b.Reset()
+
+		span.Metrics[name] = value.Value
 	}
 }
 
