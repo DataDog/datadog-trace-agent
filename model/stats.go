@@ -98,6 +98,14 @@ func (d Distribution) Merge(d2 Distribution) {
 	d.Summary.Merge(d2.Summary)
 }
 
+// Weigh applies a weight factor to a distribution and return the result as a
+// new distribution.
+func (d Distribution) Weigh(weight float64) Distribution {
+	d2 := Distribution(d)
+	d2.Summary = quantile.WeighSummary(d.Summary, weight)
+	return d2
+}
+
 // Copy returns a distro with the same data but a different underlying summary
 func (d Distribution) Copy() Distribution {
 	d2 := Distribution(d)

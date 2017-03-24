@@ -10,9 +10,7 @@ import (
 )
 
 /*
-FIXME: shamelessly copied from dgryski/go-gk, not verified, not really tested
-Should reimplement everything from scratch from the paper
-
+DEPRECATED: this code is not used anymore, SliceSummary is used instead
 "Space-Efficient Online Computation of Quantile Summaries" (Greenwald, Khanna 2001)
 
 http://infolab.stanford.edu/~datar/courses/cs361a/papers/quantiles.pdf
