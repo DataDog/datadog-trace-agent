@@ -5,6 +5,7 @@ import (
 	"math/rand"
 )
 
+// WeightedSliceSummary associates a weight to a slice summary.
 type WeightedSliceSummary struct {
 	Weight float64
 	*SliceSummary
@@ -18,13 +19,16 @@ func probabilisticRound(g int, weight float64) int {
 	decimal := raw - math.Floor(raw)
 	limit := rand.Float64()
 
-	if limit <= decimal {
-		return int(raw)
-	} else {
-		return int(raw) + 1
+	iraw := int(raw)
+	if limit > decimal {
+		iraw++
 	}
+
+	return iraw
 }
 
+// WeighSummary applies a weight factor to a slice summary and return it as a
+// new slice.
 func WeighSummary(s *SliceSummary, weight float64) *SliceSummary {
 	sw := NewSliceSummary()
 	sw.Entries = make([]Entry, 0, len(s.Entries))
