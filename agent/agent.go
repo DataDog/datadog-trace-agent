@@ -8,6 +8,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/quantizer"
+	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 	log "github.com/cihub/seelog"
 )
@@ -136,6 +137,10 @@ func (a *Agent) Process(t model.Trace) {
 		atomic.AddInt64(&a.Receiver.stats.SpansDropped, int64(len(t)))
 		return
 	}
+
+	rate := sampler.GetTraceAppliedSampleRate(root)
+	rate *= a.Receiver.preSampler.Rate()
+	sampler.SetTraceAppliedSampleRate(root, rate)
 
 	sublayers := model.ComputeSublayers(&t)
 	model.SetSublayersOnSpan(root, sublayers)
