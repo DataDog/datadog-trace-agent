@@ -122,6 +122,20 @@ func main() {
 		defer log.Flush()
 	}
 
+	defer func() {
+		if err := recover(); err != nil {
+			// Full print of the trace in the logs
+			buf := make([]byte, 4096)
+			length := runtime.Stack(buf, false)
+			stacktrace := string(buf[:length])
+			msg := fmt.Sprintf("%s: %s\n%s", "Unexpected error", err, stacktrace)
+
+			log.Error(msg)
+			log.Flush()
+			panic(err)
+		}
+	}()
+
 	// start CPU profiling
 	if opts.cpuprofile != "" {
 		f, err := os.Create(opts.cpuprofile)
