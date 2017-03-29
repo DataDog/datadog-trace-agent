@@ -130,7 +130,9 @@ func main() {
 			stacktrace := string(buf[:length])
 			msg := fmt.Sprintf("%s: %s\n%s", "Unexpected error", err, stacktrace)
 
-			log.Info(msg)
+			log.Error(msg)
+
+			panic(err)
 		}
 
 		log.Flush()
