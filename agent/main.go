@@ -131,11 +131,9 @@ func main() {
 			msg := fmt.Sprintf("%s: %s\n%s", "Unexpected error", err, stacktrace)
 
 			log.Error(msg)
-
+			log.Flush()
 			panic(err)
 		}
-
-		log.Flush()
 	}()
 
 	// start CPU profiling
