@@ -9,6 +9,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/sampler"
+	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
 // Sampler chooses wich spans to write to the API
@@ -54,7 +55,9 @@ func NewSampler(conf *config.AgentConfig) *Sampler {
 
 // Run starts sampling traces
 func (s *Sampler) Run() {
-	go s.samplerEngine.Run()
+	watchdog.Go(func() {
+		s.samplerEngine.Run()
+	})
 }
 
 // Add samples a trace then keep it until the next flush
