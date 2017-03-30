@@ -57,10 +57,7 @@ func parseFloat64(dc *msgp.Reader) (float64, error) {
 			return 0, err
 		}
 
-		// if we have an uint64 sent over the wire, this value should be a float64
-		// so we're decoding that value using set bits. This action is compliant
-		// to msgpack specification.
-		return math.Float64frombits(i), nil
+		return float64(i), nil
 	case msgp.Float64Type:
 		f, err := dc.ReadFloat64()
 		if err != nil {
