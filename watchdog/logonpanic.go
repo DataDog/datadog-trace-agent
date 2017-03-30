@@ -7,6 +7,9 @@ import (
 	log "github.com/cihub/seelog"
 )
 
+// LogOnPanic catches panics and logs them on the fly. It also flushes
+// the log file, ensuring the message appears. Then it propagates the panic
+// so that the program flow remains unchanged.
 func LogOnPanic() {
 	if err := recover(); err != nil {
 		// Full print of the trace in the logs
