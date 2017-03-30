@@ -7,10 +7,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	log "github.com/cihub/seelog"
+
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/statsd"
-	log "github.com/cihub/seelog"
+	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
 // apiError stores a list of errors triggered when sending data to a
@@ -87,7 +89,10 @@ func NewAPIEndpoint(urls, apiKeys []string) *APIEndpoint {
 		urls:    urls,
 		client:  http.DefaultClient,
 	}
-	go a.logStats()
+	go func() {
+		defer watchdog.LogOnPanic()
+		a.logStats()
+	}()
 	return &a
 }
 

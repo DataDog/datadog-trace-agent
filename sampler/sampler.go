@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
 const (
@@ -86,7 +87,10 @@ func (s *Sampler) UpdateMaxTPS(maxTPS float64) {
 
 // Run runs and block on the Sampler main loop
 func (s *Sampler) Run() {
-	go s.Backend.Run()
+	go func() {
+		defer watchdog.LogOnPanic()
+		s.Backend.Run()
+	}()
 	s.RunAdjustScoring()
 }
 

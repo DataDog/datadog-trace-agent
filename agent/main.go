@@ -12,11 +12,12 @@ import (
 	"syscall"
 	"time"
 
+	log "github.com/cihub/seelog"
+	_ "net/http/pprof"
+
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/statsd"
-	log "github.com/cihub/seelog"
-
-	_ "net/http/pprof"
+	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
 // handleSignal closes a channel to exit cleanly from routines
@@ -122,19 +123,7 @@ func main() {
 		defer log.Flush()
 	}
 
-	defer func() {
-		if err := recover(); err != nil {
-			// Full print of the trace in the logs
-			buf := make([]byte, 4096)
-			length := runtime.Stack(buf, false)
-			stacktrace := string(buf[:length])
-			msg := fmt.Sprintf("%s: %s\n%s", "Unexpected error", err, stacktrace)
-
-			log.Error(msg)
-			log.Flush()
-			panic(err)
-		}
-	}()
+	defer watchdog.LogOnPanic()
 
 	// start CPU profiling
 	if opts.cpuprofile != "" {
@@ -224,7 +213,10 @@ func main() {
 	agent := NewAgent(agentConf)
 
 	// Handle stops properly
-	go handleSignal(agent.exit)
+	go func() {
+		defer watchdog.LogOnPanic()
+		handleSignal(agent.exit)
+	}()
 
 	log.Infof("trace-agent running on host %s", agentConf.HostName)
 	agent.Run()

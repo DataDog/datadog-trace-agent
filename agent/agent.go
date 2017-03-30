@@ -96,10 +96,12 @@ func (a *Agent) Run() {
 			var wg sync.WaitGroup
 			wg.Add(2)
 			go func() {
+				defer watchdog.LogOnPanic()
 				p.Stats = a.Concentrator.Flush()
 				wg.Done()
 			}()
 			go func() {
+				defer watchdog.LogOnPanic()
 				p.Traces = a.Sampler.Flush()
 				wg.Done()
 			}()
@@ -155,8 +157,14 @@ func (a *Agent) Process(t model.Trace) {
 	}
 
 	weight := pt.weight() // need to do this now because sampler edits .Metrics map
-	go a.Concentrator.Add(pt, weight)
-	go a.Sampler.Add(pt)
+	go func() {
+		defer watchdog.LogOnPanic()
+		a.Concentrator.Add(pt, weight)
+	}()
+	go func() {
+		defer watchdog.LogOnPanic()
+		a.Sampler.Add(pt)
+	}()
 }
 
 func (a *Agent) watchdog() {
