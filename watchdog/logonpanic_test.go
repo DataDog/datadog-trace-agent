@@ -2,6 +2,7 @@ package watchdog
 
 import (
 	"bytes"
+	"fmt"
 	"sync"
 	"testing"
 
@@ -28,6 +29,9 @@ func TestLogOnPanicMain(t *testing.T) {
 	defer func() {
 		r := recover()
 		assert.NotNil(r, "panic should bubble up and be trapped here")
+		assert.Contains(fmt.Sprintf("%v", r),
+			"integer divide by zero",
+			"divide by zero panic should be forwarded")
 		msg := testLogBuf.String()
 		assert.Contains(msg,
 			"Unexpected error: runtime error: integer divide by zero",
@@ -51,6 +55,9 @@ func TestLogOnPanicGoroutine(t *testing.T) {
 		defer func() {
 			r := recover()
 			assert.NotNil(r, "panic should bubble up and be trapped here")
+			assert.Contains(fmt.Sprintf("%v", r),
+				"what could possibly go wrong?",
+				"custom panic should be forwarded")
 			msg := testLogBuf.String()
 			assert.Contains(msg,
 				"Unexpected error: what could possibly go wrong?",
