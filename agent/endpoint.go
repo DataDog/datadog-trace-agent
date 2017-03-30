@@ -89,10 +89,9 @@ func NewAPIEndpoint(urls, apiKeys []string) *APIEndpoint {
 		urls:    urls,
 		client:  http.DefaultClient,
 	}
-	go func() {
-		defer watchdog.LogOnPanic()
+	watchdog.Go(func() {
 		a.logStats()
-	}()
+	})
 	return &a
 }
 

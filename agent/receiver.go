@@ -106,10 +106,9 @@ func (r *HTTPReceiver) Run() {
 		log.Error(err)
 	}
 
-	go func() {
-		defer watchdog.LogOnPanic()
+	watchdog.Go(func() {
 		r.logStats()
-	}()
+	})
 }
 
 // Listen creates a new HTTP server listening on the provided address.
@@ -137,14 +136,12 @@ func (r *HTTPReceiver) Listen(addr, logExtra string) error {
 
 	log.Infof("listening for traces at http://%s%s", addr, logExtra)
 
-	go func() {
-		defer watchdog.LogOnPanic()
+	watchdog.Go(func() {
 		stoppableListener.Refresh(r.conf.ConnectionLimit)
-	}()
-	go func() {
-		defer watchdog.LogOnPanic()
+	})
+	watchdog.Go(func() {
 		server.Serve(stoppableListener)
-	}()
+	})
 
 	return nil
 }
