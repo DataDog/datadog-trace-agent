@@ -31,6 +31,10 @@ func (err *apiError) IsEmpty() bool {
 	return len(err.errs) == 0
 }
 
+func (err *apiError) SetClient(client *http.Client) {
+	err.endpoint.client = client
+}
+
 func (err *apiError) Append(url, apiKey string, e error) {
 	err.errs = append(err.errs, e)
 	err.endpoint.urls = append(err.endpoint.urls, url)
@@ -123,6 +127,11 @@ func (a *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 	atomic.AddInt64(&a.stats.TracesStats, int64(len(p.Stats)))
 
 	endpointErr := newAPIError()
+
+	// if this payload cannot be flushed due to API errors
+	// we need to pass the client along for future submissions
+	// FIXME(aaditya)
+	endpointErr.SetClient(a.client)
 
 	for i := range a.urls {
 		atomic.AddInt64(&a.stats.TracesPayload, 1)
