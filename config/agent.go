@@ -150,6 +150,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 		hostname = ""
 	}
 	ac := &AgentConfig{
+		Enabled:                 true,
 		HostName:                hostname,
 		DefaultEnv:              "none",
 		APIEndpoints:            []string{"https://trace.agent.datadoghq.com"},
