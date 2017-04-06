@@ -73,21 +73,29 @@ func TestSpansCoveredDuration(t *testing.T) {
 	}
 
 	tests := []struct {
-		spans    Spans
-		duration int64
+		parentStart int64
+		spans       Spans
+		duration    int64
 	}{
-		{Spans{}, 0},
-		{Spans{span(0, 100)}, 100},
-		{Spans{span(0, 50), span(50, 50)}, 100},
-		{Spans{span(0, 50), span(10, 20)}, 50},
-		{Spans{span(10, 20), span(0, 30)}, 30},
-		{Spans{span(10, 20), span(50, 20)}, 40},
-		{Spans{span(10, 20), span(15, 20)}, 25},
-		{Spans{span(10, 20), span(5, 30), span(50, 10)}, 40},
+		{0, Spans{}, 0},
+		{0, Spans{span(0, 100)}, 100},
+		{0, Spans{span(0, 50), span(50, 50)}, 100},
+		{0, Spans{span(0, 50), span(10, 20)}, 50},
+		{0, Spans{span(10, 20), span(0, 30)}, 30},
+		{0, Spans{span(10, 20), span(50, 20)}, 40},
+		{0, Spans{span(10, 20), span(15, 20)}, 25},
+		{0, Spans{span(10, 20), span(5, 30), span(50, 10)}, 40},
+
+		{5, Spans{span(10, 10), span(15, 10)}, 15},
+		{5, Spans{span(0, 10)}, 5},
+		{5, Spans{span(0, 10), span(5, 10)}, 10},
+
+		{40, Spans{span(0, 60), span(10, 10), span(30, 10)}, 20},
 	}
 
 	for _, test := range tests {
-		assert.Equal(test.duration, test.spans.CoveredDuration(),
+		coveredDuration := test.spans.CoveredDuration(test.parentStart)
+		assert.Equal(test.duration, coveredDuration,
 			fmt.Sprintf("%#v", test.spans))
 	}
 }

@@ -132,36 +132,47 @@ func (spans spansByStartDate) Less(i, j int) bool {
 
 // CoveredDuration returns the amount of time in nanoseconds covered by at
 // least one span.
-func (spans Spans) CoveredDuration() int64 {
+func (spans Spans) CoveredDuration(parentStart int64) int64 {
 	if len(spans) == 0 {
 		return 0
+	}
+
+	adjustStart := func(start int64) int64 {
+		if start < parentStart {
+			return parentStart
+		}
+		return start
 	}
 
 	// Sort by increasing start date
 	sort.Sort(spansByStartDate(spans))
 
 	duration := int64(0)
-	start := spans[0].Start
+	start := adjustStart(spans[0].Start)
 	maxEnd := spans[0].End()
 
 	for i, span := range spans {
 		end := span.End()
+		if end < parentStart {
+			continue
+		}
 
 		if i == len(spans)-1 {
 			// Last span
 			duration += maxEnd - start
 		} else {
 			nextSpan := spans[i+1]
+			nextStart := adjustStart(nextSpan.Start)
 			nextEnd := nextSpan.End()
 
-			if nextSpan.Start <= end {
+			if nextStart <= end {
 				// span and nextSpan overlap
 				if nextEnd > end {
 					maxEnd = nextEnd
 				}
 			} else {
 				duration += maxEnd - start
-				start = nextSpan.Start
+				start = nextStart
 				maxEnd = nextEnd
 			}
 		}
