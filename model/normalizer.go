@@ -157,7 +157,7 @@ func (s *Span) Normalize() error {
 
 // NormalizeTrace takes a trace and
 // * rejects the trace if there is a trace ID discrepancy between 2 spans
-// * rejects spans that cannot be normalized
+// * rejects the trace if two spans have the same span_id
 // * rejects empty traces
 // * rejects traces where at least one span cannot be normalized
 // * return the normalized trace and an error:
@@ -168,15 +168,25 @@ func NormalizeTrace(t Trace) (Trace, error) {
 		return t, errors.New("empty trace")
 	}
 
+	spanIDs := make(map[uint64]struct{})
+
 	traceID := t[0].TraceID
-	for i, s := range t {
-		if s.TraceID != traceID {
-			return t, fmt.Errorf("trace id mismatch %s:%x != %s:%x", t[0].Name, t[0].TraceID, s.Name, s.TraceID)
+	for i, span := range t {
+		if _, ok := spanIDs[span.SpanID]; ok {
+			return t, fmt.Errorf("duplicate span id %v (span %v)",
+				span.SpanID, span)
+		}
+
+		if span.TraceID != traceID {
+			return t, fmt.Errorf("trace id mismatch %s:%x != %s:%x",
+				t[0].Name, t[0].TraceID, span.Name, span.TraceID)
 		}
 
 		if err := t[i].Normalize(); err != nil {
-			return t, fmt.Errorf("invalid span %v: %v", s, err)
+			return t, fmt.Errorf("invalid span %v: %v", span, err)
 		}
+
+		spanIDs[span.SpanID] = struct{}{}
 	}
 
 	return t, nil

@@ -276,6 +276,17 @@ func TestNormalizeTraceInvalidSpan(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestNormalizeTraceDuplicateSpanID(t *testing.T) {
+	span1 := testSpan()
+	span2 := testSpan()
+	span2.SpanID = span1.SpanID
+
+	trace := Trace{span1, span2}
+
+	_, err := NormalizeTrace(trace)
+	assert.Error(t, err)
+}
+
 func TestNormalizeTrace(t *testing.T) {
 	span1 := testSpan()
 
