@@ -243,8 +243,8 @@ APM_CONF:
 		goto ENV_CONF
 	}
 
-	if v, _ := conf.Get("Main", "apm_enabled"); v == "true" {
-		c.Enabled = true
+	if v := strings.ToLower(conf.GetDefault("Main", "apm_enabled", "")); v == "no" || v == "false" {
+		c.Enabled = false
 	}
 
 	if v, _ := conf.Get("trace.config", "env"); v != "" {
