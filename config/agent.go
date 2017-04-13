@@ -243,7 +243,7 @@ APM_CONF:
 		goto ENV_CONF
 	}
 
-	if v, _ := conf.Get("Main", "apm_enabled"); v == "no" || v == "false" {
+	if v := strings.ToLower(conf.GetDefault("Main", "apm_enabled", "")); v == "no" || v == "false" {
 		c.Enabled = false
 	}
 
