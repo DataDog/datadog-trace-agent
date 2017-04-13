@@ -2,6 +2,8 @@ package model
 
 import (
 	"fmt"
+
+	log "github.com/cihub/seelog"
 )
 
 // SublayerValue is just a span-metric placeholder for a given sublayer val
@@ -53,6 +55,15 @@ func ComputeSublayers(trace *Trace) []SublayerValue {
 
 		childrenDuration := nonAsyncChildren.CoveredDuration(span.Start)
 		duration := span.Duration - childrenDuration
+		if duration < 0.0 {
+			// XXX Spans.CoveredDuration should never return a duration longer
+			// than span.duration. If that happens anyway, make sure we don't
+			// leak negative durations in stats, and log it because something
+			// is really wrong.
+			log.Errorf("span %v (%d children, %v covered duration, span.Start %v)",
+				span, len(nonAsyncChildren), childrenDuration, span.Start)
+			duration = 0.0
+		}
 
 		if span.Type != "" {
 			typeDuration[span.Type] += float64(duration)
