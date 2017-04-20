@@ -177,9 +177,9 @@ func NewDefaultAgentConfig() *AgentConfig {
 		LogLevel:    "INFO",
 		LogFilePath: "/var/log/datadog/trace-agent.log",
 
-		MaxMemory:        1e9, // 1 Gb
-		MaxCPU:           0.5, // 50 %
-		MaxConnections:   5000,
+		MaxMemory:        5e8, // 500 Mb, should rarely go above 50 Mb
+		MaxCPU:           0.5, // 50%, well behaving agents keep below 5%
+		MaxConnections:   200, // in practice, rarely goes over 20
 		WatchdogInterval: time.Minute,
 	}
 
