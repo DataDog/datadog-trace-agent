@@ -193,10 +193,6 @@ func CalcPreSampleRate(maxUserAvg, currentUserAvg, currentRate float64) float64 
 		// the machine running the code etc. But, there's no point in targetting 0.
 		// Benchmarks show 2% should always be, reasonnably, reachable.
 		userAvg0 = float64(0.02) // 2% CPU usage
-		// userAvgMin is a limit that maxUserAvg should respect, because trying
-		// to remain below this through pre-sampling can do more harm than good,
-		// trying to drop everything and still not reaching the goal.
-		userAvgMin = float64(0.04) // 4% CPU usage
 		// deltaMin is a threshold that must be passed before changing the
 		// pre-sampling rate. If set to 0.3, for example, the new rate must be
 		// either over 130% or below 70% of the previous value, before we actually
@@ -210,10 +206,6 @@ func CalcPreSampleRate(maxUserAvg, currentUserAvg, currentRate float64) float64 
 
 	if maxUserAvg <= userAvg0 || currentUserAvg <= 0 || currentRate <= 0 || currentRate > 1 {
 		return 1 // inconsistent input data, in doubt, disable the feature
-	}
-
-	if maxUserAvg < userAvgMin {
-		maxUserAvg = userAvgMin
 	}
 
 	newRate := float64(1)

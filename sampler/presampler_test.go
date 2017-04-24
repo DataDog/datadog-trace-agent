@@ -11,6 +11,9 @@ import (
 func TestCalcPreSampleRate(t *testing.T) {
 	assert := assert.New(t)
 
+	// [0] -> maxUserAvg: the value in the conf file
+	// [1] -> currentUserAvg: the value reported by the CPU watchdog
+	// [2] -> currentRate: the current (pre)sampling rate
 	expected := map[[3]float64]float64{
 		[3]float64{0.1, 0.1, 1}:     1,                   // just at max CPU usage, currently not sampling
 		[3]float64{0.2, 0.1, 1}:     1,                   // below max CPU usage, currently not sampling
@@ -26,8 +29,8 @@ func TestCalcPreSampleRate(t *testing.T) {
 		[3]float64{0.15, 0.05, 0.5}: 1,                   // 33% of max CPU usage, currently sampling at 50% -> back to no sampling
 		[3]float64{0.1, 1000000, 1}: 0.05,                // insane CPU usage, currently sampling at 50% -> return min
 		[3]float64{0.1, 0.05, 0.1}:  0.26666666666666666, // 50% of max CPU, currently sampling at 10% -> double the rate
-		[3]float64{0.04, 0.05, 1}:   0.6666666666666666,  // 4% of max CPU, currently not sampling -> sampling at 66%
-		[3]float64{0.025, 0.05, 1}:  0.6666666666666666,  // 2,5% of max CPU, currently not sampling -> same rate than with 4%
+		[3]float64{0.04, 0.05, 1}:   0.6666666666666666,  // 4% max CPU, using 5%, currently not sampling -> sampling at 66%
+		[3]float64{0.025, 0.05, 1}:  0.16666666666666669, // 2,5% max CPU, using 5%, currently not sampling -> aggressive sampling at 16%
 		[3]float64{0.01, 0.05, 0.1}: 1,                   // non-sensible max CPU -> disable pre-sampling
 		[3]float64{0.1, 0, 0.1}:     1,                   // non-sensible current CPU usage -> disable pre-sampling
 		[3]float64{0.1, 0.05, 0}:    1,                   // non-sensible current rate -> disable pre-sampling
