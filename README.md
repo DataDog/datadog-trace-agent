@@ -13,8 +13,7 @@ Just [run the Datadog Agent](http://docs.datadoghq.com/guides/basic_agent_usage/
 
 ## Run on OSX
 
-The Trace Agent isn't part of the OSX Datadog Agent yet.
-You have to run it manually on its side.
+The APM agent (aka Trace Agent) isn't part of the OSX Datadog Agent yet, it needs to be run manually on the side.
 
 - Have the [OSX Datadog Agent](https://app.datadoghq.com/account/settings#agent/mac).
 - Download the [latest OSX Trace Agent release](https://github.com/DataDog/datadog-trace-agent/releases).
