@@ -4,6 +4,7 @@ package sampler
 // with cpu watchdog is merged as there are probably going to be git conflicts...
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"sync"
@@ -186,51 +187,46 @@ func (ps *PreSampler) DecayScore() {
 // CalcPreSampleRate gives the new sample rate to apply for a given max user CPU average.
 // It takes the current sample rate and user CPU average as those parameters both
 // have an influence on the result.
-func CalcPreSampleRate(maxUserAvg, currentUserAvg, currentRate float64) float64 {
+func CalcPreSampleRate(maxUserAvg, currentUserAvg, currentRate float64) (float64, error) {
 	const (
-		// userAvg0 is the CPU usage we can possibly reach with sampling at 0%.
-		// Of course this really depends on the data received, the context,
-		// the machine running the code etc. But, there's no point in targetting 0.
-		// Benchmarks show 2% should always be, reasonnably, reachable.
-		userAvg0 = float64(0.02) // 2% CPU usage
 		// deltaMin is a threshold that must be passed before changing the
-		// pre-sampling rate. If set to 0.3, for example, the new rate must be
-		// either over 130% or below 70% of the previous value, before we actually
+		// pre-sampling rate. If set to 0.1, for example, the new rate must be
+		// below 90% or above 110% of the previous value, before we actually
 		// adjust the sampling rate. This is to avoid over-adapting and jittering.
-		deltaMin = float64(0.3) // -30% change
+		deltaMin = float64(0.1) // +/- 10% change
 		// rateMin is an absolute minimum rate, never sample more than this, it is
 		// inefficient, the cost handling the payloads without even reading them
 		// is too high anyway.
 		rateMin = float64(0.05) // 5% hard-limit
 	)
 
-	if maxUserAvg <= userAvg0 || currentUserAvg <= 0 || currentRate <= 0 || currentRate > 1 {
-		return 1 // inconsistent input data, in doubt, disable the feature
+	if maxUserAvg <= 0 || currentUserAvg <= 0 || currentRate <= 0 || currentRate > 1 {
+		return 1, fmt.Errorf("inconsistent pre-sampling input maxUserAvg=%f currentUserAvg=%f currentRate=%f",
+			maxUserAvg, currentUserAvg, currentRate)
 	}
 
 	newRate := float64(1)
-	slope := (currentUserAvg - userAvg0) / currentRate
-	if slope <= 0 {
-		// OK, here, slope is:
-		// - zero -> no matter how we presample, CPU will remain the same
-		// - negative -> would mean the more we sample, the more CPU we consume...
-		// So in short, there's no need to sample (in practice, it means
-		// we're below userAvg0, which is our base CPU usage).
-		return 1
-	}
-
-	newRate = (maxUserAvg - userAvg0) / slope
-	if newRate <= 0 || newRate >= 1 {
-		return 1 // again, in doubt, disable pre-sampling
+	slope := currentUserAvg / currentRate
+	newRate = maxUserAvg / slope
+	if newRate >= 1 {
+		return 1, nil // no need to pre-sample anything
 	}
 
 	delta := (newRate - currentRate) / currentRate
-	if delta > -deltaMin && delta < 0 {
-		return currentRate
-	}
-	if newRate < rateMin {
-		return rateMin
+	if delta > -deltaMin && delta < deltaMin {
+		// no need to change, this is close enough to what we want (avoid jittering)
+		return currentRate, nil
 	}
 
-	return newRate
+	// Taking the average of both values, it is going to converge in the long run,
+	// but no need to hurry, wait for next iteration.
+	newRate = (newRate + currentRate) / 2
+
+	if newRate < rateMin {
+		// Here, we would need a too-aggressive sampling rate to cope with
+		// our objective, and pre-sampling is not the right tool any more.
+		return rateMin, fmt.Errorf("raising pre-sampling rate from %d%% to %d%% (max cpu %d%%)", int(newRate*100), int(rateMin*100), int(maxUserAvg*100))
+	}
+
+	return newRate, nil
 }

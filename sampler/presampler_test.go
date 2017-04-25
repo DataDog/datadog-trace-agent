@@ -1,6 +1,7 @@
 package sampler
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -14,31 +15,50 @@ func TestCalcPreSampleRate(t *testing.T) {
 	// [0] -> maxUserAvg: the value in the conf file
 	// [1] -> currentUserAvg: the value reported by the CPU watchdog
 	// [2] -> currentRate: the current (pre)sampling rate
-	expected := map[[3]float64]float64{
-		[3]float64{0.1, 0.1, 1}:     1,                   // just at max CPU usage, currently not sampling
-		[3]float64{0.2, 0.1, 1}:     1,                   // below max CPU usage, currently not sampling
-		[3]float64{0.1, 0.15, 1}:    0.6153846153846154,  // 150% of max CPU usage, currently not sampling -> sample below 66%
-		[3]float64{0.1, 0.2, 1}:     0.4444444444444444,  // 200% of max CPU usage, currently not sampling -> sample below 50%
-		[3]float64{0.2, 1, 1}:       0.18367346938775514, // 500% of max CPU usage, currently not sampling -> sample below 20%
-		[3]float64{0.1, 0.11, 1}:    1,                   // 110% of max CPU usage, currently not sampling
-		[3]float64{0.1, 0.09, 1}:    1,                   // 90% of max CPU usage, currently not sampling
-		[3]float64{0.1, 0.05, 1}:    1,                   // 50% of max CPU usage, currently not sampling
-		[3]float64{0.1, 0.11, 0.5}:  0.5,                 // 110% of max CPU usage, currently sampling at 50% -> keep going
-		[3]float64{0.1, 0.09, 0.5}:  0.5714285714285715,  // 90% of max CPU usage, currently sampling at 50% -> sample above 50%
-		[3]float64{0.1, 0.5, 0.5}:   0.08333333333333334, // 50% of max CPU usage, currently sampling at 50% -> sample less
-		[3]float64{0.15, 0.05, 0.5}: 1,                   // 33% of max CPU usage, currently sampling at 50% -> back to no sampling
-		[3]float64{0.1, 1000000, 1}: 0.05,                // insane CPU usage, currently sampling at 50% -> return min
-		[3]float64{0.1, 0.05, 0.1}:  0.26666666666666666, // 50% of max CPU, currently sampling at 10% -> double the rate
-		[3]float64{0.04, 0.05, 1}:   0.6666666666666666,  // 4% max CPU, using 5%, currently not sampling -> sampling at 66%
-		[3]float64{0.025, 0.05, 1}:  0.16666666666666669, // 2,5% max CPU, using 5%, currently not sampling -> aggressive sampling at 16%
-		[3]float64{0.01, 0.05, 0.1}: 1,                   // non-sensible max CPU -> disable pre-sampling
-		[3]float64{0.1, 0, 0.1}:     1,                   // non-sensible current CPU usage -> disable pre-sampling
-		[3]float64{0.1, 0.05, 0}:    1,                   // non-sensible current rate -> disable pre-sampling
+	expected := map[struct {
+		maxUserAvg     float64 // the value in the conf file
+		currentUserAvg float64 // the value reported by the CPU watchdog
+		currentRate    float64 // the current (pre)sampling rate
+	}]struct {
+		r   float64
+		err error
+	}{
+		{maxUserAvg: 0.1, currentUserAvg: 0.1, currentRate: 1}:     {r: 1, err: nil},
+		{maxUserAvg: 0.2, currentUserAvg: 0.1, currentRate: 1}:     {r: 1, err: nil},
+		{maxUserAvg: 0.1, currentUserAvg: 0.15, currentRate: 1}:    {r: 0.8333333333333334, err: nil},
+		{maxUserAvg: 0.1, currentUserAvg: 0.2, currentRate: 1}:     {r: 0.75, err: nil},
+		{maxUserAvg: 0.2, currentUserAvg: 1, currentRate: 1}:       {r: 0.6, err: nil},
+		{maxUserAvg: 0.1, currentUserAvg: 0.11, currentRate: 1}:    {r: 1, err: nil},
+		{maxUserAvg: 0.1, currentUserAvg: 0.09, currentRate: 1}:    {r: 1, err: nil},
+		{maxUserAvg: 0.1, currentUserAvg: 0.05, currentRate: 1}:    {r: 1, err: nil},
+		{maxUserAvg: 0.1, currentUserAvg: 0.11, currentRate: 0.5}:  {r: 0.5, err: nil},
+		{maxUserAvg: 0.1, currentUserAvg: 0.09, currentRate: 0.5}:  {r: 0.5277777777777778, err: nil},
+		{maxUserAvg: 0.1, currentUserAvg: 0.5, currentRate: 0.5}:   {r: 0.3, err: nil},
+		{maxUserAvg: 0.15, currentUserAvg: 0.05, currentRate: 0.5}: {r: 1, err: nil},
+
+		{maxUserAvg: 0.1, currentUserAvg: 1000000, currentRate: 1}:                  {r: 0.50000005, err: nil},
+		{maxUserAvg: 0.1, currentUserAvg: 500000, currentRate: 0.50000005}:          {r: 0.25000007500000504, err: nil},
+		{maxUserAvg: 0.1, currentUserAvg: 250000, currentRate: 0.25000007500000504}: {r: 0.1250000875000175, err: nil},
+		{maxUserAvg: 0.1, currentUserAvg: 125000, currentRate: 0.1250000875000175}:  {r: 0.06250009375004376, err: nil},
+		{maxUserAvg: 0.1, currentUserAvg: 65000, currentRate: 0.06250009375004376}:  {r: 0.05, err: fmt.Errorf("raising pre-sampling rate from 3%% to 5%% (max cpu 10%%)")},
+
+		{maxUserAvg: 0.1, currentUserAvg: 0.05, currentRate: 0.1}:  {r: 0.15000000000000002, err: nil},
+		{maxUserAvg: 0.04, currentUserAvg: 0.05, currentRate: 1}:   {r: 0.8999999999999999, err: nil},
+		{maxUserAvg: 0.025, currentUserAvg: 0.05, currentRate: 1}:  {r: 0.75, err: nil},
+		{maxUserAvg: 0.01, currentUserAvg: 0.05, currentRate: 0.1}: {r: 0.060000000000000005, err: nil},
+
+		{maxUserAvg: 0.1, currentUserAvg: 0, currentRate: 0.1}:  {r: 1, err: fmt.Errorf("inconsistent pre-sampling input maxUserAvg=0.100000 currentUserAvg=0.000000 currentRate=0.100000")},
+		{maxUserAvg: 0.1, currentUserAvg: 0.05, currentRate: 0}: {r: 1, err: fmt.Errorf("inconsistent pre-sampling input maxUserAvg=0.100000 currentUserAvg=0.050000 currentRate=0.000000")},
 	}
 
 	for k, v := range expected {
-		r := CalcPreSampleRate(k[0], k[1], k[2])
-		assert.Equal(v, r, "bad pre sample rate for maxUserAvg=%f currentUserAvg=%f, currentRate=%f, got %v, expected %v", k[0], k[1], k[2], r, v)
+		r, err := CalcPreSampleRate(k.maxUserAvg, k.currentUserAvg, k.currentRate)
+		assert.Equal(v.r, r, "bad pre sample rate for maxUserAvg=%f currentUserAvg=%f, currentRate=%f, got %v, expected %v", k.maxUserAvg, k.currentUserAvg, k.currentRate, r, v.r)
+		if v.err == nil {
+			assert.Nil(err, "there should be no error for maxUserAvg=%f currentUserAvg=%f, currentRate=%f, got %v", k.maxUserAvg, k.currentUserAvg, k.currentRate, err)
+		} else {
+			assert.Equal(v.err, err, "unexpected error for maxUserAvg=%f currentUserAvg=%f, currentRate=%f, got %v, expected %v", k.maxUserAvg, k.currentUserAvg, k.currentRate, err, v.err)
+		}
 	}
 }
 
