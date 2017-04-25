@@ -320,9 +320,6 @@ APM_CONF:
 	}
 
 	if v, e := conf.GetFloat("trace.watchdog", "max_cpu_percent"); e == nil {
-		if v <= 4 {
-			log.Warn("max_cpu_percent is below 4%, pre-sampling can happen at a very high rate, we recommend a greater value, eg 10%")
-		}
 		c.MaxCPU = v / 100
 	}
 

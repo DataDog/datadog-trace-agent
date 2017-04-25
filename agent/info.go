@@ -51,6 +51,7 @@ const (
 {{if gt .Status.Receiver.TracesDropped 0}}  WARNING: Traces dropped (1 min): {{.Status.Receiver.TracesDropped}}
 {{end}}{{if gt .Status.Receiver.SpansDropped 0}}  WARNING: Spans dropped (1 min): {{.Status.Receiver.SpansDropped}}
 {{end}}{{if lt .Status.PreSampler.Rate 1.0}}  WARNING: Pre-sampling traces: {{percent .Status.PreSampler.Rate}} %
+{{end}}{{if .Status.PreSampler.Error}}  WARNING: Pre-sampler: {{.Status.PreSampler.Error}}
 {{end}}
   Bytes sent (1 min): {{add .Status.Endpoint.TracesBytes .Status.Endpoint.ServicesBytes}}
   Traces sent (1 min): {{.Status.Endpoint.TracesCount}}
@@ -132,7 +133,7 @@ func publishWatchdogInfo() interface{} {
 	return wi
 }
 
-func updatePreSamplerStats(ss sampler.PreSamplerStats) {
+func updatePreSampler(ss sampler.PreSamplerStats) {
 	infoMu.Lock()
 	infoPreSamplerStats = ss
 	infoMu.Unlock()
@@ -277,6 +278,7 @@ func getProgramBanner(version string) (string, string) {
 //   WARNING: Traces dropped (1 min): 5
 //   WARNING: Spans dropped (1 min): 10
 //   WARNING: Pre-sampling traces: 26.0 %
+//   WARNING: Pre-sampler: raising pre-sampling rate from 2.9 % to 5.0 %
 //
 //   Bytes sent (1 min): 3245
 //   Traces sent (1 min): 6

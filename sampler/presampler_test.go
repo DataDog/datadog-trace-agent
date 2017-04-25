@@ -23,6 +23,7 @@ func TestCalcPreSampleRate(t *testing.T) {
 		r   float64
 		err error
 	}{
+		// Various cases showing general usage
 		{maxUserAvg: 0.1, currentUserAvg: 0.1, currentRate: 1}:     {r: 1, err: nil},
 		{maxUserAvg: 0.2, currentUserAvg: 0.1, currentRate: 1}:     {r: 1, err: nil},
 		{maxUserAvg: 0.1, currentUserAvg: 0.15, currentRate: 1}:    {r: 0.8333333333333334, err: nil},
@@ -32,21 +33,37 @@ func TestCalcPreSampleRate(t *testing.T) {
 		{maxUserAvg: 0.1, currentUserAvg: 0.09, currentRate: 1}:    {r: 1, err: nil},
 		{maxUserAvg: 0.1, currentUserAvg: 0.05, currentRate: 1}:    {r: 1, err: nil},
 		{maxUserAvg: 0.1, currentUserAvg: 0.11, currentRate: 0.5}:  {r: 0.5, err: nil},
-		{maxUserAvg: 0.1, currentUserAvg: 0.09, currentRate: 0.5}:  {r: 0.5277777777777778, err: nil},
 		{maxUserAvg: 0.1, currentUserAvg: 0.5, currentRate: 0.5}:   {r: 0.3, err: nil},
 		{maxUserAvg: 0.15, currentUserAvg: 0.05, currentRate: 0.5}: {r: 1, err: nil},
-
-		{maxUserAvg: 0.1, currentUserAvg: 1000000, currentRate: 1}:                  {r: 0.50000005, err: nil},
-		{maxUserAvg: 0.1, currentUserAvg: 500000, currentRate: 0.50000005}:          {r: 0.25000007500000504, err: nil},
-		{maxUserAvg: 0.1, currentUserAvg: 250000, currentRate: 0.25000007500000504}: {r: 0.1250000875000175, err: nil},
-		{maxUserAvg: 0.1, currentUserAvg: 125000, currentRate: 0.1250000875000175}:  {r: 0.06250009375004376, err: nil},
-		{maxUserAvg: 0.1, currentUserAvg: 65000, currentRate: 0.06250009375004376}:  {r: 0.05, err: fmt.Errorf("raising pre-sampling rate from 3%% to 5%% (max cpu 10%%)")},
-
 		{maxUserAvg: 0.1, currentUserAvg: 0.05, currentRate: 0.1}:  {r: 0.15000000000000002, err: nil},
 		{maxUserAvg: 0.04, currentUserAvg: 0.05, currentRate: 1}:   {r: 0.8999999999999999, err: nil},
 		{maxUserAvg: 0.025, currentUserAvg: 0.05, currentRate: 1}:  {r: 0.75, err: nil},
 		{maxUserAvg: 0.01, currentUserAvg: 0.05, currentRate: 0.1}: {r: 0.060000000000000005, err: nil},
 
+		// Check it's back to 1 even if current sampling rate is close to 1
+		{maxUserAvg: 0.01, currentUserAvg: 0.005, currentRate: 0.99}: {r: 1, err: nil},
+
+		// Anti-jittering thing (not doing anything if target is too close to current)
+		{maxUserAvg: 5, currentUserAvg: 3, currentRate: 0.5}:   {r: 0.6666666666666667, err: nil},
+		{maxUserAvg: 5, currentUserAvg: 4, currentRate: 0.5}:   {r: 0.5625, err: nil},
+		{maxUserAvg: 5, currentUserAvg: 4.5, currentRate: 0.5}: {r: 0.5, err: nil},
+		{maxUserAvg: 5, currentUserAvg: 4.9, currentRate: 0.5}: {r: 0.5, err: nil},
+		{maxUserAvg: 5, currentUserAvg: 5, currentRate: 0.5}:   {r: 0.5, err: nil},
+		{maxUserAvg: 5, currentUserAvg: 5.1, currentRate: 0.5}: {r: 0.5, err: nil},
+		{maxUserAvg: 5, currentUserAvg: 5.5, currentRate: 0.5}: {r: 0.5, err: nil},
+		{maxUserAvg: 5, currentUserAvg: 6, currentRate: 0.5}:   {r: 0.45833333333333337, err: nil},
+		{maxUserAvg: 5, currentUserAvg: 7, currentRate: 0.5}:   {r: 0.4285714285714286, err: nil},
+
+		// What happens when sampling at very high rate, and how do we converge on this
+		{maxUserAvg: 0.1, currentUserAvg: 1000000, currentRate: 1}:                  {r: 0.50000005, err: nil},
+		{maxUserAvg: 0.1, currentUserAvg: 500000, currentRate: 0.50000005}:          {r: 0.25000007500000504, err: nil},
+		{maxUserAvg: 0.1, currentUserAvg: 250000, currentRate: 0.25000007500000504}: {r: 0.1250000875000175, err: nil},
+		{maxUserAvg: 0.1, currentUserAvg: 125000, currentRate: 0.1250000875000175}:  {r: 0.06250009375004376, err: nil},
+		{maxUserAvg: 0.1, currentUserAvg: 65000, currentRate: 0.06250009375004376}:  {r: 0.05, err: fmt.Errorf("raising pre-sampling rate from 3.1 %% to 5.0 %%")},
+		{maxUserAvg: 0.1, currentUserAvg: 50000, currentRate: 0.05}:                 {r: 0.05, err: fmt.Errorf("raising pre-sampling rate from 2.5 %% to 5.0 %%")},
+
+		// invalid input, those should really *NEVER* happen, test is just defensive
+		{maxUserAvg: 0, currentUserAvg: 0.1, currentRate: 0.1}:  {r: 1, err: fmt.Errorf("inconsistent pre-sampling input maxUserAvg=0.000000 currentUserAvg=0.100000 currentRate=0.100000")},
 		{maxUserAvg: 0.1, currentUserAvg: 0, currentRate: 0.1}:  {r: 1, err: fmt.Errorf("inconsistent pre-sampling input maxUserAvg=0.100000 currentUserAvg=0.000000 currentRate=0.100000")},
 		{maxUserAvg: 0.1, currentUserAvg: 0.05, currentRate: 0}: {r: 1, err: fmt.Errorf("inconsistent pre-sampling input maxUserAvg=0.100000 currentUserAvg=0.050000 currentRate=0.000000")},
 	}

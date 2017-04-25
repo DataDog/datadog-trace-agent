@@ -24,6 +24,9 @@ const (
 type PreSamplerStats struct {
 	// Rate is the target pre-sampling rate.
 	Rate float64
+	// Error is the last error got when trying to calc the pre-sampling rate.
+	// Stored as a string as this is easier to marshal & publish in JSON.
+	Error string
 	// RecentPayloadsSeen is the number of payloads that passed by.
 	RecentPayloadsSeen float64
 	// RecentTracesSeen is the number of traces that passed by.
@@ -100,6 +103,13 @@ func (ps *PreSampler) Rate() float64 {
 	rate := ps.stats.Rate
 	ps.mu.RUnlock()
 	return rate
+}
+
+// SetError set the pre-sample error, thread-safe.
+func (ps *PreSampler) SetError(err error) {
+	ps.mu.Lock()
+	ps.stats.Error = err.Error()
+	ps.mu.Unlock()
 }
 
 // RealRate returns the current real pre-sample rate, thread-safe.
@@ -193,7 +203,7 @@ func CalcPreSampleRate(maxUserAvg, currentUserAvg, currentRate float64) (float64
 		// pre-sampling rate. If set to 0.1, for example, the new rate must be
 		// below 90% or above 110% of the previous value, before we actually
 		// adjust the sampling rate. This is to avoid over-adapting and jittering.
-		deltaMin = float64(0.1) // +/- 10% change
+		deltaMin = float64(0.15) // +/- 15% change
 		// rateMin is an absolute minimum rate, never sample more than this, it is
 		// inefficient, the cost handling the payloads without even reading them
 		// is too high anyway.
@@ -225,7 +235,7 @@ func CalcPreSampleRate(maxUserAvg, currentUserAvg, currentRate float64) (float64
 	if newRate < rateMin {
 		// Here, we would need a too-aggressive sampling rate to cope with
 		// our objective, and pre-sampling is not the right tool any more.
-		return rateMin, fmt.Errorf("raising pre-sampling rate from %d%% to %d%% (max cpu %d%%)", int(newRate*100), int(rateMin*100), int(maxUserAvg*100))
+		return rateMin, fmt.Errorf("raising pre-sampling rate from %0.1f %% to %0.1f %%", newRate*100, rateMin*100)
 	}
 
 	return newRate, nil
