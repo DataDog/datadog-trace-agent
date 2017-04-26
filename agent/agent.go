@@ -82,6 +82,9 @@ func (a *Agent) Run() {
 	watchdogTicker := time.NewTicker(a.conf.WatchdogInterval)
 	defer watchdogTicker.Stop()
 
+	// update the data served by expvar so that we don't expose a 0 sample rate
+	updatePreSampler(*a.Receiver.preSampler.Stats())
+
 	a.Receiver.Run()
 	a.Writer.Run()
 	a.Sampler.Run()
