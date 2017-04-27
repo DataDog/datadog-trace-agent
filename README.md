@@ -8,7 +8,7 @@ An agent that collects traces from various sources, normalizes and pre-processes
 ## Run on Linux
 
 The Trace Agent is packaged with the standard Datadog Agent.
-Just [run the Datadog Agent](http://docs.datadoghq.com/guides/basic_agent_usage/) and add `apm_enabled: true` in the `[Main]` section of your `/etc/dd-agent/datadog.conf` configuration.
+Just [run the Datadog Agent](http://docs.datadoghq.com/guides/basic_agent_usage/).
 
 
 ## Run on OSX
@@ -17,7 +17,6 @@ The APM agent (aka Trace Agent) isn't part of the OSX Datadog Agent yet, it need
 
 - Have the [OSX Datadog Agent](https://app.datadoghq.com/account/settings#agent/mac).
 - Download the [latest OSX Trace Agent release](https://github.com/DataDog/datadog-trace-agent/releases/latest).
-- Modify `/opt/datadog-agent/etc/datadog.conf` to add `apm_enabled: true` in the `[Main]` section.
 - Run the Trace Agent using the Datadog Agent configuration.
 
     `./trace-agent-osx-X.Y.Z -ddconfig /opt/datadog-agent/etc/datadog.conf`
