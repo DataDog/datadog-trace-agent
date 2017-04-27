@@ -42,10 +42,11 @@ type AgentConfig struct {
 	MaxTPS          float64
 
 	// Receiver
-	ReceiverHost    string
-	ReceiverPort    int
-	ConnectionLimit int // for rate-limiting, how many unique connections to allow in a lease period (30s)
-	ReceiverTimeout int
+	ReceiverHost     string
+	ReceiverPort     int
+	ConnectionLimit  int // for rate-limiting, how many unique connections to allow in a lease period (30s)
+	ReceiverTimeout  int
+	BindToLegacyPort bool // to define whether or not it should bind itself to the legacy port (7777) in addition to the ReceiverPort
 
 	// internal telemetry
 	StatsdHost string
@@ -164,9 +165,10 @@ func NewDefaultAgentConfig() *AgentConfig {
 		ExtraSampleRate: 1.0,
 		MaxTPS:          10,
 
-		ReceiverHost:    "localhost",
-		ReceiverPort:    8126,
-		ConnectionLimit: 2000,
+		ReceiverHost:     "localhost",
+		ReceiverPort:     8126,
+		ConnectionLimit:  2000,
+		BindToLegacyPort: false,
 
 		StatsdHost: "localhost",
 		StatsdPort: 8125,

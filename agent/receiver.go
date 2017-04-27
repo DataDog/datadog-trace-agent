@@ -101,9 +101,11 @@ func (r *HTTPReceiver) Run() {
 		die("%v", err)
 	}
 
-	legacyAddr := fmt.Sprintf("%s:%d", r.conf.ReceiverHost, legacyReceiverPort)
-	if err := r.Listen(legacyAddr, " (legacy)"); err != nil {
-		log.Error(err)
+	if r.conf.BindToLegacyPort {
+		legacyAddr := fmt.Sprintf("%s:%d", r.conf.ReceiverHost, legacyReceiverPort)
+		if err := r.Listen(legacyAddr, " (legacy)"); err != nil {
+			log.Error(err)
+		}
 	}
 
 	watchdog.Go(func() {
