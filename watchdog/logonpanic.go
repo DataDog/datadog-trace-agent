@@ -28,14 +28,16 @@ func LogOnPanic() {
 		buf := make([]byte, 4096)
 		length := runtime.Stack(buf, false)
 		stacktrace := string(buf[:length])
-		msg := fmt.Sprintf("%v: %s\n%s", "Unexpected error", err, stacktrace)
+		errMsg := fmt.Sprintf("%v", err)
+		logMsg := "Unexpected panic: " + errMsg + "\n" + stacktrace
 
 		statsd.Client.Gauge("datadog.trace_agent.panic", 1, []string{
-			"err:" + shortErrMsg(msg),
+			"err:" + shortErrMsg(errMsg),
 		}, 1)
 
-		log.Error(msg)
+		log.Error(logMsg)
 		log.Flush()
+
 		panic(err)
 	}
 }

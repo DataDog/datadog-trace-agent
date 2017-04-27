@@ -34,7 +34,7 @@ func TestLogOnPanicMain(t *testing.T) {
 			"divide by zero panic should be forwarded")
 		msg := testLogBuf.String()
 		assert.Contains(msg,
-			"Unexpected error: runtime error: integer divide by zero",
+			"Unexpected panic: runtime error: integer divide by zero",
 			"divide by zero panic should be reported in log")
 		assert.Contains(msg,
 			"github.com/DataDog/datadog-trace-agent/watchdog.TestLogOnPanicMain",
@@ -60,7 +60,7 @@ func TestLogOnPanicGoroutine(t *testing.T) {
 				"custom panic should be forwarded")
 			msg := testLogBuf.String()
 			assert.Contains(msg,
-				"Unexpected error: what could possibly go wrong?",
+				"Unexpected panic: what could possibly go wrong?",
 				"custom panic should be reported in log")
 			assert.Contains(msg,
 				"github.com/DataDog/datadog-trace-agent/watchdog.TestLogOnPanicGoroutine",
