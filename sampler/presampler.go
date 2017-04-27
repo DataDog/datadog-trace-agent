@@ -108,7 +108,11 @@ func (ps *PreSampler) Rate() float64 {
 // SetError set the pre-sample error, thread-safe.
 func (ps *PreSampler) SetError(err error) {
 	ps.mu.Lock()
-	ps.stats.Error = err.Error()
+	if err != nil {
+		ps.stats.Error = err.Error()
+	} else {
+		ps.stats.Error = ""
+	}
 	ps.mu.Unlock()
 }
 

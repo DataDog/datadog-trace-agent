@@ -161,3 +161,14 @@ func TestPreSamplerSampleWithCount(t *testing.T) {
 		RecentTracesDropped: 89116.55620097058,
 	}, ps.stats)
 }
+
+func TestPreSamplerError(t *testing.T) {
+	assert := assert.New(t)
+
+	ps := NewPreSampler(1.0, newTestLogger())
+	assert.Equal("", ps.stats.Error, "fresh pre-sampler should have no error")
+	ps.SetError(fmt.Errorf("bad news"))
+	assert.Equal("bad news", ps.stats.Error, `error should be "bad news"`)
+	ps.SetError(nil)
+	assert.Equal("", ps.stats.Error, "after reset, error should be empty")
+}
