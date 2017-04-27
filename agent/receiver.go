@@ -308,7 +308,7 @@ func (r *HTTPReceiver) logStats() {
 		tdropped := atomic.SwapInt64(&r.stats.TracesDropped, 0)
 		accStats.TracesDropped += tdropped
 
-		statsd.Client.Gauge("datadog.trace_agent.heartbeat", 1, []string{fmt.Sprintf("version:%s", Version)}, 1)
+		statsd.Client.Gauge("datadog.trace_agent.heartbeat", 1, []string{"version:" + Version}, 1)
 
 		statsd.Client.Count("datadog.trace_agent.receiver.traces", tracesBytes, []string{"endpoint:traces"}, 1)
 		statsd.Client.Count("datadog.trace_agent.receiver.services", servicesBytes, []string{"endpoint:services"}, 1)
