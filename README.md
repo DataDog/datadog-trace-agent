@@ -16,7 +16,7 @@ Just [run the Datadog Agent](http://docs.datadoghq.com/guides/basic_agent_usage/
 The APM agent (aka Trace Agent) isn't part of the OSX Datadog Agent yet, it needs to be run manually on the side.
 
 - Have the [OSX Datadog Agent](https://app.datadoghq.com/account/settings#agent/mac).
-- Download the [latest OSX Trace Agent release](https://github.com/DataDog/datadog-trace-agent/releases).
+- Download the [latest OSX Trace Agent release](https://github.com/DataDog/datadog-trace-agent/releases/latest).
 - Modify `/opt/datadog-agent/etc/datadog.conf` to add `apm_enabled: true` in the `[Main]` section.
 - Run the Trace Agent using the Datadog Agent configuration.
 
