@@ -214,9 +214,12 @@ func CalcPreSampleRate(maxUserAvg, currentUserAvg, currentRate float64) (float64
 		rateMin = float64(0.05) // 5% hard-limit
 	)
 
-	if maxUserAvg <= 0 || currentUserAvg <= 0 || currentRate <= 0 || currentRate > 1 {
+	if maxUserAvg <= 0 || currentUserAvg < 0 || currentRate < 0 || currentRate > 1 {
 		return 1, fmt.Errorf("inconsistent pre-sampling input maxUserAvg=%f currentUserAvg=%f currentRate=%f",
 			maxUserAvg, currentUserAvg, currentRate)
+	}
+	if currentUserAvg == 0 || currentRate == 0 {
+		return 1, nil // not initialized yet, beside, need to return now else divide by zero error
 	}
 
 	newRate := float64(1)

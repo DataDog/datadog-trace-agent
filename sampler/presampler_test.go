@@ -62,10 +62,13 @@ func TestCalcPreSampleRate(t *testing.T) {
 		{maxUserAvg: 0.1, currentUserAvg: 65000, currentRate: 0.06250009375004376}:  {r: 0.05, err: fmt.Errorf("raising pre-sampling rate from 3.1 %% to 5.0 %%")},
 		{maxUserAvg: 0.1, currentUserAvg: 50000, currentRate: 0.05}:                 {r: 0.05, err: fmt.Errorf("raising pre-sampling rate from 2.5 %% to 5.0 %%")},
 
+		// not initialized yet, this is what happens at startup (no error, just default to 1)
+		{maxUserAvg: 0.1, currentUserAvg: 0, currentRate: 0}: {r: 1, err: nil},
+
 		// invalid input, those should really *NEVER* happen, test is just defensive
-		{maxUserAvg: 0, currentUserAvg: 0.1, currentRate: 0.1}:  {r: 1, err: fmt.Errorf("inconsistent pre-sampling input maxUserAvg=0.000000 currentUserAvg=0.100000 currentRate=0.100000")},
-		{maxUserAvg: 0.1, currentUserAvg: 0, currentRate: 0.1}:  {r: 1, err: fmt.Errorf("inconsistent pre-sampling input maxUserAvg=0.100000 currentUserAvg=0.000000 currentRate=0.100000")},
-		{maxUserAvg: 0.1, currentUserAvg: 0.05, currentRate: 0}: {r: 1, err: fmt.Errorf("inconsistent pre-sampling input maxUserAvg=0.100000 currentUserAvg=0.050000 currentRate=0.000000")},
+		{maxUserAvg: 0, currentUserAvg: 0.1, currentRate: 0.1}:     {r: 1, err: fmt.Errorf("inconsistent pre-sampling input maxUserAvg=0.000000 currentUserAvg=0.100000 currentRate=0.100000")},
+		{maxUserAvg: 0.1, currentUserAvg: -0.02, currentRate: 0.1}: {r: 1, err: fmt.Errorf("inconsistent pre-sampling input maxUserAvg=0.100000 currentUserAvg=-0.020000 currentRate=0.100000")},
+		{maxUserAvg: 0.1, currentUserAvg: 0.05, currentRate: -0.2}: {r: 1, err: fmt.Errorf("inconsistent pre-sampling input maxUserAvg=0.100000 currentUserAvg=0.050000 currentRate=-0.200000")},
 	}
 
 	for k, v := range expected {
