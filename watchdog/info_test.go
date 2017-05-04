@@ -169,7 +169,7 @@ func doTestNetHigh(t *testing.T, n int) {
 		v.Close()
 	}
 
-	// Checking that Net connections number is in a reasonnable range
+	// Checking that Net connections number is in a reasonable range
 	assert.True(info.Connections >= int32(n/2), fmt.Sprintf("not enough connections %d < %d / 2", info.Connections, n))
 	assert.True(info.Connections <= int32(n*3), fmt.Sprintf("not enough connections %d > %d * 3", info.Connections, n))
 }
@@ -179,8 +179,7 @@ func TestNetHigh(t *testing.T) {
 	if testing.Short() {
 		return
 	}
-	doTestNetHigh(t, 100)
-	doTestNetHigh(t, 1000)
+	doTestNetHigh(t, 200)
 }
 
 func TestNetLow(t *testing.T) {
