@@ -1,5 +1,10 @@
 package model
 
+const (
+	topLevelTag  = "_top_level"
+	topLevelTrue = "true"
+)
+
 // ComputeTopLevel updates all the spans TopLevel field.
 //
 // A span is considered top-level if:
@@ -17,21 +22,16 @@ func (t Trace) ComputeTopLevel() {
 
 	// iterate on each span and mark them as top-level if relevant
 	for i, span := range t {
-		if span.ParentID == 0 {
-			// Root Span -> top-level
-			t[i].TopLevel = true
-			continue
+		if span.ParentID != 0 {
+			parentIdx, ok := spanIDToIdx[span.ParentID]
+			if ok && t[parentIdx].Service == span.Service {
+				continue
+			}
 		}
-		parentIdx, ok := spanIDToIdx[span.ParentID]
-		if !ok {
-			// Unknown parent -> top-level
-			t[i].TopLevel = true
-			continue
+
+		if span.Meta == nil {
+			t[i].Meta = make(map[string]string, 1)
 		}
-		if t[parentIdx].Service != span.Service {
-			// Parent and self have different services -> top-level
-			t[i].TopLevel = true
-			continue
-		}
+		t[i].Meta[topLevelTag] = topLevelTrue
 	}
 }

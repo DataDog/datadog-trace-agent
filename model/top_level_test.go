@@ -19,9 +19,9 @@ func TestTopLevel(t *testing.T) {
 
 	tr.ComputeTopLevel()
 
-	assert.True(tr[0].TopLevel, "root span should be top-level")
-	assert.False(tr[1].TopLevel, "main service, and not a root span, not top-level")
-	assert.True(tr[2].TopLevel, "only 1 span for this service, should be top-level")
-	assert.True(tr[3].TopLevel, "only 1 span for this service, should be top-level")
-	assert.False(tr[4].TopLevel, "yet another sup span, not top-level")
+	assert.Equal("true", tr[0].Meta["_top_level"], "root span should be top-level")
+	assert.Nil(tr[1].Meta, "main service, and not a root span, not top-level")
+	assert.Equal("true", tr[2].Meta["_top_level"], "only 1 span for this service, should be top-level")
+	assert.Equal("true", tr[3].Meta["_top_level"], "only 1 span for this service, should be top-level")
+	assert.Nil(tr[4].Meta, "yet another sup span, not top-level")
 }
