@@ -148,6 +148,8 @@ func (a *Agent) Process(t model.Trace) {
 	rate *= a.Receiver.preSampler.Rate()
 	sampler.SetTraceAppliedSampleRate(root, rate)
 
+	t.ComputeTopLevel()
+
 	sublayers := model.ComputeSublayers(&t)
 	model.SetSublayersOnSpan(root, sublayers)
 
