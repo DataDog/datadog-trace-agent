@@ -190,6 +190,11 @@ func (sb *StatsRawBucket) HandleSpan(s Span, env string, aggregators []string, w
 }
 
 func (sb *StatsRawBucket) add(s Span, weight float64, aggr string, tags TagSet) {
+	// if this is not a top-level name -> don't keep track of any stats
+	if _, ok := s.Meta[topLevelTag]; !ok {
+		return
+	}
+
 	var gs groupedStats
 	var ok bool
 
