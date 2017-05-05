@@ -21,6 +21,12 @@ var (
 	DefaultDistributions = [...]string{DURATION}
 )
 
+// Count and Distribution carry a sub_name attribute to hold the contrary of top_level,
+// which means it is true if the metric is associated to non top-level spans, and
+// false if they are associated to top-level names. This is to ease up transition,
+// this way the default is false, which means "this is top-level" and we don't risk
+// to drop them accidentaly when some old agent is running and not sending the field.
+
 // Count represents one specific "metric" we track for a given tagset
 type Count struct {
 	Key     string `json:"key"`
@@ -28,7 +34,8 @@ type Count struct {
 	Measure string `json:"measure"` // represents the entity we count, e.g. "hits", "errors", "time" (was Name)
 	TagSet  TagSet `json:"tagset"`  // set of tags for which we account this Distribution
 
-	Value float64 `json:"value"` // accumulated values
+	SubName bool    `json:"sub_name"` // true if the associated name is a sub name (contrary of top-level)
+	Value   float64 `json:"value"`    // accumulated values
 }
 
 // Distribution represents a true image of the spectrum of values, allowing arbitrary quantile queries
@@ -38,7 +45,8 @@ type Distribution struct {
 	Measure string `json:"measure"` // represents the entity we count, e.g. "hits", "errors", "time"
 	TagSet  TagSet `json:"tagset"`  // set of tags for which we account this Distribution
 
-	Summary *quantile.SliceSummary `json:"summary"` // actual representation of data
+	SubName bool                   `json:"sub_name"` // true if the associated name is a sub name (contrary of top-level)
+	Summary *quantile.SliceSummary `json:"summary"`  // actual representation of data
 }
 
 // GrainKey generates the key used to aggregate counts and distributions
@@ -54,7 +62,8 @@ func NewCount(m, ckey, name string, tgs TagSet) Count {
 		Key:     ckey,
 		Name:    name,
 		Measure: m,
-		TagSet:  tgs, // note: by doing this, tgs is a ref shared by all objects created with the same arg
+		TagSet:  tgs,  // note: by doing this, tgs is a ref shared by all objects created with the same arg
+		SubName: true, // consider it a sub-name until we saw a span marked as top-level
 		Value:   0.0,
 	}
 }
@@ -82,7 +91,8 @@ func NewDistribution(m, ckey, name string, tgs TagSet) Distribution {
 		Key:     ckey,
 		Name:    name,
 		Measure: m,
-		TagSet:  tgs, // note: by doing this, tgs is a ref shared by all objects created with the same arg
+		TagSet:  tgs,  // note: by doing this, tgs is a ref shared by all objects created with the same arg
+		SubName: true, // consider it a sub-name until we saw a span marked as top-level
 		Summary: quantile.NewSliceSummary(),
 	}
 }

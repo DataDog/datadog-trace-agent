@@ -10,8 +10,15 @@ import (
 // Most "algorithm" stuff here is tested with stats_test.go as what is important
 // is that the final data, the one with send after a call to Export(), is correct.
 
+// Here in groupedStats and sublayerStatsit's interesting to store topLevel
+// and have the default be "not top-level" and wait
+// until we get a span marked as top-level to flag is as such.
+// The public structs do the contrary and store a SubName field,
+// because by default it's interesting to consider them "top-level".
+
 type groupedStats struct {
 	tags                 TagSet
+	topLevel             bool
 	hits                 float64
 	errors               float64
 	duration             float64
@@ -19,8 +26,9 @@ type groupedStats struct {
 }
 
 type sublayerStats struct {
-	tags  TagSet
-	value int64
+	tags     TagSet
+	topLevel bool
+	value    int64
 }
 
 func newGroupedStats(tags TagSet) groupedStats {
@@ -87,6 +95,7 @@ func (sb *StatsRawBucket) Export() StatsBucket {
 			Name:    k.name,
 			Measure: HITS,
 			TagSet:  v.tags,
+			SubName: !v.topLevel,
 			Value:   float64(v.hits),
 		}
 		errorsKey := GrainKey(k.name, ERRORS, k.aggr)
@@ -95,6 +104,7 @@ func (sb *StatsRawBucket) Export() StatsBucket {
 			Name:    k.name,
 			Measure: ERRORS,
 			TagSet:  v.tags,
+			SubName: !v.topLevel,
 			Value:   float64(v.errors),
 		}
 		durationKey := GrainKey(k.name, DURATION, k.aggr)
@@ -103,6 +113,7 @@ func (sb *StatsRawBucket) Export() StatsBucket {
 			Name:    k.name,
 			Measure: DURATION,
 			TagSet:  v.tags,
+			SubName: !v.topLevel,
 			Value:   float64(v.duration),
 		}
 		ret.Distributions[durationKey] = Distribution{
@@ -110,6 +121,7 @@ func (sb *StatsRawBucket) Export() StatsBucket {
 			Name:    k.name,
 			Measure: DURATION,
 			TagSet:  v.tags,
+			SubName: !v.topLevel,
 			Summary: v.durationDistribution,
 		}
 	}
@@ -120,6 +132,7 @@ func (sb *StatsRawBucket) Export() StatsBucket {
 			Name:    k.name,
 			Measure: k.measure,
 			TagSet:  v.tags,
+			SubName: !v.topLevel,
 			Value:   float64(v.value),
 		}
 	}
@@ -190,10 +203,12 @@ func (sb *StatsRawBucket) HandleSpan(s Span, env string, aggregators []string, w
 }
 
 func (sb *StatsRawBucket) add(s Span, weight float64, aggr string, tags TagSet) {
-	// if this is not a top-level name -> don't keep track of any stats
-	if _, ok := s.Meta[topLevelTag]; !ok {
-		return
-	}
+	// [TODO:christian] the day we want to skip stats on non top-level spans
+	// totally, do it with something like:
+	// // if this is not a top-level name -> don't keep track of any stats
+	// if _, ok := s.Meta[topLevelTag]; !ok {
+	//     return
+	// }
 
 	var gs groupedStats
 	var ok bool
@@ -201,6 +216,11 @@ func (sb *StatsRawBucket) add(s Span, weight float64, aggr string, tags TagSet) 
 	key := statsKey{name: s.Name, aggr: aggr}
 	if gs, ok = sb.data[key]; !ok {
 		gs = newGroupedStats(tags)
+	}
+
+	// mark the whole stat as top-level if at least one top-level span contributes to it
+	if s.Meta[topLevelTag] == topLevelTrue {
+		gs.topLevel = true
 	}
 
 	gs.hits += weight
@@ -234,6 +254,11 @@ func (sb *StatsRawBucket) addSublayer(s Span, aggr string, tags TagSet, sub Subl
 	key := statsSubKey{name: s.Name, measure: sub.Metric, aggr: subAggr}
 	if ss, ok = sb.sublayerData[key]; !ok {
 		ss = newSublayerStats(subTags)
+	}
+
+	// mark the whole sublayer as top-level if at least one top-level span contributes to it
+	if s.Meta[topLevelTag] == topLevelTrue {
+		ss.topLevel = true
 	}
 
 	ss.value += int64(sub.Value)
