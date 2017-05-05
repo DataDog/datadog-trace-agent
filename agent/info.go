@@ -41,7 +41,7 @@ const (
 
   Hostname: {{.Status.Config.HostName}}
   Receiver: {{.Status.Config.ReceiverHost}}:{{.Status.Config.ReceiverPort}}
-  API Endpoints:{{range .Status.Config.APIEndpoints}} {{.}}{{end}}
+  API Endpoint: {{.Status.Config.APIEndpoint}}
 
   Bytes received (1 min): {{add .Status.Receiver.TracesBytes .Status.Receiver.ServicesBytes}}
   Traces received (1 min): {{.Status.Receiver.TracesReceived}}
@@ -171,7 +171,7 @@ func initInfo(conf *config.AgentConfig) error {
 		expvar.Publish("watchdog", expvar.Func(publishWatchdogInfo))
 
 		c := *conf
-		c.APIKeys = nil // should not be exported by JSON, but just to make sure
+		c.APIKey = "" // should not be exported by JSON, but just to make sure
 		var buf []byte
 		buf, err = json.Marshal(&c)
 		if err != nil {
@@ -248,7 +248,7 @@ func getProgramBanner(version string) (string, string) {
 //
 //   Hostname: localhost.localdomain
 //   Receiver: localhost:8126
-//   API Endpoints: https://trace.agent.datadoghq.com
+//   API Endpoint: https://trace.agent.datadoghq.com
 //
 //   Bytes received (1 min): 10000
 //   Traces received (1 min): 240
@@ -347,5 +347,8 @@ func Info(w io.Writer, conf *config.AgentConfig) error {
 		Program: program,
 		Status:  &info,
 	})
+	if err != nil {
+		return err
+	}
 	return nil
 }

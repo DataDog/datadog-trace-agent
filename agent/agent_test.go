@@ -18,7 +18,7 @@ func TestWatchdog(t *testing.T) {
 	}
 
 	conf := config.NewDefaultAgentConfig()
-	conf.APIKeys = append(conf.APIKeys, "apikey_2")
+	conf.APIKey = "apikey_2"
 	conf.MaxMemory = 1e7
 	conf.WatchdogInterval = time.Millisecond
 
@@ -76,7 +76,6 @@ func BenchmarkAgentTraceProcessing(b *testing.B) {
 	config.NewLoggerLevelCustom("INFO", "/var/log/datadog/trace-agent.log")
 
 	conf := config.NewDefaultAgentConfig()
-	conf.APIKeys = append(conf.APIKeys, "")
 	agent := NewAgent(conf)
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -87,7 +86,7 @@ func BenchmarkAgentTraceProcessing(b *testing.B) {
 
 func BenchmarkWatchdog(b *testing.B) {
 	conf := config.NewDefaultAgentConfig()
-	conf.APIKeys = append(conf.APIKeys, "apikey_2")
+	conf.APIKey = "apikey_2"
 	agent := NewAgent(conf)
 
 	b.ResetTimer()
