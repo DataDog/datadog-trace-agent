@@ -149,3 +149,15 @@ func TestTopLevelGetSetMeta(t *testing.T) {
 	span.setTopLevel(true)
 	assert.True(span.TopLevel(), "top-level again")
 }
+
+func TestForceMetrics(t *testing.T) {
+	assert := assert.New(t)
+
+	span := Span{}
+
+	assert.False(span.ForceMetrics(), "by default, metrics are not enforced for sub name spans")
+	span.Meta = map[string]string{"datadog.trace_metrics": "true"}
+	assert.True(span.ForceMetrics(), "metrics should be enforced because tag is present")
+	span.Meta = map[string]string{"env": "dev"}
+	assert.False(span.ForceMetrics(), "there's a tag, but metrics should not be enforced anyway")
+}

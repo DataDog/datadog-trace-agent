@@ -28,8 +28,10 @@ type Count struct {
 	Measure string `json:"measure"` // represents the entity we count, e.g. "hits", "errors", "time" (was Name)
 	TagSet  TagSet `json:"tagset"`  // set of tags for which we account this Distribution
 
-	SkipStats bool    `json:"skip_stats"` // true if stats can be skipped at some point
-	Value     float64 `json:"value"`      // accumulated values
+	SubName      bool `json:"sub_name"`      // true for sub-name (non top-level) stats
+	ForceMetrics bool `json:"force_metrics"` // true if stats should be computed no matter what
+
+	Value float64 `json:"value"` // accumulated values
 }
 
 // Distribution represents a true image of the spectrum of values, allowing arbitrary quantile queries
@@ -39,8 +41,10 @@ type Distribution struct {
 	Measure string `json:"measure"` // represents the entity we count, e.g. "hits", "errors", "time"
 	TagSet  TagSet `json:"tagset"`  // set of tags for which we account this Distribution
 
-	SkipStats bool                   `json:"skip_stats"` // true if stats can be skipped at some point
-	Summary   *quantile.SliceSummary `json:"summary"`    // actual representation of data
+	SubName      bool `json:"sub_name"`      // true for sub-name (non top-level) stats
+	ForceMetrics bool `json:"force_metrics"` // true if stats should be computed no matter what
+
+	Summary *quantile.SliceSummary `json:"summary"` // actual representation of data
 }
 
 // GrainKey generates the key used to aggregate counts and distributions

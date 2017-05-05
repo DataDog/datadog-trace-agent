@@ -11,8 +11,11 @@ import (
 // is that the final data, the one with send after a call to Export(), is correct.
 
 type groupedStats struct {
-	tags                 TagSet
-	keepStats            bool
+	tags TagSet
+
+	topLevel     bool
+	forceMetrics bool
+
 	hits                 float64
 	errors               float64
 	duration             float64
@@ -20,9 +23,12 @@ type groupedStats struct {
 }
 
 type sublayerStats struct {
-	tags      TagSet
-	keepStats bool
-	value     int64
+	tags TagSet
+
+	topLevel     bool
+	forceMetrics bool
+
+	value int64
 }
 
 func newGroupedStats(tags TagSet) groupedStats {
@@ -85,49 +91,54 @@ func (sb *StatsRawBucket) Export() StatsBucket {
 	for k, v := range sb.data {
 		hitsKey := GrainKey(k.name, HITS, k.aggr)
 		ret.Counts[hitsKey] = Count{
-			Key:       hitsKey,
-			Name:      k.name,
-			Measure:   HITS,
-			TagSet:    v.tags,
-			SkipStats: !v.keepStats,
-			Value:     float64(v.hits),
+			Key:          hitsKey,
+			Name:         k.name,
+			Measure:      HITS,
+			TagSet:       v.tags,
+			SubName:      !v.topLevel,
+			ForceMetrics: v.forceMetrics,
+			Value:        float64(v.hits),
 		}
 		errorsKey := GrainKey(k.name, ERRORS, k.aggr)
 		ret.Counts[errorsKey] = Count{
-			Key:       errorsKey,
-			Name:      k.name,
-			Measure:   ERRORS,
-			TagSet:    v.tags,
-			SkipStats: !v.keepStats,
-			Value:     float64(v.errors),
+			Key:          errorsKey,
+			Name:         k.name,
+			Measure:      ERRORS,
+			TagSet:       v.tags,
+			SubName:      !v.topLevel,
+			ForceMetrics: v.forceMetrics,
+			Value:        float64(v.errors),
 		}
 		durationKey := GrainKey(k.name, DURATION, k.aggr)
 		ret.Counts[durationKey] = Count{
-			Key:       durationKey,
-			Name:      k.name,
-			Measure:   DURATION,
-			TagSet:    v.tags,
-			SkipStats: !v.keepStats,
-			Value:     float64(v.duration),
+			Key:          durationKey,
+			Name:         k.name,
+			Measure:      DURATION,
+			TagSet:       v.tags,
+			SubName:      !v.topLevel,
+			ForceMetrics: v.forceMetrics,
+			Value:        float64(v.duration),
 		}
 		ret.Distributions[durationKey] = Distribution{
-			Key:       durationKey,
-			Name:      k.name,
-			Measure:   DURATION,
-			TagSet:    v.tags,
-			SkipStats: !v.keepStats,
-			Summary:   v.durationDistribution,
+			Key:          durationKey,
+			Name:         k.name,
+			Measure:      DURATION,
+			TagSet:       v.tags,
+			SubName:      !v.topLevel,
+			ForceMetrics: v.forceMetrics,
+			Summary:      v.durationDistribution,
 		}
 	}
 	for k, v := range sb.sublayerData {
 		key := GrainKey(k.name, k.measure, k.aggr)
 		ret.Counts[key] = Count{
-			Key:       key,
-			Name:      k.name,
-			Measure:   k.measure,
-			TagSet:    v.tags,
-			SkipStats: !v.keepStats,
-			Value:     float64(v.value),
+			Key:          key,
+			Name:         k.name,
+			Measure:      k.measure,
+			TagSet:       v.tags,
+			SubName:      !v.topLevel,
+			ForceMetrics: v.forceMetrics,
+			Value:        float64(v.value),
 		}
 	}
 	return ret
@@ -200,7 +211,7 @@ func (sb *StatsRawBucket) add(s Span, weight float64, aggr string, tags TagSet) 
 	// [TODO:christian] the day we want to skip stats on non top-level spans
 	// totally, do it with something like:
 	// // if this is not a top-level name -> don't keep track of any stats
-	// if _, ok := s.Meta[keepStatsTag]; !ok {
+	// if !s.TopLevel() && !s.ForceMetrics() {
 	//     return
 	// }
 
@@ -212,9 +223,13 @@ func (sb *StatsRawBucket) add(s Span, weight float64, aggr string, tags TagSet) 
 		gs = newGroupedStats(tags)
 	}
 
-	// keep stats if at least one span requires it
-	if !s.SkipStats() {
-		gs.keepStats = true
+	// if at least one span is marked, taint the whole stat
+	if s.TopLevel() {
+		gs.topLevel = true
+	}
+	// if at least one span is marked as forced, taint the whole stat
+	if s.ForceMetrics() {
+		gs.forceMetrics = true
 	}
 
 	gs.hits += weight
@@ -250,9 +265,13 @@ func (sb *StatsRawBucket) addSublayer(s Span, aggr string, tags TagSet, sub Subl
 		ss = newSublayerStats(subTags)
 	}
 
-	// keep stats if at least one span requires it
-	if !s.SkipStats() {
-		ss.keepStats = true
+	// if at least one span is marked, taint the whole stat
+	if s.TopLevel() {
+		ss.topLevel = true
+	}
+	// if at least one span is marked as forced, taint the whole stat
+	if s.ForceMetrics() {
+		ss.forceMetrics = true
 	}
 
 	ss.value += int64(sub.Value)

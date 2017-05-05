@@ -60,13 +60,10 @@ func (s *Span) setTopLevel(topLevel bool) {
 
 // TopLevel returns true if span is top-level.
 func (s *Span) TopLevel() bool {
-	return !(s.Meta[subNameTag] == trueTagValue)
+	return s.Meta[subNameTag] != trueTagValue
 }
 
-// SkipStats returns true if statistics should not be computed for this span.
-func (s *Span) SkipStats() bool {
-	if s.Meta[TraceMetricsTagKey] == trueTagValue {
-		return false
-	}
-	return !s.TopLevel()
+// ForceMetrics returns true if statistics computation should be forced for this span.
+func (s *Span) ForceMetrics() bool {
+	return s.Meta[TraceMetricsTagKey] == trueTagValue
 }
