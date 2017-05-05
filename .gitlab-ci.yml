@@ -1,2 +1,4 @@
 test:
-  script: "$DD_TEST_CMD"
+  script: if [ -n "$DD_TEST_CMD" ] ; then $DD_TEST_CMD ; else echo "skipping, DD_TEST_CMD is not set" ; fi
+  tags:
+    - docker
