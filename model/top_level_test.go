@@ -136,7 +136,6 @@ func TestTopLevelGetSetMeta(t *testing.T) {
 	span := Span{}
 
 	span.setTopLevel(false)
-	assert.Nil(span.Meta, "no meta at all")
 	assert.Equal("true", span.Meta["_sub_name"], "should have a _sub_name:true flag")
 	span.setTopLevel(true)
 	assert.Nil(span.Meta, "no meta at all")
