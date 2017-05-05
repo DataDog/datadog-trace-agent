@@ -53,12 +53,11 @@ func GrainKey(name, measure, aggr string) string {
 // NewCount returns a new Count for a metric and a given tag set
 func NewCount(m, ckey, name string, tgs TagSet) Count {
 	return Count{
-		Key:       ckey,
-		Name:      name,
-		Measure:   m,
-		TagSet:    tgs,  // note: by doing this, tgs is a ref shared by all objects created with the same arg
-		SkipStats: true, // consider it a sub-name until we saw a span marked as top-level
-		Value:     0.0,
+		Key:     ckey,
+		Name:    name,
+		Measure: m,
+		TagSet:  tgs, // note: by doing this, tgs is a ref shared by all objects created with the same arg
+		Value:   0.0,
 	}
 }
 
@@ -82,12 +81,11 @@ func (c Count) Merge(c2 Count) Count {
 // NewDistribution returns a new Distribution for a metric and a given tag set
 func NewDistribution(m, ckey, name string, tgs TagSet) Distribution {
 	return Distribution{
-		Key:       ckey,
-		Name:      name,
-		Measure:   m,
-		TagSet:    tgs,  // note: by doing this, tgs is a ref shared by all objects created with the same arg
-		SkipStats: true, // consider it a sub-name until we saw a span marked as top-level
-		Summary:   quantile.NewSliceSummary(),
+		Key:     ckey,
+		Name:    name,
+		Measure: m,
+		TagSet:  tgs, // note: by doing this, tgs is a ref shared by all objects created with the same arg
+		Summary: quantile.NewSliceSummary(),
 	}
 }
 
