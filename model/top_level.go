@@ -1,11 +1,15 @@
 package model
 
 const (
-	topLevelTag  = "_top_level"
-	topLevelTrue = "true"
+	// TraceMetricsTagKey is a tag key which, if set to true,
+	// ensures all statistics are computed for this span.
+	TraceMetricsTagKey = "datadog.trace_metrics"
+
+	subNameTag   = "_sub_name"
+	trueTagValue = "true"
 )
 
-// ComputeTopLevel updates all the spans TopLevel field.
+// ComputeTopLevel updates all the spans top-level attribute.
 //
 // A span is considered top-level if:
 // - it's a root span
@@ -22,16 +26,47 @@ func (t Trace) ComputeTopLevel() {
 
 	// iterate on each span and mark them as top-level if relevant
 	for i, span := range t {
-		if span.ParentID != 0 {
-			parentIdx, ok := spanIDToIdx[span.ParentID]
-			if ok && t[parentIdx].Service == span.Service {
-				continue
-			}
+		if span.ParentID == 0 {
+			continue
 		}
-
-		if span.Meta == nil {
-			t[i].Meta = make(map[string]string, 1)
+		parentIdx, ok := spanIDToIdx[span.ParentID]
+		if !ok {
+			continue
 		}
-		t[i].Meta[topLevelTag] = topLevelTrue
+		if t[parentIdx].Service != span.Service {
+			continue
+		}
+		t[i].setTopLevel(false)
 	}
+}
+
+// setTopLevel sets the top-level attribute of the span.
+func (s *Span) setTopLevel(topLevel bool) {
+	if topLevel == true {
+		if s.Meta == nil {
+			return
+		}
+		delete(s.Meta, subNameTag)
+		if len(s.Meta) == 0 {
+			s.Meta = nil
+		}
+		return
+	}
+	if s.Meta == nil {
+		s.Meta = make(map[string]string, 1)
+	}
+	s.Meta[subNameTag] = trueTagValue
+}
+
+// TopLevel returns true if span is top-level.
+func (s *Span) TopLevel() bool {
+	return !(s.Meta[subNameTag] == trueTagValue)
+}
+
+// SkipStats returns true if statistics should not be computed for this span.
+func (s *Span) SkipStats() bool {
+	if s.Meta[TraceMetricsTagKey] == trueTagValue {
+		return false
+	}
+	return !s.TopLevel()
 }

@@ -97,6 +97,7 @@ func TestStatsBucketDefault(t *testing.T) {
 			assert.Fail("Unexpected count %s", ckey)
 		}
 		assert.Equal(val, c.Value, "Count %s wrong value", ckey)
+		assert.False(c.SkipStats, "stats should be done by default")
 	}
 
 	expectedDistributions := map[string]int{
@@ -113,12 +114,13 @@ func TestStatsBucketDefault(t *testing.T) {
 		t.Logf("%v: %v", k, v.Summary.Entries)
 	}
 	assert.Len(sb.Distributions, len(expectedDistributions), "Missing distributions!")
-	for dkey, c := range sb.Distributions {
+	for dkey, d := range sb.Distributions {
 		val, ok := expectedDistributions[dkey]
 		if !ok {
 			assert.Fail("Unexpected distribution %s", dkey)
 		}
-		assert.Equal(val, len(c.Summary.Entries), "Distribution %s wrong value", dkey)
+		assert.Equal(val, len(d.Summary.Entries), "Distribution %s wrong value", dkey)
+		assert.False(d.SkipStats, "stats should be done by default")
 	}
 }
 

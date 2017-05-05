@@ -19,11 +19,11 @@ func TestTopLevelTypical(t *testing.T) {
 
 	tr.ComputeTopLevel()
 
-	assert.Equal("true", tr[0].Meta["_top_level"], "root span should be top-level")
-	assert.Nil(tr[1].Meta, "main service, and not a root span, not top-level")
-	assert.Equal("true", tr[2].Meta["_top_level"], "only 1 span for this service, should be top-level")
-	assert.Equal("true", tr[3].Meta["_top_level"], "only 1 span for this service, should be top-level")
-	assert.Nil(tr[4].Meta, "yet another sup span, not top-level")
+	assert.True(tr[0].TopLevel(), "root span should be top-level")
+	assert.False(tr[1].TopLevel(), "main service, and not a root span, not top-level")
+	assert.True(tr[2].TopLevel(), "only 1 span for this service, should be top-level")
+	assert.True(tr[3].TopLevel(), "only 1 span for this service, should be top-level")
+	assert.False(tr[4].TopLevel(), "yet another sup span, not top-level")
 }
 
 func TestTopLevelSingle(t *testing.T) {
@@ -35,7 +35,7 @@ func TestTopLevelSingle(t *testing.T) {
 
 	tr.ComputeTopLevel()
 
-	assert.Equal("true", tr[0].Meta["_top_level"], "root span should be top-level")
+	assert.True(tr[0].TopLevel(), "root span should be top-level")
 }
 
 func TestTopLevelEmpty(t *testing.T) {
@@ -61,11 +61,11 @@ func TestTopLevelOneService(t *testing.T) {
 
 	tr.ComputeTopLevel()
 
-	assert.Nil(tr[0].Meta, "just a sub-span, not top-level")
-	assert.Nil(tr[1].Meta, "just a sub-span, not top-level")
-	assert.Equal("true", tr[2].Meta["_top_level"], "root span should be top-level")
-	assert.Nil(tr[3].Meta, "just a sub-span, not top-level")
-	assert.Nil(tr[4].Meta, "just a sub-span, not top-level")
+	assert.False(tr[0].TopLevel(), "just a sub-span, not top-level")
+	assert.False(tr[1].TopLevel(), "just a sub-span, not top-level")
+	assert.True(tr[2].TopLevel(), "root span should be top-level")
+	assert.False(tr[3].TopLevel(), "just a sub-span, not top-level")
+	assert.False(tr[4].TopLevel(), "just a sub-span, not top-level")
 }
 
 func TestTopLevelLocalRoot(t *testing.T) {
@@ -83,13 +83,13 @@ func TestTopLevelLocalRoot(t *testing.T) {
 
 	tr.ComputeTopLevel()
 
-	assert.Equal("true", tr[0].Meta["_top_level"], "root span should be top-level")
-	assert.Nil(tr[1].Meta, "main service, and not a root span, not top-level")
-	assert.Equal("true", tr[2].Meta["_top_level"], "only 1 span for this service, should be top-level")
-	assert.Equal("true", tr[3].Meta["_top_level"], "top-level but not root")
-	assert.Nil(tr[4].Meta, "yet another sup span, not top-level")
-	assert.Nil(tr[5].Meta, "yet another sup span, not top-level")
-	assert.Nil(tr[6].Meta, "yet another sup span, not top-level")
+	assert.True(tr[0].TopLevel(), "root span should be top-level")
+	assert.False(tr[1].TopLevel(), "main service, and not a root span, not top-level")
+	assert.True(tr[2].TopLevel(), "only 1 span for this service, should be top-level")
+	assert.True(tr[3].TopLevel(), "top-level but not root")
+	assert.False(tr[4].TopLevel(), "yet another sup span, not top-level")
+	assert.False(tr[5].TopLevel(), "yet another sup span, not top-level")
+	assert.False(tr[6].TopLevel(), "yet another sup span, not top-level")
 }
 
 func TestTopLevelWithTag(t *testing.T) {
@@ -102,8 +102,51 @@ func TestTopLevelWithTag(t *testing.T) {
 
 	tr.ComputeTopLevel()
 
-	assert.Equal("true", tr[0].Meta["_top_level"], "root span should be top-level")
+	t.Logf("%v\n", tr[1].Meta)
+
+	assert.True(tr[0].TopLevel(), "root span should be top-level")
 	assert.Equal("prod", tr[0].Meta["env"], "env tag should still be here")
-	assert.Equal("", tr[1].Meta["_top_level"], "not a top-level span")
+	assert.False(tr[1].TopLevel(), "not a top-level span")
 	assert.Equal("prod", tr[1].Meta["env"], "env tag should still be here")
+}
+
+func TestTopLevelGetSetBlackBox(t *testing.T) {
+	assert := assert.New(t)
+
+	span := Span{}
+
+	assert.True(span.TopLevel(), "by default, all spans are considered top-level")
+	span.setTopLevel(false)
+	assert.False(span.TopLevel(), "marked as non top-level (AKA subname)")
+	span.setTopLevel(true)
+	assert.True(span.TopLevel(), "top-level again")
+
+	span.Meta = map[string]string{"env": "staging"}
+
+	assert.True(span.TopLevel(), "by default, all spans are considered top-level")
+	span.setTopLevel(false)
+	assert.False(span.TopLevel(), "marked as non top-level (AKA subname)")
+	span.setTopLevel(true)
+	assert.True(span.TopLevel(), "top-level again")
+}
+
+func TestTopLevelGetSetMeta(t *testing.T) {
+	assert := assert.New(t)
+
+	span := Span{}
+
+	span.setTopLevel(false)
+	assert.Nil(span.Meta, "no meta at all")
+	assert.Equal("true", span.Meta["_sub_name"], "should have a _sub_name:true flag")
+	span.setTopLevel(true)
+	assert.Nil(span.Meta, "no meta at all")
+
+	span.Meta = map[string]string{"env": "staging"}
+
+	span.setTopLevel(false)
+	assert.Equal("true", span.Meta["_sub_name"], "should have a _sub_name:true flag")
+	assert.Equal("staging", span.Meta["env"], "former tags should still be here")
+	assert.False(span.TopLevel(), "marked as non top-level (AKA subname)")
+	span.setTopLevel(true)
+	assert.True(span.TopLevel(), "top-level again")
 }
