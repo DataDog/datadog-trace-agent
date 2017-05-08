@@ -214,11 +214,8 @@ func TestWriterBuffering(t *testing.T) {
 	w.Stop()
 
 	// Since the writer was created with a buffer just large enough for
-	// the first two payloads, the third payload overflowed the buffer,
-	// and the first and oldest payload (p0) was discarded.
+	// the first two payloads, the third payload should overflow the buffer.
 	assert.Equal(2, len(w.payloadBuffer))
-	assert.Equal("p1", w.payloadBuffer[0].payload.Env)
-	assert.Equal("p2", w.payloadBuffer[1].payload.Env)
 }
 
 func TestWriterDisabledBuffering(t *testing.T) {

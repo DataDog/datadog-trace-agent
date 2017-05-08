@@ -95,12 +95,6 @@ func NewWriter(conf *config.AgentConfig) *Writer {
 	}
 }
 
-// isPayloadBufferingEnabled returns true if payload buffering is enabled or
-// false if it is not.
-func (w *Writer) bufferingEnabled() bool {
-	return w.conf.APIPayloadBufferMaxSize > 0
-}
-
 // Run starts the writer.
 func (w *Writer) Run() {
 	w.exitWG.Add(1)
@@ -169,10 +163,9 @@ func (w *Writer) Flush() {
 		wgWriters.Add(1)
 		go func(p *writerPayload) {
 			defer wgWriters.Done()
-			now := time.Now()
 
 			// We already tried to flush recently, so there's no point in trying again right now.
-			if p.nextFlush.After(now) {
+			if p.nextFlush.After(time.Now()) {
 				retry <- p
 				return
 			}
@@ -184,6 +177,7 @@ func (w *Writer) Flush() {
 
 			atomic.AddUint64(&nbErrors, 1)
 			if _, ok := err.(*APIError); ok {
+				now := time.Now()
 				// If the payload is too old, we drop it.
 				if now.Sub(p.creationDate) > payloadMaxAge {
 					statsd.Client.Count("datadog.trace_agent.writer.dropped_payload", int64(1), []string{"reason:too_old"}, 1)
@@ -197,7 +191,7 @@ func (w *Writer) Flush() {
 		}(p)
 	}
 
-	// Goroutine that collect all payloads to retry later.
+	// This goroutine collects all payloads to retry later and append them to the buffer.
 	var buffer []*writerPayload
 	bufSize := 0
 	nbDrops := 0
@@ -205,8 +199,9 @@ func (w *Writer) Flush() {
 	go func() {
 		defer wgBuffer.Done()
 		for p := range retry {
-			if bufSize+p.size < w.conf.APIPayloadBufferMaxSize {
+			if bufSize+p.size <= w.conf.APIPayloadBufferMaxSize {
 				buffer = append(buffer, p)
+				bufSize += p.size
 			} else {
 				nbDrops++
 			}
@@ -236,7 +231,7 @@ func (w *Writer) Flush() {
 		statsd.Client.Count("datadog.trace_agent.writer.dropped_payload", int64(nbDrops), []string{"reason:buffer_full"}, 1)
 	}
 	if bufSize > 0 {
-		log.Infof("bufSize: %d", bufSize)
+		log.Infof("bufSize: %d (Max buffer size: %d)", bufSize, w.conf.APIPayloadBufferMaxSize)
 		statsd.Client.Gauge("datadog.trace_agent.writer.payload_buffer_size", float64(bufSize), nil, 1)
 	}
 

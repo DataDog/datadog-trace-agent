@@ -15,8 +15,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
-// apiError stores the error triggered we can't send data to the endpoint.
-// It implements the error interface.
+// APIError is triggered when we can't send the payload to the API.
 type APIError struct {
 	error
 }
