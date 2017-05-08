@@ -2,6 +2,7 @@ package main
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	log "github.com/cihub/seelog"
@@ -96,7 +97,7 @@ func NewWriter(conf *config.AgentConfig) *Writer {
 
 // isPayloadBufferingEnabled returns true if payload buffering is enabled or
 // false if it is not.
-func (w *Writer) isPayloadBufferingEnabled() bool {
+func (w *Writer) bufferingEnabled() bool {
 	return w.conf.APIPayloadBufferMaxSize > 0
 }
 
@@ -155,87 +156,89 @@ func (w *Writer) FlushServices() {
 
 // Flush actually writes the data in the API
 func (w *Writer) Flush() {
-	// TODO[leo]: batch payloads in same API key
+	// Start of flushing
+	log.Info("Start flushing")
 
-	var payloads []*writerPayload
-	now := time.Now()
-	bufSize := 0
+	var wgWriters sync.WaitGroup
+	var wgBuffer sync.WaitGroup
 
-	bufferPayload := func(p *writerPayload) {
-		payloads = append(payloads, p)
-		bufSize += p.size
-	}
-
-	nbSuccesses := 0
-	nbErrors := 0
-
+	// We try to write all the payloads from w.payloadBuffer to the specified endpoint.
+	retry := make(chan *writerPayload)
+	nbErrors := uint64(0)
 	for _, p := range w.payloadBuffer {
-		if w.isPayloadBufferingEnabled() && p.nextFlush.After(now) {
-			// We already tried to flush recently, so there's no
-			// point in trying again right now.
-			bufferPayload(p)
-			continue
-		}
+		wgWriters.Add(1)
+		go func(p *writerPayload) {
+			defer wgWriters.Done()
+			now := time.Now()
 
-		err := p.write()
-
-		if err == nil {
-			nbSuccesses++
-		} else {
-			nbErrors++
-		}
-
-		if err == nil || !w.isPayloadBufferingEnabled() {
-			continue
-		}
-
-		if terr, ok := err.(*apiError); ok {
-			// We could not send the payload and this is an API
-			// endpoint error, so we can try again later.
-
-			if now.Sub(p.creationDate) > payloadMaxAge {
-				// The payload is too old, let's drop it
-				statsd.Client.Count("datadog.trace_agent.writer.dropped_payload",
-					int64(1), []string{"reason:too_old"}, 1)
-				continue
+			// We already tried to flush recently, so there's no point in trying again right now.
+			if p.nextFlush.After(now) {
+				retry <- p
+				return
 			}
 
-			p.nextFlush = now.Add(payloadResendDelay)
+			err := p.write()
+			if err == nil {
+				return // Everything went fine.
+			}
 
-			// Keep this payload in the buffer to try again later,
-			// but only with the endpoints that failed.
-			p.endpoint = terr.endpoint
-			bufferPayload(p)
-		}
+			atomic.AddUint64(&nbErrors, 1)
+			if _, ok := err.(*APIError); ok {
+				// If the payload is too old, we drop it.
+				if now.Sub(p.creationDate) > payloadMaxAge {
+					statsd.Client.Count("datadog.trace_agent.writer.dropped_payload", int64(1), []string{"reason:too_old"}, 1)
+					return
+				}
+
+				// Else we'll retry to send it later.
+				p.nextFlush = now.Add(payloadResendDelay)
+				retry <- p
+			}
+		}(p)
 	}
 
-	if nbSuccesses > 0 {
-		statsd.Client.Count("datadog.trace_agent.writer.flush",
-			int64(nbSuccesses), []string{"status:success"}, 1)
-	}
-
-	if nbErrors > 0 {
-		statsd.Client.Count("datadog.trace_agent.writer.flush",
-			int64(nbErrors), []string{"status:error"}, 1)
-	}
-
-	// Drop payloads to respect the buffer size limit if necessary.
+	// Goroutine that collect all payloads to retry later.
+	var buffer []*writerPayload
+	bufSize := 0
 	nbDrops := 0
-	for n := 0; n < len(payloads) && bufSize > w.conf.APIPayloadBufferMaxSize; n++ {
-		bufSize -= payloads[n].size
-		nbDrops++
-	}
+	wgBuffer.Add(1)
+	go func() {
+		defer wgBuffer.Done()
+		for p := range retry {
+			if bufSize+p.size < w.conf.APIPayloadBufferMaxSize {
+				buffer = append(buffer, p)
+			} else {
+				nbDrops++
+			}
+		}
+	}()
 
+	// We wait for the writers to finish so we can close the channel of payloads to retry.
+	wgWriters.Wait()
+	close(retry)
+
+	// We then wait for the buffer of payloads to retry to be filled.
+	wgBuffer.Wait()
+	w.payloadBuffer = buffer
+
+	// Update stats about this flush.
+	nbSuccesses := len(w.payloadBuffer) - int(nbErrors)
+	if nbSuccesses > 0 {
+		log.Infof("nbSuccesses: %d", nbSuccesses)
+		statsd.Client.Count("datadog.trace_agent.writer.flush", int64(nbSuccesses), []string{"status:success"}, 1)
+	}
+	if nbErrors > 0 {
+		log.Infof("nbErrors: %d", nbErrors)
+		statsd.Client.Count("datadog.trace_agent.writer.flush", int64(nbErrors), []string{"status:error"}, 1)
+	}
 	if nbDrops > 0 {
-		log.Infof("dropping %d payloads (payload buffer full)", nbDrops)
-		statsd.Client.Count("datadog.trace_agent.writer.dropped_payload",
-			int64(nbDrops), []string{"reason:buffer_full"}, 1)
-
-		payloads = payloads[nbDrops:]
+		log.Infof("Dropping %d payloads (payload buffer is full)", nbDrops)
+		statsd.Client.Count("datadog.trace_agent.writer.dropped_payload", int64(nbDrops), []string{"reason:buffer_full"}, 1)
+	}
+	if bufSize > 0 {
+		log.Infof("bufSize: %d", bufSize)
+		statsd.Client.Gauge("datadog.trace_agent.writer.payload_buffer_size", float64(bufSize), nil, 1)
 	}
 
-	statsd.Client.Gauge("datadog.trace_agent.writer.payload_buffer_size",
-		float64(bufSize), nil, 1)
-
-	w.payloadBuffer = payloads
+	log.Info("End of flushing")
 }

@@ -17,18 +17,12 @@ import (
 
 // apiError stores the error triggered we can't send data to the endpoint.
 // It implements the error interface.
-type apiError struct {
-	err      error
-	endpoint *APIEndpoint
+type APIError struct {
+	error
 }
 
-func newAPIError(err error, endpoint *APIEndpoint) *apiError {
-	return &apiError{err: err, endpoint: endpoint}
-}
-
-// Returns the error message
-func (ae *apiError) Error() string {
-	return fmt.Sprintf("%s: %v", ae.endpoint.url, ae.err)
+func newAPIError(err error) error {
+	return &APIError{err}
 }
 
 // AgentEndpoint is an interface where we write the data
@@ -125,7 +119,7 @@ func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 	if err != nil {
 		log.Errorf("error when requesting to endpoint %s: %v", url, err)
 		atomic.AddInt64(&ae.stats.TracesPayloadError, 1)
-		return payloadSize, newAPIError(err, ae)
+		return payloadSize, newAPIError(err)
 	}
 	defer resp.Body.Close()
 
@@ -137,7 +131,7 @@ func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 
 		// Only retry for 5xx (server) errors
 		if resp.StatusCode/100 == 5 {
-			return payloadSize, newAPIError(err, ae)
+			return payloadSize, newAPIError(err)
 		}
 
 		// Does not retry for other errors
