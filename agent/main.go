@@ -203,7 +203,11 @@ func main() {
 	if !ok {
 		logLevel = log.InfoLvl
 	}
-	err = SetupLogger(logLevel, agentConf.LogFilePath, 10*time.Second, 10)
+	duration := 10 * time.Second
+	if !agentConf.LogThrottlingEnabled {
+		duration = 0
+	}
+	err = SetupLogger(logLevel, agentConf.LogFilePath, duration, 10)
 	if err != nil {
 		die("cannot create logger: %v", err)
 	}
