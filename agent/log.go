@@ -95,7 +95,7 @@ type ThrottledReceiver struct {
 func (r *ThrottledReceiver) ReceiveMessage(msg string, lvl log.LogLevel, _ log.LogContextInterface) error {
 	r.logCount++
 
-	if r.logCount < r.maxLogsPerInterval {
+	if r.maxLogsPerInterval < 0 || r.logCount < r.maxLogsPerInterval {
 		forwardLogMsg(r.rawLoggerNoFmt, msg, lvl)
 	} else if r.logCount == r.maxLogsPerInterval {
 		r.rawLogger.Error("Too many messages to log, skipping for a bit...")
@@ -136,10 +136,16 @@ func (r *ThrottledReceiver) AfterParse(args log.CustomReceiverInitArgs) error {
 	r.maxLogsPerInterval = int64(maxLogsPerInterval)
 	r.rawLogger = rawLogger
 	r.rawLoggerNoFmt = rawLoggerNoFmt
+	r.done = make(chan struct{})
+
+	// If no interval was given, no need to continue setup
+	if interval <= 0 {
+		r.maxLogsPerInterval = -1
+		return nil
+	}
 
 	r.logCount = 0
 	r.tick = time.Tick(time.Duration(interval))
-	r.done = make(chan struct{})
 
 	// Start the goroutine resetting the log count
 	watchdog.Go(func() {
