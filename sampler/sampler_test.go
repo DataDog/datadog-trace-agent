@@ -6,7 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/config"
+	log "github.com/cihub/seelog"
+
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -15,7 +16,7 @@ const defaultEnv = "none"
 
 func getTestSampler() *Sampler {
 	// Disable debug logs in these tests
-	config.NewLoggerLevelCustom("INFO", "/var/log/datadog/trace-agent.log")
+	log.UseLogger(log.Disabled)
 
 	// No extra fixed sampling, no maximum TPS
 	extraRate := 1.0

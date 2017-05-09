@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	log "github.com/cihub/seelog"
+
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/fixtures"
 )
@@ -73,7 +75,7 @@ func TestWatchdog(t *testing.T) {
 
 func BenchmarkAgentTraceProcessing(b *testing.B) {
 	// Disable debug logs in these tests
-	config.NewLoggerLevelCustom("INFO", "/var/log/datadog/trace-agent.log")
+	log.UseLogger(log.Disabled)
 
 	conf := config.NewDefaultAgentConfig()
 	conf.APIKeys = append(conf.APIKeys, "")
