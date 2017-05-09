@@ -42,19 +42,12 @@ type PreSampler struct {
 	stats       PreSamplerStats
 	decayPeriod time.Duration
 	decayFactor float64
-	logger      Logger
 	mu          sync.RWMutex // needed since many requests can run in parallel
 	exit        chan struct{}
 }
 
-// Logger is an interface used internally in the agent receiver.
-type Logger interface {
-	// Errorf formats the string and logs.
-	Errorf(format string, params ...interface{})
-}
-
 // NewPreSampler returns an initialized presampler
-func NewPreSampler(rate float64, logger Logger) *PreSampler {
+func NewPreSampler(rate float64) *PreSampler {
 	decayFactor := 9.0 / 8.0
 	return &PreSampler{
 		stats: PreSamplerStats{
@@ -62,7 +55,6 @@ func NewPreSampler(rate float64, logger Logger) *PreSampler {
 		},
 		decayPeriod: defaultDecayPeriod,
 		decayFactor: decayFactor,
-		logger:      logger,
 		exit:        make(chan struct{}),
 	}
 }
@@ -180,7 +172,7 @@ func (ps *PreSampler) Sample(req *http.Request) bool {
 		var err error
 		traceCount, err = strconv.ParseInt(traceCountStr, 10, 64)
 		if err != nil {
-			ps.logger.Errorf("unable to parse HTTP header %s: %s", TraceCountHeader, traceCountStr)
+			log.Errorf("unable to parse HTTP header %s: %s", TraceCountHeader, traceCountStr)
 		}
 	}
 
