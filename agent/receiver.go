@@ -15,6 +15,7 @@ import (
 
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
@@ -56,10 +57,10 @@ type HTTPReceiver struct {
 
 	// due to the high volume the receiver handles
 	// custom logger that rate-limits errors and track statistics
-	logger *errorLogger
-	stats  receiverStats
-
-	exit chan struct{}
+	logger     *errorLogger
+	stats      receiverStats
+	preSampler *sampler.PreSampler
+	exit       chan struct{}
 
 	maxRequestBodyLength int64
 	debug                bool
@@ -68,12 +69,14 @@ type HTTPReceiver struct {
 // NewHTTPReceiver returns a pointer to a new HTTPReceiver
 func NewHTTPReceiver(conf *config.AgentConfig) *HTTPReceiver {
 	// use buffered channels so that handlers are not waiting on downstream processing
+	logger := &errorLogger{}
 	return &HTTPReceiver{
-		traces:   make(chan model.Trace, 5000), // about 1000 traces/sec for 5 sec
-		services: make(chan model.ServicesMetadata, 50),
-		conf:     conf,
-		logger:   &errorLogger{},
-		exit:     make(chan struct{}),
+		traces:     make(chan model.Trace, 5000), // about 1000 traces/sec for 5 sec
+		services:   make(chan model.ServicesMetadata, 50),
+		conf:       conf,
+		logger:     logger,
+		preSampler: sampler.NewPreSampler(conf.PreSampleRate, logger),
+		exit:       make(chan struct{}),
 
 		maxRequestBodyLength: maxRequestBodyLength,
 		debug:                strings.ToLower(conf.LogLevel) == "debug",
@@ -106,6 +109,9 @@ func (r *HTTPReceiver) Run() {
 		log.Error(err)
 	}
 
+	watchdog.Go(func() {
+		r.preSampler.Run()
+	})
 	watchdog.Go(func() {
 		r.logStats()
 	})
@@ -171,6 +177,11 @@ func (r *HTTPReceiver) httpHandleWithVersion(v APIVersion, f func(APIVersion, ht
 
 // handleTraces knows how to handle a bunch of traces
 func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *http.Request) {
+	if !r.preSampler.Sample(req) {
+		HTTPOK(w)
+		return
+	}
+
 	var traces model.Traces
 	contentType := req.Header.Get("Content-Type")
 
@@ -297,7 +308,7 @@ func (r *HTTPReceiver) logStats() {
 		tdropped := atomic.SwapInt64(&r.stats.TracesDropped, 0)
 		accStats.TracesDropped += tdropped
 
-		statsd.Client.Gauge("datadog.trace_agent.heartbeat", 1, []string{fmt.Sprintf("version:%s", Version)}, 1)
+		statsd.Client.Gauge("datadog.trace_agent.heartbeat", 1, []string{"version:" + Version}, 1)
 
 		statsd.Client.Count("datadog.trace_agent.receiver.traces", tracesBytes, []string{"endpoint:traces"}, 1)
 		statsd.Client.Count("datadog.trace_agent.receiver.services", servicesBytes, []string{"endpoint:services"}, 1)

@@ -39,6 +39,7 @@ type AgentConfig struct {
 
 	// Sampler configuration
 	ExtraSampleRate float64
+	PreSampleRate   float64
 	MaxTPS          float64
 
 	// Receiver
@@ -57,6 +58,7 @@ type AgentConfig struct {
 
 	// watchdog
 	MaxMemory        float64       // MaxMemory is the threshold (bytes allocated) above which program panics and exits, to be restarted
+	MaxCPU           float64       // MaxCPU is the max UserAvg CPU the program should consume
 	MaxConnections   int           // MaxConnections is the threshold (opened TCP connections) above which program panics and exits, to be restarted
 	WatchdogInterval time.Duration // WatchdogInterval is the delay between 2 watchdog checks
 
@@ -162,6 +164,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 		ExtraAggregators: []string{},
 
 		ExtraSampleRate: 1.0,
+		PreSampleRate:   1.0,
 		MaxTPS:          10,
 
 		ReceiverHost:    "localhost",
@@ -174,8 +177,9 @@ func NewDefaultAgentConfig() *AgentConfig {
 		LogLevel:    "INFO",
 		LogFilePath: "/var/log/datadog/trace-agent.log",
 
-		MaxMemory:        1e9,
-		MaxConnections:   5000,
+		MaxMemory:        5e8, // 500 Mb, should rarely go above 50 Mb
+		MaxCPU:           0.5, // 50%, well behaving agents keep below 5%
+		MaxConnections:   200, // in practice, rarely goes over 20
 		WatchdogInterval: time.Minute,
 	}
 
@@ -292,6 +296,9 @@ APM_CONF:
 	if v, e := conf.GetFloat("trace.sampler", "extra_sample_rate"); e == nil {
 		c.ExtraSampleRate = v
 	}
+	if v, e := conf.GetFloat("trace.sampler", "pre_sample_rate"); e == nil {
+		c.PreSampleRate = v
+	}
 	if v, e := conf.GetFloat("trace.sampler", "max_traces_per_second"); e == nil {
 		c.MaxTPS = v
 	}
@@ -310,6 +317,10 @@ APM_CONF:
 
 	if v, e := conf.GetFloat("trace.watchdog", "max_memory"); e == nil {
 		c.MaxMemory = v
+	}
+
+	if v, e := conf.GetFloat("trace.watchdog", "max_cpu_percent"); e == nil {
+		c.MaxCPU = v / 100
 	}
 
 	if v, e := conf.GetInt("trace.watchdog", "max_connections"); e == nil {

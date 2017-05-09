@@ -14,20 +14,22 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/config"
+	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
 var (
-	infoMu             sync.RWMutex
-	infoReceiverStats  receiverStats // only for the last minute
-	infoEndpointStats  endpointStats // only for the last minute
-	infoWatchdogInfo   watchdog.Info
-	infoSamplerInfo    samplerInfo
-	infoStart          = time.Now()
-	infoOnce           sync.Once
-	infoTmpl           *template.Template
-	infoNotRunningTmpl *template.Template
-	infoErrorTmpl      *template.Template
+	infoMu              sync.RWMutex
+	infoReceiverStats   receiverStats // only for the last minute
+	infoEndpointStats   endpointStats // only for the last minute
+	infoWatchdogInfo    watchdog.Info
+	infoSamplerInfo     samplerInfo
+	infoPreSamplerStats sampler.PreSamplerStats
+	infoStart           = time.Now()
+	infoOnce            sync.Once
+	infoTmpl            *template.Template
+	infoNotRunningTmpl  *template.Template
+	infoErrorTmpl       *template.Template
 )
 
 const (
@@ -48,6 +50,8 @@ const (
   Spans received (1 min): {{.Status.Receiver.SpansReceived}}
 {{if gt .Status.Receiver.TracesDropped 0}}  WARNING: Traces dropped (1 min): {{.Status.Receiver.TracesDropped}}
 {{end}}{{if gt .Status.Receiver.SpansDropped 0}}  WARNING: Spans dropped (1 min): {{.Status.Receiver.SpansDropped}}
+{{end}}{{if lt .Status.PreSampler.Rate 1.0}}  WARNING: Pre-sampling traces: {{percent .Status.PreSampler.Rate}} %
+{{end}}{{if .Status.PreSampler.Error}}  WARNING: Pre-sampler: {{.Status.PreSampler.Error}}
 {{end}}
   Bytes sent (1 min): {{add .Status.Endpoint.TracesBytes .Status.Endpoint.ServicesBytes}}
   Traces sent (1 min): {{.Status.Endpoint.TracesCount}}
@@ -129,6 +133,19 @@ func publishWatchdogInfo() interface{} {
 	return wi
 }
 
+func updatePreSampler(ss sampler.PreSamplerStats) {
+	infoMu.Lock()
+	infoPreSamplerStats = ss
+	infoMu.Unlock()
+}
+
+func publishPreSamplerStats() interface{} {
+	infoMu.RLock()
+	ss := infoPreSamplerStats
+	infoMu.RUnlock()
+	return ss
+}
+
 type infoVersion struct {
 	Version   string
 	GitCommit string
@@ -159,6 +176,9 @@ func initInfo(conf *config.AgentConfig) error {
 		"add": func(a, b int64) int64 {
 			return a + b
 		},
+		"percent": func(v float64) string {
+			return fmt.Sprintf("%02.1f", v*100)
+		},
 	}
 
 	infoOnce.Do(func() {
@@ -169,6 +189,7 @@ func initInfo(conf *config.AgentConfig) error {
 		expvar.Publish("endpoint", expvar.Func(publishEndpointStats))
 		expvar.Publish("sampler", expvar.Func(publishSamplerInfo))
 		expvar.Publish("watchdog", expvar.Func(publishWatchdogInfo))
+		expvar.Publish("presampler", expvar.Func(publishPreSamplerStats))
 
 		c := *conf
 		c.APIKeys = nil // should not be exported by JSON, but just to make sure
@@ -214,11 +235,12 @@ type StatusInfo struct {
 	MemStats struct {
 		Alloc uint64
 	} `json:"memstats"`
-	Version  infoVersion        `json:"version"`
-	Receiver receiverStats      `json:"receiver"`
-	Endpoint endpointStats      `json:"endpoint"`
-	Watchdog watchdog.Info      `json:"watchdog"`
-	Config   config.AgentConfig `json:"config"`
+	Version    infoVersion             `json:"version"`
+	Receiver   receiverStats           `json:"receiver"`
+	Endpoint   endpointStats           `json:"endpoint"`
+	Watchdog   watchdog.Info           `json:"watchdog"`
+	PreSampler sampler.PreSamplerStats `json:"presampler"`
+	Config     config.AgentConfig      `json:"config"`
 }
 
 func getProgramBanner(version string) (string, string) {
@@ -255,6 +277,8 @@ func getProgramBanner(version string) (string, string) {
 //   Spans received (1 min): 360
 //   WARNING: Traces dropped (1 min): 5
 //   WARNING: Spans dropped (1 min): 10
+//   WARNING: Pre-sampling traces: 26.0 %
+//   WARNING: Pre-sampler: raising pre-sampling rate from 2.9 % to 5.0 %
 //
 //   Bytes sent (1 min): 3245
 //   Traces sent (1 min): 6

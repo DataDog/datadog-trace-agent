@@ -34,7 +34,7 @@ func TestLogOnPanicMain(t *testing.T) {
 			"divide by zero panic should be forwarded")
 		msg := testLogBuf.String()
 		assert.Contains(msg,
-			"Unexpected error: runtime error: integer divide by zero",
+			"Unexpected panic: runtime error: integer divide by zero",
 			"divide by zero panic should be reported in log")
 		assert.Contains(msg,
 			"github.com/DataDog/datadog-trace-agent/watchdog.TestLogOnPanicMain",
@@ -60,7 +60,7 @@ func TestLogOnPanicGoroutine(t *testing.T) {
 				"custom panic should be forwarded")
 			msg := testLogBuf.String()
 			assert.Contains(msg,
-				"Unexpected error: what could possibly go wrong?",
+				"Unexpected panic: what could possibly go wrong?",
 				"custom panic should be reported in log")
 			assert.Contains(msg,
 				"github.com/DataDog/datadog-trace-agent/watchdog.TestLogOnPanicGoroutine",
@@ -75,4 +75,26 @@ func TestLogOnPanicGoroutine(t *testing.T) {
 		assert.Nil(r, "this should trap no error at all, what we demonstrate here is that recover needs to be called on a per-goroutine base")
 	}()
 	wg.Wait()
+}
+
+func TestShortErrMsg(t *testing.T) {
+	assert := assert.New(t)
+
+	expected := map[string]string{
+		"exceeded max connections":   "exceeded max conn...",
+		"cannot configure dogstatsd": "cannot configure ...",
+		"ooops":                 "ooops",
+		"0123456789abcdef":      "0123456789abcdef",
+		"0123456789abcdef0":     "0123456789abcdef0",
+		"0123456789abcdef01":    "0123456789abcdef0...",
+		"0123456789abcdef012":   "0123456789abcdef0...",
+		"0123456789abcdef0123":  "0123456789abcdef0...",
+		"0123456789abcdef01234": "0123456789abcdef0...",
+		"":    "",
+		"αβγ": "αβγ",
+	}
+
+	for k, v := range expected {
+		assert.Equal(v, shortErrMsg(k), "short error message for '%s' should be '%s'", k, v)
+	}
 }

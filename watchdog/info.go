@@ -16,7 +16,7 @@ const (
 	// too often and waste resources doing it, and also long enough
 	// so that it's not jittering (CPU can be volatile).
 	// OTOH it should be short enough to get up-to-date recent info.
-	cacheDelay = 5 * time.Second
+	cacheDelay = 20 * time.Second
 )
 
 // CPUInfo contains basic CPU info
