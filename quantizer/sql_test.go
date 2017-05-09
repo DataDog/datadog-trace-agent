@@ -5,7 +5,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/DataDog/datadog-trace-agent/config"
+	log "github.com/cihub/seelog"
+
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -28,8 +29,8 @@ func SQLSpan(query string) model.Span {
 func TestMain(m *testing.M) {
 	flag.Parse()
 
-	// neutralize logs for tests
-	config.NewLoggerLevelCustom("critical", "")
+	// Disable debug logs in these tests
+	log.UseLogger(log.Disabled)
 
 	os.Exit(m.Run())
 }
