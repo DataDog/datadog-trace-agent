@@ -33,6 +33,28 @@ var (
 	Year2000NanosecTS = time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC).UnixNano()
 )
 
+// webFrameworkIntegrationNames is a set of names corresponding to
+// span names of the web frameworks our client libraries handle.Used
+// in normalizeThirdPartyIntegrations().
+var webFrameworkIntegrationNames = map[string]struct{}{
+	// dd-trace-py
+	"pylons.request":  struct{}{},
+	"bottle.request":  struct{}{},
+	"django.request":  struct{}{},
+	"pyramid.request": struct{}{},
+	"flask.request":   struct{}{},
+	"falcon.request":  struct{}{},
+	"aiohttp.request": struct{}{},
+
+	// dd-trace-go
+	"mux.request": struct{}{},
+	"gin.request": struct{}{},
+
+	// dd-trace-rb
+	"rails.request":   struct{}{},
+	"sinatra.request": struct{}{},
+}
+
 // Normalize makes sure a Span is properly initialized and encloses the minimum required info
 func (s *Span) Normalize() error {
 	// Service
@@ -152,6 +174,10 @@ func (s *Span) Normalize() error {
 		s.Meta["env"] = NormalizeTag(env)
 	}
 
+	// Make sure our third party integrations are creating sane
+	// spans (doesn't fail, but might make changes to the span)
+	s.normalizeThirdPartyIntegrations()
+
 	return nil
 }
 
@@ -190,6 +216,28 @@ func NormalizeTrace(t Trace) (Trace, error) {
 	}
 
 	return t, nil
+}
+
+// normalizeThirdPartyIntegrations normalizes the span if we detect
+// it's coming from our own third-party integrations (for example, the
+// Django support of dd-trace-py.
+func (s *Span) normalizeThirdPartyIntegrations() {
+	// If it's coming from one of our web framework integrations,
+	// make sure we always have an HTTP status code.
+	if s.Type == "http" {
+		_, isHandled := webFrameworkIntegrationNames[s.Name]
+		_, hasStatusCode := s.Meta["http.status_code"]
+
+		if isHandled && !hasStatusCode {
+			if s.Meta == nil {
+				s.Meta = make(map[string]string, 1)
+			}
+
+			// We put a 500 since it's probably missing
+			// because of an error
+			s.Meta["http.status_code"] = "500"
+		}
+	}
 }
 
 // This code is borrowed from dd-go metric normalization
