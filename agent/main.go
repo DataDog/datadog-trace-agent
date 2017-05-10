@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"runtime"
 	"runtime/pprof"
+	"strings"
 	"syscall"
 	"time"
 
@@ -119,7 +120,7 @@ func main() {
 	if opts.info || opts.version {
 		log.UseLogger(log.Disabled)
 	} else {
-		config.NewLoggerLevelCustom("DEBUG", "/var/log/datadog/trace-agent.log")
+		SetupDefaultLogger()
 		defer log.Flush()
 	}
 
@@ -195,8 +196,18 @@ func main() {
 		return
 	}
 
-	// Initialize logging (replacing the default logger)
-	err = config.NewLoggerLevelCustom(agentConf.LogLevel, agentConf.LogFilePath)
+	// Initialize logging (replacing the default logger). No need
+	// to defer log.Flush, it was already done when calling
+	// "SetupDefaultLogger" earlier.
+	logLevel, ok := log.LogLevelFromString(strings.ToLower(agentConf.LogLevel))
+	if !ok {
+		logLevel = log.InfoLvl
+	}
+	duration := 10 * time.Second
+	if !agentConf.LogThrottlingEnabled {
+		duration = 0
+	}
+	err = SetupLogger(logLevel, agentConf.LogFilePath, duration, 10)
 	if err != nil {
 		die("cannot create logger: %v", err)
 	}

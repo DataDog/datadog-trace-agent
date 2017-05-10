@@ -51,12 +51,10 @@ type HTTPReceiver struct {
 	services chan model.ServicesMetadata
 	conf     *config.AgentConfig
 
-	// due to the high volume the receiver handles
-	// custom logger that rate-limits errors and track statistics
-	logger     *errorLogger
 	stats      receiverStats
 	preSampler *sampler.PreSampler
-	exit       chan struct{}
+
+	exit chan struct{}
 
 	maxRequestBodyLength int64
 	debug                bool
@@ -65,13 +63,11 @@ type HTTPReceiver struct {
 // NewHTTPReceiver returns a pointer to a new HTTPReceiver
 func NewHTTPReceiver(conf *config.AgentConfig) *HTTPReceiver {
 	// use buffered channels so that handlers are not waiting on downstream processing
-	logger := &errorLogger{}
 	return &HTTPReceiver{
 		traces:     make(chan model.Trace, 5000), // about 1000 traces/sec for 5 sec
 		services:   make(chan model.ServicesMetadata, 50),
 		conf:       conf,
-		logger:     logger,
-		preSampler: sampler.NewPreSampler(conf.PreSampleRate, logger),
+		preSampler: sampler.NewPreSampler(conf.PreSampleRate),
 		exit:       make(chan struct{}),
 
 		maxRequestBodyLength: maxRequestBodyLength,
@@ -157,7 +153,7 @@ func (r *HTTPReceiver) httpHandleWithVersion(v APIVersion, f func(APIVersion, ht
 		contentType := req.Header.Get("Content-Type")
 		if contentType == "application/msgpack" && (v == v01 || v == v02) {
 			// msgpack is only supported for versions 0.3
-			r.logger.Errorf("rejecting client request, unsupported media type %q", contentType)
+			log.Errorf("rejecting client request, unsupported media type %q", contentType)
 			HTTPFormatError([]string{tagTraceHandler, fmt.Sprintf("v:%s", v)}, w)
 			return
 		}
@@ -182,7 +178,7 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		// implement msgp.Decodable. This hack can be removed once we
 		// drop v01 support.
 		if contentType != "application/json" && contentType != "text/json" && contentType != "" {
-			r.logger.Errorf("rejecting client request, unsupported media type %q", contentType)
+			log.Errorf("rejecting client request, unsupported media type %q", contentType)
 			HTTPFormatError([]string{tagTraceHandler, fmt.Sprintf("v:%s", v)}, w)
 			return
 		}
@@ -190,7 +186,7 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		// in v01 we actually get spans that we have to transform in traces
 		var spans []model.Span
 		if err := json.NewDecoder(req.Body).Decode(&spans); err != nil {
-			r.logger.Errorf("cannot decode %s traces payload: %v", v, err)
+			log.Errorf("cannot decode %s traces payload: %v", v, err)
 			HTTPDecodingError(err, []string{tagTraceHandler, fmt.Sprintf("v:%s", v)}, w)
 			return
 		}
@@ -200,7 +196,7 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		fallthrough
 	case v03:
 		if err := decodeReceiverPayload(req.Body, &traces, v, contentType); err != nil {
-			r.logger.Errorf("cannot decode %s traces payload: %v", v, err)
+			log.Errorf("cannot decode %s traces payload: %v", v, err)
 			HTTPDecodingError(err, []string{tagTraceHandler, fmt.Sprintf("v:%s", v)}, w)
 			return
 		}
@@ -229,7 +225,7 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 			if len(errorMsg) > 150 && r.debug {
 				errorMsg = errorMsg[:150] + "..."
 			}
-			r.logger.Errorf(errorMsg)
+			log.Errorf(errorMsg)
 		} else {
 			atomic.AddInt64(&r.stats.SpansDropped, int64(spans-len(normTrace)))
 
@@ -242,7 +238,7 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 				atomic.AddInt64(&r.stats.TracesDropped, 1)
 				atomic.AddInt64(&r.stats.SpansDropped, int64(spans))
 
-				r.logger.Errorf("dropping trace reason: rate-limited")
+				log.Errorf("dropping trace reason: rate-limited")
 			}
 		}
 
@@ -258,7 +254,7 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 
 	contentType := req.Header.Get("Content-Type")
 	if err := decodeReceiverPayload(req.Body, &servicesMeta, v, contentType); err != nil {
-		r.logger.Errorf("cannot decode %s services payload: %v", v, err)
+		log.Errorf("cannot decode %s services payload: %v", v, err)
 		HTTPDecodingError(err, []string{tagServiceHandler, fmt.Sprintf("v:%s", v)}, w)
 		return
 	}
@@ -313,7 +309,6 @@ func (r *HTTPReceiver) logStats() {
 			log.Infof("receiver handled %d spans, dropped %d ; handled %d traces, dropped %d",
 				accStats.SpansReceived, accStats.SpansDropped,
 				accStats.TracesReceived, accStats.TracesDropped)
-			r.logger.Reset()
 
 			accStats = receiverStats{}
 			lastLog = now
