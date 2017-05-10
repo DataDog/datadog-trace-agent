@@ -237,6 +237,24 @@ func TestNormalizeEnv(t *testing.T) {
 	assert.Equal(t, "development", s.Meta["env"])
 }
 
+func TestNormalizeThirdPartyIntegrationsMissingStatusCode(t *testing.T) {
+	s := testSpan()
+	s.Name = "django.request"
+	s.Meta = map[string]string{}
+	s.Normalize()
+	assert.Equal(t, "500", s.Meta["http.status_code"])
+}
+
+func TestNormalizeThirdPartyIntegrationsNoMissingStatusCode(t *testing.T) {
+	s := testSpan()
+	s.Name = "django.request"
+	s.Meta = map[string]string{
+		"http.status_code": "404",
+	}
+	s.Normalize()
+	assert.Equal(t, "404", s.Meta["http.status_code"])
+}
+
 func TestSpecialZipkinRootSpan(t *testing.T) {
 	s := testSpan()
 	s.ParentID = 42
