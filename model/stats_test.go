@@ -51,6 +51,30 @@ func testTrace() Trace {
 	return trace
 }
 
+func testTraceTopLevel() Trace {
+	// Data below represents a trace with some sublayers, so that we make sure,
+	// those data are correctly calculated when aggregating in HandleSpan()
+	// A |---------------------------------------------------------------| duration: 100
+	// B   |----------------------|                                        duration: 20
+	// B     |-----| |---|                                                 duration: 5+3
+	trace := Trace{
+		Span{TraceID: 42, SpanID: 42, ParentID: 0, Service: "A",
+			Name: "A.foo", Type: "web", Resource: "α", Start: 0, Duration: 100,
+			Metrics: map[string]float64{SpanSampleRateMetricKey: 1}},
+		Span{TraceID: 42, SpanID: 100, ParentID: 42, Service: "B",
+			Name: "B.bar", Type: "web", Resource: "α", Start: 1, Duration: 20},
+		Span{TraceID: 42, SpanID: 2000, ParentID: 100, Service: "B",
+			Name: "B.bar.1", Type: "web", Resource: "α",
+			Start: 2, Duration: 5},
+		Span{TraceID: 42, SpanID: 3000, ParentID: 100, Service: "B",
+			Name: "B.bar.2", Type: "web", Resource: "α",
+			Start: 10, Duration: 3, Error: 1},
+	}
+
+	trace.ComputeTopLevel()
+	return trace
+}
+
 func TestGrainKey(t *testing.T) {
 	assert := assert.New(t)
 	gk := GrainKey("serve", "duration", "service:webserver")
@@ -298,6 +322,89 @@ func TestStatsBucketSublayers(t *testing.T) {
 		"B.bar|duration|env:default,resource:α,service:B":                                        []quantile.Entry{quantile.Entry{V: 20, G: 1, Delta: 0}},
 		"sql.query|duration|env:default,resource:SELECT value FROM table,service:C":              []quantile.Entry{quantile.Entry{V: 5, G: 1, Delta: 0}},
 		"sql.query|duration|env:default,resource:SELECT ololololo... value FROM table,service:C": []quantile.Entry{quantile.Entry{V: 3, G: 1, Delta: 0}},
+	}
+
+	assert.Len(sb.Distributions, len(expectedDistributions), "Missing distributions!")
+	for dkey, d := range sb.Distributions {
+		val, ok := expectedDistributions[dkey]
+		if !ok {
+			assert.Fail("Unexpected distribution %s", dkey)
+		}
+		assert.Equal(val, d.Summary.Entries, "Distribution %s wrong value", dkey)
+		keyFields := strings.Split(dkey, "|")
+		tags := NewTagSetFromString(keyFields[2])
+		assert.Equal(tags, d.TagSet, "bad tagset for distribution %s", dkey)
+	}
+}
+
+func TestStatsBucketSublayersTopLevel(t *testing.T) {
+	assert := assert.New(t)
+
+	tr := testTraceTopLevel()
+	sublayers := ComputeSublayers(&tr)
+	root := tr.GetRoot()
+	SetSublayersOnSpan(root, sublayers)
+
+	assert.NotNil(sublayers)
+
+	srb := NewStatsRawBucket(0, 1e9)
+
+	// No custom aggregators only the defaults
+	aggr := []string{}
+	for _, s := range tr {
+		srb.HandleSpan(s, defaultEnv, aggr, root.Weight(), &sublayers)
+	}
+	sb := srb.Export()
+
+	expectedCounts := map[string]expectedCount{
+		"A.foo|_sublayers.duration.by_service|env:default,resource:α,service:A,sublayer_service:A":   expectedCount{value: 80, topLevel: 1},
+		"A.foo|_sublayers.duration.by_service|env:default,resource:α,service:A,sublayer_service:B":   expectedCount{value: 20, topLevel: 1},
+		"A.foo|_sublayers.duration.by_type|env:default,resource:α,service:A,sublayer_type:web":       expectedCount{value: 100, topLevel: 1},
+		"A.foo|_sublayers.span_count|env:default,resource:α,service:A,:":                             expectedCount{value: 4, topLevel: 1},
+		"A.foo|hits|env:default,resource:α,service:A":                                                expectedCount{value: 1, topLevel: 1},
+		"A.foo|errors|env:default,resource:α,service:A":                                              expectedCount{value: 0, topLevel: 1},
+		"A.foo|duration|env:default,resource:α,service:A":                                            expectedCount{value: 100, topLevel: 1},
+		"B.bar|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:A":   expectedCount{value: 80, topLevel: 1},
+		"B.bar|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:B":   expectedCount{value: 20, topLevel: 1},
+		"B.bar|_sublayers.duration.by_type|env:default,resource:α,service:B,sublayer_type:web":       expectedCount{value: 100, topLevel: 1},
+		"B.bar|_sublayers.span_count|env:default,resource:α,service:B,:":                             expectedCount{value: 4, topLevel: 1},
+		"B.bar|hits|env:default,resource:α,service:B":                                                expectedCount{value: 1, topLevel: 1},
+		"B.bar|errors|env:default,resource:α,service:B":                                              expectedCount{value: 0, topLevel: 1},
+		"B.bar|duration|env:default,resource:α,service:B":                                            expectedCount{value: 20, topLevel: 1},
+		"B.bar.1|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:A": expectedCount{value: 80, topLevel: 0},
+		"B.bar.1|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:B": expectedCount{value: 20, topLevel: 0},
+		"B.bar.1|_sublayers.duration.by_type|env:default,resource:α,service:B,sublayer_type:web":     expectedCount{value: 100, topLevel: 0},
+		"B.bar.1|_sublayers.span_count|env:default,resource:α,service:B,:":                           expectedCount{value: 4, topLevel: 0},
+		"B.bar.1|hits|env:default,resource:α,service:B":                                              expectedCount{value: 1, topLevel: 0},
+		"B.bar.1|errors|env:default,resource:α,service:B":                                            expectedCount{value: 0, topLevel: 0},
+		"B.bar.1|duration|env:default,resource:α,service:B":                                          expectedCount{value: 5, topLevel: 0},
+		"B.bar.2|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:A": expectedCount{value: 80, topLevel: 0},
+		"B.bar.2|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:B": expectedCount{value: 20, topLevel: 0},
+		"B.bar.2|_sublayers.duration.by_type|env:default,resource:α,service:B,sublayer_type:web":     expectedCount{value: 100, topLevel: 0},
+		"B.bar.2|_sublayers.span_count|env:default,resource:α,service:B,:":                           expectedCount{value: 4, topLevel: 0},
+		"B.bar.2|hits|env:default,resource:α,service:B":                                              expectedCount{value: 1, topLevel: 0},
+		"B.bar.2|errors|env:default,resource:α,service:B":                                            expectedCount{value: 1, topLevel: 0},
+		"B.bar.2|duration|env:default,resource:α,service:B":                                          expectedCount{value: 3, topLevel: 0},
+	}
+
+	assert.Len(sb.Counts, len(expectedCounts), "Missing counts!")
+	for ckey, c := range sb.Counts {
+		val, ok := expectedCounts[ckey]
+		if !ok {
+			assert.Fail("Unexpected count %s", ckey)
+		}
+		assert.Equal(val.value, c.Value, "Count %s wrong value", ckey)
+		assert.Equal(val.topLevel, c.TopLevel, "Count %s wrong topLevel", ckey)
+		keyFields := strings.Split(ckey, "|")
+		tags := NewTagSetFromString(keyFields[2])
+		assert.Equal(tags, c.TagSet, "bad tagset for count %s", ckey)
+	}
+
+	expectedDistributions := map[string][]quantile.Entry{
+		"A.foo|duration|env:default,resource:α,service:A":   []quantile.Entry{quantile.Entry{V: 100, G: 1, Delta: 0}},
+		"B.bar|duration|env:default,resource:α,service:B":   []quantile.Entry{quantile.Entry{V: 20, G: 1, Delta: 0}},
+		"B.bar.1|duration|env:default,resource:α,service:B": []quantile.Entry{quantile.Entry{V: 5, G: 1, Delta: 0}},
+		"B.bar.2|duration|env:default,resource:α,service:B": []quantile.Entry{quantile.Entry{V: 3, G: 1, Delta: 0}},
 	}
 
 	assert.Len(sb.Distributions, len(expectedDistributions), "Missing distributions!")
