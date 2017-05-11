@@ -140,13 +140,20 @@ func TestStatsBucketDefault(t *testing.T) {
 	}
 
 	expectedDistributions := map[string]expectedDistribution{
-		"A.foo|duration|env:default,resource:α,service:A":     expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 1, G: 1, Delta: 0}}, topLevel: 1},
-		"A.foo|duration|env:default,resource:β,service:A":     expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 2, G: 1, Delta: 0}}, topLevel: 1},
-		"B.foo|duration|env:default,resource:γ,service:B":     expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 3, G: 1, Delta: 0}}, topLevel: 1},
-		"B.foo|duration|env:default,resource:ε,service:B":     expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 4, G: 1, Delta: 0}}, topLevel: 1},
-		"B.foo|duration|env:default,resource:ζ,service:B":     expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 5, G: 1, Delta: 0}}, topLevel: 1},
-		"sql.query|duration|env:default,resource:ζ,service:B": expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 6, G: 1, Delta: 0}}, topLevel: 1},
-		"sql.query|duration|env:default,resource:δ,service:C": expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 7, G: 1, Delta: 0}, quantile.Entry{V: 8, G: 1, Delta: 0}}, topLevel: 2},
+		"A.foo|duration|env:default,resource:α,service:A": expectedDistribution{
+			entries: []quantile.Entry{quantile.Entry{V: 1, G: 1, Delta: 0}}, topLevel: 1},
+		"A.foo|duration|env:default,resource:β,service:A": expectedDistribution{
+			entries: []quantile.Entry{quantile.Entry{V: 2, G: 1, Delta: 0}}, topLevel: 1},
+		"B.foo|duration|env:default,resource:γ,service:B": expectedDistribution{
+			entries: []quantile.Entry{quantile.Entry{V: 3, G: 1, Delta: 0}}, topLevel: 1},
+		"B.foo|duration|env:default,resource:ε,service:B": expectedDistribution{
+			entries: []quantile.Entry{quantile.Entry{V: 4, G: 1, Delta: 0}}, topLevel: 1},
+		"B.foo|duration|env:default,resource:ζ,service:B": expectedDistribution{
+			entries: []quantile.Entry{quantile.Entry{V: 5, G: 1, Delta: 0}}, topLevel: 1},
+		"sql.query|duration|env:default,resource:ζ,service:B": expectedDistribution{
+			entries: []quantile.Entry{quantile.Entry{V: 6, G: 1, Delta: 0}}, topLevel: 1},
+		"sql.query|duration|env:default,resource:δ,service:C": expectedDistribution{
+			entries: []quantile.Entry{quantile.Entry{V: 7, G: 1, Delta: 0}, quantile.Entry{V: 8, G: 1, Delta: 0}}, topLevel: 2},
 	}
 
 	for k, v := range sb.Distributions {
@@ -175,28 +182,28 @@ func TestStatsBucketExtraAggregators(t *testing.T) {
 	}
 	sb := srb.Export()
 
-	expectedCounts := map[string]float64{
-		"A.foo|duration|env:default,resource:α,service:A":                 1,
-		"A.foo|duration|env:default,resource:β,service:A":                 2,
-		"B.foo|duration|env:default,resource:γ,service:B":                 3,
-		"B.foo|duration|env:default,resource:ε,service:B":                 4,
-		"sql.query|duration|env:default,resource:δ,service:C":             15,
-		"A.foo|errors|env:default,resource:α,service:A":                   0,
-		"A.foo|errors|env:default,resource:β,service:A":                   1,
-		"B.foo|errors|env:default,resource:γ,service:B":                   0,
-		"B.foo|errors|env:default,resource:ε,service:B":                   1,
-		"sql.query|errors|env:default,resource:δ,service:C":               0,
-		"A.foo|hits|env:default,resource:α,service:A":                     1,
-		"A.foo|hits|env:default,resource:β,service:A":                     1,
-		"B.foo|hits|env:default,resource:γ,service:B":                     1,
-		"B.foo|hits|env:default,resource:ε,service:B":                     1,
-		"sql.query|hits|env:default,resource:δ,service:C":                 2,
-		"sql.query|errors|env:default,resource:ζ,service:B,version:1.4":   0,
-		"sql.query|hits|env:default,resource:ζ,service:B,version:1.4":     1,
-		"sql.query|duration|env:default,resource:ζ,service:B,version:1.4": 6,
-		"B.foo|errors|env:default,resource:ζ,service:B,version:1.3":       0,
-		"B.foo|duration|env:default,resource:ζ,service:B,version:1.3":     5,
-		"B.foo|hits|env:default,resource:ζ,service:B,version:1.3":         1,
+	expectedCounts := map[string]expectedCount{
+		"A.foo|duration|env:default,resource:α,service:A":                 expectedCount{value: 1, topLevel: 1},
+		"A.foo|duration|env:default,resource:β,service:A":                 expectedCount{value: 2, topLevel: 1},
+		"B.foo|duration|env:default,resource:γ,service:B":                 expectedCount{value: 3, topLevel: 1},
+		"B.foo|duration|env:default,resource:ε,service:B":                 expectedCount{value: 4, topLevel: 1},
+		"sql.query|duration|env:default,resource:δ,service:C":             expectedCount{value: 15, topLevel: 2},
+		"A.foo|errors|env:default,resource:α,service:A":                   expectedCount{value: 0, topLevel: 1},
+		"A.foo|errors|env:default,resource:β,service:A":                   expectedCount{value: 1, topLevel: 1},
+		"B.foo|errors|env:default,resource:γ,service:B":                   expectedCount{value: 0, topLevel: 1},
+		"B.foo|errors|env:default,resource:ε,service:B":                   expectedCount{value: 1, topLevel: 1},
+		"sql.query|errors|env:default,resource:δ,service:C":               expectedCount{value: 0, topLevel: 2},
+		"A.foo|hits|env:default,resource:α,service:A":                     expectedCount{value: 1, topLevel: 1},
+		"A.foo|hits|env:default,resource:β,service:A":                     expectedCount{value: 1, topLevel: 1},
+		"B.foo|hits|env:default,resource:γ,service:B":                     expectedCount{value: 1, topLevel: 1},
+		"B.foo|hits|env:default,resource:ε,service:B":                     expectedCount{value: 1, topLevel: 1},
+		"sql.query|hits|env:default,resource:δ,service:C":                 expectedCount{value: 2, topLevel: 2},
+		"sql.query|errors|env:default,resource:ζ,service:B,version:1.4":   expectedCount{value: 0, topLevel: 1},
+		"sql.query|hits|env:default,resource:ζ,service:B,version:1.4":     expectedCount{value: 1, topLevel: 1},
+		"sql.query|duration|env:default,resource:ζ,service:B,version:1.4": expectedCount{value: 6, topLevel: 1},
+		"B.foo|errors|env:default,resource:ζ,service:B,version:1.3":       expectedCount{value: 0, topLevel: 1},
+		"B.foo|duration|env:default,resource:ζ,service:B,version:1.3":     expectedCount{value: 5, topLevel: 1},
+		"B.foo|hits|env:default,resource:ζ,service:B,version:1.3":         expectedCount{value: 1, topLevel: 1},
 	}
 
 	assert.Len(sb.Counts, len(expectedCounts), "Missing counts!")
@@ -205,7 +212,8 @@ func TestStatsBucketExtraAggregators(t *testing.T) {
 		if !ok {
 			assert.Fail("Unexpected count %s", ckey)
 		}
-		assert.Equal(val, c.Value, "Count %s wrong value", ckey)
+		assert.Equal(val.value, c.Value, "Count %s wrong value", ckey)
+		assert.Equal(val.topLevel, c.TopLevel, "Count %s wrong topLevel", ckey)
 		keyFields := strings.Split(ckey, "|")
 		tags := NewTagSetFromString(keyFields[2])
 		assert.Equal(tags, c.TagSet, "bad tagset for count %s", ckey)
@@ -320,10 +328,14 @@ func TestStatsBucketSublayers(t *testing.T) {
 	}
 
 	expectedDistributions := map[string]expectedDistribution{
-		"A.foo|duration|env:default,resource:α,service:A":                                        expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 100, G: 1, Delta: 0}}, topLevel: 1},
-		"B.bar|duration|env:default,resource:α,service:B":                                        expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 20, G: 1, Delta: 0}}, topLevel: 1},
-		"sql.query|duration|env:default,resource:SELECT value FROM table,service:C":              expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 5, G: 1, Delta: 0}}, topLevel: 1},
-		"sql.query|duration|env:default,resource:SELECT ololololo... value FROM table,service:C": expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 3, G: 1, Delta: 0}}, topLevel: 1},
+		"A.foo|duration|env:default,resource:α,service:A": expectedDistribution{
+			entries: []quantile.Entry{quantile.Entry{V: 100, G: 1, Delta: 0}}, topLevel: 1},
+		"B.bar|duration|env:default,resource:α,service:B": expectedDistribution{
+			entries: []quantile.Entry{quantile.Entry{V: 20, G: 1, Delta: 0}}, topLevel: 1},
+		"sql.query|duration|env:default,resource:SELECT value FROM table,service:C": expectedDistribution{
+			entries: []quantile.Entry{quantile.Entry{V: 5, G: 1, Delta: 0}}, topLevel: 1},
+		"sql.query|duration|env:default,resource:SELECT ololololo... value FROM table,service:C": expectedDistribution{
+			entries: []quantile.Entry{quantile.Entry{V: 3, G: 1, Delta: 0}}, topLevel: 1},
 	}
 
 	assert.Len(sb.Distributions, len(expectedDistributions), "Missing distributions!")
@@ -405,11 +417,15 @@ func TestStatsBucketSublayersTopLevel(t *testing.T) {
 	}
 
 	expectedDistributions := map[string]expectedDistribution{
-		"A.foo|duration|env:default,resource:α,service:A": expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 100, G: 1, Delta: 0}}, topLevel: 1},
-		"B.bar|duration|env:default,resource:α,service:B": expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 20, G: 1, Delta: 0}}, topLevel: 1},
+		"A.foo|duration|env:default,resource:α,service:A": expectedDistribution{
+			entries: []quantile.Entry{quantile.Entry{V: 100, G: 1, Delta: 0}}, topLevel: 1},
+		"B.bar|duration|env:default,resource:α,service:B": expectedDistribution{
+			entries: []quantile.Entry{quantile.Entry{V: 20, G: 1, Delta: 0}}, topLevel: 1},
 		// [TODO] the ultimate target is to *NOT* compute & store the counts below, which have topLevel == 0
-		"B.bar.1|duration|env:default,resource:α,service:B": expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 5, G: 1, Delta: 0}}, topLevel: 0},
-		"B.bar.2|duration|env:default,resource:α,service:B": expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 3, G: 1, Delta: 0}}, topLevel: 0},
+		"B.bar.1|duration|env:default,resource:α,service:B": expectedDistribution{
+			entries: []quantile.Entry{quantile.Entry{V: 5, G: 1, Delta: 0}}, topLevel: 0},
+		"B.bar.2|duration|env:default,resource:α,service:B": expectedDistribution{
+			entries: []quantile.Entry{quantile.Entry{V: 3, G: 1, Delta: 0}}, topLevel: 0},
 	}
 
 	assert.Len(sb.Distributions, len(expectedDistributions), "Missing distributions!")
