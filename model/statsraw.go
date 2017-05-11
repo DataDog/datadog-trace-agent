@@ -13,8 +13,7 @@ import (
 type groupedStats struct {
 	tags TagSet
 
-	topLevel     bool
-	forceMetrics bool
+	topLevel int
 
 	hits                 float64
 	errors               float64
@@ -25,8 +24,7 @@ type groupedStats struct {
 type sublayerStats struct {
 	tags TagSet
 
-	topLevel     bool
-	forceMetrics bool
+	topLevel int
 
 	value int64
 }
@@ -91,54 +89,49 @@ func (sb *StatsRawBucket) Export() StatsBucket {
 	for k, v := range sb.data {
 		hitsKey := GrainKey(k.name, HITS, k.aggr)
 		ret.Counts[hitsKey] = Count{
-			Key:          hitsKey,
-			Name:         k.name,
-			Measure:      HITS,
-			TagSet:       v.tags,
-			SubName:      !v.topLevel,
-			ForceMetrics: v.forceMetrics,
-			Value:        float64(v.hits),
+			Key:      hitsKey,
+			Name:     k.name,
+			Measure:  HITS,
+			TagSet:   v.tags,
+			TopLevel: v.topLevel,
+			Value:    float64(v.hits),
 		}
 		errorsKey := GrainKey(k.name, ERRORS, k.aggr)
 		ret.Counts[errorsKey] = Count{
-			Key:          errorsKey,
-			Name:         k.name,
-			Measure:      ERRORS,
-			TagSet:       v.tags,
-			SubName:      !v.topLevel,
-			ForceMetrics: v.forceMetrics,
-			Value:        float64(v.errors),
+			Key:      errorsKey,
+			Name:     k.name,
+			Measure:  ERRORS,
+			TagSet:   v.tags,
+			TopLevel: v.topLevel,
+			Value:    float64(v.errors),
 		}
 		durationKey := GrainKey(k.name, DURATION, k.aggr)
 		ret.Counts[durationKey] = Count{
-			Key:          durationKey,
-			Name:         k.name,
-			Measure:      DURATION,
-			TagSet:       v.tags,
-			SubName:      !v.topLevel,
-			ForceMetrics: v.forceMetrics,
-			Value:        float64(v.duration),
+			Key:      durationKey,
+			Name:     k.name,
+			Measure:  DURATION,
+			TagSet:   v.tags,
+			TopLevel: v.topLevel,
+			Value:    float64(v.duration),
 		}
 		ret.Distributions[durationKey] = Distribution{
-			Key:          durationKey,
-			Name:         k.name,
-			Measure:      DURATION,
-			TagSet:       v.tags,
-			SubName:      !v.topLevel,
-			ForceMetrics: v.forceMetrics,
-			Summary:      v.durationDistribution,
+			Key:      durationKey,
+			Name:     k.name,
+			Measure:  DURATION,
+			TagSet:   v.tags,
+			TopLevel: v.topLevel,
+			Summary:  v.durationDistribution,
 		}
 	}
 	for k, v := range sb.sublayerData {
 		key := GrainKey(k.name, k.measure, k.aggr)
 		ret.Counts[key] = Count{
-			Key:          key,
-			Name:         k.name,
-			Measure:      k.measure,
-			TagSet:       v.tags,
-			SubName:      !v.topLevel,
-			ForceMetrics: v.forceMetrics,
-			Value:        float64(v.value),
+			Key:      key,
+			Name:     k.name,
+			Measure:  k.measure,
+			TagSet:   v.tags,
+			TopLevel: v.topLevel,
+			Value:    float64(v.value),
 		}
 	}
 	return ret
@@ -209,11 +202,7 @@ func (sb *StatsRawBucket) HandleSpan(s Span, env string, aggregators []string, w
 
 func (sb *StatsRawBucket) add(s Span, weight float64, aggr string, tags TagSet) {
 	// [TODO:christian] the day we want to skip stats on non top-level spans
-	// totally, do it with something like:
-	// // if this is not a top-level name -> don't keep track of any stats
-	// if !s.TopLevel() && !s.ForceMetrics() {
-	//     return
-	// }
+	// totally, do it here.
 
 	var gs groupedStats
 	var ok bool
@@ -223,13 +212,8 @@ func (sb *StatsRawBucket) add(s Span, weight float64, aggr string, tags TagSet) 
 		gs = newGroupedStats(tags)
 	}
 
-	// if at least one span is marked, taint the whole stat
 	if s.TopLevel() {
-		gs.topLevel = true
-	}
-	// if at least one span is marked as forced, taint the whole stat
-	if s.ForceMetrics() {
-		gs.forceMetrics = true
+		gs.topLevel++
 	}
 
 	gs.hits += weight
@@ -265,13 +249,8 @@ func (sb *StatsRawBucket) addSublayer(s Span, aggr string, tags TagSet, sub Subl
 		ss = newSublayerStats(subTags)
 	}
 
-	// if at least one span is marked, taint the whole stat
 	if s.TopLevel() {
-		ss.topLevel = true
-	}
-	// if at least one span is marked as forced, taint the whole stat
-	if s.ForceMetrics() {
-		ss.forceMetrics = true
+		ss.topLevel++
 	}
 
 	ss.value += int64(sub.Value)

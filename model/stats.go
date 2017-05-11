@@ -28,8 +28,7 @@ type Count struct {
 	Measure string `json:"measure"` // represents the entity we count, e.g. "hits", "errors", "time" (was Name)
 	TagSet  TagSet `json:"tagset"`  // set of tags for which we account this Distribution
 
-	SubName      bool `json:"sub_name"`      // true for sub-name (non top-level) stats
-	ForceMetrics bool `json:"force_metrics"` // true if stats should be computed no matter what
+	TopLevel int `json:"top_level"` // number of top-level spans contributing to this count
 
 	Value float64 `json:"value"` // accumulated values
 }
@@ -41,8 +40,7 @@ type Distribution struct {
 	Measure string `json:"measure"` // represents the entity we count, e.g. "hits", "errors", "time"
 	TagSet  TagSet `json:"tagset"`  // set of tags for which we account this Distribution
 
-	SubName      bool `json:"sub_name"`      // true for sub-name (non top-level) stats
-	ForceMetrics bool `json:"force_metrics"` // true if stats should be computed no matter what
+	TopLevel int `json:"top_level"` // number of top-level spans contributing to this count
 
 	Summary *quantile.SliceSummary `json:"summary"` // actual representation of data
 }

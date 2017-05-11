@@ -54,6 +54,16 @@ func TestGrainKey(t *testing.T) {
 	assert.Equal("serve|duration|service:webserver", gk)
 }
 
+type expectedCount struct {
+	value    float64
+	topLevel int
+}
+
+type expectedDistribution struct {
+	len      int
+	topLevel int
+}
+
 func TestStatsBucketDefault(t *testing.T) {
 	assert := assert.New(t)
 
@@ -66,28 +76,28 @@ func TestStatsBucketDefault(t *testing.T) {
 	}
 	sb := srb.Export()
 
-	expectedCounts := map[string]float64{
-		"A.foo|duration|env:default,resource:α,service:A":     1,
-		"A.foo|duration|env:default,resource:β,service:A":     2,
-		"B.foo|duration|env:default,resource:γ,service:B":     3,
-		"B.foo|duration|env:default,resource:ε,service:B":     4,
-		"B.foo|duration|env:default,resource:ζ,service:B":     5,
-		"sql.query|duration|env:default,resource:ζ,service:B": 6,
-		"sql.query|duration|env:default,resource:δ,service:C": 15,
-		"A.foo|errors|env:default,resource:α,service:A":       0,
-		"A.foo|errors|env:default,resource:β,service:A":       1,
-		"B.foo|errors|env:default,resource:γ,service:B":       0,
-		"B.foo|errors|env:default,resource:ε,service:B":       1,
-		"B.foo|errors|env:default,resource:ζ,service:B":       0,
-		"sql.query|errors|env:default,resource:ζ,service:B":   0,
-		"sql.query|errors|env:default,resource:δ,service:C":   0,
-		"A.foo|hits|env:default,resource:α,service:A":         1,
-		"A.foo|hits|env:default,resource:β,service:A":         1,
-		"B.foo|hits|env:default,resource:γ,service:B":         1,
-		"B.foo|hits|env:default,resource:ε,service:B":         1,
-		"B.foo|hits|env:default,resource:ζ,service:B":         1,
-		"sql.query|hits|env:default,resource:ζ,service:B":     1,
-		"sql.query|hits|env:default,resource:δ,service:C":     2,
+	expectedCounts := map[string]expectedCount{
+		"A.foo|duration|env:default,resource:α,service:A":     expectedCount{value: 1, topLevel: 1},
+		"A.foo|duration|env:default,resource:β,service:A":     expectedCount{value: 2, topLevel: 1},
+		"B.foo|duration|env:default,resource:γ,service:B":     expectedCount{value: 3, topLevel: 1},
+		"B.foo|duration|env:default,resource:ε,service:B":     expectedCount{value: 4, topLevel: 1},
+		"B.foo|duration|env:default,resource:ζ,service:B":     expectedCount{value: 5, topLevel: 1},
+		"sql.query|duration|env:default,resource:ζ,service:B": expectedCount{value: 6, topLevel: 1},
+		"sql.query|duration|env:default,resource:δ,service:C": expectedCount{value: 15, topLevel: 2},
+		"A.foo|errors|env:default,resource:α,service:A":       expectedCount{value: 0, topLevel: 1},
+		"A.foo|errors|env:default,resource:β,service:A":       expectedCount{value: 1, topLevel: 1},
+		"B.foo|errors|env:default,resource:γ,service:B":       expectedCount{value: 0, topLevel: 1},
+		"B.foo|errors|env:default,resource:ε,service:B":       expectedCount{value: 1, topLevel: 1},
+		"B.foo|errors|env:default,resource:ζ,service:B":       expectedCount{value: 0, topLevel: 1},
+		"sql.query|errors|env:default,resource:ζ,service:B":   expectedCount{value: 0, topLevel: 1},
+		"sql.query|errors|env:default,resource:δ,service:C":   expectedCount{value: 0, topLevel: 2},
+		"A.foo|hits|env:default,resource:α,service:A":         expectedCount{value: 1, topLevel: 1},
+		"A.foo|hits|env:default,resource:β,service:A":         expectedCount{value: 1, topLevel: 1},
+		"B.foo|hits|env:default,resource:γ,service:B":         expectedCount{value: 1, topLevel: 1},
+		"B.foo|hits|env:default,resource:ε,service:B":         expectedCount{value: 1, topLevel: 1},
+		"B.foo|hits|env:default,resource:ζ,service:B":         expectedCount{value: 1, topLevel: 1},
+		"sql.query|hits|env:default,resource:ζ,service:B":     expectedCount{value: 1, topLevel: 1},
+		"sql.query|hits|env:default,resource:δ,service:C":     expectedCount{value: 2, topLevel: 2},
 	}
 
 	assert.Len(sb.Counts, len(expectedCounts), "Missing counts!")
@@ -96,19 +106,18 @@ func TestStatsBucketDefault(t *testing.T) {
 		if !ok {
 			assert.Fail("Unexpected count %s", ckey)
 		}
-		assert.Equal(val, c.Value, "Count %s wrong value", ckey)
-		assert.False(c.SubName, "stats should be considered top-level by default")
-		assert.False(c.ForceMetrics, "metrics should not be enforced by default")
+		assert.Equal(val.value, c.Value, "Count %s wrong value", ckey)
+		assert.Equal(val.topLevel, c.TopLevel, "Count %s wrong topLevel", ckey)
 	}
 
-	expectedDistributions := map[string]int{
-		"A.foo|duration|env:default,resource:α,service:A":     1,
-		"A.foo|duration|env:default,resource:β,service:A":     1,
-		"B.foo|duration|env:default,resource:γ,service:B":     1,
-		"B.foo|duration|env:default,resource:ε,service:B":     1,
-		"B.foo|duration|env:default,resource:ζ,service:B":     1,
-		"sql.query|duration|env:default,resource:ζ,service:B": 1,
-		"sql.query|duration|env:default,resource:δ,service:C": 2,
+	expectedDistributions := map[string]expectedDistribution{
+		"A.foo|duration|env:default,resource:α,service:A":     expectedDistribution{len: 1, topLevel: 1},
+		"A.foo|duration|env:default,resource:β,service:A":     expectedDistribution{len: 1, topLevel: 1},
+		"B.foo|duration|env:default,resource:γ,service:B":     expectedDistribution{len: 1, topLevel: 1},
+		"B.foo|duration|env:default,resource:ε,service:B":     expectedDistribution{len: 1, topLevel: 1},
+		"B.foo|duration|env:default,resource:ζ,service:B":     expectedDistribution{len: 1, topLevel: 1},
+		"sql.query|duration|env:default,resource:ζ,service:B": expectedDistribution{len: 1, topLevel: 1},
+		"sql.query|duration|env:default,resource:δ,service:C": expectedDistribution{len: 2, topLevel: 2},
 	}
 
 	for k, v := range sb.Distributions {
@@ -120,9 +129,8 @@ func TestStatsBucketDefault(t *testing.T) {
 		if !ok {
 			assert.Fail("Unexpected distribution %s", dkey)
 		}
-		assert.Equal(val, len(d.Summary.Entries), "Distribution %s wrong value", dkey)
-		assert.False(d.SubName, "stats should be considered top-level by default")
-		assert.False(d.ForceMetrics, "metrics should not be enforced by default")
+		assert.Equal(val.len, len(d.Summary.Entries), "Distribution %s wrong value", dkey)
+		assert.Equal(val.topLevel, d.TopLevel, "Count %s wrong topLevel", dkey)
 	}
 }
 
