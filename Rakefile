@@ -66,6 +66,16 @@ task :build do
   })
 end
 
+desc "Build Datadog Trace agent for windows"
+task :windows do
+  ["386", "amd64"].each do |arch|
+    go_build("github.com/DataDog/datadog-trace-agent/agent", {
+               :cmd => "GOOS=windows GOARCH=#{arch} go build -a -o trace-agent-windows-#{arch}.exe",
+               :race => ENV['GO_RACE'] == 'true'
+             })
+  end
+end
+
 desc "Install Datadog Trace agent"
 task :install do
   go_build("github.com/DataDog/datadog-trace-agent/agent", :cmd=>"go build -i -o $GOPATH/bin/trace-agent")
