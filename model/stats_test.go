@@ -54,6 +54,8 @@ func testTrace() Trace {
 func testTraceTopLevel() Trace {
 	// Data below represents a trace with some sublayers, so that we make sure,
 	// those data are correctly calculated when aggregating in HandleSpan()
+	// In this case, the sublayers B and C have been merged into B,
+	// showing what happens when some spans are not marked as top-level.
 	// A |---------------------------------------------------------------| duration: 100
 	// B   |----------------------|                                        duration: 20
 	// B     |-----| |---|                                                 duration: 5+3
@@ -87,7 +89,7 @@ type expectedCount struct {
 }
 
 type expectedDistribution struct {
-	len      int
+	entries  []quantile.Entry
 	topLevel int
 }
 
@@ -138,13 +140,13 @@ func TestStatsBucketDefault(t *testing.T) {
 	}
 
 	expectedDistributions := map[string]expectedDistribution{
-		"A.foo|duration|env:default,resource:α,service:A":     expectedDistribution{len: 1, topLevel: 1},
-		"A.foo|duration|env:default,resource:β,service:A":     expectedDistribution{len: 1, topLevel: 1},
-		"B.foo|duration|env:default,resource:γ,service:B":     expectedDistribution{len: 1, topLevel: 1},
-		"B.foo|duration|env:default,resource:ε,service:B":     expectedDistribution{len: 1, topLevel: 1},
-		"B.foo|duration|env:default,resource:ζ,service:B":     expectedDistribution{len: 1, topLevel: 1},
-		"sql.query|duration|env:default,resource:ζ,service:B": expectedDistribution{len: 1, topLevel: 1},
-		"sql.query|duration|env:default,resource:δ,service:C": expectedDistribution{len: 2, topLevel: 2},
+		"A.foo|duration|env:default,resource:α,service:A":     expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 1, G: 1, Delta: 0}}, topLevel: 1},
+		"A.foo|duration|env:default,resource:β,service:A":     expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 2, G: 1, Delta: 0}}, topLevel: 1},
+		"B.foo|duration|env:default,resource:γ,service:B":     expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 3, G: 1, Delta: 0}}, topLevel: 1},
+		"B.foo|duration|env:default,resource:ε,service:B":     expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 4, G: 1, Delta: 0}}, topLevel: 1},
+		"B.foo|duration|env:default,resource:ζ,service:B":     expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 5, G: 1, Delta: 0}}, topLevel: 1},
+		"sql.query|duration|env:default,resource:ζ,service:B": expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 6, G: 1, Delta: 0}}, topLevel: 1},
+		"sql.query|duration|env:default,resource:δ,service:C": expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 7, G: 1, Delta: 0}, quantile.Entry{V: 8, G: 1, Delta: 0}}, topLevel: 2},
 	}
 
 	for k, v := range sb.Distributions {
@@ -156,8 +158,8 @@ func TestStatsBucketDefault(t *testing.T) {
 		if !ok {
 			assert.Fail("Unexpected distribution %s", dkey)
 		}
-		assert.Equal(val.len, len(d.Summary.Entries), "Distribution %s wrong value", dkey)
-		assert.Equal(val.topLevel, d.TopLevel, "Count %s wrong topLevel", dkey)
+		assert.Equal(val.entries, d.Summary.Entries, "Distribution %s wrong value", dkey)
+		assert.Equal(val.topLevel, d.TopLevel, "Distribution %s wrong topLevel", dkey)
 	}
 }
 
@@ -317,11 +319,11 @@ func TestStatsBucketSublayers(t *testing.T) {
 		assert.Equal(tags, c.TagSet, "bad tagset for count %s", ckey)
 	}
 
-	expectedDistributions := map[string][]quantile.Entry{
-		"A.foo|duration|env:default,resource:α,service:A":                                        []quantile.Entry{quantile.Entry{V: 100, G: 1, Delta: 0}},
-		"B.bar|duration|env:default,resource:α,service:B":                                        []quantile.Entry{quantile.Entry{V: 20, G: 1, Delta: 0}},
-		"sql.query|duration|env:default,resource:SELECT value FROM table,service:C":              []quantile.Entry{quantile.Entry{V: 5, G: 1, Delta: 0}},
-		"sql.query|duration|env:default,resource:SELECT ololololo... value FROM table,service:C": []quantile.Entry{quantile.Entry{V: 3, G: 1, Delta: 0}},
+	expectedDistributions := map[string]expectedDistribution{
+		"A.foo|duration|env:default,resource:α,service:A":                                        expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 100, G: 1, Delta: 0}}, topLevel: 1},
+		"B.bar|duration|env:default,resource:α,service:B":                                        expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 20, G: 1, Delta: 0}}, topLevel: 1},
+		"sql.query|duration|env:default,resource:SELECT value FROM table,service:C":              expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 5, G: 1, Delta: 0}}, topLevel: 1},
+		"sql.query|duration|env:default,resource:SELECT ololololo... value FROM table,service:C": expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 3, G: 1, Delta: 0}}, topLevel: 1},
 	}
 
 	assert.Len(sb.Distributions, len(expectedDistributions), "Missing distributions!")
@@ -330,7 +332,8 @@ func TestStatsBucketSublayers(t *testing.T) {
 		if !ok {
 			assert.Fail("Unexpected distribution %s", dkey)
 		}
-		assert.Equal(val, d.Summary.Entries, "Distribution %s wrong value", dkey)
+		assert.Equal(val.entries, d.Summary.Entries, "Distribution %s wrong value", dkey)
+		assert.Equal(val.topLevel, d.TopLevel, "Distribution %s wrong topLevel", dkey)
 		keyFields := strings.Split(dkey, "|")
 		tags := NewTagSetFromString(keyFields[2])
 		assert.Equal(tags, d.TagSet, "bad tagset for distribution %s", dkey)
@@ -357,20 +360,21 @@ func TestStatsBucketSublayersTopLevel(t *testing.T) {
 	sb := srb.Export()
 
 	expectedCounts := map[string]expectedCount{
-		"A.foo|_sublayers.duration.by_service|env:default,resource:α,service:A,sublayer_service:A":   expectedCount{value: 80, topLevel: 1},
-		"A.foo|_sublayers.duration.by_service|env:default,resource:α,service:A,sublayer_service:B":   expectedCount{value: 20, topLevel: 1},
-		"A.foo|_sublayers.duration.by_type|env:default,resource:α,service:A,sublayer_type:web":       expectedCount{value: 100, topLevel: 1},
-		"A.foo|_sublayers.span_count|env:default,resource:α,service:A,:":                             expectedCount{value: 4, topLevel: 1},
-		"A.foo|hits|env:default,resource:α,service:A":                                                expectedCount{value: 1, topLevel: 1},
-		"A.foo|errors|env:default,resource:α,service:A":                                              expectedCount{value: 0, topLevel: 1},
-		"A.foo|duration|env:default,resource:α,service:A":                                            expectedCount{value: 100, topLevel: 1},
-		"B.bar|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:A":   expectedCount{value: 80, topLevel: 1},
-		"B.bar|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:B":   expectedCount{value: 20, topLevel: 1},
-		"B.bar|_sublayers.duration.by_type|env:default,resource:α,service:B,sublayer_type:web":       expectedCount{value: 100, topLevel: 1},
-		"B.bar|_sublayers.span_count|env:default,resource:α,service:B,:":                             expectedCount{value: 4, topLevel: 1},
-		"B.bar|hits|env:default,resource:α,service:B":                                                expectedCount{value: 1, topLevel: 1},
-		"B.bar|errors|env:default,resource:α,service:B":                                              expectedCount{value: 0, topLevel: 1},
-		"B.bar|duration|env:default,resource:α,service:B":                                            expectedCount{value: 20, topLevel: 1},
+		"A.foo|_sublayers.duration.by_service|env:default,resource:α,service:A,sublayer_service:A": expectedCount{value: 80, topLevel: 1},
+		"A.foo|_sublayers.duration.by_service|env:default,resource:α,service:A,sublayer_service:B": expectedCount{value: 20, topLevel: 1},
+		"A.foo|_sublayers.duration.by_type|env:default,resource:α,service:A,sublayer_type:web":     expectedCount{value: 100, topLevel: 1},
+		"A.foo|_sublayers.span_count|env:default,resource:α,service:A,:":                           expectedCount{value: 4, topLevel: 1},
+		"A.foo|hits|env:default,resource:α,service:A":                                              expectedCount{value: 1, topLevel: 1},
+		"A.foo|errors|env:default,resource:α,service:A":                                            expectedCount{value: 0, topLevel: 1},
+		"A.foo|duration|env:default,resource:α,service:A":                                          expectedCount{value: 100, topLevel: 1},
+		"B.bar|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:A": expectedCount{value: 80, topLevel: 1},
+		"B.bar|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:B": expectedCount{value: 20, topLevel: 1},
+		"B.bar|_sublayers.duration.by_type|env:default,resource:α,service:B,sublayer_type:web":     expectedCount{value: 100, topLevel: 1},
+		"B.bar|_sublayers.span_count|env:default,resource:α,service:B,:":                           expectedCount{value: 4, topLevel: 1},
+		"B.bar|hits|env:default,resource:α,service:B":                                              expectedCount{value: 1, topLevel: 1},
+		"B.bar|errors|env:default,resource:α,service:B":                                            expectedCount{value: 0, topLevel: 1},
+		"B.bar|duration|env:default,resource:α,service:B":                                          expectedCount{value: 20, topLevel: 1},
+		// [TODO] the ultimate target is to *NOT* compute & store the counts below, which have topLevel == 0
 		"B.bar.1|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:A": expectedCount{value: 80, topLevel: 0},
 		"B.bar.1|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:B": expectedCount{value: 20, topLevel: 0},
 		"B.bar.1|_sublayers.duration.by_type|env:default,resource:α,service:B,sublayer_type:web":     expectedCount{value: 100, topLevel: 0},
@@ -400,11 +404,12 @@ func TestStatsBucketSublayersTopLevel(t *testing.T) {
 		assert.Equal(tags, c.TagSet, "bad tagset for count %s", ckey)
 	}
 
-	expectedDistributions := map[string][]quantile.Entry{
-		"A.foo|duration|env:default,resource:α,service:A":   []quantile.Entry{quantile.Entry{V: 100, G: 1, Delta: 0}},
-		"B.bar|duration|env:default,resource:α,service:B":   []quantile.Entry{quantile.Entry{V: 20, G: 1, Delta: 0}},
-		"B.bar.1|duration|env:default,resource:α,service:B": []quantile.Entry{quantile.Entry{V: 5, G: 1, Delta: 0}},
-		"B.bar.2|duration|env:default,resource:α,service:B": []quantile.Entry{quantile.Entry{V: 3, G: 1, Delta: 0}},
+	expectedDistributions := map[string]expectedDistribution{
+		"A.foo|duration|env:default,resource:α,service:A": expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 100, G: 1, Delta: 0}}, topLevel: 1},
+		"B.bar|duration|env:default,resource:α,service:B": expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 20, G: 1, Delta: 0}}, topLevel: 1},
+		// [TODO] the ultimate target is to *NOT* compute & store the counts below, which have topLevel == 0
+		"B.bar.1|duration|env:default,resource:α,service:B": expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 5, G: 1, Delta: 0}}, topLevel: 0},
+		"B.bar.2|duration|env:default,resource:α,service:B": expectedDistribution{entries: []quantile.Entry{quantile.Entry{V: 3, G: 1, Delta: 0}}, topLevel: 0},
 	}
 
 	assert.Len(sb.Distributions, len(expectedDistributions), "Missing distributions!")
@@ -413,7 +418,8 @@ func TestStatsBucketSublayersTopLevel(t *testing.T) {
 		if !ok {
 			assert.Fail("Unexpected distribution %s", dkey)
 		}
-		assert.Equal(val, d.Summary.Entries, "Distribution %s wrong value", dkey)
+		assert.Equal(val.entries, d.Summary.Entries, "Distribution %s wrong value", dkey)
+		assert.Equal(val.topLevel, d.TopLevel, "Distribution %s wrong topLevel", dkey)
 		keyFields := strings.Split(dkey, "|")
 		tags := NewTagSetFromString(keyFields[2])
 		assert.Equal(tags, d.TagSet, "bad tagset for distribution %s", dkey)
