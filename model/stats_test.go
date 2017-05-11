@@ -33,7 +33,7 @@ func testTrace() Trace {
 	// A |---------------------------------------------------------------| duration: 100
 	// B   |----------------------|                                        duration: 20
 	// C     |-----| |---|                                                 duration: 5+3
-	return Trace{
+	trace := Trace{
 		Span{TraceID: 42, SpanID: 42, ParentID: 0, Service: "A",
 			Name: "A.foo", Type: "web", Resource: "α", Start: 0, Duration: 100,
 			Metrics: map[string]float64{SpanSampleRateMetricKey: 0.5}},
@@ -46,6 +46,9 @@ func testTrace() Trace {
 			Name: "sql.query", Type: "sql", Resource: "SELECT ololololo... value FROM table",
 			Start: 10, Duration: 3, Error: 1},
 	}
+
+	trace.ComputeTopLevel()
+	return trace
 }
 
 func TestGrainKey(t *testing.T) {
@@ -238,43 +241,43 @@ func TestStatsBucketSublayers(t *testing.T) {
 	}
 	sb := srb.Export()
 
-	expectedCounts := map[string]float64{
-		"A.foo|_sublayers.duration.by_service|env:default,resource:α,service:A,sublayer_service:A":                                        80,
-		"A.foo|_sublayers.duration.by_service|env:default,resource:α,service:A,sublayer_service:B":                                        12,
-		"A.foo|_sublayers.duration.by_service|env:default,resource:α,service:A,sublayer_service:C":                                        8,
-		"A.foo|_sublayers.duration.by_type|env:default,resource:α,service:A,sublayer_type:sql":                                            8,
-		"A.foo|_sublayers.duration.by_type|env:default,resource:α,service:A,sublayer_type:web":                                            92,
-		"A.foo|_sublayers.span_count|env:default,resource:α,service:A,:":                                                                  4,
-		"A.foo|duration|env:default,resource:α,service:A":                                                                                 200,
-		"A.foo|errors|env:default,resource:α,service:A":                                                                                   0,
-		"A.foo|hits|env:default,resource:α,service:A":                                                                                     2,
-		"B.bar|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:A":                                        80,
-		"B.bar|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:B":                                        12,
-		"B.bar|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:C":                                        8,
-		"B.bar|_sublayers.duration.by_type|env:default,resource:α,service:B,sublayer_type:sql":                                            8,
-		"B.bar|_sublayers.duration.by_type|env:default,resource:α,service:B,sublayer_type:web":                                            92,
-		"B.bar|_sublayers.span_count|env:default,resource:α,service:B,:":                                                                  4,
-		"B.bar|duration|env:default,resource:α,service:B":                                                                                 40,
-		"B.bar|errors|env:default,resource:α,service:B":                                                                                   0,
-		"B.bar|hits|env:default,resource:α,service:B":                                                                                     2,
-		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT ololololo... value FROM table,service:C,sublayer_service:A": 80,
-		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT ololololo... value FROM table,service:C,sublayer_service:B": 12,
-		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT ololololo... value FROM table,service:C,sublayer_service:C": 8,
-		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT value FROM table,service:C,sublayer_service:A":              80,
-		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT value FROM table,service:C,sublayer_service:B":              12,
-		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT value FROM table,service:C,sublayer_service:C":              8,
-		"sql.query|_sublayers.duration.by_type|env:default,resource:SELECT ololololo... value FROM table,service:C,sublayer_type:sql":     8,
-		"sql.query|_sublayers.duration.by_type|env:default,resource:SELECT ololololo... value FROM table,service:C,sublayer_type:web":     92,
-		"sql.query|_sublayers.duration.by_type|env:default,resource:SELECT value FROM table,service:C,sublayer_type:sql":                  8,
-		"sql.query|_sublayers.duration.by_type|env:default,resource:SELECT value FROM table,service:C,sublayer_type:web":                  92,
-		"sql.query|_sublayers.span_count|env:default,resource:SELECT ololololo... value FROM table,service:C,:":                           4,
-		"sql.query|_sublayers.span_count|env:default,resource:SELECT value FROM table,service:C,:":                                        4,
-		"sql.query|duration|env:default,resource:SELECT ololololo... value FROM table,service:C":                                          6,
-		"sql.query|duration|env:default,resource:SELECT value FROM table,service:C":                                                       10,
-		"sql.query|errors|env:default,resource:SELECT ololololo... value FROM table,service:C":                                            2,
-		"sql.query|errors|env:default,resource:SELECT value FROM table,service:C":                                                         0,
-		"sql.query|hits|env:default,resource:SELECT ololololo... value FROM table,service:C":                                              2,
-		"sql.query|hits|env:default,resource:SELECT value FROM table,service:C":                                                           2,
+	expectedCounts := map[string]expectedCount{
+		"A.foo|_sublayers.duration.by_service|env:default,resource:α,service:A,sublayer_service:A":                                        expectedCount{value: 80, topLevel: 1},
+		"A.foo|_sublayers.duration.by_service|env:default,resource:α,service:A,sublayer_service:B":                                        expectedCount{value: 12, topLevel: 1},
+		"A.foo|_sublayers.duration.by_service|env:default,resource:α,service:A,sublayer_service:C":                                        expectedCount{value: 8, topLevel: 1},
+		"A.foo|_sublayers.duration.by_type|env:default,resource:α,service:A,sublayer_type:sql":                                            expectedCount{value: 8, topLevel: 1},
+		"A.foo|_sublayers.duration.by_type|env:default,resource:α,service:A,sublayer_type:web":                                            expectedCount{value: 92, topLevel: 1},
+		"A.foo|_sublayers.span_count|env:default,resource:α,service:A,:":                                                                  expectedCount{value: 4, topLevel: 1},
+		"A.foo|duration|env:default,resource:α,service:A":                                                                                 expectedCount{value: 200, topLevel: 1},
+		"A.foo|errors|env:default,resource:α,service:A":                                                                                   expectedCount{value: 0, topLevel: 1},
+		"A.foo|hits|env:default,resource:α,service:A":                                                                                     expectedCount{value: 2, topLevel: 1},
+		"B.bar|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:A":                                        expectedCount{value: 80, topLevel: 1},
+		"B.bar|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:B":                                        expectedCount{value: 12, topLevel: 1},
+		"B.bar|_sublayers.duration.by_service|env:default,resource:α,service:B,sublayer_service:C":                                        expectedCount{value: 8, topLevel: 1},
+		"B.bar|_sublayers.duration.by_type|env:default,resource:α,service:B,sublayer_type:sql":                                            expectedCount{value: 8, topLevel: 1},
+		"B.bar|_sublayers.duration.by_type|env:default,resource:α,service:B,sublayer_type:web":                                            expectedCount{value: 92, topLevel: 1},
+		"B.bar|_sublayers.span_count|env:default,resource:α,service:B,:":                                                                  expectedCount{value: 4, topLevel: 1},
+		"B.bar|duration|env:default,resource:α,service:B":                                                                                 expectedCount{value: 40, topLevel: 1},
+		"B.bar|errors|env:default,resource:α,service:B":                                                                                   expectedCount{value: 0, topLevel: 1},
+		"B.bar|hits|env:default,resource:α,service:B":                                                                                     expectedCount{value: 2, topLevel: 1},
+		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT ololololo... value FROM table,service:C,sublayer_service:A": expectedCount{value: 80, topLevel: 1},
+		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT ololololo... value FROM table,service:C,sublayer_service:B": expectedCount{value: 12, topLevel: 1},
+		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT ololololo... value FROM table,service:C,sublayer_service:C": expectedCount{value: 8, topLevel: 1},
+		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT value FROM table,service:C,sublayer_service:A":              expectedCount{value: 80, topLevel: 1},
+		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT value FROM table,service:C,sublayer_service:B":              expectedCount{value: 12, topLevel: 1},
+		"sql.query|_sublayers.duration.by_service|env:default,resource:SELECT value FROM table,service:C,sublayer_service:C":              expectedCount{value: 8, topLevel: 1},
+		"sql.query|_sublayers.duration.by_type|env:default,resource:SELECT ololololo... value FROM table,service:C,sublayer_type:sql":     expectedCount{value: 8, topLevel: 1},
+		"sql.query|_sublayers.duration.by_type|env:default,resource:SELECT ololololo... value FROM table,service:C,sublayer_type:web":     expectedCount{value: 92, topLevel: 1},
+		"sql.query|_sublayers.duration.by_type|env:default,resource:SELECT value FROM table,service:C,sublayer_type:sql":                  expectedCount{value: 8, topLevel: 1},
+		"sql.query|_sublayers.duration.by_type|env:default,resource:SELECT value FROM table,service:C,sublayer_type:web":                  expectedCount{value: 92, topLevel: 1},
+		"sql.query|_sublayers.span_count|env:default,resource:SELECT ololololo... value FROM table,service:C,:":                           expectedCount{value: 4, topLevel: 1},
+		"sql.query|_sublayers.span_count|env:default,resource:SELECT value FROM table,service:C,:":                                        expectedCount{value: 4, topLevel: 1},
+		"sql.query|duration|env:default,resource:SELECT ololololo... value FROM table,service:C":                                          expectedCount{value: 6, topLevel: 1},
+		"sql.query|duration|env:default,resource:SELECT value FROM table,service:C":                                                       expectedCount{value: 10, topLevel: 1},
+		"sql.query|errors|env:default,resource:SELECT ololololo... value FROM table,service:C":                                            expectedCount{value: 2, topLevel: 1},
+		"sql.query|errors|env:default,resource:SELECT value FROM table,service:C":                                                         expectedCount{value: 0, topLevel: 1},
+		"sql.query|hits|env:default,resource:SELECT ololololo... value FROM table,service:C":                                              expectedCount{value: 2, topLevel: 1},
+		"sql.query|hits|env:default,resource:SELECT value FROM table,service:C":                                                           expectedCount{value: 2, topLevel: 1},
 	}
 
 	assert.Len(sb.Counts, len(expectedCounts), "Missing counts!")
@@ -283,7 +286,8 @@ func TestStatsBucketSublayers(t *testing.T) {
 		if !ok {
 			assert.Fail("Unexpected count %s", ckey)
 		}
-		assert.Equal(val, c.Value, "Count %s wrong value", ckey)
+		assert.Equal(val.value, c.Value, "Count %s wrong value", ckey)
+		assert.Equal(val.topLevel, c.TopLevel, "Count %s wrong topLevel", ckey)
 		keyFields := strings.Split(ckey, "|")
 		tags := NewTagSetFromString(keyFields[2])
 		assert.Equal(tags, c.TagSet, "bad tagset for count %s", ckey)
