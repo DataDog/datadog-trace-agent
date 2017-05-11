@@ -201,9 +201,6 @@ func (sb *StatsRawBucket) HandleSpan(s Span, env string, aggregators []string, w
 }
 
 func (sb *StatsRawBucket) add(s Span, weight float64, aggr string, tags TagSet) {
-	// [TODO:christian] the day we want to skip stats on non top-level spans
-	// totally, do it here.
-
 	var gs groupedStats
 	var ok bool
 
