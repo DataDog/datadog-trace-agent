@@ -11,7 +11,10 @@ import (
 // is that the final data, the one with send after a call to Export(), is correct.
 
 type groupedStats struct {
-	tags                 TagSet
+	tags TagSet
+
+	topLevel int
+
 	hits                 float64
 	errors               float64
 	duration             float64
@@ -19,7 +22,10 @@ type groupedStats struct {
 }
 
 type sublayerStats struct {
-	tags  TagSet
+	tags TagSet
+
+	topLevel int
+
 	value int64
 }
 
@@ -83,44 +89,49 @@ func (sb *StatsRawBucket) Export() StatsBucket {
 	for k, v := range sb.data {
 		hitsKey := GrainKey(k.name, HITS, k.aggr)
 		ret.Counts[hitsKey] = Count{
-			Key:     hitsKey,
-			Name:    k.name,
-			Measure: HITS,
-			TagSet:  v.tags,
-			Value:   float64(v.hits),
+			Key:      hitsKey,
+			Name:     k.name,
+			Measure:  HITS,
+			TagSet:   v.tags,
+			TopLevel: v.topLevel,
+			Value:    float64(v.hits),
 		}
 		errorsKey := GrainKey(k.name, ERRORS, k.aggr)
 		ret.Counts[errorsKey] = Count{
-			Key:     errorsKey,
-			Name:    k.name,
-			Measure: ERRORS,
-			TagSet:  v.tags,
-			Value:   float64(v.errors),
+			Key:      errorsKey,
+			Name:     k.name,
+			Measure:  ERRORS,
+			TagSet:   v.tags,
+			TopLevel: v.topLevel,
+			Value:    float64(v.errors),
 		}
 		durationKey := GrainKey(k.name, DURATION, k.aggr)
 		ret.Counts[durationKey] = Count{
-			Key:     durationKey,
-			Name:    k.name,
-			Measure: DURATION,
-			TagSet:  v.tags,
-			Value:   float64(v.duration),
+			Key:      durationKey,
+			Name:     k.name,
+			Measure:  DURATION,
+			TagSet:   v.tags,
+			TopLevel: v.topLevel,
+			Value:    float64(v.duration),
 		}
 		ret.Distributions[durationKey] = Distribution{
-			Key:     durationKey,
-			Name:    k.name,
-			Measure: DURATION,
-			TagSet:  v.tags,
-			Summary: v.durationDistribution,
+			Key:      durationKey,
+			Name:     k.name,
+			Measure:  DURATION,
+			TagSet:   v.tags,
+			TopLevel: v.topLevel,
+			Summary:  v.durationDistribution,
 		}
 	}
 	for k, v := range sb.sublayerData {
 		key := GrainKey(k.name, k.measure, k.aggr)
 		ret.Counts[key] = Count{
-			Key:     key,
-			Name:    k.name,
-			Measure: k.measure,
-			TagSet:  v.tags,
-			Value:   float64(v.value),
+			Key:      key,
+			Name:     k.name,
+			Measure:  k.measure,
+			TagSet:   v.tags,
+			TopLevel: v.topLevel,
+			Value:    float64(v.value),
 		}
 	}
 	return ret
@@ -198,6 +209,10 @@ func (sb *StatsRawBucket) add(s Span, weight float64, aggr string, tags TagSet) 
 		gs = newGroupedStats(tags)
 	}
 
+	if s.TopLevel() {
+		gs.topLevel++
+	}
+
 	gs.hits += weight
 	if s.Error != 0 {
 		gs.errors += weight
@@ -229,6 +244,10 @@ func (sb *StatsRawBucket) addSublayer(s Span, aggr string, tags TagSet, sub Subl
 	key := statsSubKey{name: s.Name, measure: sub.Metric, aggr: subAggr}
 	if ss, ok = sb.sublayerData[key]; !ok {
 		ss = newSublayerStats(subTags)
+	}
+
+	if s.TopLevel() {
+		ss.topLevel++
 	}
 
 	ss.value += int64(sub.Value)

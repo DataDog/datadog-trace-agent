@@ -28,6 +28,8 @@ type Count struct {
 	Measure string `json:"measure"` // represents the entity we count, e.g. "hits", "errors", "time" (was Name)
 	TagSet  TagSet `json:"tagset"`  // set of tags for which we account this Distribution
 
+	TopLevel int `json:"top_level"` // number of top-level spans contributing to this count
+
 	Value float64 `json:"value"` // accumulated values
 }
 
@@ -37,6 +39,8 @@ type Distribution struct {
 	Name    string `json:"name"`    // the name of the trace/spans we count (was a member of TagSet)
 	Measure string `json:"measure"` // represents the entity we count, e.g. "hits", "errors", "time"
 	TagSet  TagSet `json:"tagset"`  // set of tags for which we account this Distribution
+
+	TopLevel int `json:"top_level"` // number of top-level spans contributing to this count
 
 	Summary *quantile.SliceSummary `json:"summary"` // actual representation of data
 }
