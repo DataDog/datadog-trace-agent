@@ -15,7 +15,7 @@ import (
 const defaultEnv = "default"
 
 func testSpans() []Span {
-	return []Span{
+	spans := []Span{
 		Span{Service: "A", Name: "A.foo", Resource: "α", Duration: 1},
 		Span{Service: "A", Name: "A.foo", Resource: "β", Duration: 2, Error: 1},
 		Span{Service: "B", Name: "B.foo", Resource: "γ", Duration: 3},
@@ -25,6 +25,11 @@ func testSpans() []Span {
 		Span{Service: "C", Name: "sql.query", Resource: "δ", Duration: 7},
 		Span{Service: "C", Name: "sql.query", Resource: "δ", Duration: 8},
 	}
+	for i, span := range spans {
+		span.setTopLevel(true)
+		spans[i] = span
+	}
+	return spans
 }
 
 func testTrace() Trace {

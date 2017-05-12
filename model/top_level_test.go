@@ -115,19 +115,19 @@ func TestTopLevelGetSetBlackBox(t *testing.T) {
 
 	span := Span{}
 
-	assert.True(span.TopLevel(), "by default, all spans are considered top-level")
-	span.setTopLevel(false)
-	assert.False(span.TopLevel(), "marked as non top-level (AKA subname)")
+	assert.False(span.TopLevel(), "by default, all spans are considered non top-level")
 	span.setTopLevel(true)
-	assert.True(span.TopLevel(), "top-level again")
+	assert.True(span.TopLevel(), "marked as top-level")
+	span.setTopLevel(false)
+	assert.False(span.TopLevel(), "no more top-level")
 
 	span.Meta = map[string]string{"env": "staging"}
 
-	assert.True(span.TopLevel(), "by default, all spans are considered top-level")
-	span.setTopLevel(false)
-	assert.False(span.TopLevel(), "marked as non top-level (AKA subname)")
+	assert.False(span.TopLevel(), "by default, all spans are considered non top-level")
 	span.setTopLevel(true)
-	assert.True(span.TopLevel(), "top-level again")
+	assert.True(span.TopLevel(), "marked as top-level")
+	span.setTopLevel(false)
+	assert.False(span.TopLevel(), "no more top-level")
 }
 
 func TestTopLevelGetSetMeta(t *testing.T) {
@@ -135,19 +135,23 @@ func TestTopLevelGetSetMeta(t *testing.T) {
 
 	span := Span{}
 
-	span.setTopLevel(false)
-	assert.Equal("true", span.Meta["_sub_name"], "should have a _sub_name:true flag")
+	assert.Nil(span.Meta, "no meta at all")
 	span.setTopLevel(true)
+	assert.Equal("true", span.Meta["_top_level"], "should have a _top_level:true flag")
+	span.setTopLevel(false)
 	assert.Nil(span.Meta, "no meta at all")
 
 	span.Meta = map[string]string{"env": "staging"}
 
-	span.setTopLevel(false)
-	assert.Equal("true", span.Meta["_sub_name"], "should have a _sub_name:true flag")
-	assert.Equal("staging", span.Meta["env"], "former tags should still be here")
-	assert.False(span.TopLevel(), "marked as non top-level (AKA subname)")
+	assert.False(span.TopLevel(), "still non top-level")
 	span.setTopLevel(true)
-	assert.True(span.TopLevel(), "top-level again")
+	assert.Equal("true", span.Meta["_top_level"], "should have a _top_level:true flag")
+	assert.Equal("staging", span.Meta["env"], "former tags should still be here")
+	assert.True(span.TopLevel(), "marked as top-level")
+	span.setTopLevel(false)
+	assert.False(span.TopLevel(), "non top-level any more")
+	assert.Equal("", span.Meta["_top_level"], "should have no _top_level:true flag")
+	assert.Equal("staging", span.Meta["env"], "former tags should still be here")
 }
 
 func TestForceMetrics(t *testing.T) {
