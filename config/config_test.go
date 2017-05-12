@@ -43,7 +43,7 @@ func TestOnlyEnvConfig(t *testing.T) {
 	os.Setenv("DD_API_KEY", "apikey_from_env")
 
 	agentConfig, _ := NewAgentConfig(nil, nil)
-	assert.Equal(t, []string{"apikey_from_env"}, agentConfig.APIKeys)
+	assert.Equal(t, "apikey_from_env", agentConfig.APIKey)
 
 	os.Setenv("DD_API_KEY", "")
 }
@@ -64,7 +64,7 @@ func TestOnlyDDAgentConfig(t *testing.T) {
 	agentConfig, _ := NewAgentConfig(configFile, nil)
 
 	assert.Equal("thing", agentConfig.HostName)
-	assert.Equal([]string{"apikey_12"}, agentConfig.APIKeys)
+	assert.Equal("apikey_12", agentConfig.APIKey)
 	assert.Equal("0.0.0.0", agentConfig.ReceiverHost)
 	assert.Equal(28125, agentConfig.StatsdPort)
 	assert.Equal("DEBUG", agentConfig.LogLevel)
@@ -76,7 +76,7 @@ func TestDDAgentMultiAPIKeys(t *testing.T) {
 	configFile := &File{instance: ddAgentConf, Path: "whatever"}
 
 	agentConfig, _ := NewAgentConfig(configFile, nil)
-	assert.Equal([]string{"foo", "bar"}, agentConfig.APIKeys)
+	assert.Equal("foo", agentConfig.APIKey)
 }
 
 func TestDDAgentConfigWithLegacy(t *testing.T) {
@@ -102,8 +102,8 @@ func TestDDAgentConfigWithLegacy(t *testing.T) {
 	agentConfig, _ := NewAgentConfig(conf, legacyConf)
 
 	// Properly loaded attributes
-	assert.Equal([]string{"pommedapi"}, agentConfig.APIKeys)
-	assert.Equal([]string{"an_endpoint"}, agentConfig.APIEndpoints)
+	assert.Equal("pommedapi", agentConfig.APIKey)
+	assert.Equal("an_endpoint", agentConfig.APIEndpoint)
 	assert.Equal([]string{"resource", "error"}, agentConfig.ExtraAggregators)
 	assert.Equal(0.33, agentConfig.ExtraSampleRate)
 

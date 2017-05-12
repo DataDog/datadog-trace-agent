@@ -28,8 +28,8 @@ type AgentConfig struct {
 	DefaultEnv string // the traces will default to this environment
 
 	// API
-	APIEndpoints            []string
-	APIKeys                 []string `json:"-"` // never publish this
+	APIEndpoint             string
+	APIKey                  string `json:"-"` // never publish this
 	APIEnabled              bool
 	APIPayloadBufferMaxSize int
 
@@ -86,7 +86,7 @@ func mergeEnv(c *AgentConfig) {
 		for i := range vals {
 			vals[i] = strings.TrimSpace(vals[i])
 		}
-		c.APIKeys = vals
+		c.APIKey = vals[0]
 	}
 
 	if v := os.Getenv("DD_RECEIVER_PORT"); v != "" {
@@ -156,8 +156,8 @@ func NewDefaultAgentConfig() *AgentConfig {
 		Enabled:                 true,
 		HostName:                hostname,
 		DefaultEnv:              "none",
-		APIEndpoints:            []string{"https://trace.agent.datadoghq.com"},
-		APIKeys:                 []string{},
+		APIEndpoint:             "https://trace.agent.datadoghq.com",
+		APIKey:                  "",
 		APIEnabled:              true,
 		APIPayloadBufferMaxSize: 16 * 1024 * 1024,
 
@@ -208,7 +208,7 @@ func NewAgentConfig(conf *File, legacyConf *File) (*AgentConfig, error) {
 		}
 
 		if v := m.Key("api_key").Strings(","); len(v) != 0 {
-			c.APIKeys = v
+			c.APIKey = v[0]
 		} else {
 			log.Info("Failed to parse api_key from dd-agent config")
 		}
@@ -274,7 +274,7 @@ APM_CONF:
 		for i := range vals {
 			vals[i] = strings.TrimSpace(vals[i])
 		}
-		c.APIKeys = vals
+		c.APIKey = vals[0]
 	}
 
 	if v, _ := conf.Get("trace.api", "endpoint"); v != "" {
@@ -282,7 +282,9 @@ APM_CONF:
 		for i := range vals {
 			vals[i] = strings.TrimSpace(vals[i])
 		}
-		c.APIEndpoints = vals
+
+		// Takes the first endpoint
+		c.APIEndpoint = vals[0]
 	}
 
 	if v, e := conf.GetInt("trace.api", "payload_buffer_max_size"); e == nil {
@@ -342,12 +344,9 @@ ENV_CONF:
 	mergeEnv(c)
 
 	// check for api-endpoint parity after all possible overrides have been applied
-	if len(c.APIKeys) == 0 {
+	if c.APIKey == "" {
 		return c, errors.New("you must specify an API Key, either via a configuration file or the DD_API_KEY env var")
 	}
 
-	if len(c.APIKeys) != len(c.APIEndpoints) {
-		return c, errors.New("every API key needs to have an explicit endpoint associated")
-	}
 	return c, nil
 }
