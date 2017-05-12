@@ -150,9 +150,6 @@ func (w *Writer) FlushServices() {
 
 // Flush actually writes the data in the API
 func (w *Writer) Flush() {
-	// Start of flushing
-	log.Info("Start flushing")
-
 	var wgWriters sync.WaitGroup
 	var wgBuffer sync.WaitGroup
 
@@ -234,6 +231,4 @@ func (w *Writer) Flush() {
 		log.Infof("bufSize: %d (Max buffer size: %d)", bufSize, w.conf.APIPayloadBufferMaxSize)
 		statsd.Client.Gauge("datadog.trace_agent.writer.payload_buffer_size", float64(bufSize), nil, 1)
 	}
-
-	log.Info("End of flushing")
 }
