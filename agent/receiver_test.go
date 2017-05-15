@@ -20,7 +20,7 @@ func TestReceiverRequestBodyLength(t *testing.T) {
 	assert := assert.New(t)
 
 	conf := config.NewDefaultAgentConfig()
-	conf.APIKeys = []string{"test"}
+	conf.APIKey = "test"
 
 	// save the global mux aside, we don't want to break other tests
 	defaultMux := http.DefaultServeMux

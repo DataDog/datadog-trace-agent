@@ -65,8 +65,8 @@ func TestWriterServices(t *testing.T) {
 	defer testAPI.Close()
 
 	conf := config.NewDefaultAgentConfig()
-	conf.APIEndpoints = []string{testAPI.URL}
-	conf.APIKeys = []string{"xxxxxxx"}
+	conf.APIEndpoint = testAPI.URL
+	conf.APIKey = "xxxxxxx"
 
 	w := NewWriter(conf)
 	w.inServices = make(chan model.ServicesMetadata)
@@ -109,8 +109,8 @@ func TestWriterPayload(t *testing.T) {
 	defer server.Close()
 
 	conf := config.NewDefaultAgentConfig()
-	conf.APIEndpoints = []string{server.URL}
-	conf.APIKeys = []string{"key"}
+	conf.APIEndpoint = server.URL
+	conf.APIKey = "key"
 
 	w := NewWriter(conf)
 	go w.Run()
@@ -145,15 +145,9 @@ func TestWriterPayloadErrors(t *testing.T) {
 	server := newTestServer(t, data)
 	defer server.Close()
 
-	failingServer400 := newFailingTestServer(t, http.StatusBadRequest)
-	defer failingServer400.Close()
-
-	failingServer500 := newFailingTestServer(t, http.StatusInternalServerError)
-	defer failingServer500.Close()
-
 	conf := config.NewDefaultAgentConfig()
-	conf.APIEndpoints = []string{server.URL, failingServer400.URL, failingServer500.URL}
-	conf.APIKeys = []string{"key", "key400", "key500"}
+	conf.APIEndpoint = server.URL
+	conf.APIKey = "key"
 
 	w := NewWriter(conf)
 	go w.Run()
@@ -177,15 +171,8 @@ receivingLoop:
 
 	w.Stop()
 
-	// The payload for failingServer500 must have been kept in the buffer since it
-	// could not be written. The payload for failingServer400 must not
-	// have been kept since we do not retry on 4xx errors.
-	assert.Equal(1, len(w.payloadBuffer))
-
-	p0 := w.payloadBuffer[0]
-	endpoint := p0.endpoint.(*APIEndpoint)
-	assert.Equal(1, len(endpoint.apiKeys))
-	assert.Equal("key500", endpoint.apiKeys[0])
+	// The payloadBuffer must be empty since the request to the bucket must have succeeded.
+	assert.Equal(0, len(w.payloadBuffer))
 }
 
 func TestWriterBuffering(t *testing.T) {
@@ -211,8 +198,8 @@ func TestWriterBuffering(t *testing.T) {
 	defer server.Close()
 
 	conf := config.NewDefaultAgentConfig()
-	conf.APIEndpoints = []string{server.URL}
-	conf.APIKeys = []string{"key"}
+	conf.APIEndpoint = server.URL
+	conf.APIKey = "key"
 	conf.APIPayloadBufferMaxSize = payloadSizes[0] + payloadSizes[1]
 
 	w := NewWriter(conf)
@@ -241,8 +228,8 @@ func TestWriterDisabledBuffering(t *testing.T) {
 	defer server.Close()
 
 	conf := config.NewDefaultAgentConfig()
-	conf.APIEndpoints = []string{server.URL}
-	conf.APIKeys = []string{"key"}
+	conf.APIEndpoint = server.URL
+	conf.APIKey = "key"
 	conf.APIPayloadBufferMaxSize = 0
 
 	w := NewWriter(conf)

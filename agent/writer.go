@@ -66,7 +66,7 @@ func NewWriter(conf *config.AgentConfig) *Writer {
 	var endpoint AgentEndpoint
 
 	if conf.APIEnabled {
-		endpoint = NewAPIEndpoint(conf.APIEndpoints, conf.APIKeys)
+		endpoint = NewAPIEndpoint(conf.APIEndpoint, conf.APIKey)
 		if conf.Proxy != nil {
 			// we have some kind of proxy configured.
 			// make sure our http client uses it
