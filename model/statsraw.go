@@ -195,7 +195,7 @@ func (sb *StatsRawBucket) HandleSpan(s Span, env string, aggregators []string, w
 	// sublayers - special case
 	if sublayers != nil {
 		for _, sub := range *sublayers {
-			sb.addSublayer(s, grain, tags, sub)
+			sb.addSublayer(s, weight, grain, tags, sub)
 		}
 	}
 }
@@ -227,7 +227,7 @@ func (sb *StatsRawBucket) add(s Span, weight float64, aggr string, tags TagSet) 
 	sb.data[key] = gs
 }
 
-func (sb *StatsRawBucket) addSublayer(s Span, aggr string, tags TagSet, sub SublayerValue) {
+func (sb *StatsRawBucket) addSublayer(s Span, weight float64, aggr string, tags TagSet, sub SublayerValue) {
 	// This is not as efficient as a "regular" add as we don't update
 	// all sublayers at once (one call for HITS, and another one for ERRORS, DURATION...)
 	// when logically, if we have a sublayer for HITS, we also have one for DURATION,
@@ -250,7 +250,7 @@ func (sb *StatsRawBucket) addSublayer(s Span, aggr string, tags TagSet, sub Subl
 		ss.topLevel++
 	}
 
-	ss.value += int64(sub.Value)
+	ss.value += int64(weight * sub.Value)
 
 	sb.sublayerData[key] = ss
 }
