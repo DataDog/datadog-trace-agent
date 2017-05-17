@@ -1,12 +1,13 @@
 package model
 
 const (
-	// TraceMetricsTagKey is a tag key which, if set to true,
+	// TraceMetricsKey is a tag key which, if set to true,
 	// ensures all statistics are computed for this span.
 	// [FIXME] *not implemented yet*
-	TraceMetricsTagKey = "datadog.trace_metrics"
+	TraceMetricsKey = "datadog.trace_metrics"
 
-	topLevelTag  = "_top_level"
+	// This is a special metric, it's 1 if the span is top-level, 0 if not.
+	topLevelKey  = "_top_level"
 	trueTagValue = "true"
 )
 
@@ -39,27 +40,27 @@ func (t Trace) ComputeTopLevel() {
 // setTopLevel sets the top-level attribute of the span.
 func (s *Span) setTopLevel(topLevel bool) {
 	if !topLevel {
-		if s.Meta == nil {
+		if s.Metrics == nil {
 			return
 		}
-		delete(s.Meta, topLevelTag)
-		if len(s.Meta) == 0 {
-			s.Meta = nil
+		delete(s.Metrics, topLevelKey)
+		if len(s.Metrics) == 0 {
+			s.Metrics = nil
 		}
 		return
 	}
-	if s.Meta == nil {
-		s.Meta = make(map[string]string, 1)
+	if s.Metrics == nil {
+		s.Metrics = make(map[string]float64, 1)
 	}
-	s.Meta[topLevelTag] = trueTagValue
+	s.Metrics[topLevelKey] = 1
 }
 
 // TopLevel returns true if span is top-level.
 func (s *Span) TopLevel() bool {
-	return s.Meta[topLevelTag] == trueTagValue
+	return s.Metrics[topLevelKey] == 1
 }
 
 // ForceMetrics returns true if statistics computation should be forced for this span.
 func (s *Span) ForceMetrics() bool {
-	return s.Meta[TraceMetricsTagKey] == trueTagValue
+	return s.Meta[TraceMetricsKey] == trueTagValue
 }
