@@ -96,18 +96,18 @@ func TestTopLevelWithTag(t *testing.T) {
 	assert := assert.New(t)
 
 	tr := Trace{
-		Span{TraceID: 1, SpanID: 1, ParentID: 0, Service: "mcnulty", Type: "web", Meta: map[string]string{"env": "prod"}},
-		Span{TraceID: 1, SpanID: 2, ParentID: 1, Service: "mcnulty", Type: "web", Meta: map[string]string{"env": "prod"}},
+		Span{TraceID: 1, SpanID: 1, ParentID: 0, Service: "mcnulty", Type: "web", Metrics: map[string]float64{"custom": 42}},
+		Span{TraceID: 1, SpanID: 2, ParentID: 1, Service: "mcnulty", Type: "web", Metrics: map[string]float64{"custom": 42}},
 	}
 
 	tr.ComputeTopLevel()
 
-	t.Logf("%v\n", tr[1].Meta)
+	t.Logf("%v\n", tr[1].Metrics)
 
 	assert.True(tr[0].TopLevel(), "root span should be top-level")
-	assert.Equal("prod", tr[0].Meta["env"], "env tag should still be here")
+	assert.Equal(float64(42), tr[0].Metrics["custom"], "custom metric should still be here")
 	assert.False(tr[1].TopLevel(), "not a top-level span")
-	assert.Equal("prod", tr[1].Meta["env"], "env tag should still be here")
+	assert.Equal(float64(42), tr[1].Metrics["custom"], "custom metric should still be here")
 }
 
 func TestTopLevelGetSetBlackBox(t *testing.T) {
@@ -121,7 +121,7 @@ func TestTopLevelGetSetBlackBox(t *testing.T) {
 	span.setTopLevel(false)
 	assert.False(span.TopLevel(), "no more top-level")
 
-	span.Meta = map[string]string{"env": "staging"}
+	span.Metrics = map[string]float64{"custom": 42}
 
 	assert.False(span.TopLevel(), "by default, all spans are considered non top-level")
 	span.setTopLevel(true)
@@ -130,28 +130,28 @@ func TestTopLevelGetSetBlackBox(t *testing.T) {
 	assert.False(span.TopLevel(), "no more top-level")
 }
 
-func TestTopLevelGetSetMeta(t *testing.T) {
+func TestTopLevelGetSetMetrics(t *testing.T) {
 	assert := assert.New(t)
 
 	span := Span{}
 
-	assert.Nil(span.Meta, "no meta at all")
+	assert.Nil(span.Metrics, "no meta at all")
 	span.setTopLevel(true)
-	assert.Equal("true", span.Meta["_top_level"], "should have a _top_level:true flag")
+	assert.Equal(float64(1), span.Metrics["_top_level"], "should have a _top_level:1 flag")
 	span.setTopLevel(false)
-	assert.Nil(span.Meta, "no meta at all")
+	assert.Nil(span.Metrics, "no meta at all")
 
-	span.Meta = map[string]string{"env": "staging"}
+	span.Metrics = map[string]float64{"custom": 42}
 
 	assert.False(span.TopLevel(), "still non top-level")
 	span.setTopLevel(true)
-	assert.Equal("true", span.Meta["_top_level"], "should have a _top_level:true flag")
-	assert.Equal("staging", span.Meta["env"], "former tags should still be here")
+	assert.Equal(float64(1), span.Metrics["_top_level"], "should have a _top_level:1 flag")
+	assert.Equal(float64(42), span.Metrics["custom"], "former metrics should still be here")
 	assert.True(span.TopLevel(), "marked as top-level")
 	span.setTopLevel(false)
 	assert.False(span.TopLevel(), "non top-level any more")
-	assert.Equal("", span.Meta["_top_level"], "should have no _top_level:true flag")
-	assert.Equal("staging", span.Meta["env"], "former tags should still be here")
+	assert.Equal(float64(0), span.Metrics["_top_level"], "should have no _top_level:1 flag")
+	assert.Equal(float64(42), span.Metrics["custom"], "former metrics should still be here")
 }
 
 func TestForceMetrics(t *testing.T) {

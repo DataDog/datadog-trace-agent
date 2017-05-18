@@ -90,12 +90,12 @@ func TestGrainKey(t *testing.T) {
 
 type expectedCount struct {
 	value    float64
-	topLevel int
+	topLevel int64
 }
 
 type expectedDistribution struct {
 	entries  []quantile.Entry
-	topLevel int
+	topLevel int64
 }
 
 func TestStatsBucketDefault(t *testing.T) {

@@ -13,7 +13,7 @@ import (
 type groupedStats struct {
 	tags TagSet
 
-	topLevel int
+	topLevel int64
 
 	hits                 float64
 	errors               float64
@@ -24,7 +24,7 @@ type groupedStats struct {
 type sublayerStats struct {
 	tags TagSet
 
-	topLevel int
+	topLevel int64
 
 	value int64
 }
