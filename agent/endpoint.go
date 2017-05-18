@@ -133,7 +133,7 @@ func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 	defer resp.Body.Close()
 
 	// We monitor the status code received
-	tagStatusCode := "status_code" + strconv.Itoa(resp.StatusCode)
+	tagStatusCode := "status_code:" + strconv.Itoa(resp.StatusCode)
 	log.Info(tagStatusCode)
 	statsd.Client.Incr("datadog.trace_agent.writer.status_code", []string{tagStatusCode}, 1)
 
