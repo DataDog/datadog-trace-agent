@@ -156,9 +156,11 @@ func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 	log.Infof("flushed payload to the API, time:%s, size:%d", flushTime, len(data))
 	statsd.Client.Gauge("datadog.trace_agent.writer.flush_duration", flushTime.Seconds(), nil, 1)
 
-	tagNbRetry := "nb_retry:" + strconv.FormatUint(uint64(ae.nbRetry), 10)
-	log.Info(tagNbRetry)
-	statsd.Client.Incr("datadog.trace_agent.writer.nb_retry", []string{tagNbRetry}, 1)
+	if ae.Retry != 0 {
+		tagNbRetry := "nb_retry:" + strconv.FormatUint(uint64(ae.nbRetry), 10)
+		log.Info(tagNbRetry)
+		statsd.Client.Incr("datadog.trace_agent.writer.nb_retry", []string{tagNbRetry}, 1)
+	}
 
 	// Everything went fine
 	return payloadSize, nil
