@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -23,6 +24,7 @@ type apiError struct {
 }
 
 func newAPIError(err error, endpoint *APIEndpoint) *apiError {
+	endpoint.nbRetry += 1
 	return &apiError{err: err, endpoint: endpoint}
 }
 
@@ -45,15 +47,15 @@ type AgentEndpoint interface {
 // APIEndpoint implements AgentEndpoint to send data to a
 // an endpoint and API key.
 type APIEndpoint struct {
-	apiKey string
-	url    string
-	stats  endpointStats
-	client *http.Client
+	apiKey  string
+	url     string
+	nbRetry uint
+	stats   endpointStats
+	client  *http.Client
 }
 
 // NewAPIEndpoint returns a new APIEndpoint from a given config
-// of URL (such as https://trace.agent.datadoghq.com) and API
-// keys
+// of URL (such as https://trace.agent.datadoghq.com) and API keys
 func NewAPIEndpoint(url, apiKey string) *APIEndpoint {
 	if apiKey == "" {
 		panic(fmt.Errorf("No API key"))
@@ -130,6 +132,10 @@ func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 	}
 	defer resp.Body.Close()
 
+	// We monitor the status code received
+	tagStatCode := "status_code:" + strconv.Itoa(resp.StatusCode)
+	statsd.Client.Incr("datadog.trace_agent.writer.status_code", []string{tagStatCode}, 1)
+
 	// We check the status code to see if the request has succeeded.
 	if resp.StatusCode/100 != 2 {
 		err := fmt.Errorf("request to %s responded with %s", url, resp.Status)
@@ -145,11 +151,13 @@ func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 		return payloadSize, err
 	}
 
+	// Everything went fine
 	flushTime := time.Since(startFlush)
 	log.Infof("flushed payload to the API, time:%s, size:%d", flushTime, len(data))
 	statsd.Client.Gauge("datadog.trace_agent.writer.flush_duration", flushTime.Seconds(), nil, 1)
+	tagNbRetry := "nb_retry:" + strconv.FormatUint(uint64(ae.nbRetry), 10)
+	statsd.Client.Incr("datadog.trace_agent.writer.nb_retry", []string{tagNbRetry}, 1)
 
-	// Everything went fine
 	return payloadSize, nil
 }
 
