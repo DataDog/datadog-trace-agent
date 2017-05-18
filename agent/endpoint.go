@@ -133,8 +133,10 @@ func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 	defer resp.Body.Close()
 
 	// We monitor the status code received
-	tagStatCode := "status_code:" + strconv.Itoa(resp.StatusCode)
-	statsd.Client.Incr("datadog.trace_agent.writer.status_code", []string{tagStatCode}, 1)
+	if resp.StatusCode != nil {
+		tagStatCode := "status_code:" + strconv.Itoa(resp.StatusCode)
+		statsd.Client.Incr("datadog.trace_agent.writer.status_code", []string{tagStatCode}, 1)
+	}
 
 	// We check the status code to see if the request has succeeded.
 	if resp.StatusCode/100 != 2 {
@@ -155,7 +157,7 @@ func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 	log.Infof("flushed payload to the API, time:%s, size:%d", flushTime, len(data))
 	statsd.Client.Gauge("datadog.trace_agent.writer.flush_duration", flushTime.Seconds(), nil, 1)
 
-	if ae.nbRetry != 0 {
+	if ae.nbRetry != nil && ae.nbRetry != 0 {
 		tagNbRetry := "nb_retry:" + strconv.FormatUint(uint64(ae.nbRetry), 10)
 		statsd.Client.Incr("datadog.trace_agent.writer.nb_retry", []string{tagNbRetry}, 1)
 	}
