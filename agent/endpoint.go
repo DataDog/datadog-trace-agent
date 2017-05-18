@@ -24,7 +24,7 @@ type apiError struct {
 }
 
 func newAPIError(err error, endpoint *APIEndpoint) *apiError {
-	endpoint.nbRetry += 1
+	endpoint.nbRetry++
 	return &apiError{err: err, endpoint: endpoint}
 }
 
