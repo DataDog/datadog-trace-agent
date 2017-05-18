@@ -157,6 +157,105 @@ func (s *SliceSummary) Merge(s2 *SliceSummary) {
 	s.compress()
 }
 
+type combinePtr struct {
+	prev *Entry
+	next *Entry
+	this *Entry
+	from int
+}
+
+func (s *SliceSummary) Combine(s2 *SliceSummary) {
+	if s2.N == 0 {
+		return
+	}
+	if s.N == 0 {
+		s.N = s2.N
+		s.Entries = make([]Entry, 0, len(s2.Entries))
+		s.Entries = append(s.Entries, s2.Entries...)
+		return
+	}
+
+	sorted := make([]*combinePtr, 0, len(s.Entries)+len(s2.Entries))
+
+	var lastFrom1, lastFrom2 *combinePtr
+	var pos1, pos2 int
+	var len1, len2 int = len(s.Entries), len(s2.Entries)
+
+	_ = "breakpoint"
+
+	for pos1 < len1 || pos2 < len2 {
+		fmt.Printf("pos1 %d, pos2 %d\n", pos1, pos2)
+		fmt.Printf("pos1 %v, pos2 %v\n", s.Entries[pos1%len1], s.Entries[pos2%len2])
+		if pos2 == len2 || (pos1 != len1 && s.Entries[pos1].V <= s2.Entries[pos2].V) {
+			var last *Entry
+			if lastFrom2 != nil {
+				last = lastFrom2.this
+			}
+
+			cp := combinePtr{
+				prev: last,
+				this: &s.Entries[pos1],
+				from: 1,
+			}
+			if lastFrom2 != nil {
+				lastFrom2.next = &s.Entries[pos1]
+			}
+			sorted = append(sorted, &cp)
+			lastFrom1 = &cp
+			pos1++
+		} else {
+			var last *Entry
+			if lastFrom1 != nil {
+				last = lastFrom1.this
+			}
+
+			cp := combinePtr{
+				prev: last,
+				this: &s2.Entries[pos2],
+				from: 2,
+			}
+			if lastFrom1 != nil {
+				lastFrom1.next = &s2.Entries[pos2]
+			}
+			sorted = append(sorted, &cp)
+			lastFrom2 = &cp
+			pos2++
+		}
+	}
+
+	newsumm := make([]Entry, 0, len(s.Entries)+len(s2.Entries))
+
+	for _, cp := range sorted {
+		fmt.Println(cp)
+	}
+
+	for _, cp := range sorted {
+		newEntry := Entry{
+			V: cp.this.V,
+			G: cp.this.G,
+		}
+
+		var rmin, rmax int = 0, cp.this.Delta
+
+		fmt.Println(cp)
+
+		if cp.next != nil {
+			rmax += cp.next.G + cp.next.Delta - 1
+		} else {
+			if cp.prev != nil {
+				rmax += cp.prev.Delta
+			}
+		}
+
+		newEntry.Delta = rmax - rmin
+
+		newsumm = append(newsumm, newEntry)
+	}
+
+	s.Entries = newsumm
+	s.N += s2.N
+}
+
 // Copy allocates a new summary with the same data
 func (s *SliceSummary) Copy() *SliceSummary {
 	s2 := NewSliceSummary()
