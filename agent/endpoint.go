@@ -134,7 +134,6 @@ func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 
 	// We monitor the status code received
 	tagStatusCode := "status_code:" + strconv.Itoa(resp.StatusCode)
-	log.Info(tagStatusCode)
 	statsd.Client.Incr("datadog.trace_agent.writer.status_code", []string{tagStatusCode}, 1)
 
 	// We check the status code to see if the request has succeeded.
@@ -158,7 +157,6 @@ func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 
 	if ae.nbRetry != 0 {
 		tagNbRetry := "nb_retry:" + strconv.FormatUint(uint64(ae.nbRetry), 10)
-		log.Info(tagNbRetry)
 		statsd.Client.Incr("datadog.trace_agent.writer.nb_retry", []string{tagNbRetry}, 1)
 	}
 
