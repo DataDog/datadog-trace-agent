@@ -13,7 +13,7 @@ import (
 type groupedStats struct {
 	tags TagSet
 
-	topLevel int64
+	topLevel float64
 
 	hits                 float64
 	errors               float64
@@ -24,7 +24,7 @@ type groupedStats struct {
 type sublayerStats struct {
 	tags TagSet
 
-	topLevel int64
+	topLevel float64
 
 	value int64
 }
@@ -210,7 +210,7 @@ func (sb *StatsRawBucket) add(s Span, weight float64, aggr string, tags TagSet) 
 	}
 
 	if s.TopLevel() {
-		gs.topLevel++
+		gs.topLevel += weight
 	}
 
 	gs.hits += weight
@@ -247,7 +247,7 @@ func (sb *StatsRawBucket) addSublayer(s Span, weight float64, aggr string, tags 
 	}
 
 	if s.TopLevel() {
-		ss.topLevel++
+		ss.topLevel += weight
 	}
 
 	ss.value += int64(weight * sub.Value)
