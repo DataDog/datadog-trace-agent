@@ -22,8 +22,8 @@ const (
 func (t Trace) ComputeTopLevel() {
 	// build a lookup map
 	spanIDToIdx := make(map[uint64]int, len(t))
-	for i, v := range t {
-		spanIDToIdx[v.SpanID] = i
+	for i, span := range t {
+		spanIDToIdx[span.SpanID] = i
 	}
 
 	// iterate on each span and mark them as top-level if relevant
@@ -35,6 +35,18 @@ func (t Trace) ComputeTopLevel() {
 		}
 		t[i].setTopLevel(true)
 	}
+}
+
+// TopLevelSpans returns the list of all span ids which are marked as top-level.
+// You need to call ComputeTopLevel before, else it returns an empty map.
+func (t Trace) TopLevelSpans() map[uint64]struct{} {
+	ids := make(map[uint64]struct{}, len(t)) // possibly too big, but not gigantic yet ensure only one alloc is done
+	for _, span := range t {
+		if span.TopLevel() {
+			ids[span.SpanID] = struct{}{}
+		}
+	}
+	return ids
 }
 
 // setTopLevel sets the top-level attribute of the span.

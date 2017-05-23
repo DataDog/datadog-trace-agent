@@ -63,8 +63,9 @@ func TestConcentratorStatsCounts(t *testing.T) {
 			testSpan(c, 6, 24, 1, "A1", "resource2", 0),
 		},
 	}
+	testTrace.Trace.ComputeTopLevel()
 
-	c.Add(testTrace, testTrace.weight())
+	c.Add(testTrace, testTrace.weight(), testTrace.Trace.TopLevelSpans())
 	stats := c.Flush()
 
 	if !assert.Equal(2, len(stats), "We should get exactly 2 StatsBucket") {
