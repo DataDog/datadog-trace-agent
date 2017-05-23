@@ -34,7 +34,7 @@ func NewConcentrator(aggregators []string, bsize int64) *Concentrator {
 }
 
 // Add appends to the proper stats bucket this trace's statistics
-func (c *Concentrator) Add(t processedTrace, weight float64, topLevelSpans map[uint64]struct{}) {
+func (c *Concentrator) Add(t processedTrace) {
 	c.mu.Lock()
 
 	for _, s := range t.Trace {
@@ -47,9 +47,9 @@ func (c *Concentrator) Add(t processedTrace, weight float64, topLevelSpans map[u
 
 		if t.Root != nil && s.SpanID == t.Root.SpanID && t.Sublayers != nil {
 			// handle sublayers
-			b.HandleSpan(s, t.Env, c.aggregators, weight, topLevelSpans, &t.Sublayers)
+			b.HandleSpan(s, t.Env, c.aggregators, &t.Sublayers)
 		} else {
-			b.HandleSpan(s, t.Env, c.aggregators, weight, topLevelSpans, nil)
+			b.HandleSpan(s, t.Env, c.aggregators, nil)
 		}
 	}
 

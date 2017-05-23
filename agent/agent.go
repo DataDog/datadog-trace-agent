@@ -167,10 +167,13 @@ func (a *Agent) Process(t model.Trace) {
 		pt.Env = tenv
 	}
 
-	weight := pt.weight() // need to do this now because sampler edits .Metrics map
-	topLevelSpans := t.TopLevelSpans()
+	// Need to do this computation before entering the concentrator
+	// as they access the Metrics map, which is not thread safe.
+	t.ComputeWeight(*root)
+	t.ComputeTopLevel()
+
 	watchdog.Go(func() {
-		a.Concentrator.Add(pt, weight, topLevelSpans)
+		a.Concentrator.Add(pt)
 	})
 	watchdog.Go(func() {
 		a.Sampler.Add(pt)

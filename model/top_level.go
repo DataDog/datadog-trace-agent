@@ -37,18 +37,6 @@ func (t Trace) ComputeTopLevel() {
 	}
 }
 
-// TopLevelSpans returns the list of all span ids which are marked as top-level.
-// You need to call ComputeTopLevel before, else it returns an empty map.
-func (t Trace) TopLevelSpans() map[uint64]struct{} {
-	ids := make(map[uint64]struct{}, len(t)) // possibly too big, but not gigantic yet ensure only one alloc is done
-	for _, span := range t {
-		if span.TopLevel() {
-			ids[span.SpanID] = struct{}{}
-		}
-	}
-	return ids
-}
-
 // setTopLevel sets the top-level attribute of the span.
 func (s *Span) setTopLevel(topLevel bool) {
 	if !topLevel {
@@ -59,12 +47,18 @@ func (s *Span) setTopLevel(topLevel bool) {
 		if len(s.Metrics) == 0 {
 			s.Metrics = nil
 		}
+		s.topLevel = false
 		return
 	}
 	if s.Metrics == nil {
 		s.Metrics = make(map[string]float64, 1)
 	}
+	// Setting the metrics value, so that code downstream in the pipeline
+	// can identify this as top-level without recomputing everything.
 	s.Metrics[topLevelKey] = 1
+	// Setting the private attribute, this is used by internal agent code
+	// which can't access the metrics map because of concurrency issues.
+	s.topLevel = true
 }
 
 // TopLevel returns true if span is top-level.
