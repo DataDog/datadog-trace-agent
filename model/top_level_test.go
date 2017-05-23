@@ -24,6 +24,13 @@ func TestTopLevelTypical(t *testing.T) {
 	assert.True(tr[2].TopLevel(), "only 1 span for this service, should be top-level")
 	assert.True(tr[3].TopLevel(), "only 1 span for this service, should be top-level")
 	assert.False(tr[4].TopLevel(), "yet another sup span, not top-level")
+
+	topLevelSpans := tr.TopLevelSpans()
+	assert.Equal(map[uint64]struct{}{
+		1: struct{}{},
+		3: struct{}{},
+		4: struct{}{},
+	}, topLevelSpans, "spans marked as top-level should be in the map")
 }
 
 func TestTopLevelSingle(t *testing.T) {
@@ -36,6 +43,11 @@ func TestTopLevelSingle(t *testing.T) {
 	tr.ComputeTopLevel()
 
 	assert.True(tr[0].TopLevel(), "root span should be top-level")
+
+	topLevelSpans := tr.TopLevelSpans()
+	assert.Equal(map[uint64]struct{}{
+		1: struct{}{},
+	}, topLevelSpans, "spans marked as top-level should be in the map")
 }
 
 func TestTopLevelEmpty(t *testing.T) {
@@ -46,6 +58,10 @@ func TestTopLevelEmpty(t *testing.T) {
 	tr.ComputeTopLevel()
 
 	assert.Equal(0, len(tr), "trace should still be empty")
+
+	topLevelSpans := tr.TopLevelSpans()
+	assert.Equal(map[uint64]struct{}{},
+		topLevelSpans, "top-level spans map should be empty")
 }
 
 func TestTopLevelOneService(t *testing.T) {
@@ -66,6 +82,11 @@ func TestTopLevelOneService(t *testing.T) {
 	assert.True(tr[2].TopLevel(), "root span should be top-level")
 	assert.False(tr[3].TopLevel(), "just a sub-span, not top-level")
 	assert.False(tr[4].TopLevel(), "just a sub-span, not top-level")
+
+	topLevelSpans := tr.TopLevelSpans()
+	assert.Equal(map[uint64]struct{}{
+		1: struct{}{},
+	}, topLevelSpans, "spans marked as top-level should be in the map")
 }
 
 func TestTopLevelLocalRoot(t *testing.T) {
@@ -90,6 +111,13 @@ func TestTopLevelLocalRoot(t *testing.T) {
 	assert.False(tr[4].TopLevel(), "yet another sup span, not top-level")
 	assert.False(tr[5].TopLevel(), "yet another sup span, not top-level")
 	assert.False(tr[6].TopLevel(), "yet another sup span, not top-level")
+
+	topLevelSpans := tr.TopLevelSpans()
+	assert.Equal(map[uint64]struct{}{
+		1: struct{}{},
+		3: struct{}{},
+		4: struct{}{},
+	}, topLevelSpans, "spans marked as top-level should be in the map")
 }
 
 func TestTopLevelWithTag(t *testing.T) {
@@ -108,6 +136,11 @@ func TestTopLevelWithTag(t *testing.T) {
 	assert.Equal(float64(42), tr[0].Metrics["custom"], "custom metric should still be here")
 	assert.False(tr[1].TopLevel(), "not a top-level span")
 	assert.Equal(float64(42), tr[1].Metrics["custom"], "custom metric should still be here")
+
+	topLevelSpans := tr.TopLevelSpans()
+	assert.Equal(map[uint64]struct{}{
+		1: struct{}{},
+	}, topLevelSpans, "spans marked as top-level should be in the map")
 }
 
 func TestTopLevelGetSetBlackBox(t *testing.T) {
