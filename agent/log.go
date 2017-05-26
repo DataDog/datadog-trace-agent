@@ -148,7 +148,8 @@ func (r *ThrottledReceiver) AfterParse(args log.CustomReceiverInitArgs) error {
 	r.tick = time.Tick(time.Duration(interval))
 
 	// Start the goroutine resetting the log count
-	watchdog.Go(func() {
+	go func() {
+		defer watchdog.LogOnPanic()
 		for {
 			select {
 			case <-r.tick:
@@ -158,7 +159,7 @@ func (r *ThrottledReceiver) AfterParse(args log.CustomReceiverInitArgs) error {
 			}
 		}
 
-	})
+	}()
 
 	return nil
 }
