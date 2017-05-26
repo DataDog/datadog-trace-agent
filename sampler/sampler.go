@@ -87,9 +87,10 @@ func (s *Sampler) UpdateMaxTPS(maxTPS float64) {
 
 // Run runs and block on the Sampler main loop
 func (s *Sampler) Run() {
-	watchdog.Go(func() {
+	go func() {
+		defer watchdog.LogOnPanic()
 		s.Backend.Run()
-	})
+	}()
 	s.RunAdjustScoring()
 }
 

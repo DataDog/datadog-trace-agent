@@ -168,12 +168,14 @@ func (a *Agent) Process(t model.Trace) {
 	}
 
 	weight := pt.weight() // need to do this now because sampler edits .Metrics map
-	watchdog.Go(func() {
+	go func() {
+		defer watchdog.LogOnPanic()
 		a.Concentrator.Add(pt, weight)
-	})
-	watchdog.Go(func() {
+	}()
+	go func() {
+		defer watchdog.LogOnPanic()
 		a.Sampler.Add(pt)
-	})
+	}()
 }
 
 func (a *Agent) watchdog() {
