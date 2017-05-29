@@ -66,6 +66,35 @@ func (t Trace) GetRoot() *Span {
 	return &t[len(t)-1]
 }
 
+// ChildrenMap returns a map containing for each span id the list of its
+// direct children.
+func (t Trace) ChildrenMap() map[uint64]Spans {
+	childrenMap := make(map[uint64]Spans)
+
+	for i := range t {
+		span := &t[i]
+
+		if span.ParentID == 0 {
+			continue
+		}
+
+		children, ok := childrenMap[span.SpanID]
+		if !ok {
+			childrenMap[span.SpanID] = Spans{}
+		}
+
+		children, ok = childrenMap[span.ParentID]
+		if ok {
+			children = append(children, span)
+		} else {
+			children = Spans{span}
+		}
+		childrenMap[span.ParentID] = children
+	}
+
+	return childrenMap
+}
+
 // NewTraceFlushMarker returns a trace with a single span as flush marker
 func NewTraceFlushMarker() Trace {
 	return []Span{NewFlushMarker()}
