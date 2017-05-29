@@ -60,3 +60,11 @@ func TestSpanWeight(t *testing.T) {
 	span.Metrics[SpanSampleRateMetricKey] = 1.5
 	assert.Equal(1.0, span.Weight())
 }
+
+func TestSpanWeightNil(t *testing.T) {
+	assert := assert.New(t)
+
+	var span *Span
+
+	assert.Equal(1.0, span.Weight(), "Weight should be callable on nil and return a default value")
+}

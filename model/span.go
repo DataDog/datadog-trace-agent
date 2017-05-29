@@ -74,6 +74,9 @@ func (s *Span) End() int64 {
 // Weight returns the weight of the span as defined for sampling, i.e. the
 // inverse of the sampling rate.
 func (s *Span) Weight() float64 {
+	if s == nil {
+		return 1.0
+	}
 	sampleRate, ok := s.Metrics[SpanSampleRateMetricKey]
 	if !ok || sampleRate <= 0.0 || sampleRate > 1.0 {
 		return 1.0
