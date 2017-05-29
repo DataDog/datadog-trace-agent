@@ -267,7 +267,7 @@ func RandomSpan() model.Span {
 
 // GetTestSpan returns a Span with different fields set
 func GetTestSpan() model.Span {
-	return model.Span{
+	span := model.Span{
 		TraceID:  42,
 		SpanID:   52,
 		ParentID: 42,
@@ -280,11 +280,15 @@ func GetTestSpan() model.Span {
 		Meta:     map[string]string{"http.host": "192.168.0.1"},
 		Metrics:  map[string]float64{"http.monitor": 41.99},
 	}
+	trace := model.Trace{span}
+	trace.ComputeWeight(model.Span{})
+	trace.ComputeTopLevel()
+	return trace[0]
 }
 
 // TestSpan returns a fix span with hardcoded info, useful for reproducible tests
 func TestSpan() model.Span {
-	return model.Span{
+	span := model.Span{
 		Duration: 10000000,
 		Error:    0,
 		Resource: "GET /some/raclette",
@@ -303,4 +307,8 @@ func TestSpan() model.Span {
 		ParentID: 1111,
 		Type:     "http",
 	}
+	trace := model.Trace{span}
+	trace.ComputeWeight(model.Span{})
+	trace.ComputeTopLevel()
+	return trace[0]
 }
