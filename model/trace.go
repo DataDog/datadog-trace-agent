@@ -70,3 +70,14 @@ func (t Trace) GetRoot() *Span {
 func NewTraceFlushMarker() Trace {
 	return []Span{NewFlushMarker()}
 }
+
+// ComputeWeight sets the weight private attribute to the weight
+// of the root Span. This is because sampling ratio is stored as a metrics
+// only is the root span, but is required for computing values in any span.
+func (t Trace) ComputeWeight(root Span) {
+	weight := root.Weight()
+
+	for i := range t {
+		t[i].weight = weight
+	}
+}

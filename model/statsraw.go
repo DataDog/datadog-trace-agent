@@ -174,7 +174,7 @@ func assembleGrain(b *bytes.Buffer, env, resource, service string, m map[string]
 }
 
 // HandleSpan adds the span to this bucket stats, aggregated with the finest grain matching given aggregators
-func (sb *StatsRawBucket) HandleSpan(s Span, env string, aggregators []string, weight float64, sublayers *[]SublayerValue) {
+func (sb *StatsRawBucket) HandleSpan(s Span, env string, aggregators []string, sublayers *[]SublayerValue) {
 	if env == "" {
 		panic("env should never be empty")
 	}
@@ -190,17 +190,17 @@ func (sb *StatsRawBucket) HandleSpan(s Span, env string, aggregators []string, w
 	}
 
 	grain, tags := assembleGrain(&sb.keyBuf, env, s.Resource, s.Service, m)
-	sb.add(s, weight, grain, tags)
+	sb.add(s, grain, tags)
 
 	// sublayers - special case
 	if sublayers != nil {
 		for _, sub := range *sublayers {
-			sb.addSublayer(s, weight, grain, tags, sub)
+			sb.addSublayer(s, grain, tags, sub)
 		}
 	}
 }
 
-func (sb *StatsRawBucket) add(s Span, weight float64, aggr string, tags TagSet) {
+func (sb *StatsRawBucket) add(s Span, aggr string, tags TagSet) {
 	var gs groupedStats
 	var ok bool
 
@@ -209,15 +209,15 @@ func (sb *StatsRawBucket) add(s Span, weight float64, aggr string, tags TagSet) 
 		gs = newGroupedStats(tags)
 	}
 
-	if s.TopLevel() {
-		gs.topLevel += weight
+	if s.topLevel {
+		gs.topLevel += s.weight
 	}
 
-	gs.hits += weight
+	gs.hits += s.weight
 	if s.Error != 0 {
-		gs.errors += weight
+		gs.errors += s.weight
 	}
-	gs.duration += float64(s.Duration) * weight
+	gs.duration += float64(s.Duration) * s.weight
 
 	// TODO add for s.Metrics ability to define arbitrary counts and distros, check some config?
 	// alter resolution of duration distro
@@ -227,7 +227,7 @@ func (sb *StatsRawBucket) add(s Span, weight float64, aggr string, tags TagSet) 
 	sb.data[key] = gs
 }
 
-func (sb *StatsRawBucket) addSublayer(s Span, weight float64, aggr string, tags TagSet, sub SublayerValue) {
+func (sb *StatsRawBucket) addSublayer(s Span, aggr string, tags TagSet, sub SublayerValue) {
 	// This is not as efficient as a "regular" add as we don't update
 	// all sublayers at once (one call for HITS, and another one for ERRORS, DURATION...)
 	// when logically, if we have a sublayer for HITS, we also have one for DURATION,
@@ -246,11 +246,11 @@ func (sb *StatsRawBucket) addSublayer(s Span, weight float64, aggr string, tags 
 		ss = newSublayerStats(subTags)
 	}
 
-	if s.TopLevel() {
-		ss.topLevel += weight
+	if s.topLevel {
+		ss.topLevel += s.weight
 	}
 
-	ss.value += int64(weight * sub.Value)
+	ss.value += int64(s.weight * sub.Value)
 
 	sb.sublayerData[key] = ss
 }
