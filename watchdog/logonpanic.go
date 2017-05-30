@@ -41,11 +41,3 @@ func LogOnPanic() {
 		panic(err)
 	}
 }
-
-// Go is a helper func that calls LogOnPanic and f in a goroutine.
-func Go(f func()) {
-	go func() {
-		defer LogOnPanic()
-		f()
-	}()
-}

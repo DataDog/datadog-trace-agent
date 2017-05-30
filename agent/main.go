@@ -224,9 +224,10 @@ func main() {
 	agent := NewAgent(agentConf)
 
 	// Handle stops properly
-	watchdog.Go(func() {
+	go func() {
+		defer watchdog.LogOnPanic()
 		handleSignal(agent.exit)
-	})
+	}()
 
 	log.Infof("trace-agent running on host %s", agentConf.HostName)
 	agent.Run()

@@ -171,13 +171,15 @@ func (a *Agent) Process(t model.Trace) {
 	// as they access the Metrics map, which is not thread safe.
 	t.ComputeWeight(*root)
 	t.ComputeTopLevel()
-
-	watchdog.Go(func() {
+	go func() {
+		defer watchdog.LogOnPanic()
 		a.Concentrator.Add(pt)
-	})
-	watchdog.Go(func() {
+
+	}()
+	go func() {
+		defer watchdog.LogOnPanic()
 		a.Sampler.Add(pt)
-	})
+	}()
 }
 
 func (a *Agent) watchdog() {

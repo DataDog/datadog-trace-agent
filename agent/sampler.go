@@ -55,9 +55,10 @@ func NewSampler(conf *config.AgentConfig) *Sampler {
 
 // Run starts sampling traces
 func (s *Sampler) Run() {
-	watchdog.Go(func() {
+	go func() {
+		defer watchdog.LogOnPanic()
 		s.samplerEngine.Run()
-	})
+	}()
 }
 
 // Add samples a trace then keep it until the next flush

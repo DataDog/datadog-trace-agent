@@ -103,9 +103,10 @@ func (w *Writer) isPayloadBufferingEnabled() bool {
 // Run starts the writer.
 func (w *Writer) Run() {
 	w.exitWG.Add(1)
-	watchdog.Go(func() {
+	go func() {
+		defer watchdog.LogOnPanic()
 		w.main()
-	})
+	}()
 }
 
 // main is the main loop of the writer goroutine. If buffers payloads and
