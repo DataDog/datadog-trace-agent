@@ -152,7 +152,7 @@ func TestZeroingExtraAggregatorsFromConfig(t *testing.T) {
 		"hostname = thing",
 		"api_key = apikey_12",
 		"[trace.concentrator]",
-		"extra_aggregators=",
+		"extra_aggregators = ",
 	}, "\n")))
 
 	conf := &File{instance: dd, Path: "whatever"}
