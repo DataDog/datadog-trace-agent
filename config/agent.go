@@ -296,7 +296,7 @@ APM_CONF:
 	}
 
 	if v, e := conf.GetStrArray("trace.concentrator", "extra_aggregators", ","); e == nil {
-		c.ExtraAggregators = append(c.ExtraAggregators, v...)
+		c.ExtraAggregators = v
 	} else {
 		log.Debug("No aggregator configuration, using defaults")
 	}
