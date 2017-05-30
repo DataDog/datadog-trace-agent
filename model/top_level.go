@@ -22,8 +22,8 @@ const (
 func (t Trace) ComputeTopLevel() {
 	// build a lookup map
 	spanIDToIdx := make(map[uint64]int, len(t))
-	for i, v := range t {
-		spanIDToIdx[v.SpanID] = i
+	for i, span := range t {
+		spanIDToIdx[span.SpanID] = i
 	}
 
 	// iterate on each span and mark them as top-level if relevant
@@ -47,12 +47,18 @@ func (s *Span) setTopLevel(topLevel bool) {
 		if len(s.Metrics) == 0 {
 			s.Metrics = nil
 		}
+		s.topLevel = false
 		return
 	}
 	if s.Metrics == nil {
 		s.Metrics = make(map[string]float64, 1)
 	}
+	// Setting the metrics value, so that code downstream in the pipeline
+	// can identify this as top-level without recomputing everything.
 	s.Metrics[topLevelKey] = 1
+	// Setting the private attribute, this is used by internal agent code
+	// which can't access the metrics map because of concurrency issues.
+	s.topLevel = true
 }
 
 // TopLevel returns true if span is top-level.

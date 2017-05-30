@@ -28,6 +28,12 @@ type Span struct {
 	Metrics  map[string]float64 `json:"metrics" msg:"metrics"`     // arbitrary metrics
 	ParentID uint64             `json:"parent_id" msg:"parent_id"` // span ID of the span in which this one was created
 	Type     string             `json:"type" msg:"type"`           // protocol associated with the span
+
+	// Those are cached information, they are here not only for optimization,
+	// but because the func which fill their values read
+	// the Metrics map and causes map read/write concurrent accesses.
+	weight   float64 // caches the result of Weight() called on the root span
+	topLevel bool    // caches the result of TopLevel()
 }
 
 // String formats a Span struct to be displayed as a string
@@ -68,6 +74,9 @@ func (s *Span) End() int64 {
 // Weight returns the weight of the span as defined for sampling, i.e. the
 // inverse of the sampling rate.
 func (s *Span) Weight() float64 {
+	if s == nil {
+		return 1.0
+	}
 	sampleRate, ok := s.Metrics[SpanSampleRateMetricKey]
 	if !ok || sampleRate <= 0.0 || sampleRate > 1.0 {
 		return 1.0
