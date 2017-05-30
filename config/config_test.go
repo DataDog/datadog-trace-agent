@@ -24,6 +24,19 @@ func TestGetStrArray(t *testing.T) {
 	assert.Equal(ports, []string{"10", "15", "20", "25"})
 }
 
+func TestGetStrArrayEmpty(t *testing.T) {
+	assert := assert.New(t)
+	f, _ := ini.Load([]byte("[Main]\n\nports = "))
+	conf := File{
+		f,
+		"some/path",
+	}
+
+	ports, err := conf.GetStrArray("Main", "ports", ",")
+	assert.Nil(err)
+	assert.Equal([]string{}, ports)
+}
+
 func TestDefaultConfig(t *testing.T) {
 	assert := assert.New(t)
 	agentConfig := NewDefaultAgentConfig()
@@ -104,7 +117,7 @@ func TestDDAgentConfigWithLegacy(t *testing.T) {
 	// Properly loaded attributes
 	assert.Equal("pommedapi", agentConfig.APIKey)
 	assert.Equal("an_endpoint", agentConfig.APIEndpoint)
-	assert.Equal([]string{"http.status_code", "resource", "error"}, agentConfig.ExtraAggregators)
+	assert.Equal([]string{"resource", "error"}, agentConfig.ExtraAggregators)
 	assert.Equal(0.33, agentConfig.ExtraSampleRate)
 
 	// Check some defaults
@@ -127,8 +140,24 @@ func TestDDAgentConfigWithNewOpts(t *testing.T) {
 
 	conf := &File{instance: dd, Path: "whatever"}
 	agentConfig, _ := NewAgentConfig(conf, nil)
-	assert.Equal([]string{"http.status_code", "resource", "error"}, agentConfig.ExtraAggregators)
+	assert.Equal([]string{"resource", "error"}, agentConfig.ExtraAggregators)
 	assert.Equal(0.33, agentConfig.ExtraSampleRate)
+}
+
+func TestZeroingExtraAggregatorsFromConfig(t *testing.T) {
+	assert := assert.New(t)
+	// check that providing empty extra_aggregators clears the defaults
+	dd, _ := ini.Load([]byte(strings.Join([]string{
+		"[Main]",
+		"hostname = thing",
+		"api_key = apikey_12",
+		"[trace.concentrator]",
+		"extra_aggregators=",
+	}, "\n")))
+
+	conf := &File{instance: dd, Path: "whatever"}
+	agentConfig, _ := NewAgentConfig(conf, nil)
+	assert.Equal([]string{}, agentConfig.ExtraAggregators)
 }
 
 func TestConfigNewIfExists(t *testing.T) {

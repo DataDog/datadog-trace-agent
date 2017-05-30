@@ -96,6 +96,9 @@ func (c *File) GetStrArray(section, name, sep string) ([]string, error) {
 	}
 
 	value := c.instance.Section(section).Key(name).String()
+	if value == "" {
+		return []string{}, nil
+	}
 	return strings.Split(value, sep), nil
 }
 
