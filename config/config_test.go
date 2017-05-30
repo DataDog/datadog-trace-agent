@@ -104,7 +104,7 @@ func TestDDAgentConfigWithLegacy(t *testing.T) {
 	// Properly loaded attributes
 	assert.Equal("pommedapi", agentConfig.APIKey)
 	assert.Equal("an_endpoint", agentConfig.APIEndpoint)
-	assert.Equal([]string{"resource", "error"}, agentConfig.ExtraAggregators)
+	assert.Equal([]string{"http.status_code", "resource", "error"}, agentConfig.ExtraAggregators)
 	assert.Equal(0.33, agentConfig.ExtraSampleRate)
 
 	// Check some defaults
@@ -127,7 +127,7 @@ func TestDDAgentConfigWithNewOpts(t *testing.T) {
 
 	conf := &File{instance: dd, Path: "whatever"}
 	agentConfig, _ := NewAgentConfig(conf, nil)
-	assert.Equal([]string{"resource", "error"}, agentConfig.ExtraAggregators)
+	assert.Equal([]string{"http.status_code", "resource", "error"}, agentConfig.ExtraAggregators)
 	assert.Equal(0.33, agentConfig.ExtraSampleRate)
 }
 

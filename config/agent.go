@@ -162,7 +162,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 		APIPayloadBufferMaxSize: 16 * 1024 * 1024,
 
 		BucketInterval:   time.Duration(10) * time.Second,
-		ExtraAggregators: []string{},
+		ExtraAggregators: []string{"http.status_code"},
 
 		ExtraSampleRate: 1.0,
 		PreSampleRate:   1.0,
@@ -296,7 +296,7 @@ APM_CONF:
 	}
 
 	if v, e := conf.GetStrArray("trace.concentrator", "extra_aggregators", ","); e == nil {
-		c.ExtraAggregators = v
+		c.ExtraAggregators = append(c.ExtraAggregators, v...)
 	} else {
 		log.Debug("No aggregator configuration, using defaults")
 	}
