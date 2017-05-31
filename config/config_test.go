@@ -24,6 +24,19 @@ func TestGetStrArray(t *testing.T) {
 	assert.Equal(ports, []string{"10", "15", "20", "25"})
 }
 
+func TestGetStrArrayEmpty(t *testing.T) {
+	assert := assert.New(t)
+	f, _ := ini.Load([]byte("[Main]\n\nports = "))
+	conf := File{
+		f,
+		"some/path",
+	}
+
+	ports, err := conf.GetStrArray("Main", "ports", ",")
+	assert.Nil(err)
+	assert.Equal([]string{}, ports)
+}
+
 func TestDefaultConfig(t *testing.T) {
 	assert := assert.New(t)
 	agentConfig := NewDefaultAgentConfig()
@@ -91,7 +104,7 @@ func TestDDAgentConfigWithLegacy(t *testing.T) {
 		"api_key = pommedapi",
 		"endpoint = an_endpoint",
 		"[trace.concentrator]",
-		"extra_aggregators=resource,error",
+		"extra_aggregators=region,error",
 		"[trace.sampler]",
 		"extra_sample_rate=0.33",
 	}, "\n")))
@@ -104,7 +117,9 @@ func TestDDAgentConfigWithLegacy(t *testing.T) {
 	// Properly loaded attributes
 	assert.Equal("pommedapi", agentConfig.APIKey)
 	assert.Equal("an_endpoint", agentConfig.APIEndpoint)
-	assert.Equal([]string{"resource", "error"}, agentConfig.ExtraAggregators)
+
+	// ExtraAggregators contains Datadog defaults + user-specified aggregators
+	assert.Equal([]string{"http.status_code", "region", "error"}, agentConfig.ExtraAggregators)
 	assert.Equal(0.33, agentConfig.ExtraSampleRate)
 
 	// Check some defaults
@@ -120,15 +135,34 @@ func TestDDAgentConfigWithNewOpts(t *testing.T) {
 		"hostname = thing",
 		"api_key = apikey_12",
 		"[trace.concentrator]",
-		"extra_aggregators=resource,error",
+		"extra_aggregators=region,error",
 		"[trace.sampler]",
 		"extra_sample_rate=0.33",
 	}, "\n")))
 
 	conf := &File{instance: dd, Path: "whatever"}
 	agentConfig, _ := NewAgentConfig(conf, nil)
-	assert.Equal([]string{"resource", "error"}, agentConfig.ExtraAggregators)
+
+	// ExtraAggregators contains Datadog defaults + user-specified aggregators
+	assert.Equal([]string{"http.status_code", "region", "error"}, agentConfig.ExtraAggregators)
 	assert.Equal(0.33, agentConfig.ExtraSampleRate)
+}
+
+func TestEmptyExtraAggregatorsFromConfig(t *testing.T) {
+	assert := assert.New(t)
+
+	// providing empty extra_aggregators leaves the Datadog default in place
+	dd, _ := ini.Load([]byte(strings.Join([]string{
+		"[Main]",
+		"hostname = thing",
+		"api_key = apikey_12",
+		"[trace.concentrator]",
+		"extra_aggregators = ",
+	}, "\n")))
+
+	conf := &File{instance: dd, Path: "whatever"}
+	agentConfig, _ := NewAgentConfig(conf, nil)
+	assert.Equal([]string{"http.status_code"}, agentConfig.ExtraAggregators)
 }
 
 func TestConfigNewIfExists(t *testing.T) {
