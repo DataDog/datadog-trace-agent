@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	log "github.com/cihub/seelog"
@@ -152,6 +153,13 @@ func (s *Span) Normalize() error {
 		s.Meta["env"] = NormalizeTag(env)
 	}
 
+	// Status Code
+	if sc, ok := s.Meta["http.status_code"]; ok {
+		if !isValidStatusCode(sc) {
+			s.Meta["http.status_code"] = "500"
+		}
+	}
+
 	return nil
 }
 
@@ -190,6 +198,15 @@ func NormalizeTrace(t Trace) (Trace, error) {
 	}
 
 	return t, nil
+}
+
+func isValidStatusCode(sc string) bool {
+	if code, err := strconv.ParseUint(sc, 10, 64); err == nil {
+		if 100 <= code && code < 600 {
+			return true
+		}
+	}
+	return false
 }
 
 // This code is borrowed from dd-go metric normalization
