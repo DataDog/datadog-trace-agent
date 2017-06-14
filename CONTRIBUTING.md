@@ -7,7 +7,7 @@ This document aims to provide some basic guidelines to contribute to this reposi
 ## Submitting issues
 
 - You can first take a look at the [Troubleshooting](https://datadog.zendesk.com/hc/en-us/sections/200766955-Troubleshooting) section of our [Knowledge base](https://datadog.zendesk.com/hc/en-us).
-- If you can't find anything useful, send an email to <mailto:tracehelp@datadoghq.com>, or contact us via Slack at https://dd.slack.com/messages/trace-help
+- If you can't find anything useful, send an email to <mailto:tracehelp@datadoghq.com>, or join the [APM channel](https://datadoghq.slack.com/messages/apm) in our Datadog Slack. Visit [http://chat.datadoghq.com](http://chat.datadoghq.com) to join the Slack.
 - Finally, you can open a Github issue with clear steps to reproduce. If there is an existing issue that seems close to your problem,
 prefer leaving a comment there to opening a new issue.
 
