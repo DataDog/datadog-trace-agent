@@ -1,5 +1,18 @@
 require "./gorake.rb"
 
+def os
+  case RUBY_PLATFORM
+  when /linux/
+    "linux"
+  when /darwin/
+    "darwin"
+  when /x64-mingw32/
+    "windows"
+  else
+    fail 'Unsupported OS'
+  end
+end
+
 desc 'Bootstrap CI environment'
 task :bootstrap do
   tools = {
@@ -69,8 +82,14 @@ end
 desc "Build Datadog Trace agent for windows"
 task :windows do
   ["386", "amd64"].each do |arch|
+    case os
+    when "windows"
+        set_env = "set \"GOOS=windows\" && set \"GOARCH=#{arch}\""
+    else
+        set_env = "GOOS=windows GOARCH=#{arch}"
+    end
     go_build("github.com/DataDog/datadog-trace-agent/agent", {
-               :cmd => "GOOS=windows GOARCH=#{arch} go build -a -o trace-agent-windows-#{arch}.exe",
+               :cmd => set_env + " go build -a -o trace-agent-windows-#{arch}.exe",
                :race => ENV['GO_RACE'] == 'true'
              })
   end
