@@ -23,7 +23,6 @@ type apiError struct {
 }
 
 func newAPIError(err error, endpoint *APIEndpoint) *apiError {
-	endpoint.nbRetry++
 	return &apiError{err: err, endpoint: endpoint}
 }
 
@@ -46,11 +45,10 @@ type AgentEndpoint interface {
 // APIEndpoint implements AgentEndpoint to send data to a
 // an endpoint and API key.
 type APIEndpoint struct {
-	apiKey  string
-	url     string
-	nbRetry uint
-	stats   endpointStats
-	client  *http.Client
+	apiKey string
+	url    string
+	stats  endpointStats
+	client *http.Client
 }
 
 // NewAPIEndpoint returns a new APIEndpoint from a given config
@@ -143,6 +141,8 @@ func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 
 		// Only retry for 5xx (server) errors
 		if resp.StatusCode/100 == 5 {
+			atomic.AddInt64(&ae.stats.PayloadRetries, 1)
+			statsd.Client.Incr("datadog.trace_agent.writer.retries", []string{tagStatusCode}, 0.1)
 			return payloadSize, newAPIError(err, ae)
 		}
 
@@ -153,7 +153,6 @@ func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 	flushTime := time.Since(startFlush)
 	log.Infof("flushed payload to the API, time:%s, size:%d", flushTime, len(data))
 	statsd.Client.Gauge("datadog.trace_agent.writer.flush_duration", flushTime.Seconds(), nil, 1)
-	statsd.Client.Gauge("datadog.trace_agent.writer.nb_retry", float64(ae.nbRetry), nil, 1)
 
 	// Everything went fine
 	return payloadSize, nil
@@ -220,6 +219,7 @@ func (ae *APIEndpoint) logStats() {
 		accStats.ServicesPayload = atomic.SwapInt64(&ae.stats.ServicesPayload, 0)
 		accStats.ServicesPayloadError = atomic.SwapInt64(&ae.stats.ServicesPayloadError, 0)
 		accStats.ServicesBytes = atomic.SwapInt64(&ae.stats.ServicesBytes, 0)
+		accStats.PayloadRetries = atomic.SwapInt64(&ae.stats.PayloadRetries, 0)
 		updateEndpointStats(accStats)
 	}
 }
@@ -251,6 +251,8 @@ type endpointStats struct {
 	// TracesBytes is the size of the services payload data sent, including errors.
 	// If several URLs are given, it does not change the size (shared for all).
 	ServicesBytes int64
+	// PayloadRetries is the number of times we need to retry to send a payload to the API.
+	PayloadRetries int64
 }
 
 // NullEndpoint implements AgentEndpoint, it just logs data
