@@ -157,6 +157,7 @@ func (s *Span) Normalize() error {
 	if sc, ok := s.Meta["http.status_code"]; ok {
 		if !isValidStatusCode(sc) {
 			delete(s.Meta, "http.status_code")
+			log.Debugf("Drop invalid meta `http.status_code`: %s", sc)
 		}
 	}
 
