@@ -156,7 +156,7 @@ func (s *Span) Normalize() error {
 	// Status Code
 	if sc, ok := s.Meta["http.status_code"]; ok {
 		if !isValidStatusCode(sc) {
-			s.Meta["http.status_code"] = "500"
+			delete(s.Meta, "http.status_code")
 		}
 	}
 
@@ -202,9 +202,7 @@ func NormalizeTrace(t Trace) (Trace, error) {
 
 func isValidStatusCode(sc string) bool {
 	if code, err := strconv.ParseUint(sc, 10, 64); err == nil {
-		if 100 <= code && code < 600 {
-			return true
-		}
+		return 100 <= code && code < 600
 	}
 	return false
 }
