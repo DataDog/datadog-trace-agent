@@ -10,6 +10,10 @@ An agent that collects traces from various sources, normalizes and pre-processes
 The Trace Agent is packaged with the standard Datadog Agent.
 Just [run the Datadog Agent](http://docs.datadoghq.com/guides/basic_agent_usage/).
 
+Note: the Trace Agent is not yet included in the installation from source of
+the Trace Agent. Follow the instructions in [Development](#development) to do
+it manually.
+
 
 ## Run on OSX
 
@@ -31,6 +35,14 @@ The APM agent (aka Trace Agent) isn't part of the OSX Datadog Agent yet, it need
 2017-04-24 13:46:36 INFO (receiver.go:137) - listening for traces at http://localhost:8126
 ```
 
+## Run on Windows
+
+- Have the [Windows Datadog Agent](https://app.datadoghq.com/account/settings#agent/windows).
+- Download the [latest Windows Trace Agent release](https://github.com/DataDog/datadog-trace-agent/releases/latest).
+- Run the Trace Agent using the Datadog Agent configuration.
+
+    `./trace-agent-windows-X.Y.Z.exe -ddconfig "%ProgramData%\Datadog\datadog.conf"`
+
 
 ## Development
 
@@ -39,12 +51,13 @@ Pre-requisites:
 - `rake`
 
 
-Hacking:
+Build and run from source:
 - Import dependencies with `rake restore`. This task uses
   [glide](https://github.com/Masterminds/glide) to import all dependencies
   listed in `glide.yaml` in the `vendor` directory with the right version.
 - Run `rake build` to build the `trace-agent` binary from current source
 - Or run `rake install` to install `trace-agent` to your $GOPATH
+- You can then run it with `trace-agent --ddconfig PATH_TO_YOUR_DATADOG_CONFIG_FILE`
 
 
 ## Testing
