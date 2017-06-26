@@ -150,7 +150,7 @@ func (a *Agent) Process(t model.Trace) {
 
 	t.ComputeTopLevel()
 
-	sublayers := model.ComputeSublayers(&t)
+	sublayers := model.ComputeSublayers(t)
 	model.SetSublayersOnSpan(root, sublayers)
 
 	for i := range t {
