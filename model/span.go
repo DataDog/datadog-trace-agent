@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"math/rand"
-	"sort"
 )
 
 const (
@@ -123,69 +122,4 @@ func (spans Spans) GoString() string {
 	buf.WriteByte('}')
 
 	return buf.String()
-}
-
-type spansByStartDate []*Span
-
-func (spans spansByStartDate) Len() int {
-	return len(spans)
-}
-
-func (spans spansByStartDate) Swap(i, j int) {
-	spans[i], spans[j] = spans[j], spans[i]
-}
-
-func (spans spansByStartDate) Less(i, j int) bool {
-	return spans[i].Start < spans[j].Start
-}
-
-// CoveredDuration returns the amount of time in nanoseconds covered by at
-// least one span.
-func (spans Spans) CoveredDuration(parentStart int64) int64 {
-	if len(spans) == 0 {
-		return 0
-	}
-
-	adjustStart := func(start int64) int64 {
-		if start < parentStart {
-			return parentStart
-		}
-		return start
-	}
-
-	// Sort by increasing start date
-	sort.Sort(spansByStartDate(spans))
-
-	duration := int64(0)
-	start := adjustStart(spans[0].Start)
-	maxEnd := spans[0].End()
-
-	for i, span := range spans {
-		end := span.End()
-		if end < parentStart {
-			continue
-		}
-
-		if i == len(spans)-1 {
-			// Last span
-			duration += maxEnd - start
-		} else {
-			nextSpan := spans[i+1]
-			nextStart := adjustStart(nextSpan.Start)
-			nextEnd := nextSpan.End()
-
-			if nextStart <= end {
-				// span and nextSpan overlap
-				if nextEnd > end {
-					maxEnd = nextEnd
-				}
-			} else {
-				duration += maxEnd - start
-				start = nextStart
-				maxEnd = nextEnd
-			}
-		}
-	}
-
-	return duration
 }

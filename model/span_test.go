@@ -1,7 +1,6 @@
 package model
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -60,44 +59,6 @@ func TestSpanWeight(t *testing.T) {
 
 	span.Metrics[SpanSampleRateMetricKey] = 1.5
 	assert.Equal(1.0, span.Weight())
-}
-
-func TestSpansCoveredDuration(t *testing.T) {
-	assert := assert.New(t)
-
-	span := func(start, duration int64) *Span {
-		return &Span{
-			Start:    start,
-			Duration: duration,
-		}
-	}
-
-	tests := []struct {
-		parentStart int64
-		spans       Spans
-		duration    int64
-	}{
-		{0, Spans{}, 0},
-		{0, Spans{span(0, 100)}, 100},
-		{0, Spans{span(0, 50), span(50, 50)}, 100},
-		{0, Spans{span(0, 50), span(10, 20)}, 50},
-		{0, Spans{span(10, 20), span(0, 30)}, 30},
-		{0, Spans{span(10, 20), span(50, 20)}, 40},
-		{0, Spans{span(10, 20), span(15, 20)}, 25},
-		{0, Spans{span(10, 20), span(5, 30), span(50, 10)}, 40},
-
-		{5, Spans{span(10, 10), span(15, 10)}, 15},
-		{5, Spans{span(0, 10)}, 5},
-		{5, Spans{span(0, 10), span(5, 10)}, 10},
-
-		{40, Spans{span(0, 60), span(10, 10), span(30, 10)}, 20},
-	}
-
-	for _, test := range tests {
-		coveredDuration := test.spans.CoveredDuration(test.parentStart)
-		assert.Equal(test.duration, coveredDuration,
-			fmt.Sprintf("%#v", test.spans))
-	}
 }
 
 func TestSpanWeightNil(t *testing.T) {
