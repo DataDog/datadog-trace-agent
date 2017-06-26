@@ -81,13 +81,13 @@ func TestComputeSublayers(t *testing.T) {
 				span(1, 0, "web-server", "web", 0, 100),
 			},
 			[]SublayerValue{
-				sublayerValueService("web-server", 100.0),
-				sublayerValueType("web", 100.0),
-				sublayerValueCount(1.0),
+				sublayerValueService("web-server", 100),
+				sublayerValueType("web", 100),
+				sublayerValueCount(1),
 			},
 		},
 
-		// Multiple spans, non-parallel, non-asynchronous
+		// Multiple spans
 		//
 		// 0  10  20  30  40  50  60  70  80  90 100
 		// |===|===|===|===|===|===|===|===|===|===|
@@ -103,17 +103,18 @@ func TestComputeSublayers(t *testing.T) {
 				span(4, 1, "web-server", "template", 40, 20),
 			},
 			[]SublayerValue{
-				sublayerValueService("db-server", 10.0),
-				sublayerValueService("pgsql", 10.0),
-				sublayerValueService("web-server", 80.0),
-				sublayerValueType("db", 20.0),
-				sublayerValueType("template", 20.0),
-				sublayerValueType("web", 60.0),
-				sublayerValueCount(4.0),
+				sublayerValueService("db-server", 10),
+				sublayerValueService("pgsql", 10),
+				sublayerValueService("web-server", 80),
+				sublayerValueType("db", 20),
+				sublayerValueType("template", 20),
+				sublayerValueType("web", 60),
+				sublayerValueCount(4),
 			},
 		},
 
-		// Parallel spans
+		// Multiple parallel spans with no multiple service
+		// active
 		//
 		// 0  10  20  30  40  50  60  70  80  90 100
 		// |===|===|===|===|===|===|===|===|===|===|
@@ -122,7 +123,7 @@ func TestComputeSublayers(t *testing.T) {
 		//       <-3----->   <--6---->
 		//         <-4----->               <-7->
 		{
-			"parallel spans",
+			"multiple parallel spans no multiple service active",
 			Trace{
 				span(1, 0, "web-server", "web", 0, 100),
 				span(2, 1, "rpc1", "rpc", 10, 20),
@@ -133,91 +134,64 @@ func TestComputeSublayers(t *testing.T) {
 				span(7, 1, "rpc3", "rpc", 80, 10),
 			},
 			[]SublayerValue{
-				sublayerValueService("rpc1", 60.0),
-				sublayerValueService("rpc2", 40.0),
-				sublayerValueService("rpc3", 10.0),
-				sublayerValueService("web-server", 35.0),
-				sublayerValueType("rpc", 110.0),
-				sublayerValueType("web", 35.0),
-				sublayerValueCount(7.0),
+				sublayerValueService("rpc1", 30),
+				sublayerValueService("rpc2", 25),
+				sublayerValueService("rpc3", 10),
+				sublayerValueService("web-server", 35),
+				sublayerValueType("rpc", 65),
+				sublayerValueType("web", 35),
+				sublayerValueCount(7),
 			},
 		},
 
-		// Asynchronous spans, non-parallel
+		// Parallel spans parent not waiting
 		//
 		// 0  10  20  30  40  50  60  70  80  90 100
 		// |===|===|===|===|===|===|===|===|===|===|
 		// <-1----------------->
 		//         <-2---------------->
-		//                         <-3----->
+		//                         <-3------------->
 		{
-			"asynchronous spans",
+			"parallel spans parent not waiting",
 			Trace{
 				span(1, 0, "web-server", "web", 0, 50),
 				span(2, 1, "rpc1", "rpc", 20, 50),
-				span(3, 2, "rpc2", "rpc", 60, 20),
+				span(3, 2, "rpc2", "rpc", 60, 40),
 			},
 			[]SublayerValue{
-				sublayerValueService("rpc1", 50.0),
-				sublayerValueService("rpc2", 20.0),
-				sublayerValueService("web-server", 50.0),
-				sublayerValueType("rpc", 70.0),
-				sublayerValueType("web", 50.0),
-				sublayerValueCount(3.0),
+				sublayerValueService("rpc1", 40),
+				sublayerValueService("rpc2", 40),
+				sublayerValueService("web-server", 20),
+				sublayerValueType("rpc", 80),
+				sublayerValueType("web", 20),
+				sublayerValueCount(3),
 			},
 		},
 
-		// Parallel asynchronous spans
+		// Multiple parallel spans multiple service active parent not waiting
 		//
 		// 0  10  20  30  40  50  60  70  80  90 100
 		// |===|===|===|===|===|===|===|===|===|===|
 		// <-1----------------->
 		//         <-2----------------->
-		//     <-3------------------------->
+		//     <-3-------------------------------->
 		//                         <-4->
 		{
-			"parallel asynchronous spans",
-			Trace{
-				span(1, 0, "web-server", "web", 0, 50),
-				span(2, 0, "rpc1", "rpc", 20, 50),
-				span(3, 0, "rpc1", "rpc", 10, 70),
-				span(4, 0, "rpc2", "rpc", 60, 10),
-			},
-			[]SublayerValue{
-				sublayerValueService("rpc1", 120.0),
-				sublayerValueService("rpc2", 10.0),
-				sublayerValueService("web-server", 50.0),
-				sublayerValueType("rpc", 130.0),
-				sublayerValueType("web", 50.0),
-				sublayerValueCount(4.0),
-			},
-		},
-
-		// Asynchronous spans with children
-		//
-		// 0  10  20  30  40  50  60  70  80  90 100
-		// |===|===|===|===|===|===|===|===|===|===|
-		// <-1----------------->
-		//         <-2----------------->
-		//             <-3--------->
-		//                     <-4--------->
-		{
-			"asynchronous spans with children",
+			"multiple parallel spans multiple service active parent not waiting",
 			Trace{
 				span(1, 0, "web-server", "web", 0, 50),
 				span(2, 1, "rpc1", "rpc", 20, 50),
-				span(3, 2, "pgsql", "db", 30, 30),
-				span(4, 2, "rpc2", "rpc", 50, 30),
+				span(3, 1, "rpc2", "rpc", 10, 90),
+				span(4, 1, "rpc3", "rpc", 60, 10),
 			},
 			[]SublayerValue{
-				sublayerValueService("pgsql", 30.0),
-				sublayerValueService("rpc1", 20.0),
-				sublayerValueService("rpc2", 30.0),
-				sublayerValueService("web-server", 50.0),
-				sublayerValueType("db", 30.0),
-				sublayerValueType("rpc", 50.0),
-				sublayerValueType("web", 50.0),
-				sublayerValueCount(4.0),
+				sublayerValueService("rpc1", 23),
+				sublayerValueService("rpc2", 63),
+				sublayerValueService("rpc3", 3),
+				sublayerValueService("web-server", 10),
+				sublayerValueType("rpc", 90),
+				sublayerValueType("web", 10),
+				sublayerValueCount(4),
 			},
 		},
 
@@ -230,7 +204,7 @@ func TestComputeSublayers(t *testing.T) {
 		//     <-2----------------->       <-3--------->
 		//         <-4--------->
 		//       <-5------------------->
-		//                         <--6---------------------------->
+		//                         <--6-------------------->
 		//                                             <-7------------->
 		{
 			"mix of everything",
@@ -240,28 +214,28 @@ func TestComputeSublayers(t *testing.T) {
 				span(3, 1, "render", "web", 80, 30),
 				span(4, 2, "pg-read", "db", 20, 30),
 				span(5, 1, "redis", "cache", 15, 55),
-				span(6, 1, "rpc1", "rpc", 60, 80),
+				span(6, 1, "rpc1", "rpc", 60, 60),
 				span(7, 6, "alert", "rpc", 110, 40),
 			},
 			[]SublayerValue{
-				sublayerValueService("alert", 40.0),
-				sublayerValueService("pg", 20.0),
-				sublayerValueService("pg-read", 30.0),
-				sublayerValueService("redis", 55.0),
-				sublayerValueService("render", 30.0),
-				sublayerValueService("rpc1", 80.0),
-				sublayerValueService("web-server", 40.0),
-				sublayerValueType("cache", 55.0),
-				sublayerValueType("db", 50.0),
-				sublayerValueType("rpc", 120.0),
-				sublayerValueType("web", 70.0),
-				sublayerValueCount(7.0),
+				sublayerValueService("alert", 35),
+				sublayerValueService("pg", 12),
+				sublayerValueService("pg-read", 15),
+				sublayerValueService("redis", 27),
+				sublayerValueService("render", 15),
+				sublayerValueService("rpc1", 30),
+				sublayerValueService("web-server", 15),
+				sublayerValueType("cache", 27),
+				sublayerValueType("db", 27),
+				sublayerValueType("rpc", 65),
+				sublayerValueType("web", 30),
+				sublayerValueCount(7),
 			},
 		},
 	}
 
 	for _, test := range tests {
-		values := ComputeSublayers(&test.trace)
+		values := ComputeSublayers(test.trace)
 		sort.Sort(sublayerValues(values))
 
 		assert.Equal(test.values, values, "test: "+test.name)
@@ -337,6 +311,6 @@ func BenchmarkSublayerThru(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		ComputeSublayers(&tr)
+		ComputeSublayers(tr)
 	}
 }
