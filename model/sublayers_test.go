@@ -293,6 +293,81 @@ func TestBuildTraceTimestamps(t *testing.T) {
 	}
 }
 
+func TestBuildTraceActiveSpansMapping(t *testing.T) {
+	assert := assert.New(t)
+
+	span := func(id, parentId uint64, service, spanType string, start, duration int64) Span {
+		return Span{
+			TraceID:  1,
+			SpanID:   id,
+			ParentID: parentId,
+			Service:  service,
+			Type:     spanType,
+			Start:    start,
+			Duration: duration,
+		}
+	}
+
+	tests := []struct {
+		name       string
+		trace      Trace
+		timestamps []int64
+		expected   map[int64][]uint64
+	}{
+		//
+		// 0  10  20  30  40  50  60  70  80  90 100 110 120 130 140 150
+		// |===|===|===|===|===|===|===|===|===|===|===|===|===|===|===|
+		// <-1------------------------------------------------->
+		//     <-2----------------->       <-3--------->
+		//         <-4--------->
+		//       <-5------------------->
+		//                         <--6-------------------->
+		//                                             <-7------------->
+		{
+			"mix of everything",
+			Trace{
+				span(1, 0, "web-server", "web", 0, 130),
+				span(2, 1, "pg", "db", 10, 50),
+				span(3, 1, "render", "web", 80, 30),
+				span(4, 2, "pg-read", "db", 20, 30),
+				span(5, 1, "redis", "cache", 15, 55),
+				span(6, 1, "rpc1", "rpc", 60, 60),
+				span(7, 6, "alert", "rpc", 110, 40),
+			},
+			[]int64{0, 10, 15, 20, 50, 60, 70, 80, 110, 120, 130, 150},
+			map[int64][]uint64{
+				0:   []uint64{1},
+				10:  []uint64{2},
+				15:  []uint64{2, 5},
+				20:  []uint64{4, 5},
+				50:  []uint64{2, 5},
+				60:  []uint64{5, 6},
+				70:  []uint64{6},
+				80:  []uint64{3, 6},
+				110: []uint64{7},
+				120: []uint64{1, 7},
+				130: []uint64{7},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		actual := buildTraceActiveSpansMapping(test.trace, test.timestamps)
+
+		actualSpanIds := make(map[int64][]uint64, len(actual))
+		for ts, spans := range actual {
+			ids := make([]uint64, 0, len(spans))
+			for _, span := range spans {
+				ids = append(ids, span.SpanID)
+			}
+
+			actualSpanIds[ts] = ids
+		}
+
+		assert.Equal(test.expected, actualSpanIds, "test: "+test.name)
+	}
+}
+
 func TestSetSublayersOnSpan(t *testing.T) {
 	assert := assert.New(t)
 
