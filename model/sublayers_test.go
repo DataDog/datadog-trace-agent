@@ -404,39 +404,41 @@ func TestSetSublayersOnSpan(t *testing.T) {
 	}, span.Metrics)
 }
 
-func BenchmarkSublayerThru(b *testing.B) {
-	// real trace
-	tr := Trace{
-		Span{
-			TraceID: 1, SpanID: 1, ParentID: 0,
-			Start: 42, Duration: 1000000000,
-			Service: "mcnulty", Type: "web",
-		},
-		Span{
-			TraceID: 1, SpanID: 2, ParentID: 1,
-			Start: 100, Duration: 200000000,
-			Service: "mcnulty", Type: "sql",
-		},
-		Span{
-			TraceID: 1, SpanID: 3, ParentID: 2,
-			Start: 150, Duration: 199999000,
-			Service: "master-db", Type: "sql",
-		},
-		Span{
-			TraceID: 1, SpanID: 4, ParentID: 1,
-			Start: 500000000, Duration: 500000,
-			Service: "redis", Type: "redis",
-		},
-		Span{
-			TraceID: 1, SpanID: 5, ParentID: 1,
-			Start: 700000000, Duration: 700000,
-			Service: "mcnulty", Type: "",
-		},
+func BenchmarkComputeSublayers(b *testing.B) {
+	span := func(id, parentId uint64, service, spanType string, start, duration int64) Span {
+		return Span{
+			TraceID:  1,
+			SpanID:   id,
+			ParentID: parentId,
+			Service:  service,
+			Type:     spanType,
+			Start:    start,
+			Duration: duration,
+		}
+	}
+
+	//
+	// 0  10  20  30  40  50  60  70  80  90 100 110 120 130 140 150
+	// |===|===|===|===|===|===|===|===|===|===|===|===|===|===|===|
+	// <-1------------------------------------------------->
+	//     <-2----------------->       <-3--------->
+	//         <-4--------->
+	//       <-5------------------->
+	//                         <--6-------------------->
+	//                                             <-7------------->
+	trace := Trace{
+		span(1, 0, "web-server", "web", 0, 130),
+		span(2, 1, "pg", "db", 10, 50),
+		span(3, 1, "render", "web", 80, 30),
+		span(4, 2, "pg-read", "db", 20, 30),
+		span(5, 1, "redis", "cache", 15, 55),
+		span(6, 1, "rpc1", "rpc", 60, 60),
+		span(7, 6, "alert", "rpc", 110, 40),
 	}
 
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		ComputeSublayers(tr)
+		ComputeSublayers(trace)
 	}
 }
