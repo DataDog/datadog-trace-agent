@@ -1,8 +1,10 @@
 package model
 
 import (
+	"bytes"
 	"fmt"
 	"math/rand"
+	"sort"
 )
 
 const (
@@ -83,4 +85,107 @@ func (s *Span) Weight() float64 {
 	}
 
 	return 1.0 / sampleRate
+}
+
+// Spans is a slice of span pointers
+type Spans []*Span
+
+func (spans Spans) String() string {
+	var buf bytes.Buffer
+
+	buf.WriteString("Spans{")
+
+	for i, span := range spans {
+		if i > 0 {
+			buf.WriteString(", ")
+		}
+		fmt.Fprintf(&buf, "%v", span)
+	}
+
+	buf.WriteByte('}')
+
+	return buf.String()
+}
+
+// GoString returns a description of a slice of spans.
+func (spans Spans) GoString() string {
+	var buf bytes.Buffer
+
+	buf.WriteString("Spans{")
+
+	for i, span := range spans {
+		if i > 0 {
+			buf.WriteString(", ")
+		}
+		fmt.Fprintf(&buf, "%#v", span)
+	}
+
+	buf.WriteByte('}')
+
+	return buf.String()
+}
+
+type spansByStartDate []*Span
+
+func (spans spansByStartDate) Len() int {
+	return len(spans)
+}
+
+func (spans spansByStartDate) Swap(i, j int) {
+	spans[i], spans[j] = spans[j], spans[i]
+}
+
+func (spans spansByStartDate) Less(i, j int) bool {
+	return spans[i].Start < spans[j].Start
+}
+
+// CoveredDuration returns the amount of time in nanoseconds covered by at
+// least one span.
+func (spans Spans) CoveredDuration(parentStart int64) int64 {
+	if len(spans) == 0 {
+		return 0
+	}
+
+	adjustStart := func(start int64) int64 {
+		if start < parentStart {
+			return parentStart
+		}
+		return start
+	}
+
+	// Sort by increasing start date
+	sort.Sort(spansByStartDate(spans))
+
+	duration := int64(0)
+	start := adjustStart(spans[0].Start)
+	maxEnd := spans[0].End()
+
+	for i, span := range spans {
+		end := span.End()
+		if end < parentStart {
+			continue
+		}
+
+		if i == len(spans)-1 {
+			// Last span
+			duration += maxEnd - start
+		} else {
+			nextSpan := spans[i+1]
+			nextStart := adjustStart(nextSpan.Start)
+			nextEnd := nextSpan.End()
+
+			if nextStart <= end {
+				// span and nextSpan overlap
+				if nextEnd > end {
+					maxEnd = nextEnd
+				}
+			} else {
+				duration += maxEnd - start
+				start = nextStart
+				maxEnd = nextEnd
+			}
+		}
+	}
+
+	return duration
 }
