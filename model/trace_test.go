@@ -31,3 +31,25 @@ func TestGetRootFromPartialTrace(t *testing.T) {
 
 	assert.Equal(trace.GetRoot().SpanID, uint64(12341))
 }
+
+func TestTraceChildrenMap(t *testing.T) {
+	assert := assert.New(t)
+
+	trace := Trace{
+		Span{SpanID: 1, ParentID: 0},
+		Span{SpanID: 2, ParentID: 1},
+		Span{SpanID: 3, ParentID: 1},
+		Span{SpanID: 4, ParentID: 2},
+		Span{SpanID: 5, ParentID: 3},
+		Span{SpanID: 6, ParentID: 4},
+	}
+
+	childrenMap := trace.ChildrenMap()
+
+	assert.Equal(Spans{&trace[1], &trace[2]}, childrenMap[1])
+	assert.Equal(Spans{&trace[3]}, childrenMap[2])
+	assert.Equal(Spans{&trace[4]}, childrenMap[3])
+	assert.Equal(Spans{&trace[5]}, childrenMap[4])
+	assert.Equal(Spans{}, childrenMap[5])
+	assert.Equal(Spans{}, childrenMap[6])
+}

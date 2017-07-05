@@ -268,7 +268,7 @@ func TestStatsBucketSublayers(t *testing.T) {
 	assert := assert.New(t)
 
 	tr := testTrace()
-	sublayers := ComputeSublayers(&tr)
+	sublayers := ComputeSublayers(tr)
 	root := tr.GetRoot()
 	SetSublayersOnSpan(root, sublayers)
 
@@ -364,7 +364,7 @@ func TestStatsBucketSublayersTopLevel(t *testing.T) {
 	assert := assert.New(t)
 
 	tr := testTraceTopLevel()
-	sublayers := ComputeSublayers(&tr)
+	sublayers := ComputeSublayers(tr)
 	root := tr.GetRoot()
 	SetSublayersOnSpan(root, sublayers)
 
@@ -495,7 +495,7 @@ func BenchmarkHandleSpanSublayers(b *testing.B) {
 	aggr := []string{}
 
 	tr := testTrace()
-	sublayers := ComputeSublayers(&tr)
+	sublayers := ComputeSublayers(tr)
 	root := tr.GetRoot()
 	SetSublayersOnSpan(root, sublayers)
 
