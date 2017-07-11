@@ -1,14 +1,13 @@
 package main
 
 import (
-	"bytes"
-	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -286,17 +285,17 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 // logStats periodically submits stats about the receiver to statsd
 func (r *HTTPReceiver) logStats() {
 	var lastLog time.Time
-	accStats := getInitStatsCopy()
+	accStats := newReceiverStats()
 
 	for now := range time.Tick(10 * time.Second) {
 		statsd.Client.Gauge("datadog.trace_agent.heartbeat", 1, []string{"version:" + Version}, 1)
 
 		// We update accStats with the new stats we collected
-		for _, payloadStats := range r.stats.clone() {
-			for k, v := range payloadStats.stats {
-				accStats[k] += v
-			}
-		}
+		accStats.acc(r.stats)
+		r.stats.Lock()
+		log.Infof("ReceiverStats: %s", r.stats.String())
+		r.stats.Unlock()
+		log.Infof("AccStats: %s", accStats.String())
 
 		// Publish the stats accumulated during the last flush and reset r.stats
 		r.stats.publish()
@@ -306,12 +305,10 @@ func (r *HTTPReceiver) logStats() {
 
 		if now.Sub(lastLog) >= time.Minute {
 			// Here we log the stats we accumulated
-			log.Infof("receiver handled: %d traces (dropped: %d); %d spans (dropped: %d)",
-				accStats["traces_received"], accStats["traces_dropped"],
-				accStats["spans_received"], accStats["spans_dropped"])
+			log.Infof("Accumulated stats (for 1 minute): %s", accStats.String())
 
 			// We reset the stats accumulated during the last minute
-			accStats = getInitStatsCopy()
+			accStats.reset()
 			lastLog = now
 		}
 	}
@@ -326,12 +323,29 @@ func newReceiverStats() *receiverStats {
 	return &receiverStats{sync.Mutex{}, map[uint64]payloadStats{}}
 }
 
+func (s *receiverStats) String() string {
+	str := ""
+	for k, v := range s.stats {
+		str += strconv.FormatUint(k, 10) + v.String()
+	}
+	return str
+}
+
+func (accStats *receiverStats) acc(rs *receiverStats) {
+	rs.Lock()
+	defer rs.Unlock()
+	for _, payloadStats := range rs.stats {
+		accStats.updateStats(&payloadStats)
+	}
+}
+
 func (s *receiverStats) updateStats(ps *payloadStats) {
-	hash := getHash(ps.tags)
-	payloadStats, ok := s.getPayloadStats(hash)
+	log.Infof("stats before update: %v", s.String())
+	payloadStats, ok := s.getPayloadStats(ps.hash)
 	if !ok {
 		// No stats for this hash yet
-		s.setStats(hash, ps)
+		log.Infof("No stats for this hash: %v", ps.hash)
+		s.setStats(ps)
 		return
 	}
 
@@ -339,7 +353,7 @@ func (s *receiverStats) updateStats(ps *payloadStats) {
 	for k, v := range ps.stats {
 		payloadStats.stats[k] += v
 	}
-	s.setStats(hash, payloadStats)
+	s.setStats(payloadStats)
 }
 
 func (s *receiverStats) getPayloadStats(hash uint64) (*payloadStats, bool) {
@@ -362,10 +376,10 @@ func (s *receiverStats) clone() map[uint64]payloadStats {
 	return stats
 }
 
-func (s *receiverStats) setStats(hash uint64, stats *payloadStats) {
+func (s *receiverStats) setStats(ps *payloadStats) {
 	s.Lock()
 	defer s.Unlock()
-	s.stats[hash] = *stats
+	s.stats[ps.hash] = *ps
 }
 
 func (s *receiverStats) publish() {
@@ -386,12 +400,18 @@ func (s *receiverStats) reset() {
 type payloadStats struct {
 	stats map[string]int64
 	tags  []string
+	hash  uint64
 }
 
 func newPayloadStats(req *http.Request) *payloadStats {
 	stats := getInitStatsCopy()
 	tags := getTags(req)
-	return &payloadStats{stats, tags}
+	hash := hash(tags)
+	return &payloadStats{stats, tags, hash}
+}
+
+func (s *payloadStats) String() string {
+	return fmt.Sprintf("%v: %v\n", s.tags, s.stats)
 }
 
 func (s *payloadStats) clone() *payloadStats {
@@ -399,7 +419,7 @@ func (s *payloadStats) clone() *payloadStats {
 	for k, v := range s.stats {
 		stats[k] = v
 	}
-	return &payloadStats{stats, s.tags}
+	return &payloadStats{stats, s.tags, s.hash}
 }
 
 func (s *payloadStats) publish() {
@@ -426,27 +446,12 @@ func getTags(req *http.Request) []string {
 	return tags
 }
 
-// getHash returns the hash of the tag map
-func getHash(tags []string) uint64 {
+// hash returns the hash of the tag slice
+func hash(tags []string) uint64 {
 	h := fnv.New64()
-	bytes, err := getBytes(tags)
-	if err != nil {
-		log.Errorf("Couldn't parse the header tags into a hash: %v", err)
-		return 0
-	}
-	h.Write(bytes)
+	s := strings.Join(tags, "")
+	h.Write([]byte(s))
 	return h.Sum64()
-}
-
-// getBytes return the binary version of any interface
-func getBytes(key interface{}) ([]byte, error) {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(key)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
 }
 
 func getTraces(v APIVersion, w http.ResponseWriter, req *http.Request) (model.Traces, bool) {
