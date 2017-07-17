@@ -1,6 +1,7 @@
 package model
 
 import (
+	"bytes"
 	"fmt"
 	"math/rand"
 )
@@ -83,4 +84,42 @@ func (s *Span) Weight() float64 {
 	}
 
 	return 1.0 / sampleRate
+}
+
+// Spans is a slice of span pointers
+type Spans []*Span
+
+func (spans Spans) String() string {
+	var buf bytes.Buffer
+
+	buf.WriteString("Spans{")
+
+	for i, span := range spans {
+		if i > 0 {
+			buf.WriteString(", ")
+		}
+		fmt.Fprintf(&buf, "%v", span)
+	}
+
+	buf.WriteByte('}')
+
+	return buf.String()
+}
+
+// GoString returns a description of a slice of spans.
+func (spans Spans) GoString() string {
+	var buf bytes.Buffer
+
+	buf.WriteString("Spans{")
+
+	for i, span := range spans {
+		if i > 0 {
+			buf.WriteString(", ")
+		}
+		fmt.Fprintf(&buf, "%#v", span)
+	}
+
+	buf.WriteByte('}')
+
+	return buf.String()
 }

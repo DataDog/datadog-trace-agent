@@ -165,7 +165,17 @@ func (r *ThrottledReceiver) AfterParse(args log.CustomReceiverInitArgs) error {
 }
 
 // Flush implements log.CustomReceiver
-func (*ThrottledReceiver) Flush() {}
+func (r *ThrottledReceiver) Flush() {
+	// Flush all raw loggers, a typical use cases for log is showing an error at startup
+	// (eg: "cannot listen on localhost:8126: listen tcp 127.0.0.1:8126: bind: address already in use")
+	// and those are not shown if we don't Flush for real.
+	if r.rawLogger != nil { // set by AfterParse, so double-checking it's not nil
+		r.rawLogger.Flush()
+	}
+	if r.rawLoggerNoFmt != nil { // set by AfterParse, so double-checking it's not nil
+		r.rawLoggerNoFmt.Flush()
+	}
+}
 
 // Close implements log.CustomReceiver
 func (r *ThrottledReceiver) Close() error {

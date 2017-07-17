@@ -230,7 +230,9 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 			ps.stats["spans_dropped"] += int64(spans)
 
 			errorMsg := fmt.Sprintf("dropping trace reason: %s (debug for more info), %v", err, normTrace)
-			if len(errorMsg) > 150 && r.debug {
+
+			// avoid truncation in DEBUG mode
+			if len(errorMsg) > 150 && !r.debug {
 				errorMsg = errorMsg[:150] + "..."
 			}
 			log.Errorf(errorMsg)
