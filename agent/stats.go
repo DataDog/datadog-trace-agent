@@ -11,7 +11,7 @@ import (
 
 type receiverStats struct {
 	sync.RWMutex
-	stats map[uint64]*tagStats
+	Stats map[uint64]*tagStats
 }
 
 func newReceiverStats() *receiverStats {
@@ -20,17 +20,17 @@ func newReceiverStats() *receiverStats {
 
 func (rs *receiverStats) update(ts *tagStats) {
 	rs.Lock()
-	if rs.stats[ts.hash] != nil {
-		rs.stats[ts.hash].update(ts)
+	if rs.Stats[ts.Hash] != nil {
+		rs.Stats[ts.Hash].update(ts)
 	} else {
-		rs.stats[ts.hash] = ts.clone()
+		rs.Stats[ts.Hash] = ts.clone()
 	}
 	rs.Unlock()
 }
 
 func (rs *receiverStats) acc(new *receiverStats) {
 	new.RLock()
-	for _, tagStats := range new.stats {
+	for _, tagStats := range new.Stats {
 		rs.update(tagStats)
 	}
 	new.RUnlock()
@@ -38,7 +38,7 @@ func (rs *receiverStats) acc(new *receiverStats) {
 
 func (rs *receiverStats) publish() {
 	rs.RLock()
-	for _, tagStats := range rs.stats {
+	for _, tagStats := range rs.Stats {
 		tagStats.publish()
 	}
 	rs.RUnlock()
@@ -46,16 +46,22 @@ func (rs *receiverStats) publish() {
 
 func (rs *receiverStats) reset() {
 	rs.Lock()
-	for _, tagStats := range rs.stats {
+	for _, tagStats := range rs.Stats {
 		tagStats.reset()
 	}
 	rs.Unlock()
 }
 
-func (rs *receiverStats) String() string {
+func (rs *receiverStats) clone() *receiverStats {
+	clone := newReceiverStats()
+	clone.acc(rs)
+	return clone
+}
+
+func (rs receiverStats) String() string {
 	str := ""
 	rs.RLock()
-	for _, tagStats := range rs.stats {
+	for _, tagStats := range rs.Stats {
 		str += tagStats.String()
 	}
 	rs.RUnlock()
@@ -64,8 +70,8 @@ func (rs *receiverStats) String() string {
 
 type tagStats struct {
 	stats
-	tags []string
-	hash uint64
+	Tags []string
+	Hash uint64
 }
 
 type stats struct {
@@ -93,7 +99,7 @@ func newTagStats(tags []string) *tagStats {
 }
 
 func (ts *tagStats) clone() *tagStats {
-	return &tagStats{ts.stats, ts.tags, ts.hash}
+	return &tagStats{ts.stats, ts.Tags, ts.Hash}
 }
 
 func (ts *tagStats) update(new *tagStats) {
@@ -117,17 +123,17 @@ func (ts *tagStats) reset() {
 }
 
 func (ts *tagStats) publish() {
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_received", ts.TracesReceived, ts.tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_dropped", ts.TracesDropped, ts.tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_bytes", ts.TracesBytes, ts.tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.spans_received", ts.SpansReceived, ts.tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.spans_dropped", ts.SpansDropped, ts.tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.services_bytes", ts.ServicesBytes, ts.tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.services_meta", ts.ServicesMeta, ts.tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.traces_received", ts.TracesReceived, ts.Tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.traces_dropped", ts.TracesDropped, ts.Tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.traces_bytes", ts.TracesBytes, ts.Tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.spans_received", ts.SpansReceived, ts.Tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.spans_dropped", ts.SpansDropped, ts.Tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.services_bytes", ts.ServicesBytes, ts.Tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.services_meta", ts.ServicesMeta, ts.Tags, 1)
 }
 
-func (ts *tagStats) String() string {
-	return fmt.Sprintf("\n\t%v -> traces received: %v, traces dropped: %v", ts.tags, ts.TracesReceived, ts.TracesDropped)
+func (ts tagStats) String() string {
+	return fmt.Sprintf("\n\t%v -> traces received: %v, traces dropped: %v", ts.Tags, ts.TracesReceived, ts.TracesDropped)
 }
 
 // hash returns the hash of the tag slice
