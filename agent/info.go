@@ -83,7 +83,7 @@ func publishUptime() interface{} {
 
 func updateReceiverStats(rs *receiverStats) {
 	infoMu.Lock()
-	infoReceiverStats = *rs
+	infoReceiverStats = *rs.clone()
 	infoMu.Unlock()
 }
 

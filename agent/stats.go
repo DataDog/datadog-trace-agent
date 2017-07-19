@@ -58,7 +58,7 @@ func (rs *receiverStats) clone() *receiverStats {
 	return clone
 }
 
-func (rs receiverStats) String() string {
+func (rs *receiverStats) String() string {
 	str := ""
 	rs.RLock()
 	for _, tagStats := range rs.Stats {
@@ -132,7 +132,7 @@ func (ts *tagStats) publish() {
 	statsd.Client.Count("datadog.trace_agent.receiver.services_meta", ts.ServicesMeta, ts.Tags, 1)
 }
 
-func (ts tagStats) String() string {
+func (ts *tagStats) String() string {
 	return fmt.Sprintf("\n\t%v -> traces received: %v, traces dropped: %v", ts.Tags, ts.TracesReceived, ts.TracesDropped)
 }
 
