@@ -23,7 +23,7 @@ func (rs *receiverStats) update(ts *tagStats) {
 	if rs.stats[ts.hash] != nil {
 		rs.stats[ts.hash].update(ts)
 	} else {
-		rs.stats[ts.hash] = ts
+		rs.stats[ts.hash] = ts.clone()
 	}
 	rs.Unlock()
 }
@@ -53,7 +53,7 @@ func (rs *receiverStats) reset() {
 }
 
 func (rs *receiverStats) String() string {
-	str := "receiverStats:"
+	str := ""
 	rs.RLock()
 	for _, tagStats := range rs.stats {
 		str += tagStats.String()
@@ -90,6 +90,10 @@ func newTagStats(tags []string) *tagStats {
 		tags = []string{}
 	}
 	return &tagStats{stats{}, tags, hash(tags)}
+}
+
+func (ts *tagStats) clone() *tagStats {
+	return &tagStats{ts.stats, ts.tags, ts.hash}
 }
 
 func (ts *tagStats) update(new *tagStats) {
