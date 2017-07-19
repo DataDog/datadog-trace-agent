@@ -181,8 +181,8 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 	HTTPOK(w) // We successfuly decoded the payload
 
 	// We create a new tagStats struct where we will store the stats for this payload
-	ts := newTagStats(req)
-	ts.tags = append(ts.tags, "endpoint:traces")
+	tags := parseTags(req)
+	ts := newTagStats(append(tags, "method:handleTraces"))
 
 	bytesRead := req.Body.(*model.LimitedReader).Count
 	if bytesRead > 0 {
@@ -239,12 +239,13 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 		HTTPDecodingError(err, []string{tagServiceHandler, fmt.Sprintf("v:%s", v)}, w)
 		return
 	}
-	statsd.Client.Count("datadog.trace_agent.receiver.service", int64(len(servicesMeta)), nil, 1)
+
 	HTTPOK(w)
 
 	// We create a new tagStats struct where we will store the stats for this payload
-	ts := newTagStats(req)
-	ts.tags = append(ts.tags, "endpoint:services")
+	tags := parseTags(req)
+	ts := newTagStats(append(tags, "method:handleServices"))
+	ts.ServicesMeta = int64(len(servicesMeta))
 
 	bytesRead := req.Body.(*model.LimitedReader).Count
 	if bytesRead > 0 {
@@ -339,4 +340,16 @@ func decodeReceiverPayload(r io.Reader, dest msgp.Decodable, v APIVersion, conte
 	default:
 		panic(fmt.Sprintf("unhandled content type %q", contentType))
 	}
+}
+
+// parseTags extracts tags from the header request
+func parseTags(req *http.Request) []string {
+	tags := []string{}
+	for meta, headerField := range headerFields {
+		value := req.Header.Get(headerField)
+		if value != "" {
+			tags = append(tags, meta+":"+value)
+		}
+	}
+	return tags
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"hash/fnv"
-	"net/http"
 	"strings"
 	"sync"
 
@@ -81,10 +80,11 @@ type stats struct {
 	SpansDropped int64
 	// ServicesBytes is the amount of data received on the services endpoint (raw data, encoded, compressed)
 	ServicesBytes int64
+	// ServicesMeta is the size of the services meta data
+	ServicesMeta int64
 }
 
-func newTagStats(req *http.Request) *tagStats {
-	tags := parseTags(req)
+func newTagStats(tags []string) *tagStats {
 	return &tagStats{stats{}, tags, hash(tags)}
 }
 
@@ -95,6 +95,7 @@ func (ts *tagStats) update(new *tagStats) {
 	ts.SpansReceived += new.SpansReceived
 	ts.SpansDropped += new.SpansDropped
 	ts.ServicesBytes += new.ServicesBytes
+	ts.ServicesMeta += new.ServicesMeta
 }
 
 func (ts *tagStats) reset() {
@@ -104,6 +105,7 @@ func (ts *tagStats) reset() {
 	ts.SpansReceived = 0
 	ts.SpansDropped = 0
 	ts.ServicesBytes = 0
+	ts.ServicesMeta = 0
 }
 
 func (ts *tagStats) publish() {
@@ -113,18 +115,7 @@ func (ts *tagStats) publish() {
 	statsd.Client.Count("datadog.trace_agent.receiver.spans_received", ts.SpansReceived, ts.tags, 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.spans_dropped", ts.SpansDropped, ts.tags, 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.services_bytes", ts.ServicesBytes, ts.tags, 1)
-}
-
-// parseTags extracts tags from the header request
-func parseTags(req *http.Request) []string {
-	tags := []string{}
-	for meta, headerField := range headerFields {
-		value := req.Header.Get(headerField)
-		if value != "" {
-			tags = append(tags, meta+":"+value)
-		}
-	}
-	return tags
+	statsd.Client.Count("datadog.trace_agent.receiver.services_meta", ts.ServicesMeta, ts.tags, 1)
 }
 
 // hash returns the hash of the tag slice

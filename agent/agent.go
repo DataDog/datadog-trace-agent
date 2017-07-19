@@ -138,8 +138,11 @@ func (a *Agent) Process(t model.Trace) {
 	root := t.GetRoot()
 	if root.End() < model.Now()-2*a.conf.BucketInterval.Nanoseconds() {
 		log.Errorf("skipping trace with root too far in past, root:%v", *root)
-		//atomic.AddInt64(&a.Receiver.stats.TracesDropped, 1)
-		//atomic.AddInt64(&a.Receiver.stats.SpansDropped, int64(len(t)))
+		tags := []string{"method:Process"}
+		ts := newTagStats(tags)
+		ts.TracesDropped += 1
+		ts.SpansDropped += int64(len(t))
+		a.Receiver.stats.update(ts)
 		return
 	}
 
