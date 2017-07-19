@@ -277,7 +277,7 @@ func (r *HTTPReceiver) logStats() {
 
 		if now.Sub(lastLog) >= time.Minute {
 			// Here we log the stats we accumulated
-			log.Infof("Accumulated stats (for 1 minute): %+v", accStats)
+			log.Info(accStats.String())
 
 			// We reset the stats accumulated during the last minute
 			accStats.reset()

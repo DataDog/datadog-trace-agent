@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"hash/fnv"
 	"strings"
 	"sync"
@@ -28,13 +29,11 @@ func (rs *receiverStats) update(ts *tagStats) {
 }
 
 func (rs *receiverStats) acc(new *receiverStats) {
-	rs.Lock()
 	new.RLock()
-	for hash, tagStats := range new.stats {
-		rs.stats[hash].update(tagStats)
+	for _, tagStats := range new.stats {
+		rs.update(tagStats)
 	}
 	new.RUnlock()
-	rs.Unlock()
 }
 
 func (rs *receiverStats) publish() {
@@ -51,6 +50,16 @@ func (rs *receiverStats) reset() {
 		tagStats.reset()
 	}
 	rs.Unlock()
+}
+
+func (rs *receiverStats) String() string {
+	str := "receiverStats:"
+	rs.RLock()
+	for _, tagStats := range rs.stats {
+		str += tagStats.String()
+	}
+	rs.RUnlock()
+	return str
 }
 
 type tagStats struct {
@@ -77,6 +86,9 @@ type stats struct {
 }
 
 func newTagStats(tags []string) *tagStats {
+	if tags == nil {
+		tags = []string{}
+	}
 	return &tagStats{stats{}, tags, hash(tags)}
 }
 
@@ -108,6 +120,10 @@ func (ts *tagStats) publish() {
 	statsd.Client.Count("datadog.trace_agent.receiver.spans_dropped", ts.SpansDropped, ts.tags, 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.services_bytes", ts.ServicesBytes, ts.tags, 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.services_meta", ts.ServicesMeta, ts.tags, 1)
+}
+
+func (ts *tagStats) String() string {
+	return fmt.Sprintf("\n\t%v -> traces received: %v, traces dropped: %v", ts.tags, ts.TracesReceived, ts.TracesDropped)
 }
 
 // hash returns the hash of the tag slice
