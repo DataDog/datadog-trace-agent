@@ -20,7 +20,7 @@ import (
 
 var (
 	infoMu              sync.RWMutex
-	infoReceiverStats   receiverStats // only for the last minute
+	infoReceiverStats   stats         // only for the last minute
 	infoEndpointStats   endpointStats // only for the last minute
 	infoWatchdogInfo    watchdog.Info
 	infoSamplerInfo     samplerInfo
@@ -81,15 +81,15 @@ func publishUptime() interface{} {
 	return int(time.Since(infoStart) / time.Second)
 }
 
-func updateReceiverStats(rs *receiverStats) {
+func updateReceiverStats(s stats) {
 	infoMu.Lock()
-	infoReceiverStats = *rs.clone()
+	infoReceiverStats = s
 	infoMu.Unlock()
 }
 
 func publishReceiverStats() interface{} {
 	infoMu.RLock()
-	rs := infoReceiverStats.clone()
+	rs := infoReceiverStats
 	infoMu.RUnlock()
 	return rs
 }
@@ -236,7 +236,7 @@ type StatusInfo struct {
 		Alloc uint64
 	} `json:"memstats"`
 	Version    infoVersion             `json:"version"`
-	Receiver   receiverStats           `json:"receiver"`
+	Receiver   stats                   `json:"receiver"`
 	Endpoint   endpointStats           `json:"endpoint"`
 	Watchdog   watchdog.Info           `json:"watchdog"`
 	PreSampler sampler.PreSamplerStats `json:"presampler"`
@@ -343,6 +343,9 @@ func Info(w io.Writer, conf *config.AgentConfig) error {
 
 	defer resp.Body.Close() // OK to defer, this is not on hot path
 
+	//responseData, _ := ioutil.ReadAll(resp.Body)
+	//fmt.Println(string(responseData))
+
 	var info StatusInfo
 	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
 		program, banner := getProgramBanner(Version)
@@ -359,6 +362,7 @@ func Info(w io.Writer, conf *config.AgentConfig) error {
 		})
 		return err
 	}
+	fmt.Printf("%+v", info)
 
 	// display the remote program version, now that we know it
 	program, banner := getProgramBanner(info.Version.Version)

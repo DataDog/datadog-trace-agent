@@ -21,7 +21,7 @@ func newReceiverStats() *receiverStats {
 func (rs *receiverStats) update(ts *tagStats) {
 	rs.Lock()
 	if rs.Stats[ts.Hash] != nil {
-		rs.Stats[ts.Hash].update(ts)
+		rs.Stats[ts.Hash].update(ts.stats)
 	} else {
 		rs.Stats[ts.Hash] = ts.clone()
 	}
@@ -42,6 +42,16 @@ func (rs *receiverStats) publish() {
 		tagStats.publish()
 	}
 	rs.RUnlock()
+}
+
+func (rs *receiverStats) tot() stats {
+	tot := stats{}
+	rs.RLock()
+	for _, tagStats := range rs.Stats {
+		tot.update(tagStats.stats)
+	}
+	rs.RUnlock()
+	return tot
 }
 
 func (rs *receiverStats) reset() {
@@ -74,6 +84,31 @@ type tagStats struct {
 	Hash uint64
 }
 
+func newTagStats(tags []string) *tagStats {
+	if tags == nil {
+		tags = []string{}
+	}
+	return &tagStats{stats{}, tags, hash(tags)}
+}
+
+func (ts *tagStats) publish() {
+	statsd.Client.Count("datadog.trace_agent.receiver.traces_received", ts.TracesReceived, ts.Tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.traces_dropped", ts.TracesDropped, ts.Tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.traces_bytes", ts.TracesBytes, ts.Tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.spans_received", ts.SpansReceived, ts.Tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.spans_dropped", ts.SpansDropped, ts.Tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.services_bytes", ts.ServicesBytes, ts.Tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.services_meta", ts.ServicesMeta, ts.Tags, 1)
+}
+
+func (ts *tagStats) clone() *tagStats {
+	return &tagStats{ts.stats, ts.Tags, ts.Hash}
+}
+
+func (ts *tagStats) String() string {
+	return fmt.Sprintf("\n\t%v -> traces received: %v, traces dropped: %v", ts.Tags, ts.TracesReceived, ts.TracesDropped)
+}
+
 type stats struct {
 	// TracesReceived is the total number of traces received, including the dropped ones
 	TracesReceived int64
@@ -91,49 +126,24 @@ type stats struct {
 	ServicesMeta int64
 }
 
-func newTagStats(tags []string) *tagStats {
-	if tags == nil {
-		tags = []string{}
-	}
-	return &tagStats{stats{}, tags, hash(tags)}
+func (s *stats) update(new stats) {
+	s.TracesReceived += new.TracesReceived
+	s.TracesDropped += new.TracesDropped
+	s.TracesBytes += new.TracesBytes
+	s.SpansReceived += new.SpansReceived
+	s.SpansDropped += new.SpansDropped
+	s.ServicesBytes += new.ServicesBytes
+	s.ServicesMeta += new.ServicesMeta
 }
 
-func (ts *tagStats) clone() *tagStats {
-	return &tagStats{ts.stats, ts.Tags, ts.Hash}
-}
-
-func (ts *tagStats) update(new *tagStats) {
-	ts.TracesReceived += new.TracesReceived
-	ts.TracesDropped += new.TracesDropped
-	ts.TracesBytes += new.TracesBytes
-	ts.SpansReceived += new.SpansReceived
-	ts.SpansDropped += new.SpansDropped
-	ts.ServicesBytes += new.ServicesBytes
-	ts.ServicesMeta += new.ServicesMeta
-}
-
-func (ts *tagStats) reset() {
-	ts.TracesReceived = 0
-	ts.TracesDropped = 0
-	ts.TracesBytes = 0
-	ts.SpansReceived = 0
-	ts.SpansDropped = 0
-	ts.ServicesBytes = 0
-	ts.ServicesMeta = 0
-}
-
-func (ts *tagStats) publish() {
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_received", ts.TracesReceived, ts.Tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_dropped", ts.TracesDropped, ts.Tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_bytes", ts.TracesBytes, ts.Tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.spans_received", ts.SpansReceived, ts.Tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.spans_dropped", ts.SpansDropped, ts.Tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.services_bytes", ts.ServicesBytes, ts.Tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.services_meta", ts.ServicesMeta, ts.Tags, 1)
-}
-
-func (ts *tagStats) String() string {
-	return fmt.Sprintf("\n\t%v -> traces received: %v, traces dropped: %v", ts.Tags, ts.TracesReceived, ts.TracesDropped)
+func (s *stats) reset() {
+	s.TracesReceived = 0
+	s.TracesDropped = 0
+	s.TracesBytes = 0
+	s.SpansReceived = 0
+	s.SpansDropped = 0
+	s.ServicesBytes = 0
+	s.ServicesMeta = 0
 }
 
 // hash returns the hash of the tag slice

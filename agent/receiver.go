@@ -277,7 +277,7 @@ func (r *HTTPReceiver) logStats() {
 
 		if now.Sub(lastLog) >= time.Minute {
 			// We expose the stats accumulated to expvar
-			updateReceiverStats(accStats.clone())
+			updateReceiverStats(accStats.tot())
 			log.Infof("Stats (for the the last minute): %s", accStats.String())
 
 			// We reset the stats accumulated during the last minute
