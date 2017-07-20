@@ -21,7 +21,7 @@ func newReceiverStats() *receiverStats {
 func (rs *receiverStats) update(ts *tagStats) {
 	rs.Lock()
 	if rs.Stats[ts.Hash] != nil {
-		rs.Stats[ts.Hash].update(ts.stats)
+		rs.Stats[ts.Hash].update(ts.Stats)
 	} else {
 		rs.Stats[ts.Hash] = ts.clone()
 	}
@@ -44,11 +44,11 @@ func (rs *receiverStats) publish() {
 	rs.RUnlock()
 }
 
-func (rs *receiverStats) tot() stats {
-	tot := stats{}
+func (rs *receiverStats) tot() Stats {
+	tot := Stats{}
 	rs.RLock()
 	for _, tagStats := range rs.Stats {
-		tot.update(tagStats.stats)
+		tot.update(tagStats.Stats)
 	}
 	rs.RUnlock()
 	return tot
@@ -79,7 +79,7 @@ func (rs *receiverStats) String() string {
 }
 
 type tagStats struct {
-	stats
+	Stats
 	Tags []string
 	Hash uint64
 }
@@ -88,7 +88,7 @@ func newTagStats(tags []string) *tagStats {
 	if tags == nil {
 		tags = []string{}
 	}
-	return &tagStats{stats{}, tags, hash(tags)}
+	return &tagStats{Stats{}, tags, hash(tags)}
 }
 
 func (ts *tagStats) publish() {
@@ -102,14 +102,14 @@ func (ts *tagStats) publish() {
 }
 
 func (ts *tagStats) clone() *tagStats {
-	return &tagStats{ts.stats, ts.Tags, ts.Hash}
+	return &tagStats{ts.Stats, ts.Tags, ts.Hash}
 }
 
 func (ts *tagStats) String() string {
 	return fmt.Sprintf("\n\t%v -> traces received: %v, traces dropped: %v", ts.Tags, ts.TracesReceived, ts.TracesDropped)
 }
 
-type stats struct {
+type Stats struct {
 	// TracesReceived is the total number of traces received, including the dropped ones
 	TracesReceived int64
 	// TracesDropped is the number of traces dropped
@@ -126,7 +126,7 @@ type stats struct {
 	ServicesMeta int64
 }
 
-func (s *stats) update(new stats) {
+func (s *Stats) update(new Stats) {
 	s.TracesReceived += new.TracesReceived
 	s.TracesDropped += new.TracesDropped
 	s.TracesBytes += new.TracesBytes
@@ -136,7 +136,7 @@ func (s *stats) update(new stats) {
 	s.ServicesMeta += new.ServicesMeta
 }
 
-func (s *stats) reset() {
+func (s *Stats) reset() {
 	s.TracesReceived = 0
 	s.TracesDropped = 0
 	s.TracesBytes = 0

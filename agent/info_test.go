@@ -146,36 +146,36 @@ func TestInfo(t *testing.T) {
 
 	var buf bytes.Buffer
 	err = Info(&buf, conf)
-	//assert.Nil(err)
+	assert.Nil(err)
 	info := buf.String()
 
 	t.Logf("Info:\n%s\n", info)
 
-	//lines := strings.Split(info, "\n")
-	//assert.Equal(21, len(lines))
-	//assert.Regexp(regexp.MustCompile(`^={10,100}$`), lines[0])
-	//assert.Regexp(regexp.MustCompile(`^Trace Agent \(v.*\)$`), lines[1])
-	//assert.Regexp(regexp.MustCompile(`^={10,100}$`), lines[2])
-	//assert.Equal(len(lines[1]), len(lines[0]))
-	//assert.Equal(len(lines[1]), len(lines[2]))
-	//assert.Equal("", lines[3])
-	//assert.Equal("  Pid: 38149", lines[4])
-	//assert.Equal("  Uptime: 15 seconds", lines[5])
-	//assert.Equal("  Mem alloc: 773552 bytes", lines[6])
-	//assert.Equal("", lines[7])
-	//assert.Equal("  Hostname: localhost.localdomain", lines[8])
-	//assert.Equal("  Receiver: localhost:8126", lines[9])
-	//assert.Equal("  API Endpoint: https://trace.agent.datadoghq.com", lines[10])
-	//assert.Equal("", lines[11])
-	//assert.Equal("  Bytes received (1 min): 11000", lines[12])
-	//assert.Equal("  Traces received (1 min): 240", lines[13])
-	//assert.Equal("  Spans received (1 min): 360", lines[14])
-	//assert.Equal("", lines[15])
-	//assert.Equal("  Bytes sent (1 min): 3591", lines[16])
-	//assert.Equal("  Traces sent (1 min): 6", lines[17])
-	//assert.Equal("  Stats sent (1 min): 60", lines[18])
-	//assert.Equal("", lines[19])
-	//assert.Equal("", lines[20])
+	lines := strings.Split(info, "\n")
+	assert.Equal(21, len(lines))
+	assert.Regexp(regexp.MustCompile(`^={10,100}$`), lines[0])
+	assert.Regexp(regexp.MustCompile(`^Trace Agent \(v.*\)$`), lines[1])
+	assert.Regexp(regexp.MustCompile(`^={10,100}$`), lines[2])
+	assert.Equal(len(lines[1]), len(lines[0]))
+	assert.Equal(len(lines[1]), len(lines[2]))
+	assert.Equal("", lines[3])
+	assert.Equal("  Pid: 38149", lines[4])
+	assert.Equal("  Uptime: 15 seconds", lines[5])
+	assert.Equal("  Mem alloc: 773552 bytes", lines[6])
+	assert.Equal("", lines[7])
+	assert.Equal("  Hostname: localhost.localdomain", lines[8])
+	assert.Equal("  Receiver: localhost:8126", lines[9])
+	assert.Equal("  API Endpoint: https://trace.agent.datadoghq.com", lines[10])
+	assert.Equal("", lines[11])
+	assert.Equal("  Bytes received (1 min): 11000", lines[12])
+	assert.Equal("  Traces received (1 min): 240", lines[13])
+	assert.Equal("  Spans received (1 min): 360", lines[14])
+	assert.Equal("", lines[15])
+	assert.Equal("  Bytes sent (1 min): 3591", lines[16])
+	assert.Equal("  Traces sent (1 min): 6", lines[17])
+	assert.Equal("  Stats sent (1 min): 60", lines[18])
+	assert.Equal("", lines[19])
+	assert.Equal("", lines[20])
 }
 
 func TestWarning(t *testing.T) {
@@ -197,44 +197,44 @@ func TestWarning(t *testing.T) {
 	assert.Nil(err)
 	conf.ReceiverPort = port
 
-	//var buf bytes.Buffer
-	//err = Info(&buf, conf)
-	//assert.Nil(err)
-	//info := buf.String()
+	var buf bytes.Buffer
+	err = Info(&buf, conf)
+	assert.Nil(err)
+	info := buf.String()
 
-	//t.Logf("Info:\n%s\n", info)
+	t.Logf("Info:\n%s\n", info)
 
-	//lines := strings.Split(info, "\n")
-	//assert.Equal(27, len(lines))
-	//assert.Regexp(regexp.MustCompile(`^={10,100}$`), lines[0])
-	//assert.Regexp(regexp.MustCompile(`^Trace Agent \(v.*\)$`), lines[1])
-	//assert.Regexp(regexp.MustCompile(`^={10,100}$`), lines[2])
-	//assert.Equal(len(lines[1]), len(lines[0]))
-	//assert.Equal(len(lines[1]), len(lines[2]))
-	//assert.Equal("", lines[3])
-	//assert.Equal("  Pid: 38149", lines[4])
-	//assert.Equal("  Uptime: 15 seconds", lines[5])
-	//assert.Equal("  Mem alloc: 773552 bytes", lines[6])
-	//assert.Equal("", lines[7])
-	//assert.Equal("  Hostname: localhost.localdomain", lines[8])
-	//assert.Equal("  Receiver: localhost:8126", lines[9])
-	//assert.Equal("  API Endpoint: https://trace.agent.datadoghq.com", lines[10])
-	//assert.Equal("", lines[11])
-	//assert.Equal("  Bytes received (1 min): 11000", lines[12])
-	//assert.Equal("  Traces received (1 min): 240", lines[13])
-	//assert.Equal("  Spans received (1 min): 360", lines[14])
-	//assert.Equal("  WARNING: Traces dropped (1 min): 5", lines[15])
-	//assert.Equal("  WARNING: Spans dropped (1 min): 10", lines[16])
-	//assert.Equal("  WARNING: Pre-sampling traces: 42.1 %", lines[17])
-	//assert.Equal("  WARNING: Pre-sampler: raising pre-sampling rate from 3.1 % to 5.0 %", lines[18])
-	//assert.Equal("", lines[19])
-	//assert.Equal("  Bytes sent (1 min): 3591", lines[20])
-	//assert.Equal("  Traces sent (1 min): 6", lines[21])
-	//assert.Equal("  Stats sent (1 min): 60", lines[22])
-	//assert.Equal("  WARNING: Traces API errors (1 min): 3/4", lines[23])
-	//assert.Equal("  WARNING: Services API errors (1 min): 1/2", lines[24])
-	//assert.Equal("", lines[25])
-	//assert.Equal("", lines[26])
+	lines := strings.Split(info, "\n")
+	assert.Equal(27, len(lines))
+	assert.Regexp(regexp.MustCompile(`^={10,100}$`), lines[0])
+	assert.Regexp(regexp.MustCompile(`^Trace Agent \(v.*\)$`), lines[1])
+	assert.Regexp(regexp.MustCompile(`^={10,100}$`), lines[2])
+	assert.Equal(len(lines[1]), len(lines[0]))
+	assert.Equal(len(lines[1]), len(lines[2]))
+	assert.Equal("", lines[3])
+	assert.Equal("  Pid: 38149", lines[4])
+	assert.Equal("  Uptime: 15 seconds", lines[5])
+	assert.Equal("  Mem alloc: 773552 bytes", lines[6])
+	assert.Equal("", lines[7])
+	assert.Equal("  Hostname: localhost.localdomain", lines[8])
+	assert.Equal("  Receiver: localhost:8126", lines[9])
+	assert.Equal("  API Endpoint: https://trace.agent.datadoghq.com", lines[10])
+	assert.Equal("", lines[11])
+	assert.Equal("  Bytes received (1 min): 11000", lines[12])
+	assert.Equal("  Traces received (1 min): 240", lines[13])
+	assert.Equal("  Spans received (1 min): 360", lines[14])
+	assert.Equal("  WARNING: Traces dropped (1 min): 5", lines[15])
+	assert.Equal("  WARNING: Spans dropped (1 min): 10", lines[16])
+	assert.Equal("  WARNING: Pre-sampling traces: 42.1 %", lines[17])
+	assert.Equal("  WARNING: Pre-sampler: raising pre-sampling rate from 3.1 % to 5.0 %", lines[18])
+	assert.Equal("", lines[19])
+	assert.Equal("  Bytes sent (1 min): 3591", lines[20])
+	assert.Equal("  Traces sent (1 min): 6", lines[21])
+	assert.Equal("  Stats sent (1 min): 60", lines[22])
+	assert.Equal("  WARNING: Traces API errors (1 min): 3/4", lines[23])
+	assert.Equal("  WARNING: Services API errors (1 min): 1/2", lines[24])
+	assert.Equal("", lines[25])
+	assert.Equal("", lines[26])
 }
 
 func TestNotRunning(t *testing.T) {
@@ -322,17 +322,12 @@ func TestInfoReceiverStats(t *testing.T) {
 	conf := testInit(t)
 	assert.NotNil(conf)
 
-	stats := newReceiverStats()
-	tags := []string{"tag:test"}
-	tagStats := newTagStats(tags)
-	tagStats.TracesReceived = 666
-	tagStats.TracesDropped = 666
-	tagStats.TracesBytes = 666
-	tagStats.SpansReceived = 666
-	tagStats.SpansDropped = 666
-	tagStats.ServicesBytes = 666
-	tagStats.ServicesMeta = 666
-
+	stats := Stats{
+		SpansReceived:  1000,
+		TracesReceived: 100,
+		SpansDropped:   5,
+		TracesDropped:  2,
+	}
 	// run this with -race flag
 	done := make(chan struct{}, 4)
 	for i := 0; i < 2; i++ {
@@ -356,41 +351,30 @@ func TestInfoReceiverStats(t *testing.T) {
 	}
 	s := publishReceiverStats()
 	switch s := s.(type) {
-	case receiverStats:
-		println(s.String())
-		println("loooooooooooool")
-		ts := s.Stats[hash(tags)]
-		assert.Equal(int64(666), ts.TracesReceived)
-		assert.Equal(int64(666), ts.TracesDropped)
-		assert.Equal(int64(666), ts.TracesBytes)
-		assert.Equal(int64(666), ts.SpansReceived)
-		assert.Equal(int64(666), ts.SpansDropped)
-		assert.Equal(int64(666), ts.ServicesBytes)
-		assert.Equal(int64(666), ts.ServicesMeta)
-
+	case Stats:
+		assert.Equal(int64(1000), s.SpansReceived)
+		assert.Equal(int64(100), s.TracesReceived)
+		assert.Equal(int64(5), s.SpansDropped)
+		assert.Equal(int64(2), s.TracesDropped)
 		buf, err := json.Marshal(&s)
 		assert.NotNil(buf)
 		assert.Nil(err)
-		var statsCopy receiverStats
+		var statsCopy Stats
 		err = json.Unmarshal(buf, &statsCopy)
 		assert.Nil(err)
-		//assert.Equal(stats, statsCopy)
-
+		assert.Equal(stats, statsCopy)
 	default:
-		//t.Errorf("bad stats type: %v", s)
+		t.Errorf("bad stats type: %v", s)
 	}
-
-	//ts := s.stats[hash(tags)]
-	//ts.SpansReceived++
-	//updateReceiverStats(stats)
-	//s = publishReceiverStats()
-	//ts = s.stats[hash(tags)]
-	//switch s := s.(type) {
-	//case receiverStats:
-	//	assert.Equal(int64(667), ts.SpansReceived)
-	//default:
-	//	t.Errorf("bad stats type: %v", s)
-	//}
+	stats.SpansReceived++
+	updateReceiverStats(stats)
+	s = publishReceiverStats()
+	switch s := s.(type) {
+	case Stats:
+		assert.Equal(int64(1001), s.SpansReceived)
+	default:
+		t.Errorf("bad stats type: %v", s)
+	}
 }
 
 func TestInfoConfig(t *testing.T) {
