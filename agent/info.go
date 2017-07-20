@@ -343,9 +343,6 @@ func Info(w io.Writer, conf *config.AgentConfig) error {
 
 	defer resp.Body.Close() // OK to defer, this is not on hot path
 
-	//responseData, _ := ioutil.ReadAll(resp.Body)
-	//fmt.Println(string(responseData))
-
 	var info StatusInfo
 	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
 		program, banner := getProgramBanner(Version)
@@ -362,7 +359,6 @@ func Info(w io.Writer, conf *config.AgentConfig) error {
 		})
 		return err
 	}
-	fmt.Printf("%+v", info)
 
 	// display the remote program version, now that we know it
 	program, banner := getProgramBanner(info.Version.Version)
