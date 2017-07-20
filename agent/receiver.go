@@ -193,12 +193,12 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 	for i := range traces {
 		spans := len(traces[i])
 
-		ts.TracesReceived += 1
+		ts.TracesReceived++
 		ts.SpansReceived += int64(spans)
 
 		normTrace, err := model.NormalizeTrace(traces[i])
 		if err != nil {
-			ts.TracesDropped += 1
+			ts.TracesDropped++
 			ts.SpansDropped += int64(spans)
 
 			errorMsg := fmt.Sprintf("dropping trace reason: %s (debug for more info), %v", err, normTrace)
@@ -217,7 +217,7 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 			select {
 			case r.traces <- normTrace:
 			default:
-				ts.TracesDropped += 1
+				ts.TracesDropped++
 				ts.SpansDropped += int64(spans)
 
 				log.Errorf("dropping trace reason: rate-limited")

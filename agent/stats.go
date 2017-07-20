@@ -109,6 +109,7 @@ func (ts *tagStats) String() string {
 	return fmt.Sprintf("\n\t%v -> traces received: %v, traces dropped: %v", ts.Tags, ts.TracesReceived, ts.TracesDropped)
 }
 
+// Stats holds the metrics that will be reported every 10s by the agent
 type Stats struct {
 	// TracesReceived is the total number of traces received, including the dropped ones
 	TracesReceived int64

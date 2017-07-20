@@ -140,7 +140,7 @@ func (a *Agent) Process(t model.Trace) {
 		log.Errorf("skipping trace with root too far in past, root:%v", *root)
 		tags := []string{"method:Process"}
 		ts := newTagStats(tags)
-		ts.TracesDropped += 1
+		ts.TracesDropped++
 		ts.SpansDropped += int64(len(t))
 		a.Receiver.stats.update(ts)
 		return
