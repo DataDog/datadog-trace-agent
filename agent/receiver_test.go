@@ -16,6 +16,9 @@ import (
 	"github.com/tinylib/msgp/msgp"
 )
 
+// Traces shouldn't come from more than 5 different sources
+var meta = []string{"aaaa", "bbb", "cccccc", "ddddd", "ee"}
+
 func TestReceiverRequestBodyLength(t *testing.T) {
 	assert := assert.New(t)
 
@@ -400,7 +403,7 @@ func TestReceiverServiceMsgpackDecoder(t *testing.T) {
 	}
 }
 
-func BenchmarkHandleTraces(b *testing.B) {
+func BenchmarkHandleTracesFromOneApp(b *testing.B) {
 	// prepare the payload
 	// msgpack payload
 	var buf bytes.Buffer
@@ -408,6 +411,7 @@ func BenchmarkHandleTraces(b *testing.B) {
 
 	// prepare the receiver
 	config := config.NewDefaultAgentConfig()
+	config.APIKey = "test"
 	receiver := NewHTTPReceiver(config)
 
 	// response recorder
@@ -428,6 +432,51 @@ func BenchmarkHandleTraces(b *testing.B) {
 		rr := httptest.NewRecorder()
 		req, _ := http.NewRequest("POST", "/v0.3/traces", bytes.NewReader(buf.Bytes()))
 		req.Header.Set("Content-Type", "application/msgpack")
+		// Add meta data to simulate data comming from multiple applications
+		for _, v := range headerFields {
+			req.Header.Set(v, meta[n%len(meta)])
+		}
+
+		// trace only this execution
+		b.StartTimer()
+		handler.ServeHTTP(rr, req)
+	}
+}
+
+func BenchmarkHandleTracesFromMultipleApps(b *testing.B) {
+	// prepare the payload
+	// msgpack payload
+	var buf bytes.Buffer
+	msgp.Encode(&buf, fixtures.GetTestTrace(1, 1))
+
+	// prepare the receiver
+	config := config.NewDefaultAgentConfig()
+	config.APIKey = "test"
+	receiver := NewHTTPReceiver(config)
+
+	// response recorder
+	handler := http.HandlerFunc(receiver.httpHandleWithVersion(v03, receiver.handleTraces))
+
+	// benchmark
+	b.ResetTimer()
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		b.StopTimer()
+		// consume the traces channel without doing anything
+		select {
+		case <-receiver.traces:
+		default:
+		}
+
+		// forge the request
+		rr := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/v0.3/traces", bytes.NewReader(buf.Bytes()))
+		req.Header.Set("Content-Type", "application/msgpack")
+
+		// Add meta data to simulate data comming from multiple applications
+		for _, v := range headerFields {
+			req.Header.Set(v, meta[n%len(meta)])
+		}
 
 		// trace only this execution
 		b.StartTimer()
