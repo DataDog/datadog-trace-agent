@@ -32,13 +32,13 @@ func (rs *receiverStats) getTagStats(tags Tags) *tagStats {
 }
 
 // acc will accumulate the stats from another receiverStats struct
-func (rs *receiverStats) acc(new *receiverStats) {
-	new.Lock()
-	for _, tagStats := range new.Stats {
+func (rs *receiverStats) acc(recent *receiverStats) {
+	recent.Lock()
+	for _, tagStats := range recent.Stats {
 		ts := rs.getTagStats(tagStats.Tags)
 		ts.update(tagStats.Stats)
 	}
-	new.Unlock()
+	recent.Unlock()
 }
 
 func (rs *receiverStats) publish() {
@@ -129,14 +129,14 @@ type Stats struct {
 	ServicesBytes int64
 }
 
-func (s *Stats) update(new Stats) {
-	atomic.AddInt64(&s.TracesReceived, new.TracesReceived)
-	atomic.AddInt64(&s.TracesDropped, new.TracesDropped)
-	atomic.AddInt64(&s.TracesBytes, new.TracesBytes)
-	atomic.AddInt64(&s.SpansReceived, new.SpansReceived)
-	atomic.AddInt64(&s.SpansDropped, new.SpansDropped)
-	atomic.AddInt64(&s.ServicesReceived, new.ServicesReceived)
-	atomic.AddInt64(&s.ServicesBytes, new.ServicesBytes)
+func (s *Stats) update(recent Stats) {
+	atomic.AddInt64(&s.TracesReceived, recent.TracesReceived)
+	atomic.AddInt64(&s.TracesDropped, recent.TracesDropped)
+	atomic.AddInt64(&s.TracesBytes, recent.TracesBytes)
+	atomic.AddInt64(&s.SpansReceived, recent.SpansReceived)
+	atomic.AddInt64(&s.SpansDropped, recent.SpansDropped)
+	atomic.AddInt64(&s.ServicesReceived, recent.ServicesReceived)
+	atomic.AddInt64(&s.ServicesBytes, recent.ServicesBytes)
 }
 
 func (s *Stats) reset() {
