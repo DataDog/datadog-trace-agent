@@ -31,6 +31,7 @@ func (rs *receiverStats) getTagStats(tags Tags) *tagStats {
 	return tagStats
 }
 
+// acc will accumulate the stats from another receiverStats struct
 func (rs *receiverStats) acc(new *receiverStats) {
 	new.Lock()
 	for _, tagStats := range new.Stats {
@@ -48,6 +49,7 @@ func (rs *receiverStats) publish() {
 	rs.RUnlock()
 }
 
+// tot returns a Stats struct holding the sum of all stats, independtly of their tags.
 func (rs *receiverStats) tot() Stats {
 	tot := Stats{}
 	rs.RLock()
@@ -64,12 +66,6 @@ func (rs *receiverStats) reset() {
 		tagStats.reset()
 	}
 	rs.Unlock()
-}
-
-func (rs *receiverStats) clone() *receiverStats {
-	clone := newReceiverStats()
-	clone.acc(rs)
-	return clone
 }
 
 // String gives a string representation of the receiverStats struct.
@@ -112,10 +108,6 @@ func (ts *tagStats) publish() {
 	statsd.Client.Count("datadog.trace_agent.receiver.spans_dropped", spansDropped, ts.Tags.toArray(), 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.services_received", servicesReceived, ts.Tags.toArray(), 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.services_bytes", servicesBytes, ts.Tags.toArray(), 1)
-}
-
-func (ts *tagStats) clone() *tagStats {
-	return &tagStats{ts.Tags, ts.Stats}
 }
 
 // Stats holds the metrics that will be reported every 10s by the agent.
