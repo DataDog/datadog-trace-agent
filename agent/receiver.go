@@ -181,7 +181,7 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 
 	HTTPOK(w) // We successfuly decoded the payload
 
-	// We parse the tags from the eader and get the address of the struct holding the stats associated
+	// We parse the tags from the header
 	tags := Tags{
 		req.Header.Get("Datadog-Meta-Lang"),
 		req.Header.Get("Datadog-Meta-Lang-Version"),
@@ -189,6 +189,8 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		req.Header.Get("Datadog-Meta-Tracer-Version"),
 		"traces",
 	}
+
+	// We get the address of the struct holding the stats associated to the tags
 	ts := r.stats.getTagStats(tags)
 
 	bytesRead := req.Body.(*model.LimitedReader).Count
@@ -246,7 +248,7 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 
 	HTTPOK(w)
 
-	// We parse the tags from the header and get the address of the struct holding the stats associated
+	// We parse the tags from the header
 	tags := Tags{
 		req.Header.Get("Datadog-Meta-Lang"),
 		req.Header.Get("Datadog-Meta-Lang-Version"),
@@ -254,9 +256,11 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 		req.Header.Get("Datadog-Meta-Tracer-Version"),
 		"services",
 	}
+
+	// We get the address of the struct holding the stats associated to the tags
 	ts := r.stats.getTagStats(tags)
 
-	atomic.AddInt64(&ts.ServicesMeta, int64(len(servicesMeta)))
+	atomic.AddInt64(&ts.ServicesReceived, int64(len(servicesMeta)))
 
 	bytesRead := req.Body.(*model.LimitedReader).Count
 	if bytesRead > 0 {
