@@ -5,6 +5,7 @@ import (
 	"hash/fnv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/DataDog/datadog-trace-agent/statsd"
 )
@@ -18,22 +19,38 @@ func newReceiverStats() *receiverStats {
 	return &receiverStats{sync.RWMutex{}, map[uint64]*tagStats{}}
 }
 
+func (rs *receiverStats) getTagStats(tags []string) *tagStats {
+	hash := hash(tags)
+
+	rs.Lock()
+	tagStats, ok := rs.Stats[hash]
+	if !ok {
+		tagStats = newTagStats(tags)
+		rs.Stats[hash] = tagStats
+	}
+	rs.Unlock()
+
+	return tagStats
+}
+
 func (rs *receiverStats) update(ts *tagStats) {
 	rs.Lock()
-	if rs.Stats[ts.Hash] != nil {
-		rs.Stats[ts.Hash].update(ts.Stats)
+	tagStats, ok := rs.Stats[ts.Hash]
+	if !ok {
+		rs.Stats[ts.Hash] = ts
 	} else {
-		rs.Stats[ts.Hash] = ts.clone()
+		tagStats.update(ts.Stats)
 	}
 	rs.Unlock()
 }
 
 func (rs *receiverStats) acc(new *receiverStats) {
-	new.RLock()
+	new.Lock()
 	for _, tagStats := range new.Stats {
-		rs.update(tagStats)
+		ts := rs.getTagStats(tagStats.Tags)
+		ts.update(tagStats.Stats)
 	}
-	new.RUnlock()
+	new.Unlock()
 }
 
 func (rs *receiverStats) publish() {
@@ -92,13 +109,23 @@ func newTagStats(tags []string) *tagStats {
 }
 
 func (ts *tagStats) publish() {
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_received", ts.TracesReceived, ts.Tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_dropped", ts.TracesDropped, ts.Tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_bytes", ts.TracesBytes, ts.Tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.spans_received", ts.SpansReceived, ts.Tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.spans_dropped", ts.SpansDropped, ts.Tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.services_bytes", ts.ServicesBytes, ts.Tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.services_meta", ts.ServicesMeta, ts.Tags, 1)
+	// Atomically load the stats from ts
+	tracesReceived := atomic.LoadInt64(&ts.TracesReceived)
+	tracesDropped := atomic.LoadInt64(&ts.TracesDropped)
+	tracesBytes := atomic.LoadInt64(&ts.TracesBytes)
+	spansReceived := atomic.LoadInt64(&ts.SpansReceived)
+	spansDropped := atomic.LoadInt64(&ts.SpansDropped)
+	servicesBytes := atomic.LoadInt64(&ts.ServicesBytes)
+	servicesMeta := atomic.LoadInt64(&ts.ServicesMeta)
+
+	// Publish the stats
+	statsd.Client.Count("datadog.trace_agent.receiver.traces_received", tracesReceived, ts.Tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.traces_dropped", tracesDropped, ts.Tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.traces_bytes", tracesBytes, ts.Tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.spans_received", spansReceived, ts.Tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.spans_dropped", spansDropped, ts.Tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.services_bytes", servicesBytes, ts.Tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.services_meta", servicesMeta, ts.Tags, 1)
 }
 
 func (ts *tagStats) clone() *tagStats {
@@ -109,7 +136,8 @@ func (ts *tagStats) String() string {
 	return fmt.Sprintf("\n\t%v -> traces received: %v, traces dropped: %v", ts.Tags, ts.TracesReceived, ts.TracesDropped)
 }
 
-// Stats holds the metrics that will be reported every 10s by the agent
+// Stats holds the metrics that will be reported every 10s by the agent.
+// Its fields require to be accessed in an atomic way.
 type Stats struct {
 	// TracesReceived is the total number of traces received, including the dropped ones
 	TracesReceived int64
@@ -128,23 +156,23 @@ type Stats struct {
 }
 
 func (s *Stats) update(new Stats) {
-	s.TracesReceived += new.TracesReceived
-	s.TracesDropped += new.TracesDropped
-	s.TracesBytes += new.TracesBytes
-	s.SpansReceived += new.SpansReceived
-	s.SpansDropped += new.SpansDropped
-	s.ServicesBytes += new.ServicesBytes
-	s.ServicesMeta += new.ServicesMeta
+	atomic.AddInt64(&s.TracesReceived, new.TracesReceived)
+	atomic.AddInt64(&s.TracesDropped, new.TracesDropped)
+	atomic.AddInt64(&s.TracesBytes, new.TracesBytes)
+	atomic.AddInt64(&s.SpansReceived, new.SpansReceived)
+	atomic.AddInt64(&s.SpansDropped, new.SpansDropped)
+	atomic.AddInt64(&s.ServicesBytes, new.ServicesBytes)
+	atomic.AddInt64(&s.ServicesMeta, new.ServicesMeta)
 }
 
 func (s *Stats) reset() {
-	s.TracesReceived = 0
-	s.TracesDropped = 0
-	s.TracesBytes = 0
-	s.SpansReceived = 0
-	s.SpansDropped = 0
-	s.ServicesBytes = 0
-	s.ServicesMeta = 0
+	atomic.StoreInt64(&s.TracesReceived, 0)
+	atomic.StoreInt64(&s.TracesDropped, 0)
+	atomic.StoreInt64(&s.TracesBytes, 0)
+	atomic.StoreInt64(&s.SpansReceived, 0)
+	atomic.StoreInt64(&s.SpansDropped, 0)
+	atomic.StoreInt64(&s.ServicesBytes, 0)
+	atomic.StoreInt64(&s.ServicesMeta, 0)
 }
 
 // hash returns the hash of the tag slice

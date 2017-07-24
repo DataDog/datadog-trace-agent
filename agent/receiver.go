@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	log "github.com/cihub/seelog"
@@ -180,26 +181,26 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 
 	HTTPOK(w) // We successfuly decoded the payload
 
-	// We create a new tagStats struct where we will store the stats for this payload
-	tags := parseTags(req)
-	ts := newTagStats(append(tags, "method:handleTraces"))
+	// We parse the tags from the header and get the address of the struct holding the stats associated
+	tags := append(parseTags(req), "method:handleTraces")
+	ts := r.stats.getTagStats(tags)
 
 	bytesRead := req.Body.(*model.LimitedReader).Count
 	if bytesRead > 0 {
-		ts.TracesBytes = int64(bytesRead)
+		atomic.AddInt64(&ts.TracesBytes, int64(bytesRead))
 	}
 
 	// normalize data
 	for i := range traces {
 		spans := len(traces[i])
 
-		ts.TracesReceived++
-		ts.SpansReceived += int64(spans)
+		atomic.AddInt64(&ts.TracesReceived, 1)
+		atomic.AddInt64(&ts.SpansReceived, int64(spans))
 
 		normTrace, err := model.NormalizeTrace(traces[i])
 		if err != nil {
-			ts.TracesDropped++
-			ts.SpansDropped += int64(spans)
+			atomic.AddInt64(&ts.TracesDropped, 1)
+			atomic.AddInt64(&ts.SpansDropped, int64(spans))
 
 			errorMsg := fmt.Sprintf("dropping trace reason: %s (debug for more info), %v", err, normTrace)
 
@@ -209,7 +210,7 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 			}
 			log.Errorf(errorMsg)
 		} else {
-			ts.SpansDropped += int64(spans - len(normTrace))
+			atomic.AddInt64(&ts.SpansDropped, int64(spans-len(normTrace)))
 
 			// if our downstream consumer is slow, we drop the trace on the floor
 			// this is a safety net against us using too much memory
@@ -217,16 +218,13 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 			select {
 			case r.traces <- normTrace:
 			default:
-				ts.TracesDropped++
-				ts.SpansDropped += int64(spans)
+				atomic.AddInt64(&ts.TracesDropped, 1)
+				atomic.AddInt64(&ts.SpansDropped, int64(spans))
 
 				log.Errorf("dropping trace reason: rate-limited")
 			}
 		}
-
 	}
-
-	r.stats.update(ts)
 }
 
 // handleServices handle a request with a list of several services
@@ -242,20 +240,18 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 
 	HTTPOK(w)
 
-	// We create a new tagStats struct where we will store the stats for this payload
-	tags := parseTags(req)
-	ts := newTagStats(append(tags, "method:handleServices"))
-	ts.ServicesMeta = int64(len(servicesMeta))
+	// We parse the tags from the header and get the address of the struct holding the stats associated
+	tags := append(parseTags(req), "method:handleServices")
+	ts := r.stats.getTagStats(tags)
+
+	atomic.AddInt64(&ts.ServicesMeta, int64(len(servicesMeta)))
 
 	bytesRead := req.Body.(*model.LimitedReader).Count
 	if bytesRead > 0 {
-		ts.ServicesBytes = int64(bytesRead)
+		atomic.AddInt64(&ts.ServicesBytes, int64(bytesRead))
 	}
 
 	r.services <- servicesMeta
-
-	// We update the stats
-	r.stats.update(ts)
 }
 
 // logStats periodically submits stats about the receiver to statsd
