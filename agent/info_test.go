@@ -322,7 +322,7 @@ func TestInfoReceiverStats(t *testing.T) {
 	conf := testInit(t)
 	assert.NotNil(conf)
 
-	stats := receiverStats{
+	stats := Stats{
 		SpansReceived:  1000,
 		TracesReceived: 100,
 		SpansDropped:   5,
@@ -351,7 +351,7 @@ func TestInfoReceiverStats(t *testing.T) {
 	}
 	s := publishReceiverStats()
 	switch s := s.(type) {
-	case receiverStats:
+	case Stats:
 		assert.Equal(int64(1000), s.SpansReceived)
 		assert.Equal(int64(100), s.TracesReceived)
 		assert.Equal(int64(5), s.SpansDropped)
@@ -359,7 +359,7 @@ func TestInfoReceiverStats(t *testing.T) {
 		buf, err := json.Marshal(&s)
 		assert.NotNil(buf)
 		assert.Nil(err)
-		var statsCopy receiverStats
+		var statsCopy Stats
 		err = json.Unmarshal(buf, &statsCopy)
 		assert.Nil(err)
 		assert.Equal(stats, statsCopy)
@@ -370,7 +370,7 @@ func TestInfoReceiverStats(t *testing.T) {
 	updateReceiverStats(stats)
 	s = publishReceiverStats()
 	switch s := s.(type) {
-	case receiverStats:
+	case Stats:
 		assert.Equal(int64(1001), s.SpansReceived)
 	default:
 		t.Errorf("bad stats type: %v", s)
