@@ -347,14 +347,27 @@ var headerFields = map[string]string{
 	"tracer_version": "Datadog-Meta-Tracer-Version",
 }
 
+func bite() {
+	_ = headerFields["lang"]
+}
+
 // parseTags extracts tags from the header request
 func parseTags(req *http.Request) []string {
-	tags := []string{}
-	for meta, headerField := range headerFields {
-		value := req.Header.Get(headerField)
-		if value != "" {
-			tags = append(tags, meta+":"+value)
-		}
-	}
+	tags := make([]string, len(headerFields)+1)
+	tags[0] = "lang:" + req.Header.Get("Datadog-Meta-Lang")
+	tags[1] = "lang_version:" + req.Header.Get("Datadog-Meta-Lang-Version")
+	tags[2] = "interpreter:" + req.Header.Get("Datadog-Meta-Lang-Interpreter")
+	tags[3] = "tracer_version:" + req.Header.Get("Datadog-Meta-Tracer-Version")
+	//if value != "" {
+	//	tags[0] =
+	//index := 0
+	//value := "3"
+	//for meta, _ := range headerFields {
+	//	//value = req.Header.Get(headerField)
+	//	if value != "" {
+	//		//tags[index] = meta + ":" + value
+	//		index++
+	//	}
+	//}
 	return tags
 }
