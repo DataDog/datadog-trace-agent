@@ -198,10 +198,9 @@ func (tkn *Tokenizer) scanLiteralIdentifier(quote rune) (int, []byte) {
 	if !isLetter(tkn.lastChar) {
 		return LexError, buffer.Bytes()
 	}
-	for tkn.next(); isLetter(tkn.lastChar) || isDigit(tkn.lastChar); tkn.next() {
+	for tkn.next(); skipNonLiteralIdentifier(tkn.lastChar); tkn.next() {
 		buffer.WriteByte(byte(tkn.lastChar))
 	}
-
 	// literals identifier are enclosed between quotes
 	if tkn.lastChar != uint16(quote) {
 		return LexError, buffer.Bytes()
@@ -447,6 +446,10 @@ func (tkn *Tokenizer) next() {
 		tkn.lastChar = uint16(ch)
 	}
 	tkn.Position++
+}
+
+func skipNonLiteralIdentifier(ch uint16) bool {
+	return isLetter(ch) || isDigit(ch) || '.' == ch || '-' == ch
 }
 
 func isLetter(ch uint16) bool {

@@ -249,6 +249,10 @@ func TestSQLQuantizer(t *testing.T) {
 			"SELECT pg_try_advisory_lock (123) AS t46eef3f025cc27feb31ca5a2d668a09a",
 			"SELECT pg_try_advisory_lock ( ? )",
 		},
+		{
+			"`a-a` `a.a` \"a.a\" \"a-a\"",
+			"a-a a.a a.a a-a",
+		},
 	}
 
 	for _, c := range cases {
