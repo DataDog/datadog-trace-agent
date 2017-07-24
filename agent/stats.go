@@ -31,17 +31,6 @@ func (rs *receiverStats) getTagStats(tags Tags) *tagStats {
 	return tagStats
 }
 
-func (rs *receiverStats) update(ts *tagStats) {
-	rs.Lock()
-	tagStats, ok := rs.Stats[ts.Tags]
-	if !ok {
-		rs.Stats[ts.Tags] = ts
-	} else {
-		tagStats.update(ts.Stats)
-	}
-	rs.Unlock()
-}
-
 func (rs *receiverStats) acc(new *receiverStats) {
 	new.Lock()
 	for _, tagStats := range new.Stats {
