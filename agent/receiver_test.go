@@ -19,6 +19,14 @@ import (
 // Traces shouldn't come from more than 5 different sources
 var meta = []string{"aaaa", "bbb", "cccccc", "ddddd", "ee"}
 
+// headerFields is a map used to decode the header metas
+var headerFields = map[string]string{
+	"lang":           "Datadog-Meta-Lang",
+	"lang_version":   "Datadog-Meta-Lang-Version",
+	"interpreter":    "Datadog-Meta-Lang-Interpreter",
+	"tracer_version": "Datadog-Meta-Tracer-Version",
+}
+
 func TestReceiverRequestBodyLength(t *testing.T) {
 	assert := assert.New(t)
 

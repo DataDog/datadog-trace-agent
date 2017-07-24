@@ -181,8 +181,14 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 
 	HTTPOK(w) // We successfuly decoded the payload
 
-	// We parse the tags from the header and get the address of the struct holding the stats associated
-	tags := append(parseTags(req), "method:handleTraces")
+	// We parse the tags from the eader and get the address of the struct holding the stats associated
+	tags := Tags{
+		req.Header.Get("Datadog-Meta-Lang"),
+		req.Header.Get("Datadog-Meta-Lang-Version"),
+		req.Header.Get("Datadog-Meta-Lang-Interpreter"),
+		req.Header.Get("Datadog-Meta-Tracer-Version"),
+		"traces",
+	}
 	ts := r.stats.getTagStats(tags)
 
 	bytesRead := req.Body.(*model.LimitedReader).Count
@@ -241,7 +247,13 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 	HTTPOK(w)
 
 	// We parse the tags from the header and get the address of the struct holding the stats associated
-	tags := append(parseTags(req), "method:handleServices")
+	tags := Tags{
+		req.Header.Get("Datadog-Meta-Lang"),
+		req.Header.Get("Datadog-Meta-Lang-Version"),
+		req.Header.Get("Datadog-Meta-Lang-Interpreter"),
+		req.Header.Get("Datadog-Meta-Tracer-Version"),
+		"services",
+	}
 	ts := r.stats.getTagStats(tags)
 
 	atomic.AddInt64(&ts.ServicesMeta, int64(len(servicesMeta)))
@@ -337,37 +349,4 @@ func decodeReceiverPayload(r io.Reader, dest msgp.Decodable, v APIVersion, conte
 	default:
 		panic(fmt.Sprintf("unhandled content type %q", contentType))
 	}
-}
-
-// headerFields is a map used to decode the header metas
-var headerFields = map[string]string{
-	"lang":           "Datadog-Meta-Lang",
-	"lang_version":   "Datadog-Meta-Lang-Version",
-	"interpreter":    "Datadog-Meta-Lang-Interpreter",
-	"tracer_version": "Datadog-Meta-Tracer-Version",
-}
-
-func bite() {
-	_ = headerFields["lang"]
-}
-
-// parseTags extracts tags from the header request
-func parseTags(req *http.Request) []string {
-	tags := make([]string, len(headerFields)+1)
-	tags[0] = "lang:" + req.Header.Get("Datadog-Meta-Lang")
-	tags[1] = "lang_version:" + req.Header.Get("Datadog-Meta-Lang-Version")
-	tags[2] = "interpreter:" + req.Header.Get("Datadog-Meta-Lang-Interpreter")
-	tags[3] = "tracer_version:" + req.Header.Get("Datadog-Meta-Tracer-Version")
-	//if value != "" {
-	//	tags[0] =
-	//index := 0
-	//value := "3"
-	//for meta, _ := range headerFields {
-	//	//value = req.Header.Get(headerField)
-	//	if value != "" {
-	//		//tags[index] = meta + ":" + value
-	//		index++
-	//	}
-	//}
-	return tags
 }

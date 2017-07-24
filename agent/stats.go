@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"hash/fnv"
 	"sync"
 	"sync/atomic"
 
@@ -11,21 +10,19 @@ import (
 
 type receiverStats struct {
 	sync.RWMutex
-	Stats map[uint64]*tagStats
+	Stats map[Tags]*tagStats
 }
 
 func newReceiverStats() *receiverStats {
-	return &receiverStats{sync.RWMutex{}, map[uint64]*tagStats{}}
+	return &receiverStats{sync.RWMutex{}, map[Tags]*tagStats{}}
 }
 
-func (rs *receiverStats) getTagStats(tags []string) *tagStats {
-	hash := hash(tags)
-
+func (rs *receiverStats) getTagStats(tags Tags) *tagStats {
 	rs.Lock()
-	tagStats, ok := rs.Stats[hash]
+	tagStats, ok := rs.Stats[tags]
 	if !ok {
 		tagStats = newTagStats(tags)
-		rs.Stats[hash] = tagStats
+		rs.Stats[tags] = tagStats
 	}
 	rs.Unlock()
 
@@ -34,9 +31,9 @@ func (rs *receiverStats) getTagStats(tags []string) *tagStats {
 
 func (rs *receiverStats) update(ts *tagStats) {
 	rs.Lock()
-	tagStats, ok := rs.Stats[ts.Hash]
+	tagStats, ok := rs.Stats[ts.Tags]
 	if !ok {
-		rs.Stats[ts.Hash] = ts
+		rs.Stats[ts.Tags] = ts
 	} else {
 		tagStats.update(ts.Stats)
 	}
@@ -95,16 +92,12 @@ func (rs *receiverStats) String() string {
 }
 
 type tagStats struct {
+	Tags
 	Stats
-	Tags []string
-	Hash uint64
 }
 
-func newTagStats(tags []string) *tagStats {
-	if tags == nil {
-		tags = []string{}
-	}
-	return &tagStats{Stats{}, tags, hash(tags)}
+func newTagStats(tags Tags) *tagStats {
+	return &tagStats{tags, Stats{}}
 }
 
 func (ts *tagStats) publish() {
@@ -118,17 +111,17 @@ func (ts *tagStats) publish() {
 	servicesMeta := atomic.LoadInt64(&ts.ServicesMeta)
 
 	// Publish the stats
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_received", tracesReceived, ts.Tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_dropped", tracesDropped, ts.Tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_bytes", tracesBytes, ts.Tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.spans_received", spansReceived, ts.Tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.spans_dropped", spansDropped, ts.Tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.services_bytes", servicesBytes, ts.Tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.services_meta", servicesMeta, ts.Tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.traces_received", tracesReceived, ts.Tags.toArray(), 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.traces_dropped", tracesDropped, ts.Tags.toArray(), 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.traces_bytes", tracesBytes, ts.Tags.toArray(), 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.spans_received", spansReceived, ts.Tags.toArray(), 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.spans_dropped", spansDropped, ts.Tags.toArray(), 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.services_bytes", servicesBytes, ts.Tags.toArray(), 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.services_meta", servicesMeta, ts.Tags.toArray(), 1)
 }
 
 func (ts *tagStats) clone() *tagStats {
-	return &tagStats{ts.Stats, ts.Tags, ts.Hash}
+	return &tagStats{ts.Tags, ts.Stats}
 }
 
 func (ts *tagStats) String() string {
@@ -174,11 +167,16 @@ func (s *Stats) reset() {
 	atomic.StoreInt64(&s.ServicesMeta, 0)
 }
 
-// hash returns the hash of the tag slice
-func hash(tags []string) uint64 {
-	h := fnv.New64()
-	for _, v := range tags {
-		h.Write([]byte(v))
+type Tags struct {
+	Lang, LangVersion, Interpreter, TracerVersion, Endpoint string
+}
+
+func (t *Tags) toArray() []string {
+	return []string{
+		"lang:" + t.Lang,
+		"lang_version:" + t.LangVersion,
+		"interpreter:" + t.Interpreter,
+		"tracer_version:" + t.TracerVersion,
+		"endpoint:" + t.Endpoint,
 	}
-	return h.Sum64()
 }
