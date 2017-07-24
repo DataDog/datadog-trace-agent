@@ -73,7 +73,7 @@ func (rs *receiverStats) String() string {
 	str := ""
 	rs.RLock()
 	for _, ts := range rs.Stats {
-		str += fmt.Sprintf("\n\t%v -> %s", ts.Tags, ts.String())
+		str += fmt.Sprintf("\n\t%v -> %s", ts.Tags.toArray(), ts.String())
 
 	}
 	rs.RUnlock()
