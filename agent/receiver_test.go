@@ -17,7 +17,7 @@ import (
 )
 
 // Traces shouldn't come from more than 5 different sources
-var meta = []string{"aaaa", "bbb", "cccccc", "ddddd", "ee"}
+var langs = []string{"python", "ruby", "go", "java", "C#"}
 
 // headerFields is a map used to decode the header metas
 var headerFields = map[string]string{
@@ -411,6 +411,56 @@ func TestReceiverServiceMsgpackDecoder(t *testing.T) {
 	}
 }
 
+func TestHandleTraces(t *testing.T) {
+	assert := assert.New(t)
+
+	// prepare the msgpack payload
+	var buf bytes.Buffer
+	msgp.Encode(&buf, fixtures.GetTestTrace(10, 10))
+
+	// prepare the receiver
+	config := config.NewDefaultAgentConfig()
+	config.APIKey = "test"
+	receiver := NewHTTPReceiver(config)
+
+	// response recorder
+	handler := http.HandlerFunc(receiver.httpHandleWithVersion(v03, receiver.handleTraces))
+
+	for n := 0; n < 10; n++ {
+		// consume the traces channel without doing anything
+		select {
+		case <-receiver.traces:
+		default:
+		}
+
+		// forge the request
+		rr := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/v0.3/traces", bytes.NewReader(buf.Bytes()))
+		req.Header.Set("Content-Type", "application/msgpack")
+
+		// Add meta data to simulate data comming from multiple applications
+		req.Header.Set("Datadog-Meta-Lang", langs[n%len(langs)])
+
+		handler.ServeHTTP(rr, req)
+	}
+
+	rs := receiver.stats
+	assert.Equal(5, len(rs.Stats)) // We have a tagStats struct for each application
+
+	// We test stats for each app
+	for _, lang := range langs {
+		ts, ok := rs.Stats[Tags{Lang: lang, Endpoint: "traces"}]
+		assert.True(ok)
+		assert.Equal(int64(20), ts.TracesReceived)
+		assert.Equal(int64(57622), ts.TracesBytes)
+	}
+
+	// We test that tot() correctly returns the global stats
+	stats := rs.tot()
+	assert.Equal(int64(100), stats.TracesReceived)
+	assert.Equal(int64(288110), stats.TracesBytes)
+}
+
 func BenchmarkHandleTracesFromOneApp(b *testing.B) {
 	// prepare the payload
 	// msgpack payload
@@ -440,9 +490,10 @@ func BenchmarkHandleTracesFromOneApp(b *testing.B) {
 		rr := httptest.NewRecorder()
 		req, _ := http.NewRequest("POST", "/v0.3/traces", bytes.NewReader(buf.Bytes()))
 		req.Header.Set("Content-Type", "application/msgpack")
+
 		// Add meta data to simulate data comming from multiple applications
 		for _, v := range headerFields {
-			req.Header.Set(v, meta[n%len(meta)])
+			req.Header.Set(v, langs[n%len(langs)])
 		}
 
 		// trace only this execution
@@ -483,7 +534,7 @@ func BenchmarkHandleTracesFromMultipleApps(b *testing.B) {
 
 		// Add meta data to simulate data comming from multiple applications
 		for _, v := range headerFields {
-			req.Header.Set(v, meta[n%len(meta)])
+			req.Header.Set(v, langs[n%len(langs)])
 		}
 
 		// trace only this execution
