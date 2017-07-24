@@ -158,7 +158,7 @@ func (s *Stats) String() string {
 	servicesReceived := atomic.LoadInt64(&s.ServicesReceived)
 	servicesBytes := atomic.LoadInt64(&s.ServicesBytes)
 
-	return fmt.Sprintf("traces received: %v, traces dropped: %v, amount of traces: %v bytes, services received: %v, amount of services: %v",
+	return fmt.Sprintf("traces received: %v, traces dropped: %v, traces amount: %v bytes, services received: %v, services amount: %v bytes",
 		tracesReceived, tracesDropped, tracesBytes, servicesReceived, servicesBytes)
 }
 
