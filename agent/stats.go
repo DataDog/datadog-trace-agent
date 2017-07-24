@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"hash/fnv"
-	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -178,7 +177,8 @@ func (s *Stats) reset() {
 // hash returns the hash of the tag slice
 func hash(tags []string) uint64 {
 	h := fnv.New64()
-	s := strings.Join(tags, "")
-	h.Write([]byte(s))
+	for _, v := range tags {
+		h.Write([]byte(v))
+	}
 	return h.Sum64()
 }
