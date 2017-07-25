@@ -49,7 +49,7 @@ func (rs *receiverStats) publish() {
 	rs.RUnlock()
 }
 
-// tot returns a Stats struct holding the sum of all stats, independtly of their tags.
+// tot returns a Stats struct holding the sum of all stats, independently of their tags.
 func (rs *receiverStats) tot() Stats {
 	tot := Stats{}
 	rs.RLock()
@@ -72,6 +72,9 @@ func (rs *receiverStats) reset() {
 func (rs *receiverStats) String() string {
 	str := ""
 	rs.RLock()
+	if len(rs.Stats) == 0 {
+		return "no data received"
+	}
 	for _, ts := range rs.Stats {
 		str += fmt.Sprintf("\n\t%v -> %s", ts.Tags.toArray(), ts.String())
 
