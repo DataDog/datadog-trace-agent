@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -31,7 +32,7 @@ func (rs *receiverStats) getTagStats(tags Tags) *tagStats {
 	return tagStats
 }
 
-// acc will accumulate the stats from another receiverStats struct
+// acc will accumulate the stats from another receiverStats struct.
 func (rs *receiverStats) acc(recent *receiverStats) {
 	recent.Lock()
 	for _, tagStats := range recent.Stats {
@@ -66,6 +67,26 @@ func (rs *receiverStats) reset() {
 		tagStats.reset()
 	}
 	rs.Unlock()
+}
+
+// GetLanguages returns the list of the languages used in the traces the agent receives.
+// Eventually this list will be send to our backend through the payload header.
+func (rs *receiverStats) GetLanguages() string {
+	// We need to use this map because we can have several tags for a same language.
+	langs := make(map[string]bool)
+	str := ""
+
+	rs.RLock()
+	for tags := range rs.Stats {
+		if _, ok := langs[tags.Lang]; !ok {
+			str += tags.Lang + ","
+			langs[tags.Lang] = true
+		}
+	}
+	rs.RUnlock()
+
+	str = strings.TrimRight(str, ",")
+	return str
 }
 
 // String gives a string representation of the receiverStats struct.
