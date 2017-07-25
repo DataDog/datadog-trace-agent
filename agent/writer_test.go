@@ -185,7 +185,7 @@ func TestWriterBuffering(t *testing.T) {
 		payload := newTestPayload(fmt.Sprintf("p%d", i))
 		payloads[i] = payload
 
-		data, err := model.EncodeAgentPayload(payload)
+		data, err := model.EncodeAgentPayload(&payload)
 		if err != nil {
 			t.Fatalf("cannot encode test payload: %v", err)
 		}

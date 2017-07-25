@@ -90,7 +90,7 @@ func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 	startFlush := time.Now()
 
 	// Serialize the payload to send it to the API
-	data, err := model.EncodeAgentPayload(p)
+	data, err := model.EncodeAgentPayload(&p)
 	if err != nil {
 		log.Errorf("encoding issue: %v", err)
 		return 0, err
