@@ -99,7 +99,7 @@ func (a *Agent) Run() {
 				Env:      a.conf.DefaultEnv,
 			}
 			var wg sync.WaitGroup
-			wg.Add(2)
+			wg.Add(3)
 			go func() {
 				defer watchdog.LogOnPanic()
 				p.Stats = a.Concentrator.Flush()
@@ -108,6 +108,11 @@ func (a *Agent) Run() {
 			go func() {
 				defer watchdog.LogOnPanic()
 				p.Traces = a.Sampler.Flush()
+				wg.Done()
+			}()
+			go func() {
+				defer watchdog.LogOnPanic()
+				p.SetExtra("X-Datadog-Reported-Languages", a.Receiver.Languages())
 				wg.Done()
 			}()
 

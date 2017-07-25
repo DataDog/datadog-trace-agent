@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 )
 
 // AgentPayload is the main payload to carry data that has been
@@ -16,12 +17,31 @@ type AgentPayload struct {
 	Env      string        `json:"env"`      // the default environment this agent uses
 	Traces   []Trace       `json:"traces"`   // the traces we sampled
 	Stats    []StatsBucket `json:"stats"`    // the statistics we pre-computed
+
+	// private
+	mu     sync.RWMutex
+	extras map[string]string
 }
 
 // IsEmpty tells if a payload contains data. If not, it's useless
 // to flush it.
 func (p *AgentPayload) IsEmpty() bool {
 	return len(p.Stats) == 0 && len(p.Traces) == 0
+}
+
+// Extras returns this payloads extra metadata fields
+func (p *AgentPayload) Extras() map[string]string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.extras
+}
+
+// SetExtra sets the given metadata field on a payload
+func (p *AgentPayload) SetExtra(key, val string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.extras[key] = val
 }
 
 // AgentPayloadVersion is the version the agent agrees to with
@@ -69,11 +89,15 @@ func AgentPayloadAPIPath() string {
 
 // SetAgentPayloadHeaders takes a Header struct and adds the appropriate
 // header keys for the API to be able to decode the data.
-func SetAgentPayloadHeaders(h http.Header) {
+func SetAgentPayloadHeaders(h http.Header, extras map[string]string) {
 	switch GlobalAgentPayloadVersion {
 	case AgentPayloadV01:
 		h.Set("Content-Type", "application/json")
 		h.Set("Content-Encoding", "gzip")
+
+		for key, value := range extras {
+			h.Set(key, value)
+		}
 	default:
 	}
 }

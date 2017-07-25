@@ -119,7 +119,8 @@ func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 	queryParams := req.URL.Query()
 	queryParams.Add("api_key", ae.apiKey)
 	req.URL.RawQuery = queryParams.Encode()
-	model.SetAgentPayloadHeaders(req.Header)
+
+	model.SetAgentPayloadHeaders(req.Header, p.Extras())
 	resp, err := ae.client.Do(req)
 
 	// If the request fails, we'll try again later.
