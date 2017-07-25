@@ -250,8 +250,8 @@ func TestSQLQuantizer(t *testing.T) {
 			"SELECT pg_try_advisory_lock ( ? )",
 		},
 		{
-			"`a-a` `a.a` \"a.a\" \"a-a\"",
-			"a-a a.a a.a a-a",
+			"INSERT INTO `qual-aa`.issues (alert0 , alert1) VALUES (NULL, NULL)",
+			"INSERT INTO qual-aa . issues ( alert0, alert1 ) VALUES ( ? )",
 		},
 	}
 
