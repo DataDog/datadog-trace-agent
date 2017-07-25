@@ -51,7 +51,7 @@ type HTTPReceiver struct {
 	services chan model.ServicesMetadata
 	conf     *config.AgentConfig
 
-	stats      receiverStats
+	stats      *receiverStats
 	preSampler *sampler.PreSampler
 
 	exit chan struct{}
@@ -67,6 +67,7 @@ func NewHTTPReceiver(conf *config.AgentConfig) *HTTPReceiver {
 		traces:     make(chan model.Trace, 5000), // about 1000 traces/sec for 5 sec
 		services:   make(chan model.ServicesMetadata, 50),
 		conf:       conf,
+		stats:      newReceiverStats(),
 		preSampler: sampler.NewPreSampler(conf.PreSampleRate),
 		exit:       make(chan struct{}),
 
@@ -173,6 +174,152 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		return
 	}
 
+	traces, ok := getTraces(v, w, req)
+	if !ok {
+		return
+	}
+
+	HTTPOK(w) // We successfuly decoded the payload
+
+	// We parse the tags from the header
+	tags := Tags{
+		req.Header.Get("Datadog-Meta-Lang"),
+		req.Header.Get("Datadog-Meta-Lang-Version"),
+		req.Header.Get("Datadog-Meta-Lang-Interpreter"),
+		req.Header.Get("Datadog-Meta-Tracer-Version"),
+		"traces",
+	}
+
+	// We get the address of the struct holding the stats associated to the tags
+	ts := r.stats.getTagStats(tags)
+
+	bytesRead := req.Body.(*model.LimitedReader).Count
+	if bytesRead > 0 {
+		atomic.AddInt64(&ts.TracesBytes, int64(bytesRead))
+	}
+
+	// normalize data
+	for i := range traces {
+		spans := len(traces[i])
+
+		atomic.AddInt64(&ts.TracesReceived, 1)
+		atomic.AddInt64(&ts.SpansReceived, int64(spans))
+
+		normTrace, err := model.NormalizeTrace(traces[i])
+		if err != nil {
+			atomic.AddInt64(&ts.TracesDropped, 1)
+			atomic.AddInt64(&ts.SpansDropped, int64(spans))
+
+			errorMsg := fmt.Sprintf("dropping trace reason: %s (debug for more info), %v", err, normTrace)
+
+			// avoid truncation in DEBUG mode
+			if len(errorMsg) > 150 && !r.debug {
+				errorMsg = errorMsg[:150] + "..."
+			}
+			log.Errorf(errorMsg)
+		} else {
+			atomic.AddInt64(&ts.SpansDropped, int64(spans-len(normTrace)))
+
+			// if our downstream consumer is slow, we drop the trace on the floor
+			// this is a safety net against us using too much memory
+			// when clients flood us
+			select {
+			case r.traces <- normTrace:
+			default:
+				atomic.AddInt64(&ts.TracesDropped, 1)
+				atomic.AddInt64(&ts.SpansDropped, int64(spans))
+
+				log.Errorf("dropping trace reason: rate-limited")
+			}
+		}
+	}
+}
+
+// handleServices handle a request with a list of several services
+func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *http.Request) {
+	var servicesMeta model.ServicesMetadata
+
+	contentType := req.Header.Get("Content-Type")
+	if err := decodeReceiverPayload(req.Body, &servicesMeta, v, contentType); err != nil {
+		log.Errorf("cannot decode %s services payload: %v", v, err)
+		HTTPDecodingError(err, []string{tagServiceHandler, fmt.Sprintf("v:%s", v)}, w)
+		return
+	}
+
+	HTTPOK(w)
+
+	// We parse the tags from the header
+	tags := Tags{
+		req.Header.Get("Datadog-Meta-Lang"),
+		req.Header.Get("Datadog-Meta-Lang-Version"),
+		req.Header.Get("Datadog-Meta-Lang-Interpreter"),
+		req.Header.Get("Datadog-Meta-Tracer-Version"),
+		"services",
+	}
+
+	// We get the address of the struct holding the stats associated to the tags
+	ts := r.stats.getTagStats(tags)
+
+	atomic.AddInt64(&ts.ServicesReceived, int64(len(servicesMeta)))
+
+	bytesRead := req.Body.(*model.LimitedReader).Count
+	if bytesRead > 0 {
+		atomic.AddInt64(&ts.ServicesBytes, int64(bytesRead))
+	}
+
+	r.services <- servicesMeta
+}
+
+// logStats periodically submits stats about the receiver to statsd
+func (r *HTTPReceiver) logStats() {
+	var lastLog time.Time
+	accStats := newReceiverStats()
+
+	for now := range time.Tick(10 * time.Second) {
+		statsd.Client.Gauge("datadog.trace_agent.heartbeat", 1, []string{"version:" + Version}, 1)
+
+		// We update accStats with the new stats we collected
+		accStats.acc(r.stats)
+
+		// Publish the stats accumulated during the last flush
+		r.stats.publish()
+
+		// We reset the stats accumulated during the last 10s.
+		r.stats.reset()
+
+		if now.Sub(lastLog) >= time.Minute {
+			// We expose the stats accumulated to expvar
+			updateReceiverStats(accStats.tot())
+			log.Info(accStats.String())
+
+			// We reset the stats accumulated during the last minute
+			accStats.reset()
+			lastLog = now
+		}
+	}
+}
+
+// Languages returns the list of the languages used in the traces the agent receives.
+// Eventually this list will be send to our backend through the payload header.
+func (r *HTTPReceiver) Languages() string {
+	// We need to use this map because we can have several tags for a same language.
+	langs := make(map[string]bool)
+	str := ""
+
+	r.stats.RLock()
+	for tags := range r.stats.Stats {
+		if _, ok := langs[tags.Lang]; !ok {
+			str += tags.Lang + ","
+			langs[tags.Lang] = true
+		}
+	}
+	r.stats.RUnlock()
+
+	str = strings.TrimRight(str, ",")
+	return str
+}
+
+func getTraces(v APIVersion, w http.ResponseWriter, req *http.Request) (model.Traces, bool) {
 	var traces model.Traces
 	contentType := req.Header.Get("Content-Type")
 
@@ -184,7 +331,7 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		if contentType != "application/json" && contentType != "text/json" && contentType != "" {
 			log.Errorf("rejecting client request, unsupported media type %q", contentType)
 			HTTPFormatError([]string{tagTraceHandler, fmt.Sprintf("v:%s", v)}, w)
-			return
+			return nil, false
 		}
 
 		// in v01 we actually get spans that we have to transform in traces
@@ -192,150 +339,23 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		if err := json.NewDecoder(req.Body).Decode(&spans); err != nil {
 			log.Errorf("cannot decode %s traces payload: %v", v, err)
 			HTTPDecodingError(err, []string{tagTraceHandler, fmt.Sprintf("v:%s", v)}, w)
-			return
+			return nil, false
 		}
 		traces = model.TracesFromSpans(spans)
-
 	case v02:
 		fallthrough
 	case v03:
 		if err := decodeReceiverPayload(req.Body, &traces, v, contentType); err != nil {
 			log.Errorf("cannot decode %s traces payload: %v", v, err)
 			HTTPDecodingError(err, []string{tagTraceHandler, fmt.Sprintf("v:%s", v)}, w)
-			return
+			return nil, false
 		}
-
 	default:
 		HTTPEndpointNotSupported([]string{tagTraceHandler, fmt.Sprintf("v:%s", v)}, w)
-		return
+		return nil, false
 	}
 
-	HTTPOK(w)
-
-	bytesRead := req.Body.(*model.LimitedReader).Count
-	if bytesRead > 0 {
-		atomic.AddInt64(&r.stats.TracesBytes, int64(bytesRead))
-	}
-
-	// normalize data
-	for i := range traces {
-		spans := len(traces[i])
-		normTrace, err := model.NormalizeTrace(traces[i])
-		if err != nil {
-			atomic.AddInt64(&r.stats.TracesDropped, 1)
-			atomic.AddInt64(&r.stats.SpansDropped, int64(spans))
-
-			errorMsg := fmt.Sprintf("dropping trace reason: %s (debug for more info), %v", err, normTrace)
-
-			// avoid truncation in DEBUG mode
-			if len(errorMsg) > 150 && !r.debug {
-				errorMsg = errorMsg[:150] + "..."
-			}
-			log.Errorf(errorMsg)
-		} else {
-			atomic.AddInt64(&r.stats.SpansDropped, int64(spans-len(normTrace)))
-
-			// if our downstream consumer is slow, we drop the trace on the floor
-			// this is a safety net against us using too much memory
-			// when clients flood us
-			select {
-			case r.traces <- normTrace:
-			default:
-				atomic.AddInt64(&r.stats.TracesDropped, 1)
-				atomic.AddInt64(&r.stats.SpansDropped, int64(spans))
-
-				log.Errorf("dropping trace reason: rate-limited")
-			}
-		}
-
-		atomic.AddInt64(&r.stats.TracesReceived, 1)
-		atomic.AddInt64(&r.stats.SpansReceived, int64(spans))
-	}
-}
-
-// handleServices handle a request with a list of several services
-func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *http.Request) {
-
-	var servicesMeta model.ServicesMetadata
-
-	contentType := req.Header.Get("Content-Type")
-	if err := decodeReceiverPayload(req.Body, &servicesMeta, v, contentType); err != nil {
-		log.Errorf("cannot decode %s services payload: %v", v, err)
-		HTTPDecodingError(err, []string{tagServiceHandler, fmt.Sprintf("v:%s", v)}, w)
-		return
-	}
-
-	statsd.Client.Count("datadog.trace_agent.receiver.service", int64(len(servicesMeta)), nil, 1)
-	HTTPOK(w)
-
-	bytesRead := req.Body.(*model.LimitedReader).Count
-	if bytesRead > 0 {
-		atomic.AddInt64(&r.stats.TracesBytes, int64(bytesRead))
-	}
-
-	r.services <- servicesMeta
-}
-
-// logStats periodically submits stats about the receiver to statsd
-func (r *HTTPReceiver) logStats() {
-	var accStats receiverStats
-	var lastLog time.Time
-
-	for now := range time.Tick(10 * time.Second) {
-		// Load counters and reset them for the next flush
-		tracesBytes := atomic.SwapInt64(&r.stats.TracesBytes, 0)
-		accStats.TracesBytes += tracesBytes
-
-		servicesBytes := atomic.SwapInt64(&r.stats.ServicesBytes, 0)
-		accStats.ServicesBytes += servicesBytes
-
-		spans := atomic.SwapInt64(&r.stats.SpansReceived, 0)
-		accStats.SpansReceived += spans
-
-		traces := atomic.SwapInt64(&r.stats.TracesReceived, 0)
-		accStats.TracesReceived += traces
-
-		sdropped := atomic.SwapInt64(&r.stats.SpansDropped, 0)
-		accStats.SpansDropped += sdropped
-
-		tdropped := atomic.SwapInt64(&r.stats.TracesDropped, 0)
-		accStats.TracesDropped += tdropped
-
-		statsd.Client.Gauge("datadog.trace_agent.heartbeat", 1, []string{"version:" + Version}, 1)
-
-		statsd.Client.Count("datadog.trace_agent.receiver.traces", tracesBytes, []string{"endpoint:traces"}, 1)
-		statsd.Client.Count("datadog.trace_agent.receiver.services", servicesBytes, []string{"endpoint:services"}, 1)
-		statsd.Client.Count("datadog.trace_agent.receiver.span", spans, nil, 1)
-		statsd.Client.Count("datadog.trace_agent.receiver.trace", traces, nil, 1)
-		statsd.Client.Count("datadog.trace_agent.receiver.span_dropped", sdropped, nil, 1)
-		statsd.Client.Count("datadog.trace_agent.receiver.trace_dropped", tdropped, nil, 1)
-
-		if now.Sub(lastLog) >= time.Minute {
-			updateReceiverStats(accStats)
-			log.Infof("receiver handled %d spans, dropped %d ; handled %d traces, dropped %d",
-				accStats.SpansReceived, accStats.SpansDropped,
-				accStats.TracesReceived, accStats.TracesDropped)
-
-			accStats = receiverStats{}
-			lastLog = now
-		}
-	}
-}
-
-// receiverStats contains stats about the volume of data received
-type receiverStats struct {
-	// TracesBytes is the amount of data received on the traces endpoint (raw data, encoded, compressed).
-	TracesBytes int64
-	// ServicesBytes is the amount of data received on the services endpoint (raw data, encoded, compressed).
-	ServicesBytes int64
-	// SpansReceived is the number of spans received, including the dropped ones
-	SpansReceived int64
-	// TracesReceived is the number of traces received, including the dropped ones
-	TracesReceived int64
-	// SpansDropped is the number of spans dropped
-	SpansDropped int64
-	// SpansReceived is the number of traces dropped
-	TracesDropped int64
+	return traces, true
 }
 
 func decodeReceiverPayload(r io.Reader, dest msgp.Decodable, v APIVersion, contentType string) error {
