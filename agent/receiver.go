@@ -144,11 +144,6 @@ func (r *HTTPReceiver) Listen(addr, logExtra string) error {
 	return nil
 }
 
-// Languages returns a string of comma-separated languages which the receiver has seen traces of
-func (r *HTTPReceiver) Languages() string {
-	return "go,python"
-}
-
 func (r *HTTPReceiver) httpHandle(fn http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		req.Body = model.NewLimitedReader(req.Body, r.maxRequestBodyLength)
