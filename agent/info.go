@@ -20,7 +20,7 @@ import (
 
 var (
 	infoMu              sync.RWMutex
-	infoReceiverStats   Stats         // only for the last minute
+	infoReceiverStats   []tagStats    // only for the last minute
 	infoEndpointStats   endpointStats // only for the last minute
 	infoWatchdogInfo    watchdog.Info
 	infoSamplerInfo     samplerInfo
@@ -81,8 +81,16 @@ func publishUptime() interface{} {
 	return int(time.Since(infoStart) / time.Second)
 }
 
-func updateReceiverStats(s Stats) {
+func updateReceiverStats(rs *receiverStats) {
 	infoMu.Lock()
+
+	rs.RLock()
+	s := make([]tagStats, 0, len(rs.Stats))
+	for _, tagStats := range rs.Stats {
+		s = append(s, *tagStats)
+	}
+	rs.RUnlock()
+
 	infoReceiverStats = s
 	infoMu.Unlock()
 }
