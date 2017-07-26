@@ -45,9 +45,15 @@ const (
   Receiver: {{.Status.Config.ReceiverHost}}:{{.Status.Config.ReceiverPort}}
   API Endpoint: {{.Status.Config.APIEndpoint}}
 
-  Bytes received (1 min): {{add .Status.Receiver.TracesBytes .Status.Receiver.ServicesBytes}}
-  Traces received (1 min): {{.Status.Receiver.TracesReceived}}
-  Spans received (1 min): {{.Status.Receiver.SpansReceived}}
+  Stats per tags (1 min): {{ range $i, $ts := .Status.Receiver }}
+  -> tags: {{ if $ts.Tags.Lang }}{{ $ts.Tags.Lang }}, {{ $ts.Tags.LangVersion }}, {{ $ts.Tags.Interpreter }}, {{ $ts.Tags.TracerVersion }}
+  {{ else }}* no tags for those stats *{{ end }}
+    Traces dropped/received: {{ $ts.Stats.TracesDropped }}/{{ $ts.Stats.TracesReceived }} ({{ $ts.Stats.TracesBytes }} bytes)
+    Spans dropped/received: {{ $ts.Stats.SpansDropped }}/{{ $ts.Stats.SpansReceived }}
+    Services received: {{ $ts.Stats.ServicesReceived }} ({{ $ts.Stats.ServicesBytes }} bytes)
+    Total data received : {{ add $ts.Stats.TracesBytes $ts.Stats.ServicesBytes }} bytes
+  {{ end }}
+
 {{if gt .Status.Receiver.TracesDropped 0}}  WARNING: Traces dropped (1 min): {{.Status.Receiver.TracesDropped}}
 {{end}}{{if gt .Status.Receiver.SpansDropped 0}}  WARNING: Spans dropped (1 min): {{.Status.Receiver.SpansDropped}}
 {{end}}{{if lt .Status.PreSampler.Rate 1.0}}  WARNING: Pre-sampling traces: {{percent .Status.PreSampler.Rate}} %
@@ -244,7 +250,7 @@ type StatusInfo struct {
 		Alloc uint64
 	} `json:"memstats"`
 	Version    infoVersion             `json:"version"`
-	Receiver   Stats                   `json:"receiver"`
+	Receiver   []tagStats              `json:"receiver"`
 	Endpoint   endpointStats           `json:"endpoint"`
 	Watchdog   watchdog.Info           `json:"watchdog"`
 	PreSampler sampler.PreSamplerStats `json:"presampler"`
@@ -367,6 +373,8 @@ func Info(w io.Writer, conf *config.AgentConfig) error {
 		})
 		return err
 	}
+
+	fmt.Printf("%+v", info)
 
 	// display the remote program version, now that we know it
 	program, banner := getProgramBanner(info.Version.Version)
