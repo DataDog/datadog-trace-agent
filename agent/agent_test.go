@@ -78,6 +78,7 @@ func BenchmarkAgentTraceProcessing(b *testing.B) {
 	log.UseLogger(log.Disabled)
 
 	conf := config.NewDefaultAgentConfig()
+	conf.APIKey = "test"
 	agent := NewAgent(conf)
 	b.ResetTimer()
 	b.ReportAllocs()

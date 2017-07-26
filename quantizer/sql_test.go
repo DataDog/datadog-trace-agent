@@ -249,6 +249,10 @@ func TestSQLQuantizer(t *testing.T) {
 			"SELECT pg_try_advisory_lock (123) AS t46eef3f025cc27feb31ca5a2d668a09a",
 			"SELECT pg_try_advisory_lock ( ? )",
 		},
+		{
+			"INSERT INTO `qual-aa`.issues (alert0 , alert1) VALUES (NULL, NULL)",
+			"INSERT INTO qual-aa . issues ( alert0, alert1 ) VALUES ( ? )",
+		},
 	}
 
 	for _, c := range cases {
