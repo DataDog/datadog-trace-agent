@@ -309,13 +309,13 @@ func (r *HTTPReceiver) Languages() string {
 	r.stats.RLock()
 	for tags := range r.stats.Stats {
 		if _, ok := langs[tags.Lang]; !ok {
-			str += tags.Lang + ","
+			str += tags.Lang + "|"
 			langs[tags.Lang] = true
 		}
 	}
 	r.stats.RUnlock()
 
-	str = strings.TrimRight(str, ",")
+	str = strings.TrimRight(str, "|")
 	return str
 }
 
