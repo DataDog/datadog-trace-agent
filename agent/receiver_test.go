@@ -449,16 +449,11 @@ func TestHandleTraces(t *testing.T) {
 
 	// We test stats for each app
 	for _, lang := range langs {
-		ts, ok := rs.Stats[Tags{Lang: lang, Endpoint: "traces"}]
+		ts, ok := rs.Stats[Tags{Lang: lang}]
 		assert.True(ok)
 		assert.Equal(int64(20), ts.TracesReceived)
 		assert.Equal(int64(57622), ts.TracesBytes)
 	}
-
-	// We test that tot() correctly returns the global stats
-	stats := rs.tot()
-	assert.Equal(int64(100), stats.TracesReceived)
-	assert.Equal(int64(288110), stats.TracesBytes)
 }
 
 func BenchmarkHandleTracesFromOneApp(b *testing.B) {

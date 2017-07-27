@@ -374,8 +374,6 @@ func Info(w io.Writer, conf *config.AgentConfig) error {
 		return err
 	}
 
-	fmt.Printf("%+v", info)
-
 	// display the remote program version, now that we know it
 	program, banner := getProgramBanner(info.Version.Version)
 	err = infoTmpl.Execute(w, struct {
