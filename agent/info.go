@@ -43,22 +43,26 @@ const (
 
   Hostname: {{.Status.Config.HostName}}
   Receiver: {{.Status.Config.ReceiverHost}}:{{.Status.Config.ReceiverPort}}
-  API Endpoint: {{.Status.Config.APIEndpoint}}
+  API Endpoint: {{.Status.Config.APIEndpoint}}{{ range $i, $ts := .Status.Receiver }}
+  
+  --- Receiver stats (1 min) ---
 
-  Stats per tags (1 min): {{ range $i, $ts := .Status.Receiver }}
-  -> tags: {{ if $ts.Tags.Lang }}{{ $ts.Tags.Lang }}, {{ $ts.Tags.LangVersion }}, {{ $ts.Tags.Interpreter }}, {{ $ts.Tags.TracerVersion }}
-  {{ else }}* no tags for those stats *{{ end }}
-    Traces dropped/received: {{ $ts.Stats.TracesDropped }}/{{ $ts.Stats.TracesReceived }} ({{ $ts.Stats.TracesBytes }} bytes)
-    Spans dropped/received: {{ $ts.Stats.SpansDropped }}/{{ $ts.Stats.SpansReceived }}
+  {{if $ts.Tags.Lang}}-> tags: {{ $ts.Tags.Lang }}, {{ $ts.Tags.LangVersion }}, {{ $ts.Tags.Interpreter }}, {{ $ts.Tags.TracerVersion }}
+  {{else}}-> * no tags for those stats *{{end}}
+    Traces received: {{ $ts.Stats.TracesReceived }} ({{ $ts.Stats.TracesBytes }} bytes)
+    Spans received: {{ $ts.Stats.SpansReceived }}
     Services received: {{ $ts.Stats.ServicesReceived }} ({{ $ts.Stats.ServicesBytes }} bytes)
-    Total data received : {{ add $ts.Stats.TracesBytes $ts.Stats.ServicesBytes }} bytes
-  {{ end }}
-
-{{if gt .Status.Receiver.TracesDropped 0}}  WARNING: Traces dropped (1 min): {{.Status.Receiver.TracesDropped}}
-{{end}}{{if gt .Status.Receiver.SpansDropped 0}}  WARNING: Spans dropped (1 min): {{.Status.Receiver.SpansDropped}}
-{{end}}{{if lt .Status.PreSampler.Rate 1.0}}  WARNING: Pre-sampling traces: {{percent .Status.PreSampler.Rate}} %
+    Total data received : {{ add $ts.Stats.TracesBytes $ts.Stats.ServicesBytes }} bytes{{if gt $ts.Stats.TracesDropped 0}}
+    
+    WARNING: Traces dropped: {{ $ts.Stats.TracesDropped }}
+    {{end}}{{if gt $ts.Stats.SpansDropped 0}}WARNING: Spans dropped: {{ $ts.Stats.SpansDropped }}{{end}}
+    
+  ------------------------------{{end}}{{if lt .Status.PreSampler.Rate 1.0}}  
+  
+  WARNING: Pre-sampling traces: {{percent .Status.PreSampler.Rate}} %
 {{end}}{{if .Status.PreSampler.Error}}  WARNING: Pre-sampler: {{.Status.PreSampler.Error}}
 {{end}}
+
   Bytes sent (1 min): {{add .Status.Endpoint.TracesBytes .Status.Endpoint.ServicesBytes}}
   Traces sent (1 min): {{.Status.Endpoint.TracesCount}}
   Stats sent (1 min): {{.Status.Endpoint.TracesStats}}
