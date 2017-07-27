@@ -21,7 +21,8 @@ type testServerHandler struct {
 	t *testing.T
 }
 
-const expectedOutput = `======================
+const (
+	expectedInfo = `======================
 Trace Agent (v 0.99.0)
 ======================
 
@@ -48,6 +49,44 @@ Trace Agent (v 0.99.0)
   Stats sent (1 min): 60
 
 `
+	expectedWarning = `======================
+Trace Agent (v 0.99.0)
+======================
+
+  Pid: 38149
+  Uptime: 15 seconds
+  Mem alloc: 773552 bytes
+
+  Hostname: localhost.localdomain
+  Receiver: localhost:8126
+  API Endpoint: https://trace.agent.datadoghq.com
+  
+  --- Receiver stats (1 min) ---
+
+  -> tags: python, 2.7.6, CPython, 0.9.0
+  
+    Traces received: 70 (10679 bytes)
+    Spans received: 984
+    Services received: 0 (0 bytes)
+    Total data received : 10679 bytes
+    
+    WARNING: Traces dropped: 23
+    WARNING: Spans dropped: 184
+    
+  ------------------------------  
+  
+  WARNING: Pre-sampling traces: 42.1 %
+  WARNING: Pre-sampler: raising pre-sampling rate from 3.1 % to 5.0 %
+
+
+  Bytes sent (1 min): 3591
+  Traces sent (1 min): 6
+  Stats sent (1 min): 60
+  WARNING: Traces API errors (1 min): 3/4
+  WARNING: Services API errors (1 min): 1/2
+
+`
+)
 
 func (h *testServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -95,7 +134,7 @@ func (h *testServerWarningHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 "endpoint": {"TracesPayload":4,"TracesPayloadError":3,"TracesBytes":3245,"TracesCount":6,"TracesStats":60,"ServicesPayload":2,"ServicesPayloadError":1,"ServicesBytes":346},
 "memstats": {"Alloc":773552,"TotalAlloc":773552,"Sys":3346432,"Lookups":6,"Mallocs":7231,"Frees":561,"HeapAlloc":773552,"HeapSys":1572864,"HeapIdle":49152,"HeapInuse":1523712,"HeapReleased":0,"HeapObjects":6670,"StackInuse":524288,"StackSys":524288,"MSpanInuse":24480,"MSpanSys":32768,"MCacheInuse":4800,"MCacheSys":16384,"BuckHashSys":2675,"GCSys":131072,"OtherSys":1066381,"NextGC":4194304,"LastGC":0,"PauseTotalNs":0,"PauseNs":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"PauseEnd":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"NumGC":0,"GCCPUFraction":0,"EnableGC":true,"DebugGC":false,"BySize":[{"Size":0,"Mallocs":0,"Frees":0},{"Size":8,"Mallocs":126,"Frees":0},{"Size":16,"Mallocs":825,"Frees":0},{"Size":32,"Mallocs":4208,"Frees":0},{"Size":48,"Mallocs":345,"Frees":0},{"Size":64,"Mallocs":262,"Frees":0},{"Size":80,"Mallocs":93,"Frees":0},{"Size":96,"Mallocs":70,"Frees":0},{"Size":112,"Mallocs":97,"Frees":0},{"Size":128,"Mallocs":24,"Frees":0},{"Size":144,"Mallocs":25,"Frees":0},{"Size":160,"Mallocs":57,"Frees":0},{"Size":176,"Mallocs":128,"Frees":0},{"Size":192,"Mallocs":13,"Frees":0},{"Size":208,"Mallocs":77,"Frees":0},{"Size":224,"Mallocs":3,"Frees":0},{"Size":240,"Mallocs":2,"Frees":0},{"Size":256,"Mallocs":17,"Frees":0},{"Size":288,"Mallocs":64,"Frees":0},{"Size":320,"Mallocs":12,"Frees":0},{"Size":352,"Mallocs":20,"Frees":0},{"Size":384,"Mallocs":1,"Frees":0},{"Size":416,"Mallocs":59,"Frees":0},{"Size":448,"Mallocs":0,"Frees":0},{"Size":480,"Mallocs":3,"Frees":0},{"Size":512,"Mallocs":2,"Frees":0},{"Size":576,"Mallocs":17,"Frees":0},{"Size":640,"Mallocs":6,"Frees":0},{"Size":704,"Mallocs":10,"Frees":0},{"Size":768,"Mallocs":0,"Frees":0},{"Size":896,"Mallocs":11,"Frees":0},{"Size":1024,"Mallocs":11,"Frees":0},{"Size":1152,"Mallocs":12,"Frees":0},{"Size":1280,"Mallocs":2,"Frees":0},{"Size":1408,"Mallocs":2,"Frees":0},{"Size":1536,"Mallocs":0,"Frees":0},{"Size":1664,"Mallocs":10,"Frees":0},{"Size":2048,"Mallocs":17,"Frees":0},{"Size":2304,"Mallocs":7,"Frees":0},{"Size":2560,"Mallocs":1,"Frees":0},{"Size":2816,"Mallocs":1,"Frees":0},{"Size":3072,"Mallocs":1,"Frees":0},{"Size":3328,"Mallocs":7,"Frees":0},{"Size":4096,"Mallocs":4,"Frees":0},{"Size":4608,"Mallocs":1,"Frees":0},{"Size":5376,"Mallocs":6,"Frees":0},{"Size":6144,"Mallocs":4,"Frees":0},{"Size":6400,"Mallocs":0,"Frees":0},{"Size":6656,"Mallocs":1,"Frees":0},{"Size":6912,"Mallocs":0,"Frees":0},{"Size":8192,"Mallocs":0,"Frees":0},{"Size":8448,"Mallocs":0,"Frees":0},{"Size":8704,"Mallocs":1,"Frees":0},{"Size":9472,"Mallocs":0,"Frees":0},{"Size":10496,"Mallocs":0,"Frees":0},{"Size":12288,"Mallocs":1,"Frees":0},{"Size":13568,"Mallocs":0,"Frees":0},{"Size":14080,"Mallocs":0,"Frees":0},{"Size":16384,"Mallocs":0,"Frees":0},{"Size":16640,"Mallocs":0,"Frees":0},{"Size":17664,"Mallocs":1,"Frees":0}]},
 "pid": 38149,
-"receiver": [{}],
+"receiver": [{"Lang":"python","LangVersion":"2.7.6","Interpreter":"CPython","TracerVersion":"0.9.0","TracesReceived":70,"TracesDropped":23,"TracesBytes":10679,"SpansReceived":984,"SpansDropped":184,"ServicesReceived":0,"ServicesBytes":0}],
 "presampler": {"Rate":0.421,"Error":"raising pre-sampling rate from 3.1 % to 5.0 %"},
 "uptime": 15,
 "version": {"BuildDate": "2017-02-01T14:28:10+0100", "GitBranch": "ufoot/statusinfo", "GitCommit": "396a217", "GoVersion": "go version go1.7 darwin/amd64", "Version": "0.99.0"}
@@ -176,39 +215,11 @@ func TestInfo(t *testing.T) {
 	err = Info(&buf, conf)
 	assert.Nil(err)
 	info := buf.String()
-	println(expectedOutput)
-	assert.Equal(expectedOutput, info)
-
 	t.Logf("Info:\n%s\n", info)
-
-	//lines := strings.Split(info, "\n")
-	//assert.Equal(21, len(lines))
-	//assert.Regexp(regexp.MustCompile(`^={10,100}$`), lines[0])
-	//assert.Regexp(regexp.MustCompile(`^Trace Agent \(v.*\)$`), lines[1])
-	//assert.Regexp(regexp.MustCompile(`^={10,100}$`), lines[2])
-	//assert.Equal(len(lines[1]), len(lines[0]))
-	//assert.Equal(len(lines[1]), len(lines[2]))
-	//assert.Equal("", lines[3])
-	//assert.Equal("  Pid: 38149", lines[4])
-	//assert.Equal("  Uptime: 15 seconds", lines[5])
-	//assert.Equal("  Mem alloc: 773552 bytes", lines[6])
-	//assert.Equal("", lines[7])
-	//assert.Equal("  Hostname: localhost.localdomain", lines[8])
-	//assert.Equal("  Receiver: localhost:8126", lines[9])
-	//assert.Equal("  API Endpoint: https://trace.agent.datadoghq.com", lines[10])
-	//assert.Equal("", lines[11])
-	//assert.Equal("  Bytes received (1 min): 11000", lines[12])
-	//assert.Equal("  Traces received (1 min): 240", lines[13])
-	//assert.Equal("  Spans received (1 min): 360", lines[14])
-	//assert.Equal("", lines[15])
-	//assert.Equal("  Bytes sent (1 min): 3591", lines[16])
-	//assert.Equal("  Traces sent (1 min): 6", lines[17])
-	//assert.Equal("  Stats sent (1 min): 60", lines[18])
-	//assert.Equal("", lines[19])
-	//assert.Equal("", lines[20])
+	assert.Equal(expectedInfo, info)
 }
 
-func Warning(t *testing.T) {
+func TestWarning(t *testing.T) {
 	assert := assert.New(t)
 	conf := testInit(t)
 	assert.NotNil(conf)
@@ -232,39 +243,8 @@ func Warning(t *testing.T) {
 	assert.Nil(err)
 	info := buf.String()
 
+	assert.Equal(expectedWarning, info)
 	t.Logf("Info:\n%s\n", info)
-
-	lines := strings.Split(info, "\n")
-	assert.Equal(27, len(lines))
-	assert.Regexp(regexp.MustCompile(`^={10,100}$`), lines[0])
-	assert.Regexp(regexp.MustCompile(`^Trace Agent \(v.*\)$`), lines[1])
-	assert.Regexp(regexp.MustCompile(`^={10,100}$`), lines[2])
-	assert.Equal(len(lines[1]), len(lines[0]))
-	assert.Equal(len(lines[1]), len(lines[2]))
-	assert.Equal("", lines[3])
-	assert.Equal("  Pid: 38149", lines[4])
-	assert.Equal("  Uptime: 15 seconds", lines[5])
-	assert.Equal("  Mem alloc: 773552 bytes", lines[6])
-	assert.Equal("", lines[7])
-	assert.Equal("  Hostname: localhost.localdomain", lines[8])
-	assert.Equal("  Receiver: localhost:8126", lines[9])
-	assert.Equal("  API Endpoint: https://trace.agent.datadoghq.com", lines[10])
-	assert.Equal("", lines[11])
-	assert.Equal("  Bytes received (1 min): 11000", lines[12])
-	assert.Equal("  Traces received (1 min): 240", lines[13])
-	assert.Equal("  Spans received (1 min): 360", lines[14])
-	assert.Equal("  WARNING: Traces dropped (1 min): 5", lines[15])
-	assert.Equal("  WARNING: Spans dropped (1 min): 10", lines[16])
-	assert.Equal("  WARNING: Pre-sampling traces: 42.1 %", lines[17])
-	assert.Equal("  WARNING: Pre-sampler: raising pre-sampling rate from 3.1 % to 5.0 %", lines[18])
-	assert.Equal("", lines[19])
-	assert.Equal("  Bytes sent (1 min): 3591", lines[20])
-	assert.Equal("  Traces sent (1 min): 6", lines[21])
-	assert.Equal("  Stats sent (1 min): 60", lines[22])
-	assert.Equal("  WARNING: Traces API errors (1 min): 3/4", lines[23])
-	assert.Equal("  WARNING: Services API errors (1 min): 1/2", lines[24])
-	assert.Equal("", lines[25])
-	assert.Equal("", lines[26])
 }
 
 func TestNotRunning(t *testing.T) {
