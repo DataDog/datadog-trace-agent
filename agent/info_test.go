@@ -21,6 +21,34 @@ type testServerHandler struct {
 	t *testing.T
 }
 
+const expectedOutput = `======================
+Trace Agent (v 0.99.0)
+======================
+
+  Pid: 38149
+  Uptime: 15 seconds
+  Mem alloc: 773552 bytes
+
+  Hostname: localhost.localdomain
+  Receiver: localhost:8126
+  API Endpoint: https://trace.agent.datadoghq.com
+  
+  --- Receiver stats (1 min) ---
+
+  -> * no tags for those stats *
+    Traces received: 0 (0 bytes)
+    Spans received: 0
+    Services received: 0 (0 bytes)
+    Total data received : 0 bytes
+    
+  ------------------------------
+
+  Bytes sent (1 min): 3591
+  Traces sent (1 min): 6
+  Stats sent (1 min): 60
+
+`
+
 func (h *testServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	switch r.URL.Path {
@@ -148,6 +176,8 @@ func TestInfo(t *testing.T) {
 	err = Info(&buf, conf)
 	assert.Nil(err)
 	info := buf.String()
+	println(expectedOutput)
+	assert.Equal(expectedOutput, info)
 
 	t.Logf("Info:\n%s\n", info)
 
