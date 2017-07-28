@@ -36,7 +36,7 @@ Trace Agent (v 0.99.0)
   
   --- Receiver stats (1 min) ---
 
-  -> * no tags for those stats *
+  -> tags: None
     Traces received: 0 (0 bytes)
     Spans received: 0
     Services received: 0 (0 bytes)
@@ -49,6 +49,7 @@ Trace Agent (v 0.99.0)
   Stats sent (1 min): 60
 
 `
+
 	expectedWarning = `======================
 Trace Agent (v 0.99.0)
 ======================
