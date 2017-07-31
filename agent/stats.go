@@ -49,17 +49,6 @@ func (rs *receiverStats) publish() {
 	rs.RUnlock()
 }
 
-// tot returns a Stats struct holding the sum of all stats, independently of their tags.
-func (rs *receiverStats) tot() Stats {
-	tot := Stats{}
-	rs.RLock()
-	for _, tagStats := range rs.Stats {
-		tot.update(tagStats.Stats)
-	}
-	rs.RUnlock()
-	return tot
-}
-
 func (rs *receiverStats) reset() {
 	rs.Lock()
 	for _, tagStats := range rs.Stats {
@@ -167,7 +156,7 @@ func (s *Stats) String() string {
 
 // Tags holds the tags we parse when we handle the header of the payload.
 type Tags struct {
-	Lang, LangVersion, Interpreter, TracerVersion, Endpoint string
+	Lang, LangVersion, Interpreter, TracerVersion string
 }
 
 // toArray will transform the Tags struct into a slice of string.
@@ -186,9 +175,6 @@ func (t *Tags) toArray() []string {
 	}
 	if t.TracerVersion != "" {
 		tags = append(tags, "tracer_version:"+t.TracerVersion)
-	}
-	if t.Endpoint != "" {
-		tags = append(tags, "endpoint:"+t.Endpoint)
 	}
 
 	return tags

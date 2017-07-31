@@ -20,7 +20,7 @@ import (
 
 var (
 	infoMu              sync.RWMutex
-	infoReceiverStats   Stats         // only for the last minute
+	infoReceiverStats   []tagStats    // only for the last minute
 	infoEndpointStats   endpointStats // only for the last minute
 	infoWatchdogInfo    watchdog.Info
 	infoSamplerInfo     samplerInfo
@@ -43,16 +43,26 @@ const (
 
   Hostname: {{.Status.Config.HostName}}
   Receiver: {{.Status.Config.ReceiverHost}}:{{.Status.Config.ReceiverPort}}
-  API Endpoint: {{.Status.Config.APIEndpoint}}
+  API Endpoint: {{.Status.Config.APIEndpoint}}{{ range $i, $ts := .Status.Receiver }}
+  
+  --- Receiver stats (1 min) ---
 
-  Bytes received (1 min): {{add .Status.Receiver.TracesBytes .Status.Receiver.ServicesBytes}}
-  Traces received (1 min): {{.Status.Receiver.TracesReceived}}
-  Spans received (1 min): {{.Status.Receiver.SpansReceived}}
-{{if gt .Status.Receiver.TracesDropped 0}}  WARNING: Traces dropped (1 min): {{.Status.Receiver.TracesDropped}}
-{{end}}{{if gt .Status.Receiver.SpansDropped 0}}  WARNING: Spans dropped (1 min): {{.Status.Receiver.SpansDropped}}
-{{end}}{{if lt .Status.PreSampler.Rate 1.0}}  WARNING: Pre-sampling traces: {{percent .Status.PreSampler.Rate}} %
+  {{if $ts.Tags.Lang}}-> tags: {{ $ts.Tags.Lang }}, {{ $ts.Tags.LangVersion }}, {{ $ts.Tags.Interpreter }}, {{ $ts.Tags.TracerVersion }}
+  {{else}}-> tags: None{{end}}
+    Traces received: {{ $ts.Stats.TracesReceived }} ({{ $ts.Stats.TracesBytes }} bytes)
+    Spans received: {{ $ts.Stats.SpansReceived }}
+    Services received: {{ $ts.Stats.ServicesReceived }} ({{ $ts.Stats.ServicesBytes }} bytes)
+    Total data received : {{ add $ts.Stats.TracesBytes $ts.Stats.ServicesBytes }} bytes{{if gt $ts.Stats.TracesDropped 0}}
+    
+    WARNING: Traces dropped: {{ $ts.Stats.TracesDropped }}
+    {{end}}{{if gt $ts.Stats.SpansDropped 0}}WARNING: Spans dropped: {{ $ts.Stats.SpansDropped }}{{end}}
+    
+  ------------------------------{{end}}{{if lt .Status.PreSampler.Rate 1.0}}  
+  
+  WARNING: Pre-sampling traces: {{percent .Status.PreSampler.Rate}} %
 {{end}}{{if .Status.PreSampler.Error}}  WARNING: Pre-sampler: {{.Status.PreSampler.Error}}
 {{end}}
+
   Bytes sent (1 min): {{add .Status.Endpoint.TracesBytes .Status.Endpoint.ServicesBytes}}
   Traces sent (1 min): {{.Status.Endpoint.TracesCount}}
   Stats sent (1 min): {{.Status.Endpoint.TracesStats}}
@@ -81,8 +91,16 @@ func publishUptime() interface{} {
 	return int(time.Since(infoStart) / time.Second)
 }
 
-func updateReceiverStats(s Stats) {
+func updateReceiverStats(rs *receiverStats) {
 	infoMu.Lock()
+
+	rs.RLock()
+	s := make([]tagStats, 0, len(rs.Stats))
+	for _, tagStats := range rs.Stats {
+		s = append(s, *tagStats)
+	}
+	rs.RUnlock()
+
 	infoReceiverStats = s
 	infoMu.Unlock()
 }
@@ -236,7 +254,7 @@ type StatusInfo struct {
 		Alloc uint64
 	} `json:"memstats"`
 	Version    infoVersion             `json:"version"`
-	Receiver   Stats                   `json:"receiver"`
+	Receiver   []tagStats              `json:"receiver"`
 	Endpoint   endpointStats           `json:"endpoint"`
 	Watchdog   watchdog.Info           `json:"watchdog"`
 	PreSampler sampler.PreSamplerStats `json:"presampler"`

@@ -141,8 +141,7 @@ func (a *Agent) Process(t model.Trace) {
 		log.Errorf("skipping trace with root too far in past, root:%v", *root)
 
 		// We get the address of the struct holding the stats associated to the tags
-		tags := Tags{Endpoint: "endpoint:process"}
-		ts := a.Receiver.stats.getTagStats(tags)
+		ts := a.Receiver.stats.getTagStats(Tags{})
 
 		atomic.AddInt64(&ts.TracesDropped, 1)
 		atomic.AddInt64(&ts.SpansDropped, int64(len(t)))
