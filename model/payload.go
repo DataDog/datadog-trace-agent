@@ -41,6 +41,10 @@ func (p *AgentPayload) SetExtra(key, val string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	if p.extras == nil {
+		p.extras = make(map[string]string)
+	}
+
 	p.extras[key] = val
 }
 
