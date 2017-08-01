@@ -76,6 +76,9 @@ func (c *Concentrator) Flush() []model.StatsBucket {
 		for _, d := range bucket.Distributions {
 			statsd.Client.Histogram("datadog.trace_agent.distribution.len", float64(d.Summary.N), nil, 1)
 		}
+		for _, d := range bucket.ErrDistributions {
+			statsd.Client.Histogram("datadog.trace_agent.err_distribution.len", float64(d.Summary.N), nil, 1)
+		}
 		sb = append(sb, bucket)
 		delete(c.buckets, ts)
 	}
