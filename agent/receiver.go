@@ -187,7 +187,6 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		req.Header.Get("Datadog-Meta-Lang-Version"),
 		req.Header.Get("Datadog-Meta-Lang-Interpreter"),
 		req.Header.Get("Datadog-Meta-Tracer-Version"),
-		"traces",
 	}
 
 	// We get the address of the struct holding the stats associated to the tags
@@ -254,7 +253,6 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 		req.Header.Get("Datadog-Meta-Lang-Version"),
 		req.Header.Get("Datadog-Meta-Lang-Interpreter"),
 		req.Header.Get("Datadog-Meta-Tracer-Version"),
-		"services",
 	}
 
 	// We get the address of the struct holding the stats associated to the tags
@@ -289,7 +287,7 @@ func (r *HTTPReceiver) logStats() {
 
 		if now.Sub(lastLog) >= time.Minute {
 			// We expose the stats accumulated to expvar
-			updateReceiverStats(accStats.tot())
+			updateReceiverStats(accStats)
 			log.Info(accStats.String())
 
 			// We reset the stats accumulated during the last minute
