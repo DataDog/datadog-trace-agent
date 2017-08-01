@@ -134,7 +134,7 @@ func (w *Writer) main() {
 			updated := w.serviceBuffer.Update(sm)
 			if updated {
 				w.FlushServices()
-				statd.Client.Count("datadog.trace_agent.services.updated", 1, nil, 1)
+				statsd.Client.Count("datadog.trace_agent.services.updated", 1, nil, 1)
 			}
 		case <-w.exit:
 			log.Info("exiting, trying to flush all remaining data")
