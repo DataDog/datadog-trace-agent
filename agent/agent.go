@@ -97,6 +97,7 @@ func (a *Agent) Run() {
 			p := model.AgentPayload{
 				HostName: a.conf.HostName,
 				Env:      a.conf.DefaultEnv,
+				extras:   make(map[string]string),
 			}
 			var wg sync.WaitGroup
 			wg.Add(3)
