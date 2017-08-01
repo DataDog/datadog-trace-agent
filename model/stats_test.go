@@ -176,6 +176,36 @@ func TestStatsBucketDefault(t *testing.T) {
 		assert.Equal(val.entries, d.Summary.Entries, "Distribution %s wrong value", dkey)
 		assert.Equal(val.topLevel, d.TopLevel, "Distribution %s wrong topLevel", dkey)
 	}
+
+	expectedErrDistributions := map[string]expectedDistribution{
+		"A.foo|duration|env:default,resource:α,service:A": expectedDistribution{
+			entries: nil, topLevel: 1},
+		"A.foo|duration|env:default,resource:β,service:A": expectedDistribution{
+			entries: []quantile.Entry{quantile.Entry{V: 2, G: 1, Delta: 0}}, topLevel: 1},
+		"B.foo|duration|env:default,resource:γ,service:B": expectedDistribution{
+			entries: nil, topLevel: 1},
+		"B.foo|duration|env:default,resource:ε,service:B": expectedDistribution{
+			entries: []quantile.Entry{quantile.Entry{V: 4, G: 1, Delta: 0}}, topLevel: 1},
+		"B.foo|duration|env:default,resource:ζ,service:B": expectedDistribution{
+			entries: nil, topLevel: 1},
+		"sql.query|duration|env:default,resource:ζ,service:B": expectedDistribution{
+			entries: nil, topLevel: 1},
+		"sql.query|duration|env:default,resource:δ,service:C": expectedDistribution{
+			entries: nil, topLevel: 2},
+	}
+
+	for k, v := range sb.ErrDistributions {
+		t.Logf("%v: %v", k, v.Summary.Entries)
+	}
+	assert.Len(sb.ErrDistributions, len(expectedErrDistributions), "Missing distributions!")
+	for dkey, d := range sb.ErrDistributions {
+		val, ok := expectedErrDistributions[dkey]
+		if !ok {
+			assert.Fail("Unexpected distribution %s", dkey)
+		}
+		assert.Equal(val.entries, d.Summary.Entries, "ErrDistribution %s wrong value", dkey)
+		assert.Equal(val.topLevel, d.TopLevel, "ErrDistribution %s wrong topLevel", dkey)
+	}
 }
 
 func TestStatsBucketExtraAggregators(t *testing.T) {

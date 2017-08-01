@@ -119,26 +119,28 @@ func (d Distribution) Copy() Distribution {
 
 // StatsBucket is a time bucket to track statistic around multiple Counts
 type StatsBucket struct {
-	Start    int64 // timestamp of start in our format
-	Duration int64 // duration of a bucket in nanoseconds
+	Start    int64 // Timestamp of start in our format
+	Duration int64 // Duration of a bucket in nanoseconds
 
-	// stats indexed by keys
-	Counts        map[string]Count        // All the true counts we keep
-	Distributions map[string]Distribution // All the true distribution we keep to answer quantile queries
+	// Stats indexed by keys
+	Counts           map[string]Count        // All the counts
+	Distributions    map[string]Distribution // All the distributions (e.g.: for quantile queries)
+	ErrDistributions map[string]Distribution // All the error distributions (e.g.: for apdex, as they account for frustrated)
 }
 
 // NewStatsBucket opens a new bucket for time ts and initializes it properly
 func NewStatsBucket(ts, d int64) StatsBucket {
 	// The only non-initialized value is the Duration which should be set by whoever closes that bucket
 	return StatsBucket{
-		Start:         ts,
-		Duration:      d,
-		Counts:        make(map[string]Count),
-		Distributions: make(map[string]Distribution),
+		Start:            ts,
+		Duration:         d,
+		Counts:           make(map[string]Count),
+		Distributions:    make(map[string]Distribution),
+		ErrDistributions: make(map[string]Distribution),
 	}
 }
 
 // IsEmpty just says if this stats bucket has no information (in which case it's useless)
 func (sb StatsBucket) IsEmpty() bool {
-	return len(sb.Counts) == 0 && len(sb.Distributions) == 0
+	return len(sb.Counts) == 0 && len(sb.Distributions) == 0 && len(sb.ErrDistributions) == 0
 }

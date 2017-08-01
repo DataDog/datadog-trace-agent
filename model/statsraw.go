@@ -15,10 +15,11 @@ type groupedStats struct {
 
 	topLevel float64
 
-	hits                 float64
-	errors               float64
-	duration             float64
-	durationDistribution *quantile.SliceSummary
+	hits                    float64
+	errors                  float64
+	duration                float64
+	durationDistribution    *quantile.SliceSummary
+	errDurationDistribution *quantile.SliceSummary
 }
 
 type sublayerStats struct {
@@ -31,8 +32,9 @@ type sublayerStats struct {
 
 func newGroupedStats(tags TagSet) groupedStats {
 	return groupedStats{
-		tags:                 tags,
-		durationDistribution: quantile.NewSliceSummary(),
+		tags:                    tags,
+		durationDistribution:    quantile.NewSliceSummary(),
+		errDurationDistribution: quantile.NewSliceSummary(),
 	}
 }
 
@@ -121,6 +123,14 @@ func (sb *StatsRawBucket) Export() StatsBucket {
 			TagSet:   v.tags,
 			TopLevel: v.topLevel,
 			Summary:  v.durationDistribution,
+		}
+		ret.ErrDistributions[durationKey] = Distribution{
+			Key:      durationKey,
+			Name:     k.name,
+			Measure:  DURATION,
+			TagSet:   v.tags,
+			TopLevel: v.topLevel,
+			Summary:  v.errDurationDistribution,
 		}
 	}
 	for k, v := range sb.sublayerData {
@@ -223,6 +233,10 @@ func (sb *StatsRawBucket) add(s Span, aggr string, tags TagSet) {
 	// alter resolution of duration distro
 	trundur := nsTimestampToFloat(s.Duration)
 	gs.durationDistribution.Insert(trundur, s.SpanID)
+
+	if s.Error != 0 {
+		gs.errDurationDistribution.Insert(trundur, s.SpanID)
+	}
 
 	sb.data[key] = gs
 }
