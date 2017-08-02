@@ -253,6 +253,10 @@ func TestSQLQuantizer(t *testing.T) {
 			"INSERT INTO `qual-aa`.issues (alert0 , alert1) VALUES (NULL, NULL)",
 			"INSERT INTO qual-aa . issues ( alert0, alert1 ) VALUES ( ? )",
 		},
+		{
+			"INSERT INTO user (id, email, name) VALUES (null, ?, ?)",
+			"INSERT INTO user ( id, email, name ) VALUES ( ? )",
+		},
 	}
 
 	for _, c := range cases {
