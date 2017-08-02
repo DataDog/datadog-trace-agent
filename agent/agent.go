@@ -15,6 +15,7 @@ import (
 )
 
 const processStatsInterval = time.Minute
+const languageHeaderKey = "X-Datadog-Reported-Languages"
 
 type processedTrace struct {
 	Trace     model.Trace
@@ -99,7 +100,7 @@ func (a *Agent) Run() {
 				Env:      a.conf.DefaultEnv,
 			}
 			var wg sync.WaitGroup
-			wg.Add(3)
+			wg.Add(2)
 			go func() {
 				defer watchdog.LogOnPanic()
 				p.Stats = a.Concentrator.Flush()
@@ -110,13 +111,9 @@ func (a *Agent) Run() {
 				p.Traces = a.Sampler.Flush()
 				wg.Done()
 			}()
-			go func() {
-				defer watchdog.LogOnPanic()
-				p.SetExtra("X-Datadog-Reported-Languages", a.Receiver.Languages())
-				wg.Done()
-			}()
 
 			wg.Wait()
+			p.SetExtra(languageHeaderKey, a.Receiver.Languages())
 
 			a.Writer.inPayloads <- p
 		case <-watchdogTicker.C:

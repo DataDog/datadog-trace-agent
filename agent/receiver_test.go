@@ -454,6 +454,18 @@ func TestHandleTraces(t *testing.T) {
 		assert.Equal(int64(20), ts.TracesReceived)
 		assert.Equal(int64(57622), ts.TracesBytes)
 	}
+	// make sure we have all our languages registered
+	assert.Equal("C#|go|java|python|ruby", receiver.Languages())
+
+	// now check for a subset of languages
+	rs.Stats = make(map[Tags]*tagStats)
+	assert.Equal("", receiver.Languages())
+
+	for _, lang := range []string{"python", "go"} {
+		rs.Stats[Tags{Lang: lang}] = &tagStats{}
+	}
+	assert.Equal("go|python", receiver.Languages())
+
 }
 
 func BenchmarkHandleTracesFromOneApp(b *testing.B) {
