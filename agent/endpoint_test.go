@@ -36,7 +36,7 @@ func BenchmarkEncodeAgentPayload(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		if _, err := model.EncodeAgentPayload(payload); err != nil {
+		if _, err := model.EncodeAgentPayload(&payload); err != nil {
 			b.Fatalf("error encoding payload: %v", b)
 		}
 	}

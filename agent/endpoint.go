@@ -90,7 +90,7 @@ func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 	startFlush := time.Now()
 
 	// Serialize the payload to send it to the API
-	data, err := model.EncodeAgentPayload(p)
+	data, err := model.EncodeAgentPayload(&p)
 	if err != nil {
 		log.Errorf("encoding issue: %v", err)
 		return 0, err
@@ -119,7 +119,8 @@ func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 	queryParams := req.URL.Query()
 	queryParams.Add("api_key", ae.apiKey)
 	req.URL.RawQuery = queryParams.Encode()
-	model.SetAgentPayloadHeaders(req.Header)
+
+	model.SetAgentPayloadHeaders(req.Header, p.Extras())
 	resp, err := ae.client.Do(req)
 
 	// If the request fails, we'll try again later.

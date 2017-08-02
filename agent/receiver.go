@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -302,19 +303,19 @@ func (r *HTTPReceiver) logStats() {
 func (r *HTTPReceiver) Languages() string {
 	// We need to use this map because we can have several tags for a same language.
 	langs := make(map[string]bool)
-	str := ""
+	str := []string{}
 
 	r.stats.RLock()
 	for tags := range r.stats.Stats {
 		if _, ok := langs[tags.Lang]; !ok {
-			str += tags.Lang + ","
+			str = append(str, tags.Lang)
 			langs[tags.Lang] = true
 		}
 	}
 	r.stats.RUnlock()
 
-	str = strings.TrimRight(str, ",")
-	return str
+	sort.Strings(str)
+	return strings.Join(str, "|")
 }
 
 func getTraces(v APIVersion, w http.ResponseWriter, req *http.Request) (model.Traces, bool) {
