@@ -94,7 +94,7 @@ receivingLoop:
 			assert.Equal("", received.header.Get("Content-Encoding"))
 			assert.Equal(`{"mcnulty":{"app_type":"web"}}`, received.body)
 			break receivingLoop
-		case <-time.After(time.Second):
+		case <-time.After(2 * time.Second):
 			t.Fatal("did not receive service data in time")
 		}
 	}
