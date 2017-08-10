@@ -118,6 +118,7 @@ func (w *Writer) main() {
 
 	flushTicker := time.NewTicker(time.Second)
 	defer flushTicker.Stop()
+	servicesUpdated := false
 
 	for {
 		select {
@@ -130,11 +131,12 @@ func (w *Writer) main() {
 			w.Flush()
 		case <-flushTicker.C:
 			w.Flush()
-		case sm := <-w.inServices:
-			updated := w.serviceBuffer.Update(sm)
-			if updated {
+			if servicesUpdated {
 				w.FlushServices()
+				servicesUpdated = false
 			}
+		case sm := <-w.inServices:
+			servicesUpdated = servicesUpdated || w.serviceBuffer.Update(sm)
 		case <-w.exit:
 			log.Info("exiting, trying to flush all remaining data")
 			w.Flush()
