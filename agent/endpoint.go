@@ -52,8 +52,7 @@ type APIEndpoint struct {
 }
 
 // NewAPIEndpoint returns a new APIEndpoint from a given config
-// of URL (such as https://trace.agent.datadoghq.com) and API
-// keys
+// of URL (such as https://trace.agent.datadoghq.com) and API keys
 func NewAPIEndpoint(url, apiKey string) *APIEndpoint {
 	if apiKey == "" {
 		panic(fmt.Errorf("No API key"))
@@ -131,6 +130,10 @@ func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 	}
 	defer resp.Body.Close()
 
+	// We monitor the status code received
+	tagStatusCode := fmt.Sprintf("status_code:%v", resp.StatusCode)
+	statsd.Client.Incr("datadog.trace_agent.writer.status_code", []string{tagStatusCode}, 1)
+
 	// We check the status code to see if the request has succeeded.
 	if resp.StatusCode/100 != 2 {
 		err := fmt.Errorf("request to %s responded with %s", url, resp.Status)
@@ -139,6 +142,8 @@ func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 
 		// Only retry for 5xx (server) errors
 		if resp.StatusCode/100 == 5 {
+			atomic.AddInt64(&ae.stats.PayloadRetries, 1)
+			statsd.Client.Incr("datadog.trace_agent.writer.retries", []string{tagStatusCode}, 0.1)
 			return payloadSize, newAPIError(err, ae)
 		}
 
@@ -215,6 +220,7 @@ func (ae *APIEndpoint) logStats() {
 		accStats.ServicesPayload = atomic.SwapInt64(&ae.stats.ServicesPayload, 0)
 		accStats.ServicesPayloadError = atomic.SwapInt64(&ae.stats.ServicesPayloadError, 0)
 		accStats.ServicesBytes = atomic.SwapInt64(&ae.stats.ServicesBytes, 0)
+		accStats.PayloadRetries = atomic.SwapInt64(&ae.stats.PayloadRetries, 0)
 		updateEndpointStats(accStats)
 	}
 }
@@ -246,6 +252,8 @@ type endpointStats struct {
 	// TracesBytes is the size of the services payload data sent, including errors.
 	// If several URLs are given, it does not change the size (shared for all).
 	ServicesBytes int64
+	// PayloadRetries is the number of times we need to retry to send a payload to the API.
+	PayloadRetries int64
 }
 
 // NullEndpoint implements AgentEndpoint, it just logs data
