@@ -103,7 +103,7 @@ func (f *GroupingFilter) Filter(token, lastToken int, buffer []byte) (int, []byt
 		if f.groupFilter > 1 {
 			return Filtered, nil
 		}
-	case f.groupFilter > 0 && token == ',':
+	case f.groupFilter > 0 && (token == ',' || token == '?'):
 		// if we are in a group drop all commas
 		return Filtered, nil
 	case f.groupMulti > 1:
