@@ -109,12 +109,16 @@ type Stats struct {
 	TracesReceived int64
 	// TracesDropped is the number of traces dropped.
 	TracesDropped int64
+	// TracesDropped is the number of traces filtered.
+	TracesFiltered int64
 	// TracesBytes is the amount of data received on the traces endpoint (raw data, encoded, compressed).
 	TracesBytes int64
 	// SpansReceived is the total number of spans received, including the dropped ones.
 	SpansReceived int64
 	// SpansDropped is the number of spans dropped.
 	SpansDropped int64
+	// SpansDropped is the number of spans filtered.
+	SpansFiltered int64
 	// ServicesReceived is the number of services received.
 	ServicesReceived int64
 	// ServicesBytes is the amount of data received on the services endpoint (raw data, encoded, compressed).

@@ -35,6 +35,7 @@ func (pt *processedTrace) weight() float64 {
 type Agent struct {
 	Receiver     *HTTPReceiver
 	Concentrator *Concentrator
+	Filter       Filter
 	Sampler      *Sampler
 	Writer       *Writer
 
@@ -56,6 +57,7 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 		conf.ExtraAggregators,
 		conf.BucketInterval.Nanoseconds(),
 	)
+	f := NewResourceFilter(conf)
 	s := NewSampler(conf)
 
 	w := NewWriter(conf)
@@ -64,6 +66,7 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 	return &Agent{
 		Receiver:     r,
 		Concentrator: c,
+		Filter:       f,
 		Sampler:      s,
 		Writer:       w,
 		conf:         conf,
@@ -147,7 +150,14 @@ func (a *Agent) Process(t model.Trace) {
 
 		atomic.AddInt64(&ts.TracesDropped, 1)
 		atomic.AddInt64(&ts.SpansDropped, int64(len(t)))
+		return
+	}
 
+	if !a.Filter.Keep(root) {
+		log.Debugf("dropping trace with blacklisted resource: %v", *root)
+		ts := a.Receiver.stats.getTagStats(Tags{})
+		atomic.AddInt64(&ts.TracesFiltered, 1)
+		atomic.AddInt64(&ts.SpansFiltered, int64(len(t)))
 		return
 	}
 

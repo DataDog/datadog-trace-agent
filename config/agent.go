@@ -65,6 +65,8 @@ type AgentConfig struct {
 
 	// http/s proxying
 	Proxy *ProxySettings
+
+	ResourceBlacklist []string
 }
 
 // mergeEnv applies overrides from environment variables to the trace agent configuration
