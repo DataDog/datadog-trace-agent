@@ -267,6 +267,10 @@ APM_CONF:
 		c.LogFilePath = v
 	}
 
+	if v, e := conf.GetStrArray("trace.config", "resource_blacklist", ','); e == nil {
+		c.ResourceBlacklist = v
+	}
+
 	if v := strings.ToLower(conf.GetDefault("trace.config", "log_throttling", "")); v == "no" || v == "false" {
 		c.LogThrottlingEnabled = false
 	}
@@ -297,7 +301,7 @@ APM_CONF:
 		c.BucketInterval = time.Duration(v) * time.Second
 	}
 
-	if v, e := conf.GetStrArray("trace.concentrator", "extra_aggregators", ","); e == nil {
+	if v, e := conf.GetStrArray("trace.concentrator", "extra_aggregators", ','); e == nil {
 		c.ExtraAggregators = append(c.ExtraAggregators, v...)
 	} else {
 		log.Debug("No aggregator configuration, using defaults")
