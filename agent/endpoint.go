@@ -215,6 +215,16 @@ func (ae *APIEndpoint) logStats() {
 		accStats.ServicesPayload = atomic.SwapInt64(&ae.stats.ServicesPayload, 0)
 		accStats.ServicesPayloadError = atomic.SwapInt64(&ae.stats.ServicesPayloadError, 0)
 		accStats.ServicesBytes = atomic.SwapInt64(&ae.stats.ServicesBytes, 0)
+
+		statsd.Client.Count("datadog.trace_agent.endpoint.traces_payload", int64(accStats.TracesPayload), nil, 1)
+		statsd.Client.Count("datadog.trace_agent.endpoint.traces_payload_error", int64(accStats.TracesPayloadError), nil, 1)
+		statsd.Client.Count("datadog.trace_agent.endpoint.traces_bytes", int64(accStats.TracesBytes), nil, 1)
+		statsd.Client.Count("datadog.trace_agent.endpoint.traces_count", int64(accStats.TracesCount), nil, 1)
+		statsd.Client.Count("datadog.trace_agent.endpoint.traces_stats", int64(accStats.TracesStats), nil, 1)
+		statsd.Client.Count("datadog.trace_agent.endpoint.services_payload", int64(accStats.ServicesPayload), nil, 1)
+		statsd.Client.Count("datadog.trace_agent.endpoint.services_payload_error", int64(accStats.ServicesPayloadError), nil, 1)
+		statsd.Client.Count("datadog.trace_agent.endpoint.services_bytes", int64(accStats.ServicesBytes), nil, 1)
+
 		updateEndpointStats(accStats)
 	}
 }
