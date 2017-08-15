@@ -105,6 +105,10 @@ func mergeEnv(c *AgentConfig) {
 		c.ReceiverHost = v
 	}
 
+	if v := os.Getenv("DD_RESOURCE_BLACKLIST"); v != "" {
+		c.ResourceBlacklist, _ = splitString(v, ',')
+	}
+
 	if v := os.Getenv("DD_DOGSTATSD_PORT"); v != "" {
 		port, err := strconv.Atoi(v)
 		if err != nil {

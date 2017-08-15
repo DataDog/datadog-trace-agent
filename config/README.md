@@ -76,6 +76,7 @@ where env vars are preferrable to static files
 - `DD_BIND_HOST` - overrides `[Main] bind_host`
 - `DD_LOG_LEVEL` - overrides `[Main] log_level`
 - `DD_RECEIVER_PORT` - overrides `[trace.receiver] receiver_port`
+- `DD_RESOURCE_BLACKLIST` - overrides `[trace.config] resource_blacklist`
 
 
 ## Logging
