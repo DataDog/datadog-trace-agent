@@ -1,32 +1,21 @@
-package main
+package filters
 
 import (
 	"regexp"
 
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
+
 	log "github.com/cihub/seelog"
 )
 
-// Filter handles Span filtering
-type Filter interface {
-	Keep(t *model.Span) bool
-}
-
-// ResourceFilter does resource-based filtering
-type ResourceFilter struct {
+// ResourceFilter implements a resource-based filter
+type resourceFilter struct {
 	blacklist []*regexp.Regexp
 }
 
-// NewResourceFilter returns a ResourceFilter holding compiled regexes
-func NewResourceFilter(conf *config.AgentConfig) *ResourceFilter {
-	blacklist := compileRules(conf.ResourceBlacklist)
-
-	return &ResourceFilter{blacklist}
-}
-
 // Keep returns true if Span.Resource doesn't match any of the filter's rules
-func (f *ResourceFilter) Keep(t *model.Span) bool {
+func (f *resourceFilter) Keep(t *model.Span) bool {
 	for _, entry := range f.blacklist {
 		if entry.MatchString(t.Resource) {
 			return false
@@ -34,6 +23,12 @@ func (f *ResourceFilter) Keep(t *model.Span) bool {
 	}
 
 	return true
+}
+
+func newResourceFilter(conf *config.AgentConfig) Filter {
+	blacklist := compileRules(conf.Ignore["resource"])
+
+	return &resourceFilter{blacklist}
 }
 
 func compileRules(entries []string) []*regexp.Regexp {

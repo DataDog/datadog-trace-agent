@@ -26,20 +26,20 @@ func TestGetStrArray(t *testing.T) {
 
 func TestGetStrArrayWithCommas(t *testing.T) {
 	assert := assert.New(t)
-	f, _ := ini.Load([]byte("[trace.config]\n\nresource_blacklist = \"x,y,z\", foobar"))
+	f, _ := ini.Load([]byte("[trace.ignore]\n\nresource = \"x,y,z\", foobar"))
 	conf := File{f, "some/path"}
 
-	vals, err := conf.GetStrArray("trace.config", "resource_blacklist", ',')
+	vals, err := conf.GetStrArray("trace.ignore", "resource", ',')
 	assert.Nil(err)
 	assert.Equal(vals, []string{"x,y,z", "foobar"})
 }
 
 func TestGetStrArrayWithEscapedSequences(t *testing.T) {
 	assert := assert.New(t)
-	f, _ := ini.Load([]byte("[trace.config]\n\nresource_blacklist = \"foo\\.bar\", \"\"\""))
+	f, _ := ini.Load([]byte("[trace.ignore]\n\nresource = \"foo\\.bar\", \"\"\""))
 	conf := File{f, "some/path"}
 
-	vals, err := conf.GetStrArray("trace.config", "resource_blacklist", ',')
+	vals, err := conf.GetStrArray("trace.ignore", "resource", ',')
 	assert.Nil(err)
 	assert.Equal(vals, []string{`foo\.bar`, `"`})
 }

@@ -86,18 +86,22 @@ func (ts *tagStats) publish() {
 	// Atomically load the stats from ts
 	tracesReceived := atomic.LoadInt64(&ts.TracesReceived)
 	tracesDropped := atomic.LoadInt64(&ts.TracesDropped)
+	tracesFiltered := atomic.LoadInt64(&ts.TracesFiltered)
 	tracesBytes := atomic.LoadInt64(&ts.TracesBytes)
 	spansReceived := atomic.LoadInt64(&ts.SpansReceived)
 	spansDropped := atomic.LoadInt64(&ts.SpansDropped)
+	spansFiltered := atomic.LoadInt64(&ts.SpansFiltered)
 	servicesReceived := atomic.LoadInt64(&ts.ServicesReceived)
 	servicesBytes := atomic.LoadInt64(&ts.ServicesBytes)
 
 	// Publish the stats
 	statsd.Client.Count("datadog.trace_agent.receiver.traces_received", tracesReceived, ts.Tags.toArray(), 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.traces_dropped", tracesDropped, ts.Tags.toArray(), 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.traces_filtered", tracesFiltered, ts.Tags.toArray(), 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.traces_bytes", tracesBytes, ts.Tags.toArray(), 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.spans_received", spansReceived, ts.Tags.toArray(), 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.spans_dropped", spansDropped, ts.Tags.toArray(), 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.spans_filtered", spansFiltered, ts.Tags.toArray(), 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.services_received", servicesReceived, ts.Tags.toArray(), 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.services_bytes", servicesBytes, ts.Tags.toArray(), 1)
 }
@@ -117,7 +121,7 @@ type Stats struct {
 	SpansReceived int64
 	// SpansDropped is the number of spans dropped.
 	SpansDropped int64
-	// SpansDropped is the number of spans filtered.
+	// SpansFiltered is the number of spans filtered.
 	SpansFiltered int64
 	// ServicesReceived is the number of services received.
 	ServicesReceived int64
@@ -128,9 +132,11 @@ type Stats struct {
 func (s *Stats) update(recent Stats) {
 	atomic.AddInt64(&s.TracesReceived, recent.TracesReceived)
 	atomic.AddInt64(&s.TracesDropped, recent.TracesDropped)
+	atomic.AddInt64(&s.TracesFiltered, recent.TracesFiltered)
 	atomic.AddInt64(&s.TracesBytes, recent.TracesBytes)
 	atomic.AddInt64(&s.SpansReceived, recent.SpansReceived)
 	atomic.AddInt64(&s.SpansDropped, recent.SpansDropped)
+	atomic.AddInt64(&s.SpansFiltered, recent.SpansFiltered)
 	atomic.AddInt64(&s.ServicesReceived, recent.ServicesReceived)
 	atomic.AddInt64(&s.ServicesBytes, recent.ServicesBytes)
 }
@@ -138,9 +144,11 @@ func (s *Stats) update(recent Stats) {
 func (s *Stats) reset() {
 	atomic.StoreInt64(&s.TracesReceived, 0)
 	atomic.StoreInt64(&s.TracesDropped, 0)
+	atomic.StoreInt64(&s.TracesFiltered, 0)
 	atomic.StoreInt64(&s.TracesBytes, 0)
 	atomic.StoreInt64(&s.SpansReceived, 0)
 	atomic.StoreInt64(&s.SpansDropped, 0)
+	atomic.StoreInt64(&s.SpansFiltered, 0)
 	atomic.StoreInt64(&s.ServicesReceived, 0)
 	atomic.StoreInt64(&s.ServicesBytes, 0)
 }
@@ -150,12 +158,14 @@ func (s *Stats) String() string {
 	// Atomically load the stas
 	tracesReceived := atomic.LoadInt64(&s.TracesReceived)
 	tracesDropped := atomic.LoadInt64(&s.TracesDropped)
+	tracesFiltered := atomic.LoadInt64(&s.TracesFiltered)
 	tracesBytes := atomic.LoadInt64(&s.TracesBytes)
 	servicesReceived := atomic.LoadInt64(&s.ServicesReceived)
 	servicesBytes := atomic.LoadInt64(&s.ServicesBytes)
 
-	return fmt.Sprintf("traces received: %v, traces dropped: %v, traces amount: %v bytes, services received: %v, services amount: %v bytes",
-		tracesReceived, tracesDropped, tracesBytes, servicesReceived, servicesBytes)
+	return fmt.Sprintf("traces received: %v, traces dropped: %v, traces filtered: %v, "+
+		"traces amount: %v bytes, services received: %v, services amount: %v bytes",
+		tracesReceived, tracesDropped, tracesFiltered, tracesBytes, servicesReceived, servicesBytes)
 }
 
 // Tags holds the tags we parse when we handle the header of the payload.

@@ -8,6 +8,7 @@ import (
 	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/datadog-trace-agent/config"
+	"github.com/DataDog/datadog-trace-agent/filters"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/quantizer"
 	"github.com/DataDog/datadog-trace-agent/sampler"
@@ -35,7 +36,7 @@ func (pt *processedTrace) weight() float64 {
 type Agent struct {
 	Receiver     *HTTPReceiver
 	Concentrator *Concentrator
-	Filter       Filter
+	Filters      []filters.Filter
 	Sampler      *Sampler
 	Writer       *Writer
 
@@ -57,7 +58,7 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 		conf.ExtraAggregators,
 		conf.BucketInterval.Nanoseconds(),
 	)
-	f := NewResourceFilter(conf)
+	f := filters.Setup(conf)
 	s := NewSampler(conf)
 
 	w := NewWriter(conf)
@@ -66,7 +67,7 @@ func NewAgent(conf *config.AgentConfig) *Agent {
 	return &Agent{
 		Receiver:     r,
 		Concentrator: c,
-		Filter:       f,
+		Filters:      f,
 		Sampler:      s,
 		Writer:       w,
 		conf:         conf,
@@ -153,11 +154,16 @@ func (a *Agent) Process(t model.Trace) {
 		return
 	}
 
-	if !a.Filter.Keep(root) {
-		log.Debugf("dropping trace with blacklisted resource: %v", *root)
+	for _, f := range a.Filters {
+		if f.Keep(root) {
+			continue
+		}
+
+		log.Debugf("rejecting trace by filter: %T  %v", f, *root)
 		ts := a.Receiver.stats.getTagStats(Tags{})
 		atomic.AddInt64(&ts.TracesFiltered, 1)
 		atomic.AddInt64(&ts.SpansFiltered, int64(len(t)))
+
 		return
 	}
 

@@ -53,6 +53,7 @@ end
 PACKAGES = %w(
   ./agent
   ./config
+  ./filters
   ./fixtures
   ./model
   ./quantile

@@ -1,4 +1,4 @@
-package main
+package filters
 
 import (
 	"testing"
@@ -61,9 +61,11 @@ func TestMultipleEntries(t *testing.T) {
 	assert.False(t, filter.Keep(span))
 }
 
-func newTestFilter(blacklist ...string) *ResourceFilter {
-	conf := &config.AgentConfig{ResourceBlacklist: blacklist}
-	return NewResourceFilter(conf)
+func newTestFilter(blacklist ...string) Filter {
+	c := config.NewDefaultAgentConfig()
+	c.Ignore["resource"] = blacklist
+
+	return newResourceFilter(c)
 }
 
 func newTestSpan(resource string) *model.Span {

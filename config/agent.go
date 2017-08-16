@@ -66,7 +66,7 @@ type AgentConfig struct {
 	// http/s proxying
 	Proxy *ProxySettings
 
-	ResourceBlacklist []string
+	Ignore map[string][]string
 }
 
 // mergeEnv applies overrides from environment variables to the trace agent configuration
@@ -105,8 +105,8 @@ func mergeEnv(c *AgentConfig) {
 		c.ReceiverHost = v
 	}
 
-	if v := os.Getenv("DD_RESOURCE_BLACKLIST"); v != "" {
-		c.ResourceBlacklist, _ = splitString(v, ',')
+	if v := os.Getenv("DD_IGNORE_RESOURCE"); v != "" {
+		c.Ignore["resource"], _ = splitString(v, ',')
 	}
 
 	if v := os.Getenv("DD_DOGSTATSD_PORT"); v != "" {
@@ -189,6 +189,8 @@ func NewDefaultAgentConfig() *AgentConfig {
 		MaxCPU:           0.5, // 50%, well behaving agents keep below 5%
 		MaxConnections:   200, // in practice, rarely goes over 20
 		WatchdogInterval: time.Minute,
+
+		Ignore: make(map[string][]string),
 	}
 
 	return ac
@@ -271,8 +273,8 @@ APM_CONF:
 		c.LogFilePath = v
 	}
 
-	if v, e := conf.GetStrArray("trace.config", "resource_blacklist", ','); e == nil {
-		c.ResourceBlacklist = v
+	if v, e := conf.GetStrArray("trace.ignore", "resource", ','); e == nil {
+		c.Ignore["resource"] = v
 	}
 
 	if v := strings.ToLower(conf.GetDefault("trace.config", "log_throttling", "")); v == "no" || v == "false" {

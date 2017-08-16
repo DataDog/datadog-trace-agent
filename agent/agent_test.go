@@ -83,7 +83,7 @@ func BenchmarkAgentTraceProcessing(b *testing.B) {
 func BenchmarkAgentTraceProcessingWithFiltering(b *testing.B) {
 	c := config.NewDefaultAgentConfig()
 	c.APIKey = "test"
-	c.ResourceBlacklist = []string{"[0-9]{3}", "foobar", "G.T [a-z]+", "[^123]+_baz"}
+	c.Ignore["resource"] = []string{"[0-9]{3}", "foobar", "G.T [a-z]+", "[^123]+_baz"}
 
 	runTraceProcessingBenchmark(b, c)
 }
@@ -93,7 +93,7 @@ func BenchmarkAgentTraceProcessingWithFiltering(b *testing.B) {
 func BenchmarkAgentTraceProcessingWithWorstCaseFiltering(b *testing.B) {
 	c := config.NewDefaultAgentConfig()
 	c.APIKey = "test"
-	c.ResourceBlacklist = []string{"[0-9]{3}", "foobar", "aaaaa?aaaa", "[^123]+_baz"}
+	c.Ignore["resource"] = []string{"[0-9]{3}", "foobar", "aaaaa?aaaa", "[^123]+_baz"}
 
 	runTraceProcessingBenchmark(b, c)
 }
