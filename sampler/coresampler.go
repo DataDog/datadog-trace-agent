@@ -30,6 +30,18 @@ const (
 	defaultSignatureScoreSlope  float64       = 3
 )
 
+// Engine is a common basic interface for sampler engines.
+type Engine interface {
+	// Run the sampler.
+	Run()
+	// Stop the sampler.
+	Stop()
+	// Sample a trace.
+	Sample(trace model.Trace, root *model.Span, env string) bool
+	// GetState returns information about the sampler.
+	GetState() interface{}
+}
+
 // Sampler is the main component of the sampling logic
 type Sampler struct {
 	// Storage of the state of the sampler
@@ -51,12 +63,10 @@ type Sampler struct {
 	exit chan struct{}
 }
 
-// NewSampler returns an initialized Sampler
-func NewSampler(extraRate float64, maxTPS float64) *Sampler {
-	decayPeriod := defaultDecayPeriod
-
+// newSampler returns an initialized Sampler
+func newSampler(extraRate float64, maxTPS float64) *Sampler {
 	s := &Sampler{
-		Backend:   NewBackend(decayPeriod),
+		Backend:   NewBackend(defaultDecayPeriod),
 		extraRate: extraRate,
 		maxTPS:    maxTPS,
 
@@ -115,38 +125,6 @@ func (s *Sampler) RunAdjustScoring() {
 	}
 }
 
-// Sample counts an incoming trace and tells if it is a sample which has to be kept
-func (s *Sampler) Sample(trace model.Trace, root *model.Span, env string) bool {
-	// Extra safety, just in case one trace is empty
-	if len(trace) == 0 {
-		return false
-	}
-
-	signature := ComputeSignatureWithRootAndEnv(trace, root, env)
-
-	// Update sampler state by counting this trace
-	s.Backend.CountSignature(signature)
-
-	sampleRate := s.GetSampleRate(trace, root, signature)
-
-	sampled := ApplySampleRate(root, sampleRate)
-
-	if sampled {
-		// Count the trace to allow us to check for the maxTPS limit.
-		// It has to happen before the maxTPS sampling.
-		s.Backend.CountSample()
-
-		// Check for the maxTPS limit, and if we require an extra sampling.
-		// No need to check if we already decided not to keep the trace.
-		maxTPSrate := s.GetMaxTPSSampleRate()
-		if maxTPSrate < 1 {
-			sampled = ApplySampleRate(root, maxTPSrate)
-		}
-	}
-
-	return sampled
-}
-
 // GetSampleRate returns the sample rate to apply to a trace.
 func (s *Sampler) GetSampleRate(trace model.Trace, root *model.Span, signature Signature) float64 {
 	sampleRate := s.GetSignatureSampleRate(signature) * s.extraRate
@@ -166,18 +144,6 @@ func (s *Sampler) GetMaxTPSSampleRate() float64 {
 	}
 
 	return maxTPSrate
-}
-
-// ApplySampleRate applies a sample rate over a trace root, returning if the trace should be sampled or not.
-// It takes into account any previous sampling.
-func ApplySampleRate(root *model.Span, sampleRate float64) bool {
-	initialRate := GetTraceAppliedSampleRate(root)
-	newRate := initialRate * sampleRate
-	SetTraceAppliedSampleRate(root, newRate)
-
-	traceID := root.TraceID
-
-	return SampleByRate(traceID, newRate)
 }
 
 // GetTraceAppliedSampleRate gets the sample rate the sample rate applied earlier in the pipeline.

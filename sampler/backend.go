@@ -17,7 +17,7 @@ type Backend struct {
 	totalScore float64
 	// Score of sampled traces
 	sampledScore float64
-	mu           sync.Mutex
+	mu           sync.RWMutex
 
 	// Every decayPeriod, decay the score
 	// Lower value is more reactive, but forgets quicker
@@ -88,27 +88,40 @@ func (b *Backend) CountSample() {
 // GetSignatureScore returns the score of a signature.
 // It is normalized to represent a number of signatures per second.
 func (b *Backend) GetSignatureScore(signature Signature) float64 {
-	b.mu.Lock()
+	b.mu.RLock()
 	score := b.scores[signature] / b.countScaleFactor
-	b.mu.Unlock()
+	b.mu.RUnlock()
 
 	return score
 }
 
+// GetAllSignatureScores returns the scores for all signatures.
+// It is normalized to represent a number of signatures per second.
+func (b *Backend) GetAllSignatureScores() map[Signature]float64 {
+	b.mu.RLock()
+	scores := make(map[Signature]float64, len(b.scores))
+	for signature, score := range b.scores {
+		scores[signature] = score / b.countScaleFactor
+	}
+	b.mu.RUnlock()
+
+	return scores
+}
+
 // GetSampledScore returns the global score of all sampled traces.
 func (b *Backend) GetSampledScore() float64 {
-	b.mu.Lock()
+	b.mu.RLock()
 	score := b.sampledScore / b.countScaleFactor
-	b.mu.Unlock()
+	b.mu.RUnlock()
 
 	return score
 }
 
 // GetTotalScore returns the global score of all sampled traces.
 func (b *Backend) GetTotalScore() float64 {
-	b.mu.Lock()
+	b.mu.RLock()
 	score := b.totalScore / b.countScaleFactor
-	b.mu.Unlock()
+	b.mu.RUnlock()
 
 	return score
 }
