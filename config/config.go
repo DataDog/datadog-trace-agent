@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/csv"
 	"fmt"
 	"os"
 	"strings"
@@ -90,19 +91,32 @@ func (c *File) GetFloat(section, name string) (float64, error) {
 }
 
 // GetStrArray returns the value split across `sep` into an array of strings.
-func (c *File) GetStrArray(section, name, sep string) ([]string, error) {
-	if exists := c.instance.Section(section).HasKey(name); !exists {
-		return []string{}, fmt.Errorf("missing `%s` value in [%s] section", name, section)
+func (c *File) GetStrArray(section, name string, sep rune) ([]string, error) {
+	value, err := c.Get(section, name)
+
+	if err != nil || value == "" {
+		return []string{}, err
 	}
 
-	value := c.instance.Section(section).Key(name).String()
-	if value == "" {
-		return []string{}, nil
-	}
-	return strings.Split(value, sep), nil
+	return splitString(value, sep)
 }
 
 // GetSection is a convenience method to return an entire section of ini config
 func (c *File) GetSection(key string) (*ini.Section, error) {
 	return c.instance.GetSection(key)
+}
+
+func splitString(s string, sep rune) ([]string, error) {
+	r := csv.NewReader(strings.NewReader(s))
+	r.TrimLeadingSpace = true
+	r.LazyQuotes = true
+	r.Comma = sep
+
+	record, err := r.Read()
+
+	if err != nil {
+		return []string{}, err
+	}
+
+	return record, nil
 }

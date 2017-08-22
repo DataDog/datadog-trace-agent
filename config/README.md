@@ -61,6 +61,10 @@ receiver_port=8126
 # how many unique client connections to allow during one 30 second lease period
 connection_limit=2000
 
+[trace.ignore]
+# a blacklist of regular expressions can be provided to disable certain traces based on their resource name
+# all entries must be surrounded by double quotes and separated by comas
+resource="GET|POST /healthcheck","GET /V1"
 ```
 
 
@@ -76,6 +80,7 @@ where env vars are preferrable to static files
 - `DD_BIND_HOST` - overrides `[Main] bind_host`
 - `DD_LOG_LEVEL` - overrides `[Main] log_level`
 - `DD_RECEIVER_PORT` - overrides `[trace.receiver] receiver_port`
+- `DD_IGNORE_RESOURCE` - overrides `[trace.ignore] resource`
 
 
 ## Logging

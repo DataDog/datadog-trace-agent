@@ -65,6 +65,8 @@ type AgentConfig struct {
 
 	// http/s proxying
 	Proxy *ProxySettings
+
+	Ignore map[string][]string
 }
 
 // mergeEnv applies overrides from environment variables to the trace agent configuration
@@ -101,6 +103,10 @@ func mergeEnv(c *AgentConfig) {
 	if v := os.Getenv("DD_BIND_HOST"); v != "" {
 		c.StatsdHost = v
 		c.ReceiverHost = v
+	}
+
+	if v := os.Getenv("DD_IGNORE_RESOURCE"); v != "" {
+		c.Ignore["resource"], _ = splitString(v, ',')
 	}
 
 	if v := os.Getenv("DD_DOGSTATSD_PORT"); v != "" {
@@ -183,6 +189,8 @@ func NewDefaultAgentConfig() *AgentConfig {
 		MaxCPU:           0.5, // 50%, well behaving agents keep below 5%
 		MaxConnections:   200, // in practice, rarely goes over 20
 		WatchdogInterval: time.Minute,
+
+		Ignore: make(map[string][]string),
 	}
 
 	return ac
@@ -265,6 +273,10 @@ APM_CONF:
 		c.LogFilePath = v
 	}
 
+	if v, e := conf.GetStrArray("trace.ignore", "resource", ','); e == nil {
+		c.Ignore["resource"] = v
+	}
+
 	if v := strings.ToLower(conf.GetDefault("trace.config", "log_throttling", "")); v == "no" || v == "false" {
 		c.LogThrottlingEnabled = false
 	}
@@ -295,7 +307,7 @@ APM_CONF:
 		c.BucketInterval = time.Duration(v) * time.Second
 	}
 
-	if v, e := conf.GetStrArray("trace.concentrator", "extra_aggregators", ","); e == nil {
+	if v, e := conf.GetStrArray("trace.concentrator", "extra_aggregators", ','); e == nil {
 		c.ExtraAggregators = append(c.ExtraAggregators, v...)
 	} else {
 		log.Debug("No aggregator configuration, using defaults")

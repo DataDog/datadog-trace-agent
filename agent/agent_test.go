@@ -74,12 +74,34 @@ func TestWatchdog(t *testing.T) {
 }
 
 func BenchmarkAgentTraceProcessing(b *testing.B) {
-	// Disable debug logs in these tests
+	c := config.NewDefaultAgentConfig()
+	c.APIKey = "test"
+
+	runTraceProcessingBenchmark(b, c)
+}
+
+func BenchmarkAgentTraceProcessingWithFiltering(b *testing.B) {
+	c := config.NewDefaultAgentConfig()
+	c.APIKey = "test"
+	c.Ignore["resource"] = []string{"[0-9]{3}", "foobar", "G.T [a-z]+", "[^123]+_baz"}
+
+	runTraceProcessingBenchmark(b, c)
+}
+
+// worst case scenario: spans are tested against multiple rules without any match.
+// this means we won't compesate the overhead of filtering by dropping traces
+func BenchmarkAgentTraceProcessingWithWorstCaseFiltering(b *testing.B) {
+	c := config.NewDefaultAgentConfig()
+	c.APIKey = "test"
+	c.Ignore["resource"] = []string{"[0-9]{3}", "foobar", "aaaaa?aaaa", "[^123]+_baz"}
+
+	runTraceProcessingBenchmark(b, c)
+}
+
+func runTraceProcessingBenchmark(b *testing.B, c *config.AgentConfig) {
+	agent := NewAgent(c)
 	log.UseLogger(log.Disabled)
 
-	conf := config.NewDefaultAgentConfig()
-	conf.APIKey = "test"
-	agent := NewAgent(conf)
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
