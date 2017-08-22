@@ -11,7 +11,6 @@ import (
 const (
 	sqlQueryTag      = "sql.query"
 	sqlQuantizeError = "agent.parse.error"
-	sqlOriginalQuery = "sql.original.query"
 )
 
 // TokenFilter is a generic interface that a TokenConsumer expects. It defines
@@ -217,7 +216,9 @@ func QuantizeSQL(span model.Span) model.Span {
 			span.Meta = make(map[string]string)
 		}
 		span.Meta[sqlQuantizeError] = "Query not parsed"
-		span.Meta[sqlOriginalQuery] = span.Resource
+		if span.Meta[sqlQueryTag] == "" {
+			span.Meta[sqlQueryTag] = span.Resource
+		}
 		span.Resource = "Non-parsable SQL query"
 		return span
 	}
