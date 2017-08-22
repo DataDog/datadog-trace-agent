@@ -90,7 +90,6 @@ func TestSQLResourceWithError(t *testing.T) {
 	for _, tc := range testCases {
 		spanQ := Quantize(tc.span)
 		assert.Equal("Non-parsable SQL query", spanQ.Resource)
-		assert.Equal("", spanQ.Meta["sql.query"])
 		assert.Equal("Query not parsed", spanQ.Meta["agent.parse.error"])
 	}
 }

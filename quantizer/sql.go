@@ -216,7 +216,7 @@ func QuantizeSQL(span model.Span) model.Span {
 			span.Meta = make(map[string]string)
 		}
 		span.Meta[sqlQuantizeError] = "Query not parsed"
-		if span.Meta[sqlQueryTag] == "" {
+		if _, ok := span.Meta[sqlQueryTag]; !ok {
 			span.Meta[sqlQueryTag] = span.Resource
 		}
 		span.Resource = "Non-parsable SQL query"
