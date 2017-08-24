@@ -95,6 +95,7 @@ func (ts *tagStats) publish() {
 	servicesBytes := atomic.LoadInt64(&ts.ServicesBytes)
 
 	// Publish the stats
+	statsd.Client.Count("datadog.trace_agent.receiver.trace", tracesReceived, ts.Tags.toArray(), 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.traces_received", tracesReceived, ts.Tags.toArray(), 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.traces_dropped", tracesDropped, ts.Tags.toArray(), 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.traces_filtered", tracesFiltered, ts.Tags.toArray(), 1)
