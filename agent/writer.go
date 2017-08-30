@@ -21,14 +21,14 @@ const payloadMaxAge = 10 * time.Minute
 // writerPayload wraps a model.AgentPayload and keeps track of a list of
 // endpoints the payload must be sent to.
 type writerPayload struct {
-	payload      model.AgentPayload // the payload itself
-	size         int                // the size of the serialized payload or 0 if it has not been serialized yet
-	endpoint     AgentEndpoint      // the endpoints the payload must be sent to
-	creationDate time.Time          // the creation date of the payload
-	nextFlush    time.Time          // The earliest moment we can flush
+	payload      *model.AgentPayload // the payload itself
+	size         int                 // the size of the serialized payload or 0 if it has not been serialized yet
+	endpoint     AgentEndpoint       // the endpoints the payload must be sent to
+	creationDate time.Time           // the creation date of the payload
+	nextFlush    time.Time           // The earliest moment we can flush
 }
 
-func newWriterPayload(p model.AgentPayload, endpoint AgentEndpoint) *writerPayload {
+func newWriterPayload(p *model.AgentPayload, endpoint AgentEndpoint) *writerPayload {
 	return &writerPayload{
 		payload:      p,
 		endpoint:     endpoint,
@@ -49,7 +49,7 @@ type Writer struct {
 	endpoint AgentEndpoint // where the data will end
 
 	// input data
-	inPayloads chan model.AgentPayload     // main payloads for processed traces/stats
+	inPayloads chan *model.AgentPayload    // main payloads for processed traces/stats
 	inServices chan model.ServicesMetadata // secondary services metadata
 
 	payloadBuffer []*writerPayload       // buffer of payloads ready to send
@@ -82,7 +82,7 @@ func NewWriter(conf *config.AgentConfig) *Writer {
 		endpoint: endpoint,
 
 		// small buffer to not block in case we're flushing
-		inPayloads: make(chan model.AgentPayload, 1),
+		inPayloads: make(chan *model.AgentPayload, 1),
 
 		payloadBuffer: make([]*writerPayload, 0, 5),
 		serviceBuffer: make(model.ServicesMetadata),
