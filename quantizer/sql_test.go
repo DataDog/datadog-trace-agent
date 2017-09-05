@@ -116,6 +116,14 @@ func TestSQLQuantizer(t *testing.T) {
 			"select * from users where id = ?",
 		},
 		{
+			"select * from users where id = 214325346 -- boom",
+			"select * from users where id = ?",
+		},
+		{
+			"select * from users where id = 214325346 # boom",
+			"select * from users where id = ?",
+		},
+		{
 			"SELECT * FROM `host` WHERE `id` IN (42, 43) /*comment with parameters,host:localhost,url:controller#home,id:FF005:00CAA*/",
 			"SELECT * FROM host WHERE id IN ( ? )",
 		},
