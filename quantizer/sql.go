@@ -208,18 +208,18 @@ func QuantizeSQL(span model.Span) model.Span {
 	}
 
 	quantizedString, err := tokenQuantizer.Process(span.Resource)
-
-	if err != nil {
+	if err != nil || quantizedString == "" {
 		// if we have an error, the partially parsed SQL is discarded so that we don't pollute
 		// users resources. Here we provide more details to debug the problem.
 		log.Debugf("Error parsing the query: `%s`", span.Resource)
-		span.Resource = "Non-parsable SQL query"
-
 		if span.Meta == nil {
 			span.Meta = make(map[string]string)
 		}
-
 		span.Meta[sqlQuantizeError] = "Query not parsed"
+		if _, ok := span.Meta[sqlQueryTag]; !ok {
+			span.Meta[sqlQueryTag] = span.Resource
+		}
+		span.Resource = "Non-parsable SQL query"
 		return span
 	}
 
