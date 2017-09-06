@@ -73,8 +73,14 @@ task :default => [:ci]
 
 desc "Build Datadog Trace agent"
 task :build do
+  case os
+  when "windows"
+    bin = "trace-agent.exe"
+  else 
+    bin = "trace-agent"
+  end
   go_build("github.com/DataDog/datadog-trace-agent/agent", {
-    :cmd => "go build -a -o trace-agent",
+    :cmd => "go build -a -o #{bin}",
     :race => ENV['GO_RACE'] == 'true',
     :add_build_vars => ENV['TRACE_AGENT_ADD_BUILD_VARS'] != 'false'
   })
