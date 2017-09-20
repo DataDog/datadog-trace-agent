@@ -15,6 +15,9 @@ import (
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
+// timeout is used by the agent to release pressure on the backend
+var timeout = 10 * time.Second
+
 // apiError stores the error triggered we can't send data to the endpoint.
 // It implements the error interface.
 type apiError struct {
@@ -63,7 +66,7 @@ func NewAPIEndpoint(url, apiKey string) *APIEndpoint {
 		apiKey: apiKey,
 		url:    url,
 		client: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: timeout,
 		},
 	}
 	go func() {
@@ -81,6 +84,7 @@ func (ae *APIEndpoint) SetProxy(settings *config.ProxySettings) {
 		return
 	}
 	ae.client = &http.Client{
+		Timeout: timeout,
 		Transport: &http.Transport{
 			Proxy: http.ProxyURL(proxyPath),
 		},
