@@ -62,7 +62,9 @@ func NewAPIEndpoint(url, apiKey string) *APIEndpoint {
 	ae := APIEndpoint{
 		apiKey: apiKey,
 		url:    url,
-		client: http.DefaultClient,
+		client: &http.Client{
+			Timeout: 10 * time.Second,
+		},
 	}
 	go func() {
 		defer watchdog.LogOnPanic()
