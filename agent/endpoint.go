@@ -15,7 +15,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
-// timeout is used by the agent to release pressure on the backend
+// timeout is the HTTP timeout for POST requests to the Datadog backend
 var timeout = 10 * time.Second
 
 // apiError stores the error triggered we can't send data to the endpoint.
