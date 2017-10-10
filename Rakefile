@@ -96,7 +96,7 @@ task :windows do
         set_env = "GOOS=windows GOARCH=#{arch}"
     end
     go_build("github.com/DataDog/datadog-trace-agent/agent", {
-               :cmd => set_env + " go build -a -o trace-agent-windows-#{arch}.exe",
+               :cmd => set_env + "&& go build -a -o trace-agent-windows-#{arch}.exe",
                :race => ENV['GO_RACE'] == 'true'
              })
   end
