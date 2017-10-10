@@ -59,16 +59,16 @@ func (rs *receiverStats) reset() {
 
 // String gives a string representation of the receiverStats struct.
 func (rs *receiverStats) String() string {
-	str := ""
 	rs.RLock()
+	defer rs.RUnlock()
+
+	str := ""
 	if len(rs.Stats) == 0 {
 		return "no data received"
 	}
 	for _, ts := range rs.Stats {
 		str += fmt.Sprintf("\n\t%v -> %s", ts.Tags.toArray(), ts.String())
-
 	}
-	rs.RUnlock()
 	return str
 }
 
