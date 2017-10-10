@@ -21,6 +21,10 @@ func TestFilter(t *testing.T) {
 		{"[0-9]+", "/abcde123", false},
 		{"\\(foobar\\)", "(foobar)", false},
 		{"\\(foobar\\)", "(bar)", true},
+		{"(GET|POST) /healthcheck", "GET /foobar", true},
+		{"(GET|POST) /healthcheck", "GET /healthcheck", false},
+		{"(GET|POST) /healthcheck", "POST /healthcheck", false},
+		{"SELECT COUNT\\(\\*\\) FROM BAR", "SELECT COUNT(*) FROM BAR", false},
 	}
 
 	for _, test := range tests {

@@ -64,7 +64,7 @@ connection_limit=2000
 [trace.ignore]
 # a blacklist of regular expressions can be provided to disable certain traces based on their resource name
 # all entries must be surrounded by double quotes and separated by comas
-resource="GET|POST /healthcheck","GET /V1"
+resource="(GET|POST) /healthcheck","GET /V1"
 ```
 
 
