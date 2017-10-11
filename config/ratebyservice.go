@@ -20,6 +20,11 @@ func (rbs *RateByService) SetAll(rates map[string]float64) {
 	if rbs.rates == nil {
 		rbs.rates = make(map[string]float64, len(rates))
 	}
+	for k := range rbs.rates {
+		if _, ok := rates[k]; !ok {
+			delete(rbs.rates, k)
+		}
+	}
 	for k, v := range rates {
 		if v < 0 {
 			v = 0
@@ -28,11 +33,6 @@ func (rbs *RateByService) SetAll(rates map[string]float64) {
 			v = 1
 		}
 		rbs.rates[k] = v
-	}
-	for k := range rbs.rates {
-		if _, ok := rates[k]; !ok {
-			delete(rbs.rates, k)
-		}
 	}
 }
 

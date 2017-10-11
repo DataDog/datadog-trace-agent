@@ -156,11 +156,6 @@ func publishPrioritySamplerInfo() interface{} {
 func updateRateByService(rbs map[string]float64) {
 	infoMu.Lock()
 	defer infoMu.Unlock()
-	// remove the default service and env, it can be inferred from other
-	// values so has little added-value and could be confusing for users.
-	// Besides, if one still really wants it:
-	// curl http://localhost:8126/degug/vars would show it.
-	delete(rbs, "service:,env:")
 	infoRateByService = rbs
 }
 
@@ -413,6 +408,15 @@ func Info(w io.Writer, conf *config.AgentConfig) error {
 
 	// display the remote program version, now that we know it
 	program, banner := getProgramBanner(info.Version.Version)
+
+	// remove the default service and env, it can be inferred from other
+	// values so has little added-value and could be confusing for users.
+	// Besides, if one still really wants it:
+	// curl http://localhost:8126/degug/vars would show it.
+	if info.RateByService != nil {
+		delete(info.RateByService, "service:,env:")
+	}
+
 	err = infoTmpl.Execute(w, struct {
 		Banner  string
 		Program string

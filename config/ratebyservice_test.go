@@ -13,7 +13,8 @@ func TestRateByServiceGetSet(t *testing.T) {
 	var rbc RateByService
 	testCases := []map[string]float64{
 		{"service:,env:": 0.1},
-		{"service:,env:": 0.5, "service:mcnulty,env:dev": 0.7, "service:postgres,env:dev": 0.2},
+		{"service:,env:": 0.3, "service:mcnulty,env:dev": 0.7, "service:postgres,env:dev": 0.2},
+		{"service:,env:": 1},
 		{},
 		{"service:,env:": 0.2},
 	}
