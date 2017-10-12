@@ -91,7 +91,7 @@ task :windows do
   ["386", "amd64"].each do |arch|
     case os
     when "windows"
-        set_env = "set \"GOOS=windows\" && set \"GOARCH=#{arch}\""
+        set_env = "set \"GOOS=windows\" && set \"GOARCH=#{arch}\" &&"
     else
         set_env = "GOOS=windows GOARCH=#{arch}"
     end
