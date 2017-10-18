@@ -78,13 +78,6 @@ func TestNormalizeEmptyResource(t *testing.T) {
 	assert.Error(t, s.Normalize())
 }
 
-func TestNormalizeLongResource(t *testing.T) {
-	s := testSpan()
-	s.Resource = strings.Repeat("SELECT ", 5000)
-	assert.NoError(t, s.Normalize())
-	assert.Equal(t, 5000, len(s.Resource))
-}
-
 func TestNormalizeTraceIDPassThru(t *testing.T) {
 	s := testSpan()
 	before := s.TraceID
@@ -165,41 +158,11 @@ func TestNormalizeMetricsPassThru(t *testing.T) {
 	assert.Equal(t, before, s.Metrics)
 }
 
-func TestNormalizeMetricsKeyTooLong(t *testing.T) {
-	s := testSpan()
-	key := strings.Repeat("TOOLONG", 1000)
-	s.Metrics[key] = 42
-	assert.NoError(t, s.Normalize())
-	for k := range s.Metrics {
-		assert.True(t, len(k) < MaxMetricsKeyLen+4)
-	}
-}
-
 func TestNormalizeMetaPassThru(t *testing.T) {
 	s := testSpan()
 	before := s.Meta
 	s.Normalize()
 	assert.Equal(t, before, s.Meta)
-}
-
-func TestNormalizeMetaKeyTooLong(t *testing.T) {
-	s := testSpan()
-	key := strings.Repeat("TOOLONG", 1000)
-	s.Meta[key] = "foo"
-	assert.NoError(t, s.Normalize())
-	for k := range s.Meta {
-		assert.True(t, len(k) < MaxMetaKeyLen+4)
-	}
-}
-
-func TestNormalizeMetaValueTooLong(t *testing.T) {
-	s := testSpan()
-	val := strings.Repeat("TOOLONG", 5000)
-	s.Meta["foo"] = val
-	assert.NoError(t, s.Normalize())
-	for _, v := range s.Meta {
-		assert.True(t, len(v) < MaxMetaValLen+4)
-	}
 }
 
 func TestNormalizeParentIDPassThru(t *testing.T) {
