@@ -42,7 +42,6 @@ type AgentConfig struct {
 	PreSampleRate          float64
 	MaxTPS                 float64
 	PrioritySampling       bool
-	PrioritySamplerTimeout time.Duration
 
 	// Receiver
 	ReceiverHost    string
@@ -176,7 +175,6 @@ func NewDefaultAgentConfig() *AgentConfig {
 		PreSampleRate:          1.0,
 		MaxTPS:                 10,
 		PrioritySampling:       true,
-		PrioritySamplerTimeout: time.Hour,
 
 		ReceiverHost:    "localhost",
 		ReceiverPort:    8126,
@@ -328,9 +326,6 @@ APM_CONF:
 	}
 	if v := strings.ToLower(conf.GetDefault("trace.sampler", "priority_sampling", "")); v == "yes" || v == "true" {
 		c.PrioritySampling = true
-	}
-	if v, e := conf.GetInt("trace.sampler", "priority_sampler_timeout"); e == nil {
-		c.PrioritySamplerTimeout = time.Duration(v) * time.Second
 	}
 
 	if v, e := conf.GetInt("trace.receiver", "receiver_port"); e == nil {
