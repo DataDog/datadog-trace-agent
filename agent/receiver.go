@@ -43,6 +43,10 @@ const (
 	// Traces: msgpack/JSON (Content-Type) slice of traces
 	// Services: msgpack/JSON, map[string]map[string][string]
 	v03 APIVersion = "v0.3"
+	// v04
+	// Traces: msgpack/JSON (Content-Type) slice of traces + returns service sampling ratios
+	// Services: msgpack/JSON, map[string]map[string][string]
+	v04 APIVersion = "v0.4"
 )
 
 // HTTPReceiver is a collector that uses HTTP protocol and just holds
@@ -51,6 +55,7 @@ type HTTPReceiver struct {
 	traces   chan model.Trace
 	services chan model.ServicesMetadata
 	conf     *config.AgentConfig
+	dynConf  *config.DynamicConfig
 
 	stats      *receiverStats
 	preSampler *sampler.PreSampler
@@ -62,12 +67,13 @@ type HTTPReceiver struct {
 }
 
 // NewHTTPReceiver returns a pointer to a new HTTPReceiver
-func NewHTTPReceiver(conf *config.AgentConfig) *HTTPReceiver {
+func NewHTTPReceiver(conf *config.AgentConfig, dynConf *config.DynamicConfig) *HTTPReceiver {
 	// use buffered channels so that handlers are not waiting on downstream processing
 	return &HTTPReceiver{
 		traces:     make(chan model.Trace, 5000), // about 1000 traces/sec for 5 sec
 		services:   make(chan model.ServicesMetadata, 50),
 		conf:       conf,
+		dynConf:    dynConf,
 		stats:      newReceiverStats(),
 		preSampler: sampler.NewPreSampler(conf.PreSampleRate),
 		exit:       make(chan struct{}),
@@ -86,10 +92,12 @@ func (r *HTTPReceiver) Run() {
 	http.HandleFunc("/v0.1/services", r.httpHandleWithVersion(v01, r.handleServices))
 	http.HandleFunc("/v0.2/traces", r.httpHandleWithVersion(v02, r.handleTraces))
 	http.HandleFunc("/v0.2/services", r.httpHandleWithVersion(v02, r.handleServices))
-
-	// current collector API
 	http.HandleFunc("/v0.3/traces", r.httpHandleWithVersion(v03, r.handleTraces))
 	http.HandleFunc("/v0.3/services", r.httpHandleWithVersion(v03, r.handleServices))
+
+	// current collector API
+	http.HandleFunc("/v0.4/traces", r.httpHandleWithVersion(v04, r.handleTraces))
+	http.HandleFunc("/v0.4/services", r.httpHandleWithVersion(v04, r.handleServices))
 
 	// expvar implicitely publishes "/debug/vars" on the same port
 
@@ -168,6 +176,21 @@ func (r *HTTPReceiver) httpHandleWithVersion(v APIVersion, f func(APIVersion, ht
 	})
 }
 
+func (r *HTTPReceiver) replyTraces(v APIVersion, w http.ResponseWriter) {
+	switch v {
+	case v01:
+		fallthrough
+	case v02:
+		fallthrough
+	case v03:
+		// Simple response, simply acknowledge with "OK"
+		HTTPOK(w)
+	case v04:
+		// Return the recommended sampling rate for each service as a JSON.
+		HTTPRateByService(w, r.dynConf)
+	}
+}
+
 // handleTraces knows how to handle a bunch of traces
 func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *http.Request) {
 	if !r.preSampler.Sample(req) {
@@ -180,7 +203,8 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		return
 	}
 
-	HTTPOK(w) // We successfuly decoded the payload
+	// We successfuly decoded the payload
+	r.replyTraces(v, w)
 
 	// We parse the tags from the header
 	tags := Tags{
@@ -220,11 +244,11 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		} else {
 			atomic.AddInt64(&ts.SpansDropped, int64(spans-len(normTrace)))
 
-			// if our downstream consumer is slow, we drop the trace on the floor
-			// this is a safety net against us using too much memory
-			// when clients flood us
 			select {
 			case r.traces <- normTrace:
+				// if our downstream consumer is slow, we drop the trace on the floor
+				// this is a safety net against us using too much memory
+				// when clients flood us
 			default:
 				atomic.AddInt64(&ts.TracesDropped, 1)
 				atomic.AddInt64(&ts.SpansDropped, int64(spans))
@@ -294,6 +318,10 @@ func (r *HTTPReceiver) logStats() {
 			// We reset the stats accumulated during the last minute
 			accStats.reset()
 			lastLog = now
+
+			// Also publish rates by service (they are updated by receiver)
+			rates := r.dynConf.RateByService.GetAll()
+			updateRateByService(rates)
 		}
 	}
 }
@@ -344,6 +372,8 @@ func getTraces(v APIVersion, w http.ResponseWriter, req *http.Request) (model.Tr
 	case v02:
 		fallthrough
 	case v03:
+		fallthrough
+	case v04:
 		if err := decodeReceiverPayload(req.Body, &traces, v, contentType); err != nil {
 			log.Errorf("cannot decode %s traces payload: %v", v, err)
 			HTTPDecodingError(err, []string{tagTraceHandler, fmt.Sprintf("v:%s", v)}, w)

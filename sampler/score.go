@@ -21,23 +21,59 @@ func SampleByRate(traceID uint64, sampleRate float64) bool {
 	return true
 }
 
-// GetSignatureSampleRate gives the sample rate to apply to any signature
-// For now, only based on count score
-func (s *Sampler) GetSignatureSampleRate(signature Signature) float64 {
-	score := s.GetCountScore(signature)
-
-	if score > 1 {
-		score = 1.0
+func capTo1(f float64) float64 {
+	if f > 1 {
+		return 1
 	}
+	return f
+}
 
-	return score
+// GetSignatureSampleRate gives the sample rate to apply to any signature.
+// For now, only based on count score.
+func (s *Sampler) GetSignatureSampleRate(signature Signature) float64 {
+	return capTo1(s.GetCountScore(signature))
+}
+
+// GetAllSignatureSampleRates gives the sample rate to apply to all signatures.
+// For now, only based on count score.
+func (s *Sampler) GetAllSignatureSampleRates() map[Signature]float64 {
+	m := s.GetAllCountScores()
+	for k, v := range m {
+		m[k] = capTo1(v)
+	}
+	return m
+}
+
+// GetDefaultSampleRate gives the sample rate to apply to an unknown signature.
+// For now, only based on count score.
+func (s *Sampler) GetDefaultSampleRate() float64 {
+	return capTo1(s.GetDefaultCountScore())
+}
+
+func (s *Sampler) backendScoreToSamplerScore(score float64) float64 {
+	return s.signatureScoreFactor / math.Pow(s.signatureScoreSlope, math.Log10(score))
 }
 
 // GetCountScore scores any signature based on its recent throughput
 // The score value can be seeing as the sample rate if the count were the only factor
 // Since other factors can intervene (such as extra global sampling), its value can be larger than 1
 func (s *Sampler) GetCountScore(signature Signature) float64 {
-	score := s.Backend.GetSignatureScore(signature)
+	return s.backendScoreToSamplerScore(s.Backend.GetSignatureScore(signature))
+}
 
-	return s.signatureScoreFactor / math.Pow(s.signatureScoreSlope, math.Log10(score))
+// GetAllCountScores scores all signatures based on their recent throughput
+// The score value can be seeing as the sample rate if the count were the only factor
+// Since other factors can intervene (such as extra global sampling), its value can be larger than 1
+func (s *Sampler) GetAllCountScores() map[Signature]float64 {
+	m := s.Backend.GetAllSignatureScores()
+	for k, v := range m {
+		m[k] = s.backendScoreToSamplerScore(v)
+	}
+	return m
+}
+
+// GetDefaultCountScore returns a default score when not knowing the signature for real.
+// Since other factors can intervene (such as extra global sampling), its value can be larger than 1
+func (s *Sampler) GetDefaultCountScore() float64 {
+	return s.backendScoreToSamplerScore(s.Backend.GetTotalScore())
 }

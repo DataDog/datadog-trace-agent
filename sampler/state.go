@@ -1,6 +1,6 @@
 package sampler
 
-// InternalState exposes all the main internal settings of the scope sampler
+// InternalState exposes all the main internal settings of the score sampler
 type InternalState struct {
 	Offset      float64
 	Slope       float64
@@ -13,11 +13,11 @@ type InternalState struct {
 // GetState collects and return internal statistics and coefficients for indication purposes
 func (s *Sampler) GetState() InternalState {
 	return InternalState{
-		s.signatureScoreOffset,
-		s.signatureScoreSlope,
-		s.Backend.GetCardinality(),
-		s.Backend.GetTotalScore(),
-		s.Backend.GetSampledScore(),
-		s.maxTPS,
+		Offset:      s.signatureScoreOffset,
+		Slope:       s.signatureScoreSlope,
+		Cardinality: s.Backend.GetCardinality(),
+		InTPS:       s.Backend.GetTotalScore(),
+		OutTPS:      s.Backend.GetSampledScore(),
+		MaxTPS:      s.maxTPS,
 	}
 }

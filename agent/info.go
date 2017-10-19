@@ -19,17 +19,19 @@ import (
 )
 
 var (
-	infoMu              sync.RWMutex
-	infoReceiverStats   []tagStats    // only for the last minute
-	infoEndpointStats   endpointStats // only for the last minute
-	infoWatchdogInfo    watchdog.Info
-	infoSamplerInfo     samplerInfo
-	infoPreSamplerStats sampler.PreSamplerStats
-	infoStart           = time.Now()
-	infoOnce            sync.Once
-	infoTmpl            *template.Template
-	infoNotRunningTmpl  *template.Template
-	infoErrorTmpl       *template.Template
+	infoMu                  sync.RWMutex
+	infoReceiverStats       []tagStats    // only for the last minute
+	infoEndpointStats       endpointStats // only for the last minute
+	infoWatchdogInfo        watchdog.Info
+	infoSamplerInfo         samplerInfo
+	infoPrioritySamplerInfo samplerInfo
+	infoRateByService       map[string]float64
+	infoPreSamplerStats     sampler.PreSamplerStats
+	infoStart               = time.Now()
+	infoOnce                sync.Once
+	infoTmpl                *template.Template
+	infoNotRunningTmpl      *template.Template
+	infoErrorTmpl           *template.Template
 )
 
 const (
@@ -44,21 +46,23 @@ const (
   Hostname: {{.Status.Config.HostName}}
   Receiver: {{.Status.Config.ReceiverHost}}:{{.Status.Config.ReceiverPort}}
   API Endpoint: {{.Status.Config.APIEndpoint}}{{ range $i, $ts := .Status.Receiver }}
-  
+
   --- Receiver stats (1 min) ---
 
-  {{if $ts.Tags.Lang}}-> tags: {{ $ts.Tags.Lang }}, {{ $ts.Tags.LangVersion }}, {{ $ts.Tags.Interpreter }}, {{ $ts.Tags.TracerVersion }}
-  {{else}}-> tags: None{{end}}
+  -> tags: {{if $ts.Tags.Lang}}{{ $ts.Tags.Lang }}, {{ $ts.Tags.LangVersion }}, {{ $ts.Tags.Interpreter }}, {{ $ts.Tags.TracerVersion }}{{else}}None{{end}}
+
     Traces received: {{ $ts.Stats.TracesReceived }} ({{ $ts.Stats.TracesBytes }} bytes)
     Spans received: {{ $ts.Stats.SpansReceived }}
     Services received: {{ $ts.Stats.ServicesReceived }} ({{ $ts.Stats.ServicesBytes }} bytes)
-    Total data received : {{ add $ts.Stats.TracesBytes $ts.Stats.ServicesBytes }} bytes{{if gt $ts.Stats.TracesDropped 0}}
-    
+    Total data received: {{ add $ts.Stats.TracesBytes $ts.Stats.ServicesBytes }} bytes{{if gt $ts.Stats.TracesDropped 0}}
+
     WARNING: Traces dropped: {{ $ts.Stats.TracesDropped }}
     {{end}}{{if gt $ts.Stats.SpansDropped 0}}WARNING: Spans dropped: {{ $ts.Stats.SpansDropped }}{{end}}
-    
-  ------------------------------{{end}}{{if lt .Status.PreSampler.Rate 1.0}}  
-  
+
+  ------------------------------{{end}}
+{{ range $key, $value := .Status.RateByService }}
+  Sample rate for '{{ $key }}': {{percent $value}} %{{ end }}{{if lt .Status.PreSampler.Rate 1.0}}
+
   WARNING: Pre-sampling traces: {{percent .Status.PreSampler.Rate}} %
 {{end}}{{if .Status.PreSampler.Error}}  WARNING: Pre-sampler: {{.Status.PreSampler.Error}}
 {{end}}
@@ -93,75 +97,96 @@ func publishUptime() interface{} {
 
 func updateReceiverStats(rs *receiverStats) {
 	infoMu.Lock()
-
+	defer infoMu.Unlock()
 	rs.RLock()
+	defer rs.RUnlock()
+
 	s := make([]tagStats, 0, len(rs.Stats))
 	for _, tagStats := range rs.Stats {
 		s = append(s, *tagStats)
 	}
-	rs.RUnlock()
 
 	infoReceiverStats = s
-	infoMu.Unlock()
 }
 
 func publishReceiverStats() interface{} {
 	infoMu.RLock()
-	rs := infoReceiverStats
-	infoMu.RUnlock()
-	return rs
+	defer infoMu.RUnlock()
+	return infoReceiverStats
 }
 
 func updateEndpointStats(es endpointStats) {
 	infoMu.Lock()
+	defer infoMu.Unlock()
 	infoEndpointStats = es
-	infoMu.Unlock()
 }
 
 func publishEndpointStats() interface{} {
 	infoMu.RLock()
-	es := infoEndpointStats
-	infoMu.RUnlock()
-	return es
+	defer infoMu.RUnlock()
+	return infoEndpointStats
 }
 
 func updateSamplerInfo(ss samplerInfo) {
 	infoMu.Lock()
+	defer infoMu.Unlock()
+
 	infoSamplerInfo = ss
-	infoMu.Unlock()
 }
 
 func publishSamplerInfo() interface{} {
 	infoMu.RLock()
-	ss := infoSamplerInfo
-	infoMu.RUnlock()
-	return ss
+	defer infoMu.RUnlock()
+	return infoSamplerInfo
+}
+
+func updatePrioritySamplerInfo(ss samplerInfo) {
+	infoMu.Lock()
+	defer infoMu.Unlock()
+
+	infoPrioritySamplerInfo = ss
+}
+
+func publishPrioritySamplerInfo() interface{} {
+	infoMu.RLock()
+	defer infoMu.RUnlock()
+	return infoPrioritySamplerInfo
+}
+
+func updateRateByService(rbs map[string]float64) {
+	infoMu.Lock()
+	defer infoMu.Unlock()
+	infoRateByService = rbs
+}
+
+func publishRateByService() interface{} {
+	infoMu.RLock()
+	defer infoMu.RUnlock()
+	return infoRateByService
 }
 
 func updateWatchdogInfo(wi watchdog.Info) {
 	infoMu.Lock()
+	defer infoMu.Unlock()
 	infoWatchdogInfo = wi
-	infoMu.Unlock()
 }
 
 func publishWatchdogInfo() interface{} {
 	infoMu.RLock()
-	wi := infoWatchdogInfo
-	infoMu.RUnlock()
-	return wi
+	defer infoMu.RUnlock()
+	return infoWatchdogInfo
 }
 
 func updatePreSampler(ss sampler.PreSamplerStats) {
 	infoMu.Lock()
+	defer infoMu.Unlock()
 	infoPreSamplerStats = ss
-	infoMu.Unlock()
 }
 
 func publishPreSamplerStats() interface{} {
 	infoMu.RLock()
-	ss := infoPreSamplerStats
-	infoMu.RUnlock()
-	return ss
+	defer infoMu.RUnlock()
+	return infoPreSamplerStats
 }
 
 type infoVersion struct {
@@ -206,6 +231,8 @@ func initInfo(conf *config.AgentConfig) error {
 		expvar.Publish("receiver", expvar.Func(publishReceiverStats))
 		expvar.Publish("endpoint", expvar.Func(publishEndpointStats))
 		expvar.Publish("sampler", expvar.Func(publishSamplerInfo))
+		expvar.Publish("prioritysampler", expvar.Func(publishPrioritySamplerInfo))
+		expvar.Publish("ratebyservice", expvar.Func(publishRateByService))
 		expvar.Publish("watchdog", expvar.Func(publishWatchdogInfo))
 		expvar.Publish("presampler", expvar.Func(publishPreSamplerStats))
 
@@ -253,12 +280,13 @@ type StatusInfo struct {
 	MemStats struct {
 		Alloc uint64
 	} `json:"memstats"`
-	Version    infoVersion             `json:"version"`
-	Receiver   []tagStats              `json:"receiver"`
-	Endpoint   endpointStats           `json:"endpoint"`
-	Watchdog   watchdog.Info           `json:"watchdog"`
-	PreSampler sampler.PreSamplerStats `json:"presampler"`
-	Config     config.AgentConfig      `json:"config"`
+	Version       infoVersion             `json:"version"`
+	Receiver      []tagStats              `json:"receiver"`
+	RateByService map[string]float64      `json:"ratebyservice"`
+	Endpoint      endpointStats           `json:"endpoint"`
+	Watchdog      watchdog.Info           `json:"watchdog"`
+	PreSampler    sampler.PreSamplerStats `json:"presampler"`
+	Config        config.AgentConfig      `json:"config"`
 }
 
 func getProgramBanner(version string) (string, string) {
@@ -380,6 +408,15 @@ func Info(w io.Writer, conf *config.AgentConfig) error {
 
 	// display the remote program version, now that we know it
 	program, banner := getProgramBanner(info.Version.Version)
+
+	// remove the default service and env, it can be inferred from other
+	// values so has little added-value and could be confusing for users.
+	// Besides, if one still really wants it:
+	// curl http://localhost:8126/degug/vars would show it.
+	if info.RateByService != nil {
+		delete(info.RateByService, "service:,env:")
+	}
+
 	err = infoTmpl.Execute(w, struct {
 		Banner  string
 		Program string

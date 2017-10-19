@@ -87,6 +87,9 @@ func (ts *tagStats) publish() {
 	tracesReceived := atomic.LoadInt64(&ts.TracesReceived)
 	tracesDropped := atomic.LoadInt64(&ts.TracesDropped)
 	tracesFiltered := atomic.LoadInt64(&ts.TracesFiltered)
+	tracesPriorityNone := atomic.LoadInt64(&ts.TracesPriorityNone)
+	tracesPriority0 := atomic.LoadInt64(&ts.TracesPriority0)
+	tracesPriority1 := atomic.LoadInt64(&ts.TracesPriority1)
 	tracesBytes := atomic.LoadInt64(&ts.TracesBytes)
 	spansReceived := atomic.LoadInt64(&ts.SpansReceived)
 	spansDropped := atomic.LoadInt64(&ts.SpansDropped)
@@ -95,16 +98,21 @@ func (ts *tagStats) publish() {
 	servicesBytes := atomic.LoadInt64(&ts.ServicesBytes)
 
 	// Publish the stats
-	statsd.Client.Count("datadog.trace_agent.receiver.trace", tracesReceived, ts.Tags.toArray(), 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_received", tracesReceived, ts.Tags.toArray(), 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_dropped", tracesDropped, ts.Tags.toArray(), 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_filtered", tracesFiltered, ts.Tags.toArray(), 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_bytes", tracesBytes, ts.Tags.toArray(), 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.spans_received", spansReceived, ts.Tags.toArray(), 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.spans_dropped", spansDropped, ts.Tags.toArray(), 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.spans_filtered", spansFiltered, ts.Tags.toArray(), 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.services_received", servicesReceived, ts.Tags.toArray(), 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.services_bytes", servicesBytes, ts.Tags.toArray(), 1)
+	tags := ts.Tags.toArray()
+
+	statsd.Client.Count("datadog.trace_agent.receiver.trace", tracesReceived, tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.traces_received", tracesReceived, tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.traces_dropped", tracesDropped, tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.traces_filtered", tracesFiltered, tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.traces_priority", tracesPriorityNone, append(tags, "priority:none"), 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.traces_priority", tracesPriority0, append(tags, "priority:0"), 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.traces_priority", tracesPriority1, append(tags, "priority:1"), 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.traces_bytes", tracesBytes, tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.spans_received", spansReceived, tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.spans_dropped", spansDropped, tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.spans_filtered", spansFiltered, tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.services_received", servicesReceived, tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.services_bytes", servicesBytes, tags, 1)
 }
 
 // Stats holds the metrics that will be reported every 10s by the agent.
@@ -114,8 +122,14 @@ type Stats struct {
 	TracesReceived int64
 	// TracesDropped is the number of traces dropped.
 	TracesDropped int64
-	// TracesDropped is the number of traces filtered.
+	// TracesFiltered is the number of traces filtered.
 	TracesFiltered int64
+	// TracesPriorityNone is the number of traces with no sampling priority.
+	TracesPriorityNone int64
+	// TracesPriority0 is the number of traces with sampling priority set to zero.
+	TracesPriority0 int64
+	// TracesPriority1 is the number of traces with sampling priority set to a non-zero value.
+	TracesPriority1 int64
 	// TracesBytes is the amount of data received on the traces endpoint (raw data, encoded, compressed).
 	TracesBytes int64
 	// SpansReceived is the total number of spans received, including the dropped ones.
@@ -134,6 +148,9 @@ func (s *Stats) update(recent Stats) {
 	atomic.AddInt64(&s.TracesReceived, recent.TracesReceived)
 	atomic.AddInt64(&s.TracesDropped, recent.TracesDropped)
 	atomic.AddInt64(&s.TracesFiltered, recent.TracesFiltered)
+	atomic.AddInt64(&s.TracesPriorityNone, recent.TracesPriorityNone)
+	atomic.AddInt64(&s.TracesPriority0, recent.TracesPriority0)
+	atomic.AddInt64(&s.TracesPriority1, recent.TracesPriority1)
 	atomic.AddInt64(&s.TracesBytes, recent.TracesBytes)
 	atomic.AddInt64(&s.SpansReceived, recent.SpansReceived)
 	atomic.AddInt64(&s.SpansDropped, recent.SpansDropped)
@@ -146,6 +163,9 @@ func (s *Stats) reset() {
 	atomic.StoreInt64(&s.TracesReceived, 0)
 	atomic.StoreInt64(&s.TracesDropped, 0)
 	atomic.StoreInt64(&s.TracesFiltered, 0)
+	atomic.StoreInt64(&s.TracesPriorityNone, 0)
+	atomic.StoreInt64(&s.TracesPriority0, 0)
+	atomic.StoreInt64(&s.TracesPriority1, 0)
 	atomic.StoreInt64(&s.TracesBytes, 0)
 	atomic.StoreInt64(&s.SpansReceived, 0)
 	atomic.StoreInt64(&s.SpansDropped, 0)
@@ -156,17 +176,19 @@ func (s *Stats) reset() {
 
 // String returns a string representation of the Stats struct
 func (s *Stats) String() string {
-	// Atomically load the stas
+	// Atomically load the stats
 	tracesReceived := atomic.LoadInt64(&s.TracesReceived)
 	tracesDropped := atomic.LoadInt64(&s.TracesDropped)
 	tracesFiltered := atomic.LoadInt64(&s.TracesFiltered)
+	// Omitting priority information, use expvar or metrics for debugging purpose
 	tracesBytes := atomic.LoadInt64(&s.TracesBytes)
 	servicesReceived := atomic.LoadInt64(&s.ServicesReceived)
 	servicesBytes := atomic.LoadInt64(&s.ServicesBytes)
 
-	return fmt.Sprintf("traces received: %v, traces dropped: %v, traces filtered: %v, "+
-		"traces amount: %v bytes, services received: %v, services amount: %v bytes",
-		tracesReceived, tracesDropped, tracesFiltered, tracesBytes, servicesReceived, servicesBytes)
+	return fmt.Sprintf("traces received: %d, traces dropped: %d, traces filtered: %d, "+
+		"traces amount: %d bytes, services received: %d, services amount: %d bytes",
+		tracesReceived, tracesDropped, tracesFiltered,
+		tracesBytes, servicesReceived, servicesBytes)
 }
 
 // Tags holds the tags we parse when we handle the header of the payload.
