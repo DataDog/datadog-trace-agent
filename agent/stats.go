@@ -97,6 +97,7 @@ func (ts *tagStats) publish() {
 	tracesPriorityNone := atomic.LoadInt64(&ts.TracesPriorityNone)
 	tracesPriority0 := atomic.LoadInt64(&ts.TracesPriority0)
 	tracesPriority1 := atomic.LoadInt64(&ts.TracesPriority1)
+	tracesPriority2 := atomic.LoadInt64(&ts.TracesPriority2)
 	tracesBytes := atomic.LoadInt64(&ts.TracesBytes)
 	spansReceived := atomic.LoadInt64(&ts.SpansReceived)
 	spansDropped := atomic.LoadInt64(&ts.SpansDropped)
@@ -114,6 +115,7 @@ func (ts *tagStats) publish() {
 	statsd.Client.Count("datadog.trace_agent.receiver.traces_priority", tracesPriorityNone, append(tags, "priority:none"), 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.traces_priority", tracesPriority0, append(tags, "priority:0"), 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.traces_priority", tracesPriority1, append(tags, "priority:1"), 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.traces_priority", tracesPriority2, append(tags, "priority:2"), 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.traces_bytes", tracesBytes, tags, 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.spans_received", spansReceived, tags, 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.spans_dropped", spansDropped, tags, 1)
@@ -135,8 +137,10 @@ type Stats struct {
 	TracesPriorityNone int64
 	// TracesPriority0 is the number of traces with sampling priority set to zero.
 	TracesPriority0 int64
-	// TracesPriority1 is the number of traces with sampling priority set to a non-zero value.
+	// TracesPriority1 is the number of traces with sampling priority automatically set to 1.
 	TracesPriority1 int64
+	// TracesPriority2 is the number of traces with sampling priority manually set to 2 or more.
+	TracesPriority2 int64
 	// TracesBytes is the amount of data received on the traces endpoint (raw data, encoded, compressed).
 	TracesBytes int64
 	// SpansReceived is the total number of spans received, including the dropped ones.
@@ -158,6 +162,7 @@ func (s *Stats) update(recent Stats) {
 	atomic.AddInt64(&s.TracesPriorityNone, recent.TracesPriorityNone)
 	atomic.AddInt64(&s.TracesPriority0, recent.TracesPriority0)
 	atomic.AddInt64(&s.TracesPriority1, recent.TracesPriority1)
+	atomic.AddInt64(&s.TracesPriority2, recent.TracesPriority2)
 	atomic.AddInt64(&s.TracesBytes, recent.TracesBytes)
 	atomic.AddInt64(&s.SpansReceived, recent.SpansReceived)
 	atomic.AddInt64(&s.SpansDropped, recent.SpansDropped)
@@ -173,6 +178,7 @@ func (s *Stats) reset() {
 	atomic.StoreInt64(&s.TracesPriorityNone, 0)
 	atomic.StoreInt64(&s.TracesPriority0, 0)
 	atomic.StoreInt64(&s.TracesPriority1, 0)
+	atomic.StoreInt64(&s.TracesPriority2, 0)
 	atomic.StoreInt64(&s.TracesBytes, 0)
 	atomic.StoreInt64(&s.SpansReceived, 0)
 	atomic.StoreInt64(&s.SpansDropped, 0)
