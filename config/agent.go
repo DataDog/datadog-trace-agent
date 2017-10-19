@@ -38,10 +38,10 @@ type AgentConfig struct {
 	ExtraAggregators []string
 
 	// Sampler configuration
-	ExtraSampleRate        float64
-	PreSampleRate          float64
-	MaxTPS                 float64
-	PrioritySampling       bool
+	ExtraSampleRate  float64
+	PreSampleRate    float64
+	MaxTPS           float64
+	PrioritySampling bool
 
 	// Receiver
 	ReceiverHost    string
@@ -171,10 +171,10 @@ func NewDefaultAgentConfig() *AgentConfig {
 		BucketInterval:   time.Duration(10) * time.Second,
 		ExtraAggregators: []string{"http.status_code"},
 
-		ExtraSampleRate:        1.0,
-		PreSampleRate:          1.0,
-		MaxTPS:                 10,
-		PrioritySampling:       true,
+		ExtraSampleRate:  1.0,
+		PreSampleRate:    1.0,
+		MaxTPS:           10,
+		PrioritySampling: true,
 
 		ReceiverHost:    "localhost",
 		ReceiverPort:    8126,
