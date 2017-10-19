@@ -51,7 +51,12 @@ func (rs *receiverStats) publish() {
 
 func (rs *receiverStats) reset() {
 	rs.Lock()
-	for _, tagStats := range rs.Stats {
+	for key, tagStats := range rs.Stats {
+		// If a tagStats was empty, let's drop it.
+		// That's a way to avoid empty stats entries or over-time leaks.
+		if tagStats.isEmpty() {
+			delete(rs.Stats, key)
+		}
 		tagStats.reset()
 	}
 	rs.Unlock()
@@ -174,6 +179,12 @@ func (s *Stats) reset() {
 	atomic.StoreInt64(&s.SpansFiltered, 0)
 	atomic.StoreInt64(&s.ServicesReceived, 0)
 	atomic.StoreInt64(&s.ServicesBytes, 0)
+}
+
+func (s *Stats) isEmpty() bool {
+	tracesBytes := atomic.LoadInt64(&s.TracesBytes)
+
+	return tracesBytes == 0
 }
 
 // String returns a string representation of the Stats struct
