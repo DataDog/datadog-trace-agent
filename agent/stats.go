@@ -57,19 +57,21 @@ func (rs *receiverStats) reset() {
 	rs.Unlock()
 }
 
-// String gives a string representation of the receiverStats struct.
-func (rs *receiverStats) String() string {
+// Strings gives a multi strings representation of the receiverStats struct.
+func (rs *receiverStats) Strings() []string {
 	rs.RLock()
 	defer rs.RUnlock()
 
-	str := ""
 	if len(rs.Stats) == 0 {
-		return "no data received"
+		return []string{"no data received"}
 	}
+
+	strings := make([]string, len(rs.Stats))
+
 	for _, ts := range rs.Stats {
-		str += fmt.Sprintf("\n\t%v -> %s", ts.Tags.toArray(), ts.String())
+		strings = append(strings, fmt.Sprintf("%v -> %s", ts.Tags.toArray(), ts.String()))
 	}
-	return str
+	return strings
 }
 
 // tagStats is the struct used to associate the stats with their set of tags.
