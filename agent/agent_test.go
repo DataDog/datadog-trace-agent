@@ -12,6 +12,9 @@ import (
 
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/fixtures"
+	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/quantizer"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestWatchdog(t *testing.T) {
@@ -73,6 +76,32 @@ func TestWatchdog(t *testing.T) {
 	buf[len(buf)-1] = 2
 }
 
+// Test to make sure that the joined effort of the quantizer and truncator, in that order, produce the
+// desired string
+func TestFormatTrace(t *testing.T) {
+	assert := assert.New(t)
+	resource := "SELECT name FROM people WHERE age = 42"
+	rep := strings.Repeat(" AND age = 42", 5000)
+	resource = resource + rep
+	testTrace := model.Trace{
+		model.Span{
+			Resource: resource,
+			Type:     "sql",
+		},
+	}
+	result := formatTrace(testTrace)[0]
+
+	assert.Equal(5000, len(result.Resource))
+	assert.NotEqual("Non-parsable SQL query", result.Resource)
+	assert.NotContains(result.Resource, "42")
+	assert.Contains(result.Resource, "SELECT name FROM people WHERE age = ?")
+
+	assert.Equal(5003, len(result.Meta["sql.query"])) // Ellipsis added in quantizer
+	assert.NotEqual("Non-parsable SQL query", result.Meta["sql.query"])
+	assert.NotContains(result.Meta["sql.query"], "42")
+	assert.Contains(result.Meta["sql.query"], "SELECT name FROM people WHERE age = ?")
+}
+
 func BenchmarkAgentTraceProcessing(b *testing.B) {
 	c := config.NewDefaultAgentConfig()
 	c.APIKey = "test"
@@ -119,4 +148,13 @@ func BenchmarkWatchdog(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		agent.watchdog()
 	}
+}
+
+// Mimicks behaviour of agent Process function
+func formatTrace(t model.Trace) model.Trace {
+	for i := range t {
+		t[i] = quantizer.Quantize(t[i])
+		t[i].Truncate()
+	}
+	return t
 }

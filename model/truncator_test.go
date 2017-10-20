@@ -16,7 +16,7 @@ func TestTruncateResourcePassThru(t *testing.T) {
 
 func TestTruncateLongResource(t *testing.T) {
 	s := testSpan()
-	s.Resource = strings.Repeat("SELECT ", 5000)
+	s.Resource = strings.Repeat("TOOLONG", 5000)
 	s.Truncate()
 	assert.Equal(t, 5000, len(s.Resource))
 }
