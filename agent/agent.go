@@ -183,8 +183,10 @@ func (a *Agent) Process(t model.Trace) {
 
 			if priority == 0 {
 				priorityPtr = &ts.TracesPriority0
-			} else {
+			} else if priority == 1 {
 				priorityPtr = &ts.TracesPriority1
+			} else {
+				priorityPtr = &ts.TracesPriority2
 			}
 		}
 	}
