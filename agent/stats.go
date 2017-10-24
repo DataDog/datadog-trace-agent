@@ -53,7 +53,7 @@ func (rs *receiverStats) reset() {
 	rs.Lock()
 	for key, tagStats := range rs.Stats {
 		// If a tagStats was empty, let's drop it.
-		// That's a way to avoid empty stats entries or over-time leaks.
+		// That's a way to avoid over-time leaks.
 		if tagStats.isEmpty() {
 			delete(rs.Stats, key)
 		}
@@ -71,10 +71,12 @@ func (rs *receiverStats) Strings() []string {
 		return []string{"no data received"}
 	}
 
-	strings := make([]string, len(rs.Stats))
+	strings := make([]string, 0, len(rs.Stats))
 
 	for _, ts := range rs.Stats {
-		strings = append(strings, fmt.Sprintf("%v -> %s", ts.Tags.toArray(), ts.String()))
+		if !ts.isEmpty() {
+			strings = append(strings, fmt.Sprintf("%v -> %s", ts.Tags.toArray(), ts.String()))
+		}
 	}
 	return strings
 }

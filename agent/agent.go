@@ -170,6 +170,7 @@ func (a *Agent) Process(t model.Trace) {
 	root := t.GetRoot()
 
 	// We get the address of the struct holding the stats associated to no tags
+	// TODO: get the real tagStats related to this trace payload.
 	ts := a.Receiver.stats.getTagStats(Tags{})
 
 	// We choose the sampler dynamically, depending on trace content,
