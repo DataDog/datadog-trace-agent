@@ -1,5 +1,4 @@
 package: github.com/DataDog/datadog-trace-agent
-
 import:
 - package: github.com/DataDog/datadog-go
   version: a9c7a9896c1847c9cc2b068a2ae68e9d74540a5d
@@ -21,7 +20,12 @@ import:
   version: v2.17.01
   subpackages:
   - cpu
-
+- package: golang.org/x/sys
+  subpackages:
+  - windows/svc
+  - windows/svc/debug
+  - windows/svc/eventlog
+  - windows/svc/mgr
 testImport:
 - package: github.com/stretchr/testify
   version: v1.1.4

@@ -1,5 +1,5 @@
-hash: 6ee4eb022b387621ddb234375954dc60256fc2df4dcf2099dfb2f55f645756e4
-updated: 2017-02-23T15:00:26.163727755+01:00
+hash: fdd2b7f90ca62d4e5e0487722a3aff0ba563913363ce1f8d74070d2e3feb2d17
+updated: 2017-10-24T16:55:28.7799183-07:00
 imports:
 - name: github.com/cihub/seelog
   version: d2c6e5aa9fbfdd1c624e140287063c7730654115
@@ -36,6 +36,15 @@ imports:
   version: 362bfb3384d53ae4d5dd745983a4d70b6d23628c
   subpackages:
   - msgp
+- name: golang.org/x/sys
+  version: a1a1f1746d156bbc9954f29134b20ed4ce2752f1
+  subpackages:
+  - windows
+  - windows/registry
+  - windows/svc
+  - windows/svc/debug
+  - windows/svc/eventlog
+  - windows/svc/mgr
 testImports:
 - name: github.com/davecgh/go-spew
   version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9
@@ -49,3 +58,4 @@ testImports:
   version: 69483b4bd14f5845b5a1e55bca19e954e827f1d0
   subpackages:
   - assert
+  - require
