@@ -74,7 +74,9 @@ func (rs *receiverStats) Strings() []string {
 	strings := make([]string, 0, len(rs.Stats))
 
 	for _, ts := range rs.Stats {
-		strings = append(strings, fmt.Sprintf("%v -> %s", ts.Tags.toArray(), ts.String()))
+		if !ts.isEmpty() {
+			strings = append(strings, fmt.Sprintf("%v -> %s", ts.Tags.toArray(), ts.String()))
+		}
 	}
 	return strings
 }
