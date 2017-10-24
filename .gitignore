@@ -4,6 +4,7 @@ trace-agent-windows-386.exe
 trace-agent-windows-amd64.exe
 generator
 *.swp
+*.exe
 python/raclette.egg-info
 sniffing/packetbeat_raclette*
 db.sqlite3
