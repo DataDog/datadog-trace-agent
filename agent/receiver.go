@@ -314,7 +314,7 @@ func (r *HTTPReceiver) logStats() {
 			// We expose the stats accumulated to expvar
 			updateReceiverStats(accStats)
 
-			for logStr := range accStats.Strings() {
+			for _, logStr := range accStats.Strings() {
 				log.Info(logStr)
 			}
 
