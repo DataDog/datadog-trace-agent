@@ -14,16 +14,8 @@ const (
 	MaxServiceLen = 100
 	// MaxNameLen the maximum length a name can have
 	MaxNameLen = 100
-	// MaxResourceLen the maximum length the resource can have
-	MaxResourceLen = 5000
 	// MaxTypeLen the maximum length a span type can have
 	MaxTypeLen = 100
-	// MaxMetaKeyLen the maximum length of metadata key
-	MaxMetaKeyLen = 100
-	// MaxMetaValLen the maximum length of metadata value
-	MaxMetaValLen = 5000
-	// MaxMetricsKeyLen the maximum length of a metric name key
-	MaxMetricsKeyLen = MaxMetaKeyLen
 	// MaxEndDateOffset the maximum amount of time in the future we
 	// tolerate for span end dates
 	MaxEndDateOffset = 10 * time.Minute
@@ -67,10 +59,6 @@ func (s *Span) Normalize() error {
 	if s.Resource == "" {
 		return errors.New("span.normalize: empty `Resource`")
 	}
-	if len(s.Resource) > MaxResourceLen {
-		s.Resource = s.Resource[:MaxResourceLen]
-		log.Debugf("span.normalize: truncated `Resource`: %s", s.Resource)
-	}
 
 	// TraceID & SpanID should be set in the client
 	// because they uniquely define the traces and associate them into traces
@@ -105,40 +93,6 @@ func (s *Span) Normalize() error {
 
 	if s.Duration <= 0 {
 		return errors.New("span.normalize: durations need to be strictly positive")
-	}
-
-	// Error - Nothing to do
-	// Optional data, Meta & Metrics can be nil
-	// Soft fail on those
-	for k, v := range s.Meta {
-		modified := false
-
-		if len(k) > MaxMetaKeyLen {
-			log.Debugf("span.normalize: truncating `Meta` key (max %d chars): %s", MaxMetaKeyLen, k)
-			delete(s.Meta, k)
-			k = k[:MaxMetaKeyLen] + "..."
-			modified = true
-		}
-
-		if len(v) > MaxMetaValLen {
-			v = v[:MaxMetaValLen] + "..."
-			modified = true
-		}
-
-		if modified {
-			s.Meta[k] = v
-		}
-	}
-
-	for k, v := range s.Metrics {
-		if len(k) > MaxMetricsKeyLen {
-			log.Debugf("span.normalize: truncating `Metrics` key (max %d chars): %s", MaxMetricsKeyLen, k)
-			delete(s.Metrics, k)
-			k = k[:MaxMetricsKeyLen] + "..."
-
-			s.Metrics[k] = v
-		}
-
 	}
 
 	// ParentID set on the client side, no way of checking

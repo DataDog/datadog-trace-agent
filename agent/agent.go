@@ -224,6 +224,7 @@ func (a *Agent) Process(t model.Trace) {
 
 	for i := range t {
 		t[i] = quantizer.Quantize(t[i])
+		t[i].Truncate()
 	}
 
 	pt := processedTrace{
