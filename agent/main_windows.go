@@ -11,6 +11,7 @@ import (
 
 	_ "net/http/pprof"
 
+	"github.com/DataDog/datadog-trace-agent/watchdog"
 	log "github.com/cihub/seelog"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
@@ -61,7 +62,6 @@ func (m *myservice) Execute(args []string, r <-chan svc.ChangeRequest, changes c
 	exit := make(chan struct{})
 
 	go func() {
-	loop:
 		for {
 			select {
 			case c := <-r:
@@ -73,6 +73,7 @@ func (m *myservice) Execute(args []string, r <-chan svc.ChangeRequest, changes c
 					changes <- c.CurrentStatus
 				case svc.Stop, svc.Shutdown:
 					close(exit)
+					return
 				default:
 					elog.Error(1, fmt.Sprintf("unexpected control request #%d", c))
 				}
@@ -174,7 +175,7 @@ func main() {
 	// Handle stops properly
 	go func() {
 		defer watchdog.LogOnPanic()
-		handleSignal(exitCommand)
+		handleSignal(exit)
 	}()
 
 	// Invoke the Agent
