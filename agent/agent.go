@@ -55,9 +55,7 @@ type Agent struct {
 }
 
 // NewAgent returns a new Agent object, ready to be started
-func NewAgent(conf *config.AgentConfig) *Agent {
-	exit := make(chan struct{})
-
+func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 	dynConf := config.NewDynamicConfig()
 	r := NewHTTPReceiver(conf, dynConf)
 	c := NewConcentrator(

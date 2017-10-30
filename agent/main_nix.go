@@ -2,26 +2,10 @@
 
 package main
 
-
 import (
-	"bytes"
 	"flag"
-	"fmt"
-	"math/rand"
-	"os"
-	"os/signal"
-	"runtime"
-	"runtime/pprof"
-	"strings"
-	"syscall"
-	"time"
-
-	log "github.com/cihub/seelog"
-	_ "net/http/pprof"
-
-	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
+	_ "net/http/pprof"
 )
 
 func init() {
@@ -41,5 +25,13 @@ func init() {
 
 // main is the main application entry point
 func main() {
-	runAgent()
+	exit := make(chan struct{})
+
+	// Handle stops properly
+	go func() {
+		defer watchdog.LogOnPanic()
+		handleSignal(exit)
+	}()
+
+	runAgent(exit)
 }

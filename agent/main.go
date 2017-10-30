@@ -98,9 +98,8 @@ apm_enabled: true
 to your datadog.conf file.
 Exiting.`
 
-
 // runAgent is the entrypoint of our code
-func runAgent() {
+func runAgent(exit chan struct{}) {
 	// configure a default logger before anything so we can observe initialization
 	if opts.info || opts.version {
 		log.UseLogger(log.Disabled)
@@ -206,13 +205,7 @@ func runAgent() {
 	// Seed rand
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	agent := NewAgent(agentConf)
-
-	// Handle stops properly
-	go func() {
-		defer watchdog.LogOnPanic()
-		handleSignal(agent.exit)
-	}()
+	agent := NewAgent(agentConf, exit)
 
 	log.Infof("trace-agent running on host %s", agentConf.HostName)
 	agent.Run()
