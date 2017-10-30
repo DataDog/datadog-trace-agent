@@ -2,7 +2,6 @@
 
 package main
 
-
 import (
 	"flag"
 	"fmt"
@@ -20,16 +19,16 @@ import (
 )
 
 var elog debug.Log
+
 const ServiceName = "datadog-trace-agent"
 
 // opts are the command-line options
 var winopts struct {
-	installService bool
+	installService   bool
 	uninstallService bool
-	startService bool
-	stopService bool
+	startService     bool
+	stopService      bool
 }
-
 
 func init() {
 	// command-line arguments
@@ -59,28 +58,30 @@ func (m *myservice) Execute(args []string, r <-chan svc.ChangeRequest, changes c
 	changes <- svc.Status{State: svc.StartPending}
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 
-	runAgent()
+	exit := make(chan struct{})
 
-loop:
-	for {
-		select {
-		case c := <-r:
-			switch c.Cmd {
-			case svc.Interrogate:
-				changes <- c.CurrentStatus
-				// Testing deadlock from https://code.google.com/p/winsvc/issues/detail?id=4
-				time.Sleep(100 * time.Millisecond)
-				changes <- c.CurrentStatus
-			case svc.Stop, svc.Shutdown:
-				// FIXME need a way to stop!
-				//app.StopAgent()
-				break loop
-			default:
-				elog.Error(1, fmt.Sprintf("unexpected control request #%d", c))
+	go func() {
+	loop:
+		for {
+			select {
+			case c := <-r:
+				switch c.Cmd {
+				case svc.Interrogate:
+					changes <- c.CurrentStatus
+					// Testing deadlock from https://code.google.com/p/winsvc/issues/detail?id=4
+					time.Sleep(100 * time.Millisecond)
+					changes <- c.CurrentStatus
+				case svc.Stop, svc.Shutdown:
+					close(exit)
+				default:
+					elog.Error(1, fmt.Sprintf("unexpected control request #%d", c))
+				}
 			}
-
 		}
-	}
+	}()
+
+	runAgent(exit)
+
 	elog.Info(1, fmt.Sprintf("prestopping %s service", ServiceName))
 	changes <- svc.Status{State: svc.StopPending}
 	return
@@ -168,8 +169,15 @@ func main() {
 	}
 
 	// if we are an interactive session, then just invoke the agent on the command line.
-	// Invoke the Agent
 
+	exit := make(chan struct{})
+	// Handle stops properly
+	go func() {
+		defer watchdog.LogOnPanic()
+		handleSignal(exitCommand)
+	}()
+
+	// Invoke the Agent
 	runAgent()
 }
 
@@ -288,7 +296,6 @@ func exePath() (string, error) {
 	return "", err
 }
 
-
 func removeService() error {
 	m, err := mgr.Connect()
 	if err != nil {
@@ -310,4 +317,3 @@ func removeService() error {
 	}
 	return nil
 }
-
