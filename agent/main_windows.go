@@ -178,7 +178,7 @@ func main() {
 	}()
 
 	// Invoke the Agent
-	runAgent()
+	runAgent(exit)
 }
 
 func startService() error {
