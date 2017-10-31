@@ -61,29 +61,28 @@ func (m *myservice) Execute(args []string, r <-chan svc.ChangeRequest, changes c
 
 	exit := make(chan struct{})
 
-	go func() {
-		for {
-			select {
-			case c := <-r:
-				switch c.Cmd {
-				case svc.Interrogate:
-					changes <- c.CurrentStatus
-					// Testing deadlock from https://code.google.com/p/winsvc/issues/detail?id=4
-					time.Sleep(100 * time.Millisecond)
-					changes <- c.CurrentStatus
-				case svc.Stop, svc.Shutdown:
-					close(exit)
-					return
-				default:
-					elog.Error(1, fmt.Sprintf("unexpected control request #%d", c))
-				}
+	go runAgent(exit)
+	elog.Info(0x40000003, ServiceName)
+loop:
+	for {
+		select {
+		case c := <-r:
+			switch c.Cmd {
+			case svc.Interrogate:
+				changes <- c.CurrentStatus
+				// Testing deadlock from https://code.google.com/p/winsvc/issues/detail?id=4
+				time.Sleep(100 * time.Millisecond)
+				changes <- c.CurrentStatus
+			case svc.Stop, svc.Shutdown:
+				elog.Info(0x40000006, ServiceName)
+				close(exit)
+				break loop
+			default:
+				elog.Warning(0xc000000A, string(c.Cmd))
 			}
 		}
-	}()
+	}
 
-	runAgent(exit)
-
-	elog.Info(1, fmt.Sprintf("prestopping %s service", ServiceName))
 	changes <- svc.Status{State: svc.StopPending}
 	return
 }
@@ -100,17 +99,17 @@ func runService(isDebug bool) {
 	}
 	defer elog.Close()
 
-	elog.Info(1, fmt.Sprintf("starting %s service", ServiceName))
 	run := svc.Run
 	if isDebug {
 		run = debug.Run
 	}
+	elog.Info(0x40000007, ServiceName)
 	err = run(ServiceName, &myservice{})
 	if err != nil {
-		elog.Error(1, fmt.Sprintf("%s service failed: %v", ServiceName, err))
+		elog.Error(0xc0000008, err.Error())
 		return
 	}
-	elog.Info(1, fmt.Sprintf("%s service stopped", ServiceName))
+	elog.Info(0x40000004, ServiceName)
 }
 
 // main is the main application entry point
