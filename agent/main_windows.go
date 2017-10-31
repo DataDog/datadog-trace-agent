@@ -61,27 +61,28 @@ func (m *myservice) Execute(args []string, r <-chan svc.ChangeRequest, changes c
 
 	exit := make(chan struct{})
 
-	go runAgent(exit)
-	elog.Info(0x40000003, ServiceName)
-loop:
-	for {
-		select {
-		case c := <-r:
-			switch c.Cmd {
-			case svc.Interrogate:
-				changes <- c.CurrentStatus
-				// Testing deadlock from https://code.google.com/p/winsvc/issues/detail?id=4
-				time.Sleep(100 * time.Millisecond)
-				changes <- c.CurrentStatus
-			case svc.Stop, svc.Shutdown:
-				elog.Info(0x40000006, ServiceName)
-				close(exit)
-				break loop
-			default:
-				elog.Warning(0xc000000A, string(c.Cmd))
+	go func() {
+		for {
+			select {
+			case c := <-r:
+				switch c.Cmd {
+				case svc.Interrogate:
+					changes <- c.CurrentStatus
+					// Testing deadlock from https://code.google.com/p/winsvc/issues/detail?id=4
+					time.Sleep(100 * time.Millisecond)
+					changes <- c.CurrentStatus
+				case svc.Stop, svc.Shutdown:
+					elog.Info(0x40000006, ServiceName)
+					close(exit)
+					return
+				default:
+					elog.Warning(0xc000000A, string(c.Cmd))
+				}
 			}
 		}
-	}
+	}()
+	elog.Info(0x40000003, ServiceName)
+	runAgent(exit)
 
 	changes <- svc.Status{State: svc.StopPending}
 	return
