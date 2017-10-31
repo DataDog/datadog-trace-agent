@@ -73,6 +73,7 @@ func (m *myservice) Execute(args []string, r <-chan svc.ChangeRequest, changes c
 					changes <- c.CurrentStatus
 				case svc.Stop, svc.Shutdown:
 					elog.Info(0x40000006, ServiceName)
+					changes <- svc.Status{State: svc.StopPending}
 					close(exit)
 					return
 				default:
@@ -84,7 +85,7 @@ func (m *myservice) Execute(args []string, r <-chan svc.ChangeRequest, changes c
 	elog.Info(0x40000003, ServiceName)
 	runAgent(exit)
 
-	changes <- svc.Status{State: svc.StopPending}
+	changes <- svc.Status{State: svc.Stopped}
 	return
 }
 
