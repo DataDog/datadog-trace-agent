@@ -4,6 +4,8 @@ trace-agent-windows-386.exe
 trace-agent-windows-amd64.exe
 generator
 *.swp
+*.exe
+*.syso
 python/raclette.egg-info
 sniffing/packetbeat_raclette*
 db.sqlite3
@@ -16,3 +18,8 @@ agent/agent
 prof*
 *test
 /vendor
+
+agent/windows_resources/trace-agent-msg.rc
+agent/windows_resources/*.bin
+# file generated at build time by message compiler
+trace-agent-msg.h

@@ -31,7 +31,8 @@ func TestWatchdog(t *testing.T) {
 	defaultMux := http.DefaultServeMux
 	http.DefaultServeMux = http.NewServeMux()
 
-	agent := NewAgent(conf)
+	exit := make(chan struct{})
+	agent := NewAgent(conf, exit)
 
 	defer func() {
 		close(agent.exit)
@@ -128,7 +129,8 @@ func BenchmarkAgentTraceProcessingWithWorstCaseFiltering(b *testing.B) {
 }
 
 func runTraceProcessingBenchmark(b *testing.B, c *config.AgentConfig) {
-	agent := NewAgent(c)
+	exit := make(chan struct{})
+	agent := NewAgent(c, exit)
 	log.UseLogger(log.Disabled)
 
 	b.ResetTimer()
@@ -141,7 +143,8 @@ func runTraceProcessingBenchmark(b *testing.B, c *config.AgentConfig) {
 func BenchmarkWatchdog(b *testing.B) {
 	conf := config.NewDefaultAgentConfig()
 	conf.APIKey = "apikey_2"
-	agent := NewAgent(conf)
+	exit := make(chan struct{})
+	agent := NewAgent(conf, exit)
 
 	b.ResetTimer()
 	b.ReportAllocs()

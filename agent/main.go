@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"flag"
 	"fmt"
 	"math/rand"
 	"os"
@@ -99,23 +98,8 @@ apm_enabled: true
 to your datadog.conf file.
 Exiting.`
 
-func init() {
-	// command-line arguments
-	flag.StringVar(&opts.ddConfigFile, "ddconfig", "/etc/dd-agent/datadog.conf", "Classic agent config file location")
-	// FIXME: merge all APM configuration into dd-agent/datadog.conf and deprecate the below flag
-	flag.StringVar(&opts.configFile, "config", "/etc/datadog/trace-agent.ini", "Trace agent ini config file.")
-	flag.BoolVar(&opts.version, "version", false, "Show version information and exit")
-	flag.BoolVar(&opts.info, "info", false, "Show info about running trace agent process and exit")
-
-	// profiling arguments
-	flag.StringVar(&opts.cpuprofile, "cpuprofile", "", "Write cpu profile to file")
-	flag.StringVar(&opts.memprofile, "memprofile", "", "Write memory profile to `file`")
-
-	flag.Parse()
-}
-
-// main is the entrypoint of our code
-func main() {
+// runAgent is the entrypoint of our code
+func runAgent(exit chan struct{}) {
 	// configure a default logger before anything so we can observe initialization
 	if opts.info || opts.version {
 		log.UseLogger(log.Disabled)
@@ -221,13 +205,7 @@ func main() {
 	// Seed rand
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	agent := NewAgent(agentConf)
-
-	// Handle stops properly
-	go func() {
-		defer watchdog.LogOnPanic()
-		handleSignal(agent.exit)
-	}()
+	agent := NewAgent(agentConf, exit)
 
 	log.Infof("trace-agent running on host %s", agentConf.HostName)
 	agent.Run()
