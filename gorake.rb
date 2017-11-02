@@ -17,7 +17,7 @@ def go_build(program, opts={})
   branch = `git rev-parse --abbrev-ref HEAD`.strip
   date = Time.now.iso8601
   goversion = `go version`.strip
-  agentversion = ENV["TRACE_AGENT_VERSION"] || "0.99.0"
+  agentversion = ENV["TRACE_AGENT_VERSION"] || "0.99.0-#{commit}"
 
   vars = {}
   vars["#{dd}.Version"] = agentversion
