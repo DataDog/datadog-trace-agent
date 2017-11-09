@@ -1,6 +1,7 @@
 package model
 
 import (
+	pb "github.com/DataDog/datadog-trace-agent/model/protobuf"
 	log "github.com/cihub/seelog"
 )
 
@@ -109,4 +110,26 @@ func (t Trace) ComputeWeight(root Span) {
 	for i := range t {
 		t[i].weight = weight
 	}
+}
+
+func (t Trace) ToProto() *pb.Trace {
+	root := t[0]
+
+	return &pb.Trace{
+		TraceID: root.TraceID,
+		Spans: []*pb.Span{
+			root.ToProto(),
+		},
+		StartTime: root.Start,
+		EndTime:   root.Start + root.Duration,
+	}
+}
+
+func ProtoToTrace(t *pb.Trace) Trace {
+	spans := make([]Span, 0, len(t.Spans))
+	for _, s := range t.Spans {
+		spans = append(spans, ProtoToSpan(s))
+	}
+
+	return Trace(spans)
 }

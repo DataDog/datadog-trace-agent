@@ -12,7 +12,9 @@ type Filter interface {
 
 // Setup returns a slice of all registered filters
 func Setup(c *config.AgentConfig) []Filter {
-	return []Filter{
+	filters := []Filter{
 		newResourceFilter(c),
 	}
+
+	return filters
 }

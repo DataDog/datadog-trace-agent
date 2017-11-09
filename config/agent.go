@@ -68,6 +68,8 @@ type AgentConfig struct {
 	Proxy *ProxySettings
 
 	Ignore map[string][]string
+
+	UseLevelFilter bool
 }
 
 // mergeEnv applies overrides from environment variables to the trace agent configuration

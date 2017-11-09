@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"net/http"
 	"sync"
 	"time"
 
@@ -240,4 +242,57 @@ func (w *Writer) Flush() {
 		float64(bufSize), nil, 1)
 
 	w.payloadBuffer = payloads
+}
+
+type LevelWriter struct {
+	endpoint string
+	in       chan *model.SparseAgentPayload // payloads for root spans
+	payload  *model.SparseAgentPayload
+
+	exit chan struct{}
+}
+
+func NewLevelWriter() *LevelWriter {
+	return &LevelWriter{
+		"/TODO/log/intake",
+		make(chan *model.SparseAgentPayload, 100),
+		nil,
+		make(chan struct{}),
+	}
+}
+
+func (l *LevelWriter) Run() {
+	flushTicker := time.NewTicker(time.Second)
+	defer flushTicker.Stop()
+
+	for {
+		select {
+		case p := <-l.in:
+			l.Buffer(p)
+		case <-flushTicker.C:
+			l.Flush()
+		case <-l.exit:
+			return
+		default:
+		}
+	}
+}
+
+func (l *LevelWriter) Flush() (*http.Response, error) {
+	bs, err := l.payload.ToProtobufBytes()
+	if err != nil {
+		log.Errorf("failed to encode leveled payload:", err)
+	}
+
+	// TODO meter this
+	resp, err := http.Post(l.endpoint, "application/octet-stream", bytes.NewReader(bs))
+	if err != nil {
+		log.Errorf("failed to send leveled payload:", err)
+	}
+
+	return resp, err
+}
+
+func (l *LevelWriter) Buffer(payload *model.SparseAgentPayload) {
+	l.payload = payload
 }

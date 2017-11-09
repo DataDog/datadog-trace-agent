@@ -43,6 +43,8 @@ type Agent struct {
 	ScoreEngine    *Sampler
 	PriorityEngine *Sampler
 	Writer         *Writer
+	LevelFilter    *filters.LevelFilter
+	LevelWriter    *LevelWriter
 
 	// config
 	conf    *config.AgentConfig
@@ -63,6 +65,12 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 		conf.BucketInterval.Nanoseconds(),
 	)
 	f := filters.Setup(conf)
+
+	var lf *filters.LevelFilter
+	if conf.UseLevelFilter {
+		lf = filters.NewLevelFilter(model.SpanLevelCritical).(*filters.LevelFilter)
+	}
+
 	ss := NewScoreEngine(conf)
 	var ps *Sampler
 	if conf.PrioritySampling {
@@ -73,6 +81,8 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 	w := NewWriter(conf)
 	w.inServices = r.services
 
+	lw := NewLevelWriter()
+
 	return &Agent{
 		Receiver:       r,
 		Concentrator:   c,
@@ -80,6 +90,8 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 		ScoreEngine:    ss,
 		PriorityEngine: ps,
 		Writer:         w,
+		LevelFilter:    lf,
+		LevelWriter:    lw,
 		conf:           conf,
 		dynConf:        dynConf,
 		exit:           exit,
@@ -166,6 +178,7 @@ func (a *Agent) Process(t model.Trace) {
 	}
 
 	root := t.GetRoot()
+	useLevelFiltering := a.LevelFilter != nil
 
 	// We get the address of the struct holding the stats associated to no tags
 	// TODO: get the real tagStats related to this trace payload.
@@ -220,9 +233,27 @@ func (a *Agent) Process(t model.Trace) {
 	sublayers := model.ComputeSublayers(t)
 	model.SetSublayersOnSpan(root, sublayers)
 
+	// ensure the root always survives the levelFilter
+	root.SetLevel(model.SpanLevelCritical)
 	for i := range t {
 		t[i] = quantizer.Quantize(t[i])
 		t[i].Truncate()
+
+		if useLevelFiltering {
+			go func() {
+				defer watchdog.LogOnPanic()
+
+				// TODO: does this thing need an env
+				if a.LevelFilter.Keep(&t[i]) {
+					env := a.conf.DefaultEnv
+					if tenv := t.GetEnv(); tenv != "" {
+						env = tenv
+					}
+
+					a.LevelWriter.in <- model.NewSparseAgentPayload(a.conf.HostName, env, model.Trace{t[i]})
+				}
+			}()
+		}
 	}
 
 	pt := processedTrace{
