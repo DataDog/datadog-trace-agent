@@ -244,17 +244,45 @@ func (w *Writer) Flush() {
 	w.payloadBuffer = payloads
 }
 
-type TransactionWriter struct {
+type Flusher interface {
+	Flush(*model.SparseAgentPayload) error
+}
+
+type LogAgentFlusher struct {
 	endpoint string
-	in       chan *model.SparseAgentPayload // payloads for root spans
-	payload  *model.SparseAgentPayload
+}
+
+type IntakeFlusher struct {
+	endpoint string
+}
+
+func (i IntakeFlusher) Flush(payload *model.SparseAgentPayload) error {
+	bs, err := payload.ToProtobufBytes()
+	if err != nil {
+		log.Errorf("failed to encode transaction payload:", err)
+	}
+
+	// TODO meter this
+	_, err = http.Post(i.endpoint, "application/octet-stream", bytes.NewReader(bs))
+	if err != nil {
+		log.Errorf("failed to send transaction payload:", err)
+	}
+
+	return err
+}
+
+type TransactionWriter struct {
+	Flusher
+
+	in      chan *model.SparseAgentPayload // payloads for root spans
+	payload *model.SparseAgentPayload
 
 	exit chan struct{}
 }
 
 func NewTransactionWriter() *TransactionWriter {
 	return &TransactionWriter{
-		"/TODO/log/intake",
+		IntakeFlusher{"TODO/transaction/intake"},
 		make(chan *model.SparseAgentPayload, 100),
 		nil,
 		make(chan struct{}),
@@ -270,27 +298,12 @@ func (l *TransactionWriter) Run() {
 		case p := <-l.in:
 			l.Buffer(p)
 		case <-flushTicker.C:
-			l.Flush()
+			l.Flush(l.payload)
 		case <-l.exit:
 			return
 		default:
 		}
 	}
-}
-
-func (l *TransactionWriter) Flush() (*http.Response, error) {
-	bs, err := l.payload.ToProtobufBytes()
-	if err != nil {
-		log.Errorf("failed to encode transaction payload:", err)
-	}
-
-	// TODO meter this
-	resp, err := http.Post(l.endpoint, "application/octet-stream", bytes.NewReader(bs))
-	if err != nil {
-		log.Errorf("failed to send transaction payload:", err)
-	}
-
-	return resp, err
 }
 
 func (l *TransactionWriter) Buffer(payload *model.SparseAgentPayload) {
