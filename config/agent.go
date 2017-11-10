@@ -201,7 +201,9 @@ func NewDefaultAgentConfig() *AgentConfig {
 		MaxConnections:   200, // in practice, rarely goes over 20
 		WatchdogInterval: time.Minute,
 
-		Ignore: make(map[string][]string),
+		Ignore:                 make(map[string][]string),
+		UseTransactionAnalyzer: true,
+		AnalyzeWebTransactions: true,
 	}
 
 	return ac

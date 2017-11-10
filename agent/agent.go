@@ -244,9 +244,9 @@ func (a *Agent) Process(t model.Trace) {
 		if useTransactionFiltering {
 			go func() {
 				defer watchdog.LogOnPanic()
-
 				// TODO: does this thing need an env
-				if a.TransactionFilter.Keep(&t[i]) {
+				if a.TransactionFilter.Keep(&t[i]) || t[i].Name == "pylons.request" {
+					log.Info("keeping a transaction")
 					env := a.conf.DefaultEnv
 					if tenv := t.GetEnv(); tenv != "" {
 						env = tenv

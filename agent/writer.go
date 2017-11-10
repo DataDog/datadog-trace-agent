@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"sync"
 	"time"
@@ -252,11 +253,43 @@ type LogAgentFlusher struct {
 	endpoint string
 }
 
+type LogAgentPayload struct {
+	Message string `json:"message"`
+}
+
+func (l LogAgentFlusher) Flush(payload *model.SparseAgentPayload) error {
+	log.Info("flusing payload to logs agent")
+	var buf bytes.Buffer
+	for _, t := range payload.Traces {
+		b, err := json.Marshal(t)
+		if err == nil {
+			buf.Write(b)
+			buf.WriteRune('\n')
+		}
+	}
+
+	logPayload := LogAgentPayload{Message: buf.String()}
+	logBytes, err := json.Marshal(logPayload)
+
+	if err != nil {
+		log.Errorf("failed to encode transaction payload:", err)
+	}
+
+	// TODO meter this
+	_, err = http.Post(l.endpoint, "application/json", bytes.NewReader(logBytes))
+	if err != nil {
+		log.Errorf("failed to send transaction payload:", err)
+	}
+
+	return err
+}
+
 type IntakeFlusher struct {
 	endpoint string
 }
 
 func (i IntakeFlusher) Flush(payload *model.SparseAgentPayload) error {
+	log.Info("flusing payload to logs intake")
 	bs, err := payload.ToProtobufBytes()
 	if err != nil {
 		log.Errorf("failed to encode transaction payload:", err)
@@ -282,7 +315,7 @@ type TransactionWriter struct {
 
 func NewTransactionWriter() *TransactionWriter {
 	return &TransactionWriter{
-		IntakeFlusher{"TODO/transaction/intake"},
+		LogAgentFlusher{"localhost:10518"},
 		make(chan *model.SparseAgentPayload, 100),
 		nil,
 		make(chan struct{}),
@@ -297,6 +330,7 @@ func (l *TransactionWriter) Run() {
 		select {
 		case p := <-l.in:
 			l.Buffer(p)
+			l.Flush(l.payload)
 		case <-flushTicker.C:
 			l.Flush(l.payload)
 		case <-l.exit:
