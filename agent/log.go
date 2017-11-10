@@ -7,10 +7,9 @@ import (
 
 	log "github.com/cihub/seelog"
 
+	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
-
-const defaultLogFilePath = "/var/log/datadog/trace-agent.log"
 
 const agentLoggerConfigFmt = `
 <seelog minlevel="%[1]s">
@@ -198,7 +197,7 @@ func SetupLogger(minLogLvl log.LogLevel, logFilePath string, logsDropInterval ti
 	log.RegisterReceiver("throttled", &ThrottledReceiver{})
 
 	// Build our config string
-	config := fmt.Sprintf(
+	logConfig := fmt.Sprintf(
 		agentLoggerConfigFmt,
 		minLogLvl,
 		logsDropInterval,
@@ -206,7 +205,7 @@ func SetupLogger(minLogLvl log.LogLevel, logFilePath string, logsDropInterval ti
 		logFilePath,
 	)
 
-	logger, err := log.LoggerFromConfigAsString(config)
+	logger, err := log.LoggerFromConfigAsString(logConfig)
 	if err != nil {
 		return err
 	}
@@ -216,9 +215,9 @@ func SetupLogger(minLogLvl log.LogLevel, logFilePath string, logsDropInterval ti
 // SetupDefaultLogger sets up a default logger for the agent, showing
 // all log messages and with no throttling.
 func SetupDefaultLogger() error {
-	config := fmt.Sprintf(rawLoggerConfigFmt, defaultLogFilePath)
+	logConfig := fmt.Sprintf(rawLoggerConfigFmt, config.DefaultLogFilePath)
 
-	logger, err := log.LoggerFromConfigAsString(config)
+	logger, err := log.LoggerFromConfigAsString(logConfig)
 	if err != nil {
 		return err
 	}

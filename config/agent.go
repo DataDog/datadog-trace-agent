@@ -184,7 +184,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 		StatsdPort: 8125,
 
 		LogLevel:             "INFO",
-		LogFilePath:          "/var/log/datadog/trace-agent.log",
+		LogFilePath:          DefaultLogFilePath,
 		LogThrottlingEnabled: true,
 
 		MaxMemory:        5e8, // 500 Mb, should rarely go above 50 Mb
