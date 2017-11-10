@@ -37,14 +37,14 @@ func (pt *processedTrace) weight() float64 {
 
 // Agent struct holds all the sub-routines structs and make the data flow between them
 type Agent struct {
-	Receiver       *HTTPReceiver
-	Concentrator   *Concentrator
-	Filters        []filters.Filter
-	ScoreEngine    *Sampler
-	PriorityEngine *Sampler
-	Writer         *Writer
-	LevelFilter    *filters.LevelFilter
-	LevelWriter    *LevelWriter
+	Receiver          *HTTPReceiver
+	Concentrator      *Concentrator
+	Filters           []filters.Filter
+	ScoreEngine       *Sampler
+	PriorityEngine    *Sampler
+	Writer            *Writer
+	TransactionFilter *filters.TransactionFilter
+	TransactionWriter *TransactionWriter
 
 	// config
 	conf    *config.AgentConfig
@@ -66,9 +66,9 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 	)
 	f := filters.Setup(conf)
 
-	var lf *filters.LevelFilter
-	if conf.UseLevelFilter {
-		lf = filters.NewLevelFilter(model.SpanLevelCritical).(*filters.LevelFilter)
+	var lf *filters.TransactionFilter
+	if conf.UseTransactionAnalyzer {
+		lf = filters.NewTransactionFilter(conf).(*filters.TransactionFilter)
 	}
 
 	ss := NewScoreEngine(conf)
@@ -81,21 +81,21 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 	w := NewWriter(conf)
 	w.inServices = r.services
 
-	lw := NewLevelWriter()
+	lw := NewTransactionWriter()
 
 	return &Agent{
-		Receiver:       r,
-		Concentrator:   c,
-		Filters:        f,
-		ScoreEngine:    ss,
-		PriorityEngine: ps,
-		Writer:         w,
-		LevelFilter:    lf,
-		LevelWriter:    lw,
-		conf:           conf,
-		dynConf:        dynConf,
-		exit:           exit,
-		die:            die,
+		Receiver:          r,
+		Concentrator:      c,
+		Filters:           f,
+		ScoreEngine:       ss,
+		PriorityEngine:    ps,
+		Writer:            w,
+		TransactionFilter: lf,
+		TransactionWriter: lw,
+		conf:              conf,
+		dynConf:           dynConf,
+		exit:              exit,
+		die:               die,
 	}
 }
 
@@ -178,7 +178,7 @@ func (a *Agent) Process(t model.Trace) {
 	}
 
 	root := t.GetRoot()
-	useLevelFiltering := a.LevelFilter != nil
+	useTransactionFiltering := a.TransactionFilter != nil
 
 	// We get the address of the struct holding the stats associated to no tags
 	// TODO: get the real tagStats related to this trace payload.
@@ -233,24 +233,26 @@ func (a *Agent) Process(t model.Trace) {
 	sublayers := model.ComputeSublayers(t)
 	model.SetSublayersOnSpan(root, sublayers)
 
-	// ensure the root always survives the levelFilter
-	root.SetLevel(model.SpanLevelCritical)
+	// ensure that http transactions always survive the levelFilter
+	if root.Type == "http" {
+		root.SetLevel(model.SpanLevelCritical)
+	}
 	for i := range t {
 		t[i] = quantizer.Quantize(t[i])
 		t[i].Truncate()
 
-		if useLevelFiltering {
+		if useTransactionFiltering {
 			go func() {
 				defer watchdog.LogOnPanic()
 
 				// TODO: does this thing need an env
-				if a.LevelFilter.Keep(&t[i]) {
+				if a.TransactionFilter.Keep(&t[i]) {
 					env := a.conf.DefaultEnv
 					if tenv := t.GetEnv(); tenv != "" {
 						env = tenv
 					}
-
-					a.LevelWriter.in <- model.NewSparseAgentPayload(a.conf.HostName, env, model.Trace{t[i]})
+					// send root spans as individual traces
+					a.TransactionWriter.in <- model.NewSparseAgentPayload(a.conf.HostName, env, model.Trace{t[i]})
 				}
 			}()
 		}

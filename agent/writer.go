@@ -244,7 +244,7 @@ func (w *Writer) Flush() {
 	w.payloadBuffer = payloads
 }
 
-type LevelWriter struct {
+type TransactionWriter struct {
 	endpoint string
 	in       chan *model.SparseAgentPayload // payloads for root spans
 	payload  *model.SparseAgentPayload
@@ -252,8 +252,8 @@ type LevelWriter struct {
 	exit chan struct{}
 }
 
-func NewLevelWriter() *LevelWriter {
-	return &LevelWriter{
+func NewTransactionWriter() *TransactionWriter {
+	return &TransactionWriter{
 		"/TODO/log/intake",
 		make(chan *model.SparseAgentPayload, 100),
 		nil,
@@ -261,7 +261,7 @@ func NewLevelWriter() *LevelWriter {
 	}
 }
 
-func (l *LevelWriter) Run() {
+func (l *TransactionWriter) Run() {
 	flushTicker := time.NewTicker(time.Second)
 	defer flushTicker.Stop()
 
@@ -278,21 +278,21 @@ func (l *LevelWriter) Run() {
 	}
 }
 
-func (l *LevelWriter) Flush() (*http.Response, error) {
+func (l *TransactionWriter) Flush() (*http.Response, error) {
 	bs, err := l.payload.ToProtobufBytes()
 	if err != nil {
-		log.Errorf("failed to encode leveled payload:", err)
+		log.Errorf("failed to encode transaction payload:", err)
 	}
 
 	// TODO meter this
 	resp, err := http.Post(l.endpoint, "application/octet-stream", bytes.NewReader(bs))
 	if err != nil {
-		log.Errorf("failed to send leveled payload:", err)
+		log.Errorf("failed to send transaction payload:", err)
 	}
 
 	return resp, err
 }
 
-func (l *LevelWriter) Buffer(payload *model.SparseAgentPayload) {
+func (l *TransactionWriter) Buffer(payload *model.SparseAgentPayload) {
 	l.payload = payload
 }

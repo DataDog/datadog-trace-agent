@@ -69,7 +69,14 @@ type AgentConfig struct {
 
 	Ignore map[string][]string
 
-	UseLevelFilter bool
+	UseTransactionAnalyzer bool
+	AnalyzeWebTransactions bool
+	AnalyzedOperations     map[string]map[string]float64
+}
+
+type TransactionAnalyzerConfig struct {
+	AnalyzeWebTransactions bool
+	AnalyzedOperations     map[string]map[string]float64
 }
 
 // mergeEnv applies overrides from environment variables to the trace agent configuration
