@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -258,7 +259,7 @@ type LogAgentPayload struct {
 }
 
 func (l LogAgentFlusher) Flush(payload *model.SparseAgentPayload) error {
-	log.Info("flusing payload to logs agent")
+	log.Info("flushing payload to logs agent")
 	var buf bytes.Buffer
 	for _, t := range payload.Traces {
 		b, err := json.Marshal(t)
@@ -267,20 +268,28 @@ func (l LogAgentFlusher) Flush(payload *model.SparseAgentPayload) error {
 			buf.WriteRune('\n')
 		}
 	}
+	log.Info("flushing payload: %s", buf.String())
 
 	logPayload := LogAgentPayload{Message: buf.String()}
 	logBytes, err := json.Marshal(logPayload)
 
 	if err != nil {
-		log.Errorf("failed to encode transaction payload:", err)
+		log.Errorf("failed to encode transaction payload: %v", err)
 	}
 
 	// TODO meter this
-	_, err = http.Post(l.endpoint, "application/json", bytes.NewReader(logBytes))
+	conn, err := net.Dial("tcp", l.endpoint)
 	if err != nil {
-		log.Errorf("failed to send transaction payload:", err)
+		log.Errorf("failed to dial tcp %s %s", l.endpoint, err)
+	}
+	n, err := conn.Write(logBytes)
+	if err != nil {
+		log.Errorf("failed to write to tcp conn %s", l.endpoint)
+	} else {
+		log.Infof("wrote %v bytes", n)
 	}
 
+	log.Info("Sent payload to logs agent")
 	return err
 }
 
@@ -289,7 +298,7 @@ type IntakeFlusher struct {
 }
 
 func (i IntakeFlusher) Flush(payload *model.SparseAgentPayload) error {
-	log.Info("flusing payload to logs intake")
+	log.Info("flushing payload to logs intake")
 	bs, err := payload.ToProtobufBytes()
 	if err != nil {
 		log.Errorf("failed to encode transaction payload:", err)
@@ -323,23 +332,17 @@ func NewTransactionWriter() *TransactionWriter {
 }
 
 func (l *TransactionWriter) Run() {
+	log.Info("Running transaction writer")
 	flushTicker := time.NewTicker(time.Second)
 	defer flushTicker.Stop()
 
 	for {
 		select {
 		case p := <-l.in:
-			l.Buffer(p)
-			l.Flush(l.payload)
-		case <-flushTicker.C:
-			l.Flush(l.payload)
+			log.Info("Flushing payload")
+			l.Flush(p)
 		case <-l.exit:
 			return
-		default:
 		}
 	}
-}
-
-func (l *TransactionWriter) Buffer(payload *model.SparseAgentPayload) {
-	l.payload = payload
 }

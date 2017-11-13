@@ -115,6 +115,9 @@ func (a *Agent) Run() {
 
 	a.Receiver.Run()
 	a.Writer.Run()
+	if a.TransactionWriter != nil {
+		go a.TransactionWriter.Run()
+	}
 	a.ScoreEngine.Run()
 	if a.PriorityEngine != nil {
 		a.PriorityEngine.Run()
@@ -237,24 +240,26 @@ func (a *Agent) Process(t model.Trace) {
 	if root.Type == "http" {
 		root.SetLevel(model.SpanLevelCritical)
 	}
+
+	env := a.conf.DefaultEnv
+	// TODO: does this thing need an env
+	if tenv := t.GetEnv(); tenv != "" {
+		env = tenv
+	}
+
 	for i := range t {
 		t[i] = quantizer.Quantize(t[i])
 		t[i].Truncate()
 
 		if useTransactionFiltering {
-			go func() {
+			go func(s model.Span) {
 				defer watchdog.LogOnPanic()
-				// TODO: does this thing need an env
-				if a.TransactionFilter.Keep(&t[i]) || t[i].Name == "pylons.request" {
-					log.Info("keeping a transaction")
-					env := a.conf.DefaultEnv
-					if tenv := t.GetEnv(); tenv != "" {
-						env = tenv
-					}
+				if a.TransactionFilter.Keep(&s) {
 					// send root spans as individual traces
-					a.TransactionWriter.in <- model.NewSparseAgentPayload(a.conf.HostName, env, model.Trace{t[i]})
+					a.TransactionWriter.in <- model.NewSparseAgentPayload(a.conf.HostName, env, model.Trace{s})
+					log.Infof("Name: %s, Keep: %v", s.Name, a.TransactionFilter.Keep(&s))
 				}
-			}()
+			}(t[i])
 		}
 	}
 
