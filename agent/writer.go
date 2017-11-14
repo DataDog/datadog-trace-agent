@@ -258,10 +258,12 @@ type LogAgentPayload struct {
 	Message string `json:"message"`
 }
 
+const dummyPayload = `{"message": "PUT /api/v1/tags/hosts/i-072e9405571b0ad40 201", "resource_hash": "292bb4d6875ffe98", "name": "pylons.request","service": "mcnulty-web","trace_id": "16692539885623044373", "meta": {"http.method": "PUT","http.url": "/api/v1/tags/hosts/i-072e9405571b0ad40","pylons.user": "","system.pid": "22179","http.status_code": "201","pylons.route.action": "change","pylons.route.controller": "api/cluster"},"duration": 0.038298845,"resource": "api/cluster.change","type": "http"}`
+
 func (l LogAgentFlusher) Flush(payload *model.SparseAgentPayload) error {
 	log.Info("flushing payload to logs agent")
 	var buf bytes.Buffer
-	for _, t := range payload.Traces {
+	for _, t := range payload.Transactions {
 		b, err := json.Marshal(t)
 		if err == nil {
 			buf.Write(b)
@@ -272,17 +274,21 @@ func (l LogAgentFlusher) Flush(payload *model.SparseAgentPayload) error {
 
 	logPayload := LogAgentPayload{Message: buf.String()}
 	logBytes, err := json.Marshal(logPayload)
-
 	if err != nil {
 		log.Errorf("failed to encode transaction payload: %v", err)
 	}
 
 	// TODO meter this
-	conn, err := net.Dial("tcp", l.endpoint)
+	tcpAddr, err := net.ResolveTCPAddr("tcp", l.endpoint)
+	conn, err := net.DialTCP("tcp", nil, tcpAddr)
+	defer conn.Close()
+
 	if err != nil {
 		log.Errorf("failed to dial tcp %s %s", l.endpoint, err)
 	}
 	n, err := conn.Write(logBytes)
+	_, err = conn.Write([]byte{'\n'})
+
 	if err != nil {
 		log.Errorf("failed to write to tcp conn %s", l.endpoint)
 	} else {
@@ -324,7 +330,7 @@ type TransactionWriter struct {
 
 func NewTransactionWriter() *TransactionWriter {
 	return &TransactionWriter{
-		LogAgentFlusher{"localhost:10518"},
+		LogAgentFlusher{"localhost:10520"},
 		make(chan *model.SparseAgentPayload, 100),
 		nil,
 		make(chan struct{}),

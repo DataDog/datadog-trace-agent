@@ -184,3 +184,14 @@ func ProtoToSpan(s *pb.Span) Span {
 		Type:     s.Type,
 	}
 }
+
+func (s *Span) Message() string {
+	return fmt.Sprintf("%s %s %s", s.Name, s.Service, s.Resource)
+}
+
+func (s Span) ToAnalyzed() AnalyzedTransaction {
+	return AnalyzedTransaction{
+		s,
+		s.Message(),
+	}
+}

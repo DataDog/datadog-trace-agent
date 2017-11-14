@@ -256,7 +256,7 @@ func (a *Agent) Process(t model.Trace) {
 				defer watchdog.LogOnPanic()
 				if a.TransactionFilter.Keep(&s) {
 					// send root spans as individual traces
-					a.TransactionWriter.in <- model.NewSparseAgentPayload(a.conf.HostName, env, model.Trace{s})
+					a.TransactionWriter.in <- model.NewSparseAgentPayload(a.conf.HostName, env, s.ToAnalyzed())
 					log.Infof("Name: %s, Keep: %v", s.Name, a.TransactionFilter.Keep(&s))
 				}
 			}(t[i])
