@@ -246,20 +246,25 @@ func (w *Writer) Flush() {
 	w.payloadBuffer = payloads
 }
 
+// Flusher provides a method for flushing transactions to a sink
 type Flusher interface {
 	Flush(*model.SparseAgentPayload) error
 }
 
+// LogAgentFlusher flushes transactions to the logs agent
 type LogAgentFlusher struct {
 	endpoint string
 }
 
+// LogAgentPayload wraps the json to the logs agnet
+// TODO[aaditya]: probably kill this
 type LogAgentPayload struct {
 	Message string `json:"message"`
 }
 
 const dummyPayload = `{"message": "PUT /api/v1/tags/hosts/i-072e9405571b0ad40 201", "resource_hash": "292bb4d6875ffe98", "name": "pylons.request","service": "mcnulty-web","trace_id": "16692539885623044373", "meta": {"http.method": "PUT","http.url": "/api/v1/tags/hosts/i-072e9405571b0ad40","pylons.user": "","system.pid": "22179","http.status_code": "201","pylons.route.action": "change","pylons.route.controller": "api/cluster"},"duration": 0.038298845,"resource": "api/cluster.change","type": "http"}`
 
+// Flush flushes a transaction payload to the logs agent
 func (l LogAgentFlusher) Flush(payload *model.SparseAgentPayload) error {
 	log.Info("flushing payload to logs agent")
 	var buf bytes.Buffer
@@ -299,26 +304,29 @@ func (l LogAgentFlusher) Flush(payload *model.SparseAgentPayload) error {
 	return err
 }
 
+// IntakeFlusher flushes to the logs intake
 type IntakeFlusher struct {
 	endpoint string
 }
 
+// Flush flushes a transaction payload to the logs intake
 func (i IntakeFlusher) Flush(payload *model.SparseAgentPayload) error {
 	log.Info("flushing payload to logs intake")
 	bs, err := payload.ToProtobufBytes()
 	if err != nil {
-		log.Errorf("failed to encode transaction payload:", err)
+		log.Errorf("failed to encode transaction payload: %v", err)
 	}
 
 	// TODO meter this
 	_, err = http.Post(i.endpoint, "application/octet-stream", bytes.NewReader(bs))
 	if err != nil {
-		log.Errorf("failed to send transaction payload:", err)
+		log.Errorf("failed to send transaction payload: %v", err)
 	}
 
 	return err
 }
 
+// TransactionWriter writes transactions
 type TransactionWriter struct {
 	Flusher
 
@@ -328,6 +336,7 @@ type TransactionWriter struct {
 	exit chan struct{}
 }
 
+// NewTransactionWriter creates a new transaction writer with sane defaults
 func NewTransactionWriter() *TransactionWriter {
 	return &TransactionWriter{
 		LogAgentFlusher{"localhost:10520"},
@@ -337,6 +346,7 @@ func NewTransactionWriter() *TransactionWriter {
 	}
 }
 
+// Run runs the thing
 func (l *TransactionWriter) Run() {
 	log.Info("Running transaction writer")
 	flushTicker := time.NewTicker(time.Second)

@@ -112,6 +112,7 @@ func (t Trace) ComputeWeight(root Span) {
 	}
 }
 
+// ToProto converts a trace to protobuf
 func (t Trace) ToProto() *pb.Trace {
 	root := t[0]
 
@@ -125,6 +126,7 @@ func (t Trace) ToProto() *pb.Trace {
 	}
 }
 
+// ProtoToTrace converts protobuf to trace converts a trace to protobuf
 func ProtoToTrace(t *pb.Trace) Trace {
 	spans := make([]Span, 0, len(t.Spans))
 	for _, s := range t.Spans {

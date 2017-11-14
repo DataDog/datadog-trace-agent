@@ -75,11 +75,12 @@ func (s *Span) End() int64 {
 	return s.Start + s.Duration
 }
 
-// Level() returns the level of a span
+// Level returns the level of a span
 func (s *Span) Level() SpanLevel {
 	return s.level
 }
 
+// SetLevel sets a span's level
 func (s *Span) SetLevel(l SpanLevel) {
 	s.level = l
 }
@@ -136,8 +137,10 @@ func (spans Spans) GoString() string {
 	return buf.String()
 }
 
+// SpanLevel is a span's level
 type SpanLevel int
 
+// Span Levels
 const (
 	SpanLevelDebug SpanLevel = iota + 1
 	SpanLevelInfo
@@ -150,6 +153,7 @@ func (s *Span) Meets(cutoff SpanLevel) bool {
 	return s.hasSpanLevel && s.level >= cutoff
 }
 
+// ToProto protobufs a span
 func (s *Span) ToProto() *pb.Span {
 	return &pb.Span{
 		Service:   s.Service,
@@ -168,6 +172,7 @@ func (s *Span) ToProto() *pb.Span {
 	}
 }
 
+// ProtoToSpan converts a proto span to span
 func ProtoToSpan(s *pb.Span) Span {
 	return Span{
 		Service:  s.Service,
@@ -185,10 +190,12 @@ func ProtoToSpan(s *pb.Span) Span {
 	}
 }
 
+// Message provides a transaction representation for this span
 func (s *Span) Message() string {
 	return fmt.Sprintf("%s %s %s", s.Name, s.Service, s.Resource)
 }
 
+// ToAnalyzed converts a span to an AnalyzedTransaction
 func (s Span) ToAnalyzed() AnalyzedTransaction {
 	return AnalyzedTransaction{
 		s,
