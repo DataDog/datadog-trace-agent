@@ -197,8 +197,8 @@ func NewDefaultAgentConfig() *AgentConfig {
 		WatchdogInterval: time.Minute,
 
 		Ignore:                 make(map[string][]string),
-		UseTransactionAnalyzer: true,
-		AnalyzeWebTransactions: true,
+		UseTransactionAnalyzer: false,
+		AnalyzeWebTransactions: false,
 	}
 
 	return ac
@@ -360,6 +360,14 @@ APM_CONF:
 
 	if v, e := conf.GetInt("trace.watchdog", "check_delay_seconds"); e == nil {
 		c.WatchdogInterval = time.Duration(v) * time.Second
+	}
+
+	if v := strings.ToLower(conf.GetDefault("trace.analyzer", "use_transaction_analyzer", "")); v == "yes" || v == "true" {
+		c.UseTransactionAnalyzer = true
+	}
+
+	if v := strings.ToLower(conf.GetDefault("trace.analyzer", "analyze_web_transactions", "")); v == "yes" || v == "true" {
+		c.AnalyzeWebTransactions = true
 	}
 
 ENV_CONF:
