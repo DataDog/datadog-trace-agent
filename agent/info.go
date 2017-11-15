@@ -103,7 +103,9 @@ func updateReceiverStats(rs *receiverStats) {
 
 	s := make([]tagStats, 0, len(rs.Stats))
 	for _, tagStats := range rs.Stats {
-		s = append(s, *tagStats)
+		if !tagStats.isEmpty() {
+			s = append(s, *tagStats)
+		}
 	}
 
 	infoReceiverStats = s
