@@ -30,8 +30,8 @@ message Transaction {
         string message = 2;
 }
 
-message TracePayload {
+message TransactionPayload {
         string hostName = 1;
         string env = 2;
-        repeated Trace traces = 3;
+        repeated Transaction transactions = 3;
 }

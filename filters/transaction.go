@@ -6,8 +6,8 @@ import (
 	"math/rand"
 )
 
-// Transaction is a rule for capturing transactions
-type Transaction struct {
+// TransactionRule is a rule for capturing transactions
+type TransactionRule struct {
 	transactionType string
 
 	service   string
@@ -20,13 +20,13 @@ type Transaction struct {
 const ALL = "*"
 
 // WebOnly analyzes only web endpoints
-var WebOnly = Transaction{"http", ALL, ALL, 1}
+var WebOnly = TransactionRule{"http", ALL, ALL, 1}
 
 // McnultyOnly ensures support-admin requests are analyzed
-var McnultyOnly = Transaction{ALL, "support-admin", "pylons.request", 1}
+var McnultyOnly = TransactionRule{ALL, "support-admin", "pylons.request", 1}
 
 // Matches matches a transaction against rules
-func (t *Transaction) Matches(s *model.Span) bool {
+func (t *TransactionRule) Matches(s *model.Span) bool {
 	var typeMatches, serviceMatches, operationMatches, sampled bool
 
 	typeMatches = t.transactionType == ALL
@@ -49,8 +49,8 @@ func (t *Transaction) Matches(s *model.Span) bool {
 
 // TransactionFilter implements a filter based on span levels
 type TransactionFilter struct {
-	analyzed []Transaction
-	rejected []Transaction
+	analyzed []TransactionRule
+	rejected []TransactionRule
 }
 
 // Keep returns true if SpanLevel is at or above the cutoff level
@@ -82,7 +82,7 @@ func (f *TransactionFilter) Analyzed(s *model.Span) bool {
 
 // NewTransactionFilter creates a new transaction filter
 func NewTransactionFilter(conf *config.AgentConfig) Filter {
-	analyzed := []Transaction{}
+	analyzed := []TransactionRule{}
 	if conf.AnalyzeWebTransactions {
 		analyzed = append(analyzed, WebOnly)
 		analyzed = append(analyzed, McnultyOnly)
@@ -91,6 +91,6 @@ func NewTransactionFilter(conf *config.AgentConfig) Filter {
 	// TODO: support rejected
 	return &TransactionFilter{
 		analyzed: analyzed,
-		rejected: []Transaction{},
+		rejected: []TransactionRule{},
 	}
 }

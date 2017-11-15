@@ -81,7 +81,7 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 	w := NewWriter(conf)
 	w.inServices = r.services
 
-	lw := NewTransactionWriter()
+	tw := NewTransactionWriter()
 
 	return &Agent{
 		Receiver:          r,
@@ -90,8 +90,8 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 		ScoreEngine:       ss,
 		PriorityEngine:    ps,
 		Writer:            w,
-		TransactionFilter: lf,
-		TransactionWriter: lw,
+		TransactionFilter: tf,
+		TransactionWriter: tw,
 		conf:              conf,
 		dynConf:           dynConf,
 		exit:              exit,

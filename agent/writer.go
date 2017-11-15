@@ -361,6 +361,6 @@ func (l *TransactionWriter) Run() {
 	}
 }
 
-func (tw *TransactionWriter) Add(transaction *model.AnalyzedTransaction) {
+func (tw *TransactionWriter) Add(transaction model.AnalyzedTransaction) {
 	tw.payload.Transactions = append(tw.payload.Transactions, transaction)
 }
