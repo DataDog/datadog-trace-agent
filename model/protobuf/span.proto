@@ -25,6 +25,11 @@ message Trace {
         int64 endTime = 7;
 }
 
+message Transaction {
+        Span span = 1;
+        string message = 2;
+}
+
 message TracePayload {
         string hostName = 1;
         string env = 2;

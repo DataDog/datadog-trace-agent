@@ -66,9 +66,9 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 	)
 	f := filters.Setup(conf)
 
-	var lf *filters.TransactionFilter
+	var tf *filters.TransactionFilter
 	if conf.UseTransactionAnalyzer {
-		lf = filters.NewTransactionFilter(conf).(*filters.TransactionFilter)
+		tf = filters.NewTransactionFilter(conf).(*filters.TransactionFilter)
 	}
 
 	ss := NewScoreEngine(conf)
@@ -236,13 +236,8 @@ func (a *Agent) Process(t model.Trace) {
 	sublayers := model.ComputeSublayers(t)
 	model.SetSublayersOnSpan(root, sublayers)
 
-	// ensure that http transactions always survive the levelFilter
-	if root.Type == "http" {
-		root.SetLevel(model.SpanLevelCritical)
-	}
-
+	// inspect the root and override the default env
 	env := a.conf.DefaultEnv
-	// TODO: does this thing need an env
 	if tenv := t.GetEnv(); tenv != "" {
 		env = tenv
 	}
@@ -266,11 +261,8 @@ func (a *Agent) Process(t model.Trace) {
 	pt := processedTrace{
 		Trace:     t,
 		Root:      root,
-		Env:       a.conf.DefaultEnv,
+		Env:       env,
 		Sublayers: sublayers,
-	}
-	if tenv := t.GetEnv(); tenv != "" {
-		pt.Env = tenv
 	}
 
 	// Need to do this computation before entering the concentrator

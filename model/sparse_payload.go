@@ -23,11 +23,18 @@ type AnalyzedTransaction struct {
 	Message string `json:"message"`
 }
 
+func (t *AnalyzedTransaction) ToProto() *pb.Transaction {
+	return &pb.Transaction{
+		t.Span,
+		t.Message,
+	}
+}
+
 // ToProto converts a sparse agent payload to proto
 func (p *SparseAgentPayload) ToProto() *pb.TracePayload {
 	ts := make([]*pb.Trace, 0, len(p.Transactions))
-	for range p.Transactions {
-		ts = append(ts, nil)
+	for _, t := range p.Transactions {
+		ts = append(ts, t.ToProto())
 	}
 
 	return &pb.TracePayload{

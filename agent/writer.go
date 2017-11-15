@@ -262,8 +262,6 @@ type LogAgentPayload struct {
 	Message string `json:"message"`
 }
 
-const dummyPayload = `{"message": "PUT /api/v1/tags/hosts/i-072e9405571b0ad40 201", "resource_hash": "292bb4d6875ffe98", "name": "pylons.request","service": "mcnulty-web","trace_id": "16692539885623044373", "meta": {"http.method": "PUT","http.url": "/api/v1/tags/hosts/i-072e9405571b0ad40","pylons.user": "","system.pid": "22179","http.status_code": "201","pylons.route.action": "change","pylons.route.controller": "api/cluster"},"duration": 0.038298845,"resource": "api/cluster.change","type": "http"}`
-
 // Flush flushes a transaction payload to the logs agent
 func (l LogAgentFlusher) Flush(payload *model.SparseAgentPayload) error {
 	log.Info("flushing payload to logs agent")
@@ -361,4 +359,8 @@ func (l *TransactionWriter) Run() {
 			return
 		}
 	}
+}
+
+func (tw *TransactionWriter) Add(transaction *model.AnalyzedTransaction) {
+	tw.payload.Transactions = append(tw.payload.Transactions, transaction)
 }
