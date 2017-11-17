@@ -23,6 +23,27 @@ type AgentPayload struct {
 	extras map[string]string
 }
 
+type TracePayload struct {
+	HostName     string        `json:"hostname"`     // the host name that will be resolved by the API
+	Env          string        `json:"env"`          // the default environment this agent uses
+	Traces       []Trace       `json:"traces"`       // the traces we sampled
+	Transactions []Transaction `json:"transactions"` // the transactions we sampled
+
+	// private
+	mu     sync.RWMutex
+	extras map[string]string
+}
+
+type StatsPayload struct {
+	HostName string        `json:"hostname"` // the host name that will be resolved by the API
+	Env      string        `json:"env"`      // the default environment this agent uses
+	Stats    []StatsBucket `json:"stats"`    // the statistics we pre-computed
+
+	// private
+	mu     sync.RWMutex
+	extras map[string]string
+}
+
 // IsEmpty tells if a payload contains data. If not, it's useless
 // to flush it.
 func (p *AgentPayload) IsEmpty() bool {
