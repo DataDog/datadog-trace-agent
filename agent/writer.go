@@ -337,7 +337,7 @@ type TransactionWriter struct {
 // NewTransactionWriter creates a new transaction writer with sane defaults
 func NewTransactionWriter() *TransactionWriter {
 	return &TransactionWriter{
-		LogAgentFlusher{"localhost:10520"},
+		LogAgentFlusher{"localhost:10520"}, //TODO: make configurable
 		make(chan *model.SparseAgentPayload, 100),
 		nil,
 		make(chan struct{}),
