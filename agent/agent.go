@@ -245,17 +245,6 @@ func (a *Agent) Process(t model.Trace) {
 	for i := range t {
 		t[i] = quantizer.Quantize(t[i])
 		t[i].Truncate()
-
-		if useTransactionFiltering {
-			go func(s model.Span) {
-				defer watchdog.LogOnPanic()
-				if a.TransactionFilter.Keep(&s) {
-					// send root spans as individual traces
-					a.TransactionWriter.in <- model.NewSparseAgentPayload(a.conf.HostName, env, s.ToAnalyzed())
-					log.Infof("Name: %s, Keep: %v", s.Name, a.TransactionFilter.Keep(&s))
-				}
-			}(t[i])
-		}
 	}
 
 	pt := processedTrace{
@@ -276,7 +265,14 @@ func (a *Agent) Process(t model.Trace) {
 	}()
 	go func() {
 		defer watchdog.LogOnPanic()
-		s.Add(pt)
+		kept := s.Add(pt)
+
+		if useTransactionFiltering {
+			if !kept && a.TransactionFilter.Keep(pt.Root) {
+				//Unsampled root sapns should be routed to the transaction writer to so they are written to transaction storage
+				a.TransactionWriter.in <- model.NewSparseAgentPayload(a.conf.HostName, env, pt.Root.ToAnalyzed())
+			}
+		}
 	}()
 }
 

@@ -34,10 +34,8 @@ type Span struct {
 	// Those are cached information, they are here not only for optimization,
 	// but because the func which fill their values read
 	// the Metrics map and causes map read/write concurrent accesses.
-	weight       float64 // caches the result of Weight() called on the root span
-	topLevel     bool    // caches the result of TopLevel()
-	hasSpanLevel bool
-	level        SpanLevel
+	weight   float64 // caches the result of Weight() called on the root span
+	topLevel bool    // caches the result of TopLevel()
 }
 
 // String formats a Span struct to be displayed as a string
@@ -73,16 +71,6 @@ func NewFlushMarker() Span {
 // End returns the end time of the span.
 func (s *Span) End() int64 {
 	return s.Start + s.Duration
-}
-
-// Level returns the level of a span
-func (s *Span) Level() SpanLevel {
-	return s.level
-}
-
-// SetLevel sets a span's level
-func (s *Span) SetLevel(l SpanLevel) {
-	s.level = l
 }
 
 // Weight returns the weight of the span as defined for sampling, i.e. the
@@ -135,22 +123,6 @@ func (spans Spans) GoString() string {
 	buf.WriteByte('}')
 
 	return buf.String()
-}
-
-// SpanLevel is a span's level
-type SpanLevel int
-
-// Span Levels
-const (
-	SpanLevelDebug SpanLevel = iota + 1
-	SpanLevelInfo
-	SpanLevelCritical
-)
-
-// Meets tells us if a span meets a cutoff. Spans below the cutoff are filtered out
-// spans that don't support levels are kept
-func (s *Span) Meets(cutoff SpanLevel) bool {
-	return s.hasSpanLevel && s.level >= cutoff
 }
 
 // ToProto protobufs a span

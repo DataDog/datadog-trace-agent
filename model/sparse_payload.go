@@ -23,6 +23,7 @@ type AnalyzedTransaction struct {
 	Message string `json:"message"`
 }
 
+// ToProto converts an analyzed transaction to proto
 func (t *AnalyzedTransaction) ToProto() *pb.Transaction {
 	return &pb.Transaction{
 		t.Span.ToProto(),

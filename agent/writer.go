@@ -345,22 +345,23 @@ func NewTransactionWriter() *TransactionWriter {
 }
 
 // Run runs the thing
-func (l *TransactionWriter) Run() {
+func (tw *TransactionWriter) Run() {
 	log.Info("Running transaction writer")
 	flushTicker := time.NewTicker(time.Second)
 	defer flushTicker.Stop()
 
 	for {
 		select {
-		case p := <-l.in:
+		case p := <-tw.in:
 			log.Info("Flushing payload")
-			l.Flush(p)
-		case <-l.exit:
+			tw.Flush(p)
+		case <-tw.exit:
 			return
 		}
 	}
 }
 
+// Add buffers an analyzed transaction in the payload for submission
 func (tw *TransactionWriter) Add(transaction model.AnalyzedTransaction) {
 	tw.payload.Transactions = append(tw.payload.Transactions, transaction)
 }
