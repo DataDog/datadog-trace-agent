@@ -3,6 +3,7 @@ package model
 import (
 	"bytes"
 	"fmt"
+	pb "github.com/DataDog/datadog-trace-agent/model/protobuf"
 	"math/rand"
 )
 
@@ -122,4 +123,54 @@ func (spans Spans) GoString() string {
 	buf.WriteByte('}')
 
 	return buf.String()
+}
+
+// ToProto protobufs a span
+func (s *Span) ToProto() *pb.Span {
+	return &pb.Span{
+		Service:   s.Service,
+		Name:      s.Name,
+		Resource:  s.Resource,
+		TraceID:   s.TraceID,
+		SpanID:    s.SpanID,
+		StartTime: s.Start,
+		EndTime:   s.Start + s.Duration,
+		Duration:  s.Duration,
+		Error:     s.Error,
+		Meta:      s.Meta,
+		Metrics:   s.Metrics,
+		ParentID:  s.ParentID,
+		Type:      s.Type,
+	}
+}
+
+// ProtoToSpan converts a proto span to span
+func ProtoToSpan(s *pb.Span) Span {
+	return Span{
+		Service:  s.Service,
+		Name:     s.Name,
+		Resource: s.Resource,
+		TraceID:  s.TraceID,
+		SpanID:   s.SpanID,
+		Start:    s.StartTime,
+		Duration: s.Duration,
+		Error:    s.Error,
+		Meta:     s.Meta,
+		Metrics:  s.Metrics,
+		ParentID: s.ParentID,
+		Type:     s.Type,
+	}
+}
+
+// Message provides a transaction representation for this span
+func (s *Span) Message() string {
+	return fmt.Sprintf("%s %s %s", s.Name, s.Service, s.Resource)
+}
+
+// ToAnalyzed converts a span to an AnalyzedTransaction
+func (s Span) ToAnalyzed() AnalyzedTransaction {
+	return AnalyzedTransaction{
+		s,
+		s.Message(),
+	}
 }

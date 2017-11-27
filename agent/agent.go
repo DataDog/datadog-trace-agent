@@ -37,12 +37,14 @@ func (pt *processedTrace) weight() float64 {
 
 // Agent struct holds all the sub-routines structs and make the data flow between them
 type Agent struct {
-	Receiver       *HTTPReceiver
-	Concentrator   *Concentrator
-	Filters        []filters.Filter
-	ScoreEngine    *Sampler
-	PriorityEngine *Sampler
-	Writer         *Writer
+	Receiver          *HTTPReceiver
+	Concentrator      *Concentrator
+	Filters           []filters.Filter
+	ScoreEngine       *Sampler
+	PriorityEngine    *Sampler
+	Writer            *Writer
+	TransactionFilter *filters.TransactionFilter
+	TransactionWriter *TransactionWriter
 
 	// config
 	conf    *config.AgentConfig
@@ -63,6 +65,12 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 		conf.BucketInterval.Nanoseconds(),
 	)
 	f := filters.Setup(conf)
+
+	var tf *filters.TransactionFilter
+	if conf.UseTransactionAnalyzer {
+		tf = filters.NewTransactionFilter(conf).(*filters.TransactionFilter)
+	}
+
 	ss := NewScoreEngine(conf)
 	var ps *Sampler
 	if conf.PrioritySampling {
@@ -73,17 +81,21 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 	w := NewWriter(conf)
 	w.inServices = r.services
 
+	tw := NewTransactionWriter()
+
 	return &Agent{
-		Receiver:       r,
-		Concentrator:   c,
-		Filters:        f,
-		ScoreEngine:    ss,
-		PriorityEngine: ps,
-		Writer:         w,
-		conf:           conf,
-		dynConf:        dynConf,
-		exit:           exit,
-		die:            die,
+		Receiver:          r,
+		Concentrator:      c,
+		Filters:           f,
+		ScoreEngine:       ss,
+		PriorityEngine:    ps,
+		Writer:            w,
+		TransactionFilter: tf,
+		TransactionWriter: tw,
+		conf:              conf,
+		dynConf:           dynConf,
+		exit:              exit,
+		die:               die,
 	}
 }
 
@@ -103,6 +115,9 @@ func (a *Agent) Run() {
 
 	a.Receiver.Run()
 	a.Writer.Run()
+	if a.TransactionWriter != nil {
+		go a.TransactionWriter.Run()
+	}
 	a.ScoreEngine.Run()
 	if a.PriorityEngine != nil {
 		a.PriorityEngine.Run()
@@ -166,6 +181,7 @@ func (a *Agent) Process(t model.Trace) {
 	}
 
 	root := t.GetRoot()
+	useTransactionFiltering := a.TransactionFilter != nil
 
 	// We get the address of the struct holding the stats associated to no tags
 	// TODO: get the real tagStats related to this trace payload.
@@ -220,6 +236,12 @@ func (a *Agent) Process(t model.Trace) {
 	sublayers := model.ComputeSublayers(t)
 	model.SetSublayersOnSpan(root, sublayers)
 
+	// inspect the root and override the default env
+	env := a.conf.DefaultEnv
+	if tenv := t.GetEnv(); tenv != "" {
+		env = tenv
+	}
+
 	for i := range t {
 		t[i] = quantizer.Quantize(t[i])
 		t[i].Truncate()
@@ -228,11 +250,8 @@ func (a *Agent) Process(t model.Trace) {
 	pt := processedTrace{
 		Trace:     t,
 		Root:      root,
-		Env:       a.conf.DefaultEnv,
+		Env:       env,
 		Sublayers: sublayers,
-	}
-	if tenv := t.GetEnv(); tenv != "" {
-		pt.Env = tenv
 	}
 
 	// Need to do this computation before entering the concentrator
@@ -246,7 +265,14 @@ func (a *Agent) Process(t model.Trace) {
 	}()
 	go func() {
 		defer watchdog.LogOnPanic()
-		s.Add(pt)
+		kept := s.Add(pt)
+
+		if useTransactionFiltering {
+			if !kept && a.TransactionFilter.Keep(pt.Root) {
+				//Unsampled root sapns should be routed to the transaction writer to so they are written to transaction storage
+				a.TransactionWriter.in <- model.NewSparseAgentPayload(a.conf.HostName, env, pt.Root.ToAnalyzed())
+			}
+		}
 	}()
 }
 

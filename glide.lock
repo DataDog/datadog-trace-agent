@@ -1,5 +1,5 @@
 hash: fdd2b7f90ca62d4e5e0487722a3aff0ba563913363ce1f8d74070d2e3feb2d17
-updated: 2017-10-24T16:55:28.7799183-07:00
+updated: 2017-11-14T00:50:35.954981435Z
 imports:
 - name: github.com/cihub/seelog
   version: d2c6e5aa9fbfdd1c624e140287063c7730654115
@@ -13,6 +13,10 @@ imports:
   version: de8695c8edbf8236f30d6e1376e20b198a028d42
   subpackages:
   - oleutil
+- name: github.com/golang/protobuf
+  version: 1e59b77b52bf8e4b449a57e6f79f21226d571845
+  subpackages:
+  - proto
 - name: github.com/golang/tools
   version: 219e654bb7266d3b73c4610ed24c33d12560826a
   subpackages:

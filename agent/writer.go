@@ -1,6 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"net"
+	"net/http"
 	"sync"
 	"time"
 
@@ -240,4 +244,124 @@ func (w *Writer) Flush() {
 		float64(bufSize), nil, 1)
 
 	w.payloadBuffer = payloads
+}
+
+// Flusher provides a method for flushing transactions to a sink
+type Flusher interface {
+	Flush(*model.SparseAgentPayload) error
+}
+
+// LogAgentFlusher flushes transactions to the logs agent
+type LogAgentFlusher struct {
+	endpoint string
+}
+
+// LogAgentPayload wraps the json to the logs agnet
+// TODO[aaditya]: probably kill this
+type LogAgentPayload struct {
+	Message string `json:"message"`
+}
+
+// Flush flushes a transaction payload to the logs agent
+func (l LogAgentFlusher) Flush(payload *model.SparseAgentPayload) error {
+	log.Info("flushing payload to logs agent")
+	var buf bytes.Buffer
+	for _, t := range payload.Transactions {
+		b, err := json.Marshal(t)
+		if err == nil {
+			buf.Write(b)
+			buf.WriteRune('\n')
+		}
+	}
+	log.Info("flushing payload: %s", buf.String())
+
+	logPayload := LogAgentPayload{Message: buf.String()}
+	logBytes, err := json.Marshal(logPayload)
+	if err != nil {
+		log.Errorf("failed to encode transaction payload: %v", err)
+	}
+
+	// TODO meter this
+	tcpAddr, err := net.ResolveTCPAddr("tcp", l.endpoint)
+	conn, err := net.DialTCP("tcp", nil, tcpAddr)
+	defer conn.Close()
+
+	if err != nil {
+		log.Errorf("failed to dial tcp %s %s", l.endpoint, err)
+	}
+	n, err := conn.Write(logBytes)
+	_, err = conn.Write([]byte{'\n'})
+
+	if err != nil {
+		log.Errorf("failed to write to tcp conn %s", l.endpoint)
+	} else {
+		log.Infof("wrote %v bytes", n)
+	}
+
+	log.Info("Sent payload to logs agent")
+	return err
+}
+
+// IntakeFlusher flushes to the logs intake
+type IntakeFlusher struct {
+	endpoint string
+}
+
+// Flush flushes a transaction payload to the logs intake
+func (i IntakeFlusher) Flush(payload *model.SparseAgentPayload) error {
+	log.Info("flushing payload to logs intake")
+	bs, err := payload.ToProtobufBytes()
+	if err != nil {
+		log.Errorf("failed to encode transaction payload: %v", err)
+	}
+
+	// TODO meter this
+	_, err = http.Post(i.endpoint, "application/octet-stream", bytes.NewReader(bs))
+	if err != nil {
+		log.Errorf("failed to send transaction payload: %v", err)
+	}
+
+	return err
+}
+
+// TransactionWriter writes transactions
+type TransactionWriter struct {
+	Flusher
+
+	in      chan *model.SparseAgentPayload // payloads for root spans
+	payload *model.SparseAgentPayload
+
+	exit chan struct{}
+}
+
+// NewTransactionWriter creates a new transaction writer with sane defaults
+func NewTransactionWriter() *TransactionWriter {
+	return &TransactionWriter{
+		LogAgentFlusher{"localhost:10520"}, //TODO: make configurable
+		make(chan *model.SparseAgentPayload, 100),
+		nil,
+		make(chan struct{}),
+	}
+}
+
+// Run runs the thing
+func (tw *TransactionWriter) Run() {
+	log.Info("Running transaction writer")
+	flushTicker := time.NewTicker(time.Second)
+	defer flushTicker.Stop()
+
+	for {
+		select {
+		case p := <-tw.in:
+			log.Info("Flushing payload")
+			tw.Flush(p)
+		case <-tw.exit:
+			return
+		}
+	}
+}
+
+// Add buffers an analyzed transaction in the payload for submission
+func (tw *TransactionWriter) Add(transaction model.AnalyzedTransaction) {
+	tw.payload.Transactions = append(tw.payload.Transactions, transaction)
 }

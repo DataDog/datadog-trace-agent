@@ -68,13 +68,15 @@ func (s *Sampler) Run() {
 }
 
 // Add samples a trace then keep it until the next flush
-func (s *Sampler) Add(t processedTrace) {
+func (s *Sampler) Add(t processedTrace) (kept bool) {
 	s.mu.Lock()
 	s.traceCount++
-	if s.engine.Sample(t.Trace, t.Root, t.Env) {
+	if kept = s.engine.Sample(t.Trace, t.Root, t.Env); kept {
 		s.sampledTraces = append(s.sampledTraces, t.Trace)
 	}
 	s.mu.Unlock()
+
+	return kept
 }
 
 // Stop stops the sampler

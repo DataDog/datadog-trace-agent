@@ -68,6 +68,10 @@ type AgentConfig struct {
 	Proxy *ProxySettings
 
 	Ignore map[string][]string
+
+	UseTransactionAnalyzer bool
+	AnalyzeWebTransactions bool
+	AnalyzedOperations     map[string]map[string]float64
 }
 
 // mergeEnv applies overrides from environment variables to the trace agent configuration
@@ -192,7 +196,9 @@ func NewDefaultAgentConfig() *AgentConfig {
 		MaxConnections:   200, // in practice, rarely goes over 20
 		WatchdogInterval: time.Minute,
 
-		Ignore: make(map[string][]string),
+		Ignore:                 make(map[string][]string),
+		UseTransactionAnalyzer: false,
+		AnalyzeWebTransactions: false,
 	}
 
 	return ac
@@ -354,6 +360,14 @@ APM_CONF:
 
 	if v, e := conf.GetInt("trace.watchdog", "check_delay_seconds"); e == nil {
 		c.WatchdogInterval = time.Duration(v) * time.Second
+	}
+
+	if v := strings.ToLower(conf.GetDefault("trace.analyzer", "use_transaction_analyzer", "")); v == "yes" || v == "true" {
+		c.UseTransactionAnalyzer = true
+	}
+
+	if v := strings.ToLower(conf.GetDefault("trace.analyzer", "analyze_web_transactions", "")); v == "yes" || v == "true" {
+		c.AnalyzeWebTransactions = true
 	}
 
 ENV_CONF:
