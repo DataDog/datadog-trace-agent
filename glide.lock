@@ -1,8 +1,12 @@
-hash: fdd2b7f90ca62d4e5e0487722a3aff0ba563913363ce1f8d74070d2e3feb2d17
-updated: 2017-10-24T16:55:28.7799183-07:00
+hash: 34b8446bdae5494c2d28db02226a944af14466e1bb9a9ed1ba28f26a8949780f
+updated: 2017-11-29T12:30:01.732107+01:00
 imports:
 - name: github.com/cihub/seelog
   version: d2c6e5aa9fbfdd1c624e140287063c7730654115
+- name: github.com/DataDog/datadog-agent
+  version: 92733ff01547103d5286afc9e272d501cb18f761
+  subpackages:
+  - pkg/pidfile
 - name: github.com/DataDog/datadog-go
   version: a9c7a9896c1847c9cc2b068a2ae68e9d74540a5d
   subpackages:
@@ -18,7 +22,7 @@ imports:
   subpackages:
   - go/gcexportdata
 - name: github.com/philhofer/fwd
-  version: 98c11a7a6ec829d672b03833c3d69a7fae1ca972
+  version: bb6d471dc95d4fe11e432687f8b70ff496cf3136
 - name: github.com/shirou/gopsutil
   version: 70a1b78fe69202d93d6718fc9e3a4d6f81edfd58
   subpackages:
@@ -31,13 +35,13 @@ imports:
 - name: github.com/shirou/w32
   version: bb4de0191aa41b5507caa14b0650cdbddcd9280b
 - name: github.com/StackExchange/wmi
-  version: e542ed97d15e640bdc14b5c12162d59e8fc67324
+  version: ea383cf3ba6ec950874b8486cd72356d007c768f
 - name: github.com/tinylib/msgp
   version: 362bfb3384d53ae4d5dd745983a4d70b6d23628c
   subpackages:
   - msgp
 - name: golang.org/x/sys
-  version: a1a1f1746d156bbc9954f29134b20ed4ce2752f1
+  version: 8f0908ab3b2457e2e15403d3697c9ef5cb4b57a9
   subpackages:
   - windows
   - windows/registry

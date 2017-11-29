@@ -6,6 +6,9 @@ import:
   - statsd
 - package: github.com/cihub/seelog
   version: v2.6
+- package: github.com/DataDog/datadog-agent
+  subpackages:
+  - pkg/pidfile
 - package: github.com/tinylib/msgp
   version: 362bfb3384d53ae4d5dd745983a4d70b6d23628c
   subpackages:
