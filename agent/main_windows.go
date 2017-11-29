@@ -36,6 +36,7 @@ func init() {
 	flag.StringVar(&opts.ddConfigFile, "ddconfig", "c:\\programdata\\datadog\\datadog.conf", "Classic agent config file location")
 	// FIXME: merge all APM configuration into dd-agent/datadog.conf and deprecate the below flag
 	flag.StringVar(&opts.configFile, "config", "c:\\programdata\\datadog\\trace-agent.ini", "Trace agent ini config file.")
+	flag.StringVar(&opts.pidfilePath, "pid", "", "Path to set pidfile for process")
 	flag.BoolVar(&opts.version, "version", false, "Show version information and exit")
 	flag.BoolVar(&opts.info, "info", false, "Show info about running trace agent process and exit")
 

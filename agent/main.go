@@ -15,6 +15,7 @@ import (
 	log "github.com/cihub/seelog"
 	_ "net/http/pprof"
 
+	"github.com/DataDog/datadog-agent/pkg/pidfile"
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
@@ -53,6 +54,7 @@ func die(format string, args ...interface{}) {
 var opts struct {
 	ddConfigFile string
 	configFile   string
+	pidfilePath  string
 	logLevel     string
 	version      bool
 	info         bool
@@ -124,6 +126,20 @@ func runAgent(exit chan struct{}) {
 	if opts.version {
 		fmt.Print(versionString())
 		return
+	}
+
+	if !opts.info && opts.pidfilePath != "" {
+		err := pidfile.WritePID(opts.pidfilePath)
+		if err != nil {
+			log.Errorf("Error while writing PID file, exiting: %v", err)
+			os.Exit(1)
+		}
+
+		log.Infof("pid '%d' written to pid file '%s'", os.Getpid(), opts.pidfilePath)
+		defer func() {
+			// remove pidfile if set
+			os.Remove(opts.pidfilePath)
+		}()
 	}
 
 	// Instantiate the config
