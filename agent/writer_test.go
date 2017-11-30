@@ -46,8 +46,8 @@ func newFailingTestServer(t *testing.T, status int) *httptest.Server {
 	}))
 }
 
-func newTestPayload(env string) model.AgentPayload {
-	return model.AgentPayload{
+func newTestPayload(env string) *model.AgentPayload {
+	return &model.AgentPayload{
 		HostName: "test.host",
 		Env:      env,
 		Traces:   []model.Trace{model.Trace{fixtures.TestSpan()}},
@@ -179,13 +179,13 @@ func TestWriterBuffering(t *testing.T) {
 	assert := assert.New(t)
 
 	nbPayloads := 3
-	payloads := make([]model.AgentPayload, nbPayloads)
+	payloads := make([]*model.AgentPayload, nbPayloads)
 	payloadSizes := make([]int, nbPayloads)
 	for i := range payloads {
 		payload := newTestPayload(fmt.Sprintf("p%d", i))
 		payloads[i] = payload
 
-		data, err := model.EncodeAgentPayload(&payload)
+		data, err := model.EncodeAgentPayload(payload)
 		if err != nil {
 			t.Fatalf("cannot encode test payload: %v", err)
 		}
@@ -204,7 +204,7 @@ func TestWriterBuffering(t *testing.T) {
 
 	w := NewWriter(conf)
 	// Make the chan unbuffered to block on write
-	w.inPayloads = make(chan model.AgentPayload)
+	w.inPayloads = make(chan *model.AgentPayload)
 	go w.Run()
 
 	for _, payload := range payloads {
@@ -234,7 +234,7 @@ func TestWriterDisabledBuffering(t *testing.T) {
 
 	w := NewWriter(conf)
 	// Make the chan unbuffered to block on write
-	w.inPayloads = make(chan model.AgentPayload)
+	w.inPayloads = make(chan *model.AgentPayload)
 	go w.Run()
 
 	w.inPayloads <- newTestPayload("test")

@@ -139,7 +139,7 @@ func (a *Agent) Run() {
 			wg.Wait()
 			p.SetExtra(languageHeaderKey, a.Receiver.Languages())
 
-			a.Writer.inPayloads <- p
+			a.Writer.inPayloads <- &p
 		case <-watchdogTicker.C:
 			a.watchdog()
 		case <-a.exit:

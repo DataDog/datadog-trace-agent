@@ -7,7 +7,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/model"
 )
 
-func newBenchPayload(traces, spans, stats int) model.AgentPayload {
+func newBenchPayload(traces, spans, stats int) *model.AgentPayload {
 	payload := model.AgentPayload{
 		HostName: "test.host",
 		Env:      "test",
@@ -27,7 +27,7 @@ func newBenchPayload(traces, spans, stats int) model.AgentPayload {
 	for i := 0; i < stats; i++ {
 		payload.Stats = append(payload.Stats, fixtures.TestStatsBucket())
 	}
-	return payload
+	return &payload
 }
 
 func BenchmarkEncodeAgentPayload(b *testing.B) {
@@ -36,7 +36,7 @@ func BenchmarkEncodeAgentPayload(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		if _, err := model.EncodeAgentPayload(&payload); err != nil {
+		if _, err := model.EncodeAgentPayload(payload); err != nil {
 			b.Fatalf("error encoding payload: %v", b)
 		}
 	}

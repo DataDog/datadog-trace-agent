@@ -39,7 +39,7 @@ func (ae *apiError) Error() string {
 type AgentEndpoint interface {
 	// Write sends an agent payload which carries all the
 	// pre-processed stats/traces
-	Write(b model.AgentPayload) (int, error)
+	Write(b *model.AgentPayload) (int, error)
 
 	// WriteServices sends updates about the services metadata
 	WriteServices(s model.ServicesMetadata)
@@ -92,11 +92,11 @@ func (ae *APIEndpoint) SetProxy(settings *config.ProxySettings) {
 }
 
 // Write will send the serialized payload to the API endpoint.
-func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
+func (ae *APIEndpoint) Write(p *model.AgentPayload) (int, error) {
 	startFlush := time.Now()
 
 	// Serialize the payload to send it to the API
-	data, err := model.EncodeAgentPayload(&p)
+	data, err := model.EncodeAgentPayload(p)
 	if err != nil {
 		log.Errorf("encoding issue: %v", err)
 		return 0, err
@@ -269,7 +269,7 @@ type endpointStats struct {
 type NullEndpoint struct{}
 
 // Write just logs and bails
-func (ne NullEndpoint) Write(p model.AgentPayload) (int, error) {
+func (ne NullEndpoint) Write(p *model.AgentPayload) (int, error) {
 	log.Debug("null endpoint: dropping payload, %d traces, %d stats buckets", p.Traces, p.Stats)
 	return 0, nil
 }
