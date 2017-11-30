@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"math/rand"
 	"os"
@@ -12,11 +11,13 @@ import (
 	"syscall"
 	"time"
 
-	log "github.com/cihub/seelog"
 	_ "net/http/pprof"
+
+	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/datadog-agent/pkg/pidfile"
 	"github.com/DataDog/datadog-trace-agent/config"
+	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
@@ -62,38 +63,6 @@ var opts struct {
 	memprofile   string
 }
 
-// version info sourced from build flags
-var (
-	Version   string
-	GitCommit string
-	GitBranch string
-	BuildDate string
-	GoVersion string
-)
-
-// versionString returns the version information filled in at build time
-func versionString() string {
-	var buf bytes.Buffer
-
-	if Version != "" {
-		fmt.Fprintf(&buf, "Version: %s\n", Version)
-	}
-	if GitCommit != "" {
-		fmt.Fprintf(&buf, "Git hash: %s\n", GitCommit)
-	}
-	if GitBranch != "" {
-		fmt.Fprintf(&buf, "Git branch: %s\n", GitBranch)
-	}
-	if BuildDate != "" {
-		fmt.Fprintf(&buf, "Build date: %s\n", BuildDate)
-	}
-	if GoVersion != "" {
-		fmt.Fprintf(&buf, "Go Version: %s\n", GoVersion)
-	}
-
-	return buf.String()
-}
-
 const agentDisabledMessage = `trace-agent not enabled.
 Set env var DD_APM_ENABLED=true or add
 apm_enabled: true
@@ -124,7 +93,7 @@ func runAgent(exit chan struct{}) {
 	}
 
 	if opts.version {
-		fmt.Print(versionString())
+		fmt.Print(info.VersionString())
 		return
 	}
 
@@ -172,13 +141,13 @@ func runAgent(exit chan struct{}) {
 		die("%v", err)
 	}
 
-	err = initInfo(agentConf) // for expvar & -info option
+	err = info.InitInfo(agentConf) // for expvar & -info option
 	if err != nil {
 		panic(err)
 	}
 
 	if opts.info {
-		if err := Info(os.Stdout, agentConf); err != nil {
+		if err := info.Info(os.Stdout, agentConf); err != nil {
 			// need not display the error, Info should do it already
 			os.Exit(1)
 		}

@@ -1,4 +1,4 @@
-package main
+package info
 
 import (
 	"bytes"
@@ -186,13 +186,13 @@ func testServerError(t *testing.T) *httptest.Server {
 }
 
 // run this at the beginning of each test, this is because we *really*
-// need to have initInfo be called before doing anything
+// need to have InitInfo be called before doing anything
 func testInit(t *testing.T) *config.AgentConfig {
 	assert := assert.New(t)
 	conf := config.NewDefaultAgentConfig()
 	assert.NotNil(conf)
 
-	err := initInfo(conf)
+	err := InitInfo(conf)
 	assert.Nil(err)
 
 	return conf
@@ -338,7 +338,7 @@ func TestInfoReceiverStats(t *testing.T) {
 	conf := testInit(t)
 	assert.NotNil(conf)
 
-	stats := newReceiverStats()
+	stats := NewReceiverStats()
 	t1 := &tagStats{
 		Tags{Lang: "python"},
 		Stats{TracesReceived: 23, TracesDropped: 2, TracesBytes: 3244, SpansReceived: 213, SpansDropped: 14},
@@ -357,7 +357,7 @@ func TestInfoReceiverStats(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		go func() {
 			for j := 0; j < 1000; j++ {
-				updateReceiverStats(stats)
+				UpdateReceiverStats(stats)
 			}
 			done <- struct{}{}
 		}()
@@ -383,7 +383,7 @@ func TestInfoReceiverStats(t *testing.T) {
 		t.Errorf("bad stats type: %v", s)
 	}
 	stats.Stats[t1.Tags].TracesReceived++
-	updateReceiverStats(stats)
+	UpdateReceiverStats(stats)
 	s = publishReceiverStats()
 	switch s := s.(type) {
 	case []tagStats:

@@ -12,7 +12,7 @@ def go_build(program, opts={})
     :add_build_vars => true
   }.merge(opts)
 
-  dd = 'main'
+  dd = 'info'
   commit = `git rev-parse --short HEAD`.strip
   branch = `git rev-parse --abbrev-ref HEAD`.strip
   date = Time.now.iso8601
@@ -32,7 +32,7 @@ def go_build(program, opts={})
 
   cmd = opts[:cmd]
   cmd += ' -race' if opts[:race]
-  
+
   if ENV['windres'] then
     # first compile the message table, as it's an input to the resource file
     msgcmd = "windmc --target pe-x86-64 -r agent/windows_resources agent/windows_resources/trace-agent-msg.mc"
@@ -45,7 +45,7 @@ def go_build(program, opts={})
     sh rescmd
 
   end
-  
+
   sh "#{cmd} -ldflags \"#{ldflags.join(' ')}\" #{program}"
 end
 

@@ -1,4 +1,4 @@
-package main
+package writer
 
 import (
 	"fmt"
@@ -69,7 +69,7 @@ func TestWriterServices(t *testing.T) {
 	conf.APIKey = "xxxxxxx"
 
 	w := NewWriter(conf)
-	w.inServices = make(chan model.ServicesMetadata)
+	w.InServices = make(chan model.ServicesMetadata)
 
 	go w.Run()
 
@@ -80,7 +80,7 @@ func TestWriterServices(t *testing.T) {
 		},
 	}
 
-	w.inServices <- services
+	w.InServices <- services
 
 receivingLoop:
 	for {
@@ -115,7 +115,7 @@ func TestWriterPayload(t *testing.T) {
 	w := NewWriter(conf)
 	go w.Run()
 
-	w.inPayloads <- newTestPayload("test")
+	w.InPayloads <- newTestPayload("test")
 
 receivingLoop:
 	for {
@@ -152,7 +152,7 @@ func TestWriterPayloadErrors(t *testing.T) {
 	w := NewWriter(conf)
 	go w.Run()
 
-	w.inPayloads <- newTestPayload("test")
+	w.InPayloads <- newTestPayload("test")
 
 receivingLoop:
 	for {
@@ -204,11 +204,11 @@ func TestWriterBuffering(t *testing.T) {
 
 	w := NewWriter(conf)
 	// Make the chan unbuffered to block on write
-	w.inPayloads = make(chan model.AgentPayload)
+	w.InPayloads = make(chan model.AgentPayload)
 	go w.Run()
 
 	for _, payload := range payloads {
-		w.inPayloads <- payload
+		w.InPayloads <- payload
 	}
 
 	w.Stop()
@@ -234,10 +234,10 @@ func TestWriterDisabledBuffering(t *testing.T) {
 
 	w := NewWriter(conf)
 	// Make the chan unbuffered to block on write
-	w.inPayloads = make(chan model.AgentPayload)
+	w.InPayloads = make(chan model.AgentPayload)
 	go w.Run()
 
-	w.inPayloads <- newTestPayload("test")
+	w.InPayloads <- newTestPayload("test")
 
 	w.Stop()
 

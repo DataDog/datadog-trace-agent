@@ -9,10 +9,12 @@ import (
 
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/filters"
+	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/quantizer"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
+	"github.com/DataDog/datadog-trace-agent/writer"
 )
 
 const (
@@ -42,7 +44,7 @@ type Agent struct {
 	Filters        []filters.Filter
 	ScoreEngine    *Sampler
 	PriorityEngine *Sampler
-	Writer         *Writer
+	Writer         *writer.Writer
 
 	// config
 	conf    *config.AgentConfig
@@ -70,8 +72,8 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 		ps = NewPriorityEngine(conf, dynConf)
 	}
 
-	w := NewWriter(conf)
-	w.inServices = r.services
+	w := writer.NewWriter(conf)
+	w.InServices = r.services
 
 	return &Agent{
 		Receiver:       r,
@@ -99,7 +101,7 @@ func (a *Agent) Run() {
 	defer watchdogTicker.Stop()
 
 	// update the data served by expvar so that we don't expose a 0 sample rate
-	updatePreSampler(*a.Receiver.preSampler.Stats())
+	info.UpdatePreSampler(*a.Receiver.preSampler.Stats())
 
 	a.Receiver.Run()
 	a.Writer.Run()
@@ -139,7 +141,7 @@ func (a *Agent) Run() {
 			wg.Wait()
 			p.SetExtra(languageHeaderKey, a.Receiver.Languages())
 
-			a.Writer.inPayloads <- p
+			a.Writer.InPayloads <- p
 		case <-watchdogTicker.C:
 			a.watchdog()
 		case <-a.exit:
@@ -169,7 +171,7 @@ func (a *Agent) Process(t model.Trace) {
 
 	// We get the address of the struct holding the stats associated to no tags
 	// TODO: get the real tagStats related to this trace payload.
-	ts := a.Receiver.stats.getTagStats(Tags{})
+	ts := a.Receiver.stats.GetTagStats(info.Tags{})
 
 	// We choose the sampler dynamically, depending on trace content,
 	// it has a sampling priority info (wether 0 or 1 or more) we respect
@@ -263,7 +265,7 @@ func (a *Agent) watchdog() {
 		a.die("exceeded max connections (current=%d, max=%d)", wi.Net.Connections, a.conf.MaxConnections)
 	}
 
-	updateWatchdogInfo(wi)
+	info.UpdateWatchdogInfo(wi)
 
 	// Adjust pre-sampling dynamically
 	rate, err := sampler.CalcPreSampleRate(a.conf.MaxCPU, wi.CPU.UserAvg, a.Receiver.preSampler.RealRate())
@@ -276,5 +278,5 @@ func (a *Agent) watchdog() {
 	a.Receiver.preSampler.SetRate(rate)
 	a.Receiver.preSampler.SetError(err)
 
-	updatePreSampler(*a.Receiver.preSampler.Stats())
+	info.UpdatePreSampler(*a.Receiver.preSampler.Stats())
 }
