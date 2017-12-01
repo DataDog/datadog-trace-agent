@@ -1,4 +1,4 @@
-package main
+package writer
 
 import (
 	"bytes"
@@ -10,6 +10,7 @@ import (
 	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/datadog-trace-agent/config"
+	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
@@ -50,7 +51,7 @@ type AgentEndpoint interface {
 type APIEndpoint struct {
 	apiKey string
 	url    string
-	stats  endpointStats
+	stats  info.EndpointStats
 	client *http.Client
 }
 
@@ -209,7 +210,7 @@ func (ae *APIEndpoint) WriteServices(s model.ServicesMetadata) {
 
 // logStats periodically submits stats about the endpoint to statsd
 func (ae *APIEndpoint) logStats() {
-	var accStats endpointStats
+	var accStats info.EndpointStats
 
 	for range time.Tick(time.Minute) {
 		// Load counters and reset them for the next flush
@@ -231,37 +232,8 @@ func (ae *APIEndpoint) logStats() {
 		statsd.Client.Count("datadog.trace_agent.endpoint.services_payload_error", int64(accStats.ServicesPayloadError), nil, 1)
 		statsd.Client.Count("datadog.trace_agent.endpoint.services_bytes", int64(accStats.ServicesBytes), nil, 1)
 
-		updateEndpointStats(accStats)
+		info.UpdateEndpointStats(accStats)
 	}
-}
-
-// endpointStats contains stats about the volume of data written
-type endpointStats struct {
-	// TracesPayload is the number of traces payload sent, including errors.
-	// If several URLs are given, each URL counts for one.
-	TracesPayload int64
-	// TracesPayloadError is the number of traces payload sent with an error.
-	// If several URLs are given, each URL counts for one.
-	TracesPayloadError int64
-	// TracesBytes is the size of the traces payload data sent, including errors.
-	// If several URLs are given, it does not change the size (shared for all).
-	// This is the raw data, encoded, compressed.
-	TracesBytes int64
-	// TracesCount is the number of traces in the traces payload data sent, including errors.
-	// If several URLs are given, it does not change the size (shared for all).
-	TracesCount int64
-	// TracesStats is the number of stats in the traces payload data sent, including errors.
-	// If several URLs are given, it does not change the size (shared for all).
-	TracesStats int64
-	// TracesPayload is the number of services payload sent, including errors.
-	// If several URLs are given, each URL counts for one.
-	ServicesPayload int64
-	// ServicesPayloadError is the number of services payload sent with an error.
-	// If several URLs are given, each URL counts for one.
-	ServicesPayloadError int64
-	// TracesBytes is the size of the services payload data sent, including errors.
-	// If several URLs are given, it does not change the size (shared for all).
-	ServicesBytes int64
 }
 
 // NullEndpoint implements AgentEndpoint, it just logs data

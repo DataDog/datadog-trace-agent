@@ -9,6 +9,7 @@ import (
 	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/datadog-trace-agent/config"
+	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
@@ -22,23 +23,6 @@ type Sampler struct {
 	lastFlush     time.Time
 
 	engine sampler.Engine
-}
-
-// samplerStats contains sampler statistics
-type samplerStats struct {
-	// KeptTPS is the number of traces kept (average per second for last flush)
-	KeptTPS float64
-	// TotalTPS is the total number of traces (average per second for last flush)
-	TotalTPS float64
-}
-
-type samplerInfo struct {
-	// EngineType contains the type of the engine (tells old sampler and new distributed sampler apart)
-	EngineType string
-	// Stats contains statistics about what the sampler is doing.
-	Stats samplerStats
-	// State is the internal state of the sampler (for debugging mostly)
-	State sampler.InternalState
 }
 
 // NewScoreEngine creates a new empty sampler ready to be started
@@ -101,7 +85,7 @@ func (s *Sampler) Flush() []model.Trace {
 
 	switch state := state.(type) {
 	case sampler.InternalState:
-		var stats samplerStats
+		var stats info.SamplerStats
 		if duration > 0 {
 			stats.KeptTPS = float64(len(traces)) / duration.Seconds()
 			stats.TotalTPS = float64(traceCount) / duration.Seconds()
@@ -114,9 +98,9 @@ func (s *Sampler) Flush() []model.Trace {
 		// publish through expvar
 		switch s.engine.(type) {
 		case *sampler.ScoreEngine:
-			updateSamplerInfo(samplerInfo{EngineType: fmt.Sprint(reflect.TypeOf(s.engine)), Stats: stats, State: state})
+			info.UpdateSamplerInfo(info.SamplerInfo{EngineType: fmt.Sprint(reflect.TypeOf(s.engine)), Stats: stats, State: state})
 		case *sampler.PriorityEngine:
-			updatePrioritySamplerInfo(samplerInfo{EngineType: fmt.Sprint(reflect.TypeOf(s.engine)), Stats: stats, State: state})
+			info.UpdatePrioritySamplerInfo(info.SamplerInfo{EngineType: fmt.Sprint(reflect.TypeOf(s.engine)), Stats: stats, State: state})
 		}
 	default:
 		log.Debugf("unhandled sampler engine, can't log state")

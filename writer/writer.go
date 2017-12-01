@@ -1,4 +1,4 @@
-package main
+package writer
 
 import (
 	"sync"
@@ -49,8 +49,8 @@ type Writer struct {
 	endpoint AgentEndpoint // where the data will end
 
 	// input data
-	inPayloads chan model.AgentPayload     // main payloads for processed traces/stats
-	inServices chan model.ServicesMetadata // secondary services metadata
+	InPayloads chan model.AgentPayload     // main payloads for processed traces/stats
+	InServices chan model.ServicesMetadata // secondary services metadata
 
 	payloadBuffer []*writerPayload       // buffer of payloads ready to send
 	serviceBuffer model.ServicesMetadata // services are merged into this map continuously
@@ -82,7 +82,7 @@ func NewWriter(conf *config.AgentConfig) *Writer {
 		endpoint: endpoint,
 
 		// small buffer to not block in case we're flushing
-		inPayloads: make(chan model.AgentPayload, 1),
+		InPayloads: make(chan model.AgentPayload, 1),
 
 		payloadBuffer: make([]*writerPayload, 0, 5),
 		serviceBuffer: make(model.ServicesMetadata),
@@ -121,7 +121,7 @@ func (w *Writer) main() {
 
 	for {
 		select {
-		case p := <-w.inPayloads:
+		case p := <-w.InPayloads:
 			if p.IsEmpty() {
 				continue
 			}
@@ -130,7 +130,7 @@ func (w *Writer) main() {
 			w.Flush()
 		case <-flushTicker.C:
 			w.Flush()
-		case sm := <-w.inServices:
+		case sm := <-w.InServices:
 			updated := w.serviceBuffer.Update(sm)
 			if updated {
 				w.FlushServices()

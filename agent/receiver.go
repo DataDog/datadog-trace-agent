@@ -15,6 +15,7 @@ import (
 	"github.com/tinylib/msgp/msgp"
 
 	"github.com/DataDog/datadog-trace-agent/config"
+	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/statsd"
@@ -57,7 +58,7 @@ type HTTPReceiver struct {
 	conf     *config.AgentConfig
 	dynConf  *config.DynamicConfig
 
-	stats      *receiverStats
+	stats      *info.ReceiverStats
 	preSampler *sampler.PreSampler
 
 	exit chan struct{}
@@ -74,7 +75,7 @@ func NewHTTPReceiver(conf *config.AgentConfig, dynConf *config.DynamicConfig) *H
 		services:   make(chan model.ServicesMetadata, 50),
 		conf:       conf,
 		dynConf:    dynConf,
-		stats:      newReceiverStats(),
+		stats:      info.NewReceiverStats(),
 		preSampler: sampler.NewPreSampler(conf.PreSampleRate),
 		exit:       make(chan struct{}),
 
@@ -207,7 +208,7 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 	r.replyTraces(v, w)
 
 	// We parse the tags from the header
-	tags := Tags{
+	tags := info.Tags{
 		req.Header.Get("Datadog-Meta-Lang"),
 		req.Header.Get("Datadog-Meta-Lang-Version"),
 		req.Header.Get("Datadog-Meta-Lang-Interpreter"),
@@ -215,7 +216,7 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 	}
 
 	// We get the address of the struct holding the stats associated to the tags
-	ts := r.stats.getTagStats(tags)
+	ts := r.stats.GetTagStats(tags)
 
 	bytesRead := req.Body.(*model.LimitedReader).Count
 	if bytesRead > 0 {
@@ -273,7 +274,7 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 	HTTPOK(w)
 
 	// We parse the tags from the header
-	tags := Tags{
+	tags := info.Tags{
 		req.Header.Get("Datadog-Meta-Lang"),
 		req.Header.Get("Datadog-Meta-Lang-Version"),
 		req.Header.Get("Datadog-Meta-Lang-Interpreter"),
@@ -281,7 +282,7 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 	}
 
 	// We get the address of the struct holding the stats associated to the tags
-	ts := r.stats.getTagStats(tags)
+	ts := r.stats.GetTagStats(tags)
 
 	atomic.AddInt64(&ts.ServicesReceived, int64(len(servicesMeta)))
 
@@ -296,35 +297,35 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 // logStats periodically submits stats about the receiver to statsd
 func (r *HTTPReceiver) logStats() {
 	var lastLog time.Time
-	accStats := newReceiverStats()
+	accStats := info.NewReceiverStats()
 
 	for now := range time.Tick(10 * time.Second) {
-		statsd.Client.Gauge("datadog.trace_agent.heartbeat", 1, []string{"version:" + Version}, 1)
+		statsd.Client.Gauge("datadog.trace_agent.heartbeat", 1, []string{"version:" + info.Version}, 1)
 
 		// We update accStats with the new stats we collected
-		accStats.acc(r.stats)
+		accStats.Acc(r.stats)
 
 		// Publish the stats accumulated during the last flush
-		r.stats.publish()
+		r.stats.Publish()
 
 		// We reset the stats accumulated during the last 10s.
-		r.stats.reset()
+		r.stats.Reset()
 
 		if now.Sub(lastLog) >= time.Minute {
 			// We expose the stats accumulated to expvar
-			updateReceiverStats(accStats)
+			info.UpdateReceiverStats(accStats)
 
 			for _, logStr := range accStats.Strings() {
 				log.Info(logStr)
 			}
 
 			// We reset the stats accumulated during the last minute
-			accStats.reset()
+			accStats.Reset()
 			lastLog = now
 
 			// Also publish rates by service (they are updated by receiver)
 			rates := r.dynConf.RateByService.GetAll()
-			updateRateByService(rates)
+			info.UpdateRateByService(rates)
 		}
 	}
 }

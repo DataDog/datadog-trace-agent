@@ -1,4 +1,4 @@
-package main
+package info
 
 import (
 	"fmt"
@@ -8,18 +8,18 @@ import (
 	"github.com/DataDog/datadog-trace-agent/statsd"
 )
 
-// receiverStats is used to store all the stats per tags.
-type receiverStats struct {
+// ReceiverStats is used to store all the stats per tags.
+type ReceiverStats struct {
 	sync.RWMutex
 	Stats map[Tags]*tagStats
 }
 
-func newReceiverStats() *receiverStats {
-	return &receiverStats{sync.RWMutex{}, map[Tags]*tagStats{}}
+func NewReceiverStats() *ReceiverStats {
+	return &ReceiverStats{sync.RWMutex{}, map[Tags]*tagStats{}}
 }
 
-// getTagStats returns the struct in which the stats will be stored depending of their tags.
-func (rs *receiverStats) getTagStats(tags Tags) *tagStats {
+// GetTagStats returns the struct in which the stats will be stored depending of their tags.
+func (rs *ReceiverStats) GetTagStats(tags Tags) *tagStats {
 	rs.Lock()
 	tagStats, ok := rs.Stats[tags]
 	if !ok {
@@ -31,17 +31,17 @@ func (rs *receiverStats) getTagStats(tags Tags) *tagStats {
 	return tagStats
 }
 
-// acc will accumulate the stats from another receiverStats struct.
-func (rs *receiverStats) acc(recent *receiverStats) {
+// Acc accumulates the stats from another ReceiverStats struct.
+func (rs *ReceiverStats) Acc(recent *ReceiverStats) {
 	recent.Lock()
 	for _, tagStats := range recent.Stats {
-		ts := rs.getTagStats(tagStats.Tags)
+		ts := rs.GetTagStats(tagStats.Tags)
 		ts.update(tagStats.Stats)
 	}
 	recent.Unlock()
 }
 
-func (rs *receiverStats) publish() {
+func (rs *ReceiverStats) Publish() {
 	rs.RLock()
 	for _, tagStats := range rs.Stats {
 		tagStats.publish()
@@ -49,7 +49,7 @@ func (rs *receiverStats) publish() {
 	rs.RUnlock()
 }
 
-func (rs *receiverStats) reset() {
+func (rs *ReceiverStats) Reset() {
 	rs.Lock()
 	for key, tagStats := range rs.Stats {
 		// If a tagStats was empty, let's drop it.
@@ -62,8 +62,8 @@ func (rs *receiverStats) reset() {
 	rs.Unlock()
 }
 
-// Strings gives a multi strings representation of the receiverStats struct.
-func (rs *receiverStats) Strings() []string {
+// Strings gives a multi strings representation of the ReceiverStats struct.
+func (rs *ReceiverStats) Strings() []string {
 	rs.RLock()
 	defer rs.RUnlock()
 

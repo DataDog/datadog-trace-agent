@@ -1,4 +1,4 @@
-package main
+package info
 
 import (
 	"encoding/json"
@@ -19,19 +19,19 @@ import (
 )
 
 var (
-	infoMu                  sync.RWMutex
-	infoReceiverStats       []tagStats    // only for the last minute
-	infoEndpointStats       endpointStats // only for the last minute
-	infoWatchdogInfo        watchdog.Info
-	infoSamplerInfo         samplerInfo
-	infoPrioritySamplerInfo samplerInfo
-	infoRateByService       map[string]float64
-	infoPreSamplerStats     sampler.PreSamplerStats
-	infoStart               = time.Now()
-	infoOnce                sync.Once
-	infoTmpl                *template.Template
-	infoNotRunningTmpl      *template.Template
-	infoErrorTmpl           *template.Template
+	infoMu              sync.RWMutex
+	receiverStats       []tagStats    // only for the last minute
+	endpointStats       EndpointStats // only for the last minute
+	watchdogInfo        watchdog.Info
+	samplerInfo         SamplerInfo
+	prioritySamplerInfo SamplerInfo
+	rateByService       map[string]float64
+	preSamplerStats     sampler.PreSamplerStats
+	start               = time.Now()
+	once                sync.Once
+	infoTmpl            *template.Template
+	notRunningTmpl      *template.Template
+	errorTmpl           *template.Template
 )
 
 const (
@@ -74,14 +74,14 @@ const (
 {{end}}{{if gt .Status.Endpoint.ServicesPayloadError 0}}  WARNING: Services API errors (1 min): {{.Status.Endpoint.ServicesPayloadError}}/{{.Status.Endpoint.ServicesPayload}}
 {{end}}
 `
-	infoNotRunningTmplSrc = `{{.Banner}}
+	notRunningTmplSrc = `{{.Banner}}
 {{.Program}}
 {{.Banner}}
 
   Not running (port {{.ReceiverPort}})
 
 `
-	infoErrorTmplSrc = `{{.Banner}}
+	errorTmplSrc = `{{.Banner}}
 {{.Program}}
 {{.Banner}}
 
@@ -91,11 +91,7 @@ const (
 `
 )
 
-func publishUptime() interface{} {
-	return int(time.Since(infoStart) / time.Second)
-}
-
-func updateReceiverStats(rs *receiverStats) {
+func UpdateReceiverStats(rs *ReceiverStats) {
 	infoMu.Lock()
 	defer infoMu.Unlock()
 	rs.RLock()
@@ -108,113 +104,99 @@ func updateReceiverStats(rs *receiverStats) {
 		}
 	}
 
-	infoReceiverStats = s
+	receiverStats = s
 }
 
 func publishReceiverStats() interface{} {
 	infoMu.RLock()
 	defer infoMu.RUnlock()
-	return infoReceiverStats
+	return receiverStats
 }
 
-func updateEndpointStats(es endpointStats) {
+func UpdateEndpointStats(es EndpointStats) {
 	infoMu.Lock()
 	defer infoMu.Unlock()
-	infoEndpointStats = es
+	endpointStats = es
 }
 
 func publishEndpointStats() interface{} {
 	infoMu.RLock()
 	defer infoMu.RUnlock()
-	return infoEndpointStats
+	return endpointStats
 }
 
-func updateSamplerInfo(ss samplerInfo) {
+func UpdateSamplerInfo(ss SamplerInfo) {
 	infoMu.Lock()
 	defer infoMu.Unlock()
 
-	infoSamplerInfo = ss
+	samplerInfo = ss
 }
 
 func publishSamplerInfo() interface{} {
 	infoMu.RLock()
 	defer infoMu.RUnlock()
-	return infoSamplerInfo
+	return samplerInfo
 }
 
-func updatePrioritySamplerInfo(ss samplerInfo) {
+func UpdatePrioritySamplerInfo(ss SamplerInfo) {
 	infoMu.Lock()
 	defer infoMu.Unlock()
 
-	infoPrioritySamplerInfo = ss
+	prioritySamplerInfo = ss
 }
 
 func publishPrioritySamplerInfo() interface{} {
 	infoMu.RLock()
 	defer infoMu.RUnlock()
-	return infoPrioritySamplerInfo
+	return prioritySamplerInfo
 }
 
-func updateRateByService(rbs map[string]float64) {
+func UpdateRateByService(rbs map[string]float64) {
 	infoMu.Lock()
 	defer infoMu.Unlock()
-	infoRateByService = rbs
+	rateByService = rbs
 }
 
 func publishRateByService() interface{} {
 	infoMu.RLock()
 	defer infoMu.RUnlock()
-	return infoRateByService
+	return rateByService
 }
 
-func updateWatchdogInfo(wi watchdog.Info) {
+func UpdateWatchdogInfo(wi watchdog.Info) {
 	infoMu.Lock()
 	defer infoMu.Unlock()
-	infoWatchdogInfo = wi
+	watchdogInfo = wi
 }
 
 func publishWatchdogInfo() interface{} {
 	infoMu.RLock()
 	defer infoMu.RUnlock()
-	return infoWatchdogInfo
+	return watchdogInfo
 }
 
-func updatePreSampler(ss sampler.PreSamplerStats) {
+func UpdatePreSampler(ss sampler.PreSamplerStats) {
 	infoMu.Lock()
 	defer infoMu.Unlock()
-	infoPreSamplerStats = ss
+	preSamplerStats = ss
 }
 
 func publishPreSamplerStats() interface{} {
 	infoMu.RLock()
 	defer infoMu.RUnlock()
-	return infoPreSamplerStats
+	return preSamplerStats
 }
 
-type infoVersion struct {
-	Version   string
-	GitCommit string
-	GitBranch string
-	BuildDate string
-	GoVersion string
-}
-
-func publishVersion() interface{} {
-	return infoVersion{
-		Version:   Version,
-		GitCommit: GitCommit,
-		GitBranch: GitBranch,
-		BuildDate: BuildDate,
-		GoVersion: GoVersion,
-	}
+func publishUptime() interface{} {
+	return int(time.Since(start) / time.Second)
 }
 
 type infoString string
 
 func (s infoString) String() string { return string(s) }
 
-// This should be called only once
-func initInfo(conf *config.AgentConfig) error {
+// InitInfo initializes the info structure. It should be called only once.
+func InitInfo(conf *config.AgentConfig) error {
 	var err error
 
 	funcMap := template.FuncMap{
@@ -226,7 +208,7 @@ func initInfo(conf *config.AgentConfig) error {
 		},
 	}
 
-	infoOnce.Do(func() {
+	once.Do(func() {
 		expvar.NewInt("pid").Set(int64(os.Getpid()))
 		expvar.Publish("uptime", expvar.Func(publishUptime))
 		expvar.Publish("version", expvar.Func(publishVersion))
@@ -257,12 +239,12 @@ func initInfo(conf *config.AgentConfig) error {
 			return
 		}
 
-		infoNotRunningTmpl, err = template.New("infoNotRunning").Parse(infoNotRunningTmplSrc)
+		notRunningTmpl, err = template.New("infoNotRunning").Parse(notRunningTmplSrc)
 		if err != nil {
 			return
 		}
 
-		infoErrorTmpl, err = template.New("infoError").Parse(infoErrorTmplSrc)
+		errorTmpl, err = template.New("infoError").Parse(errorTmplSrc)
 		if err != nil {
 			return
 		}
@@ -285,7 +267,7 @@ type StatusInfo struct {
 	Version       infoVersion             `json:"version"`
 	Receiver      []tagStats              `json:"receiver"`
 	RateByService map[string]float64      `json:"ratebyservice"`
-	Endpoint      endpointStats           `json:"endpoint"`
+	Endpoint      EndpointStats           `json:"endpoint"`
 	Watchdog      watchdog.Info           `json:"watchdog"`
 	PreSampler    sampler.PreSamplerStats `json:"presampler"`
 	Config        config.AgentConfig      `json:"config"`
@@ -377,7 +359,7 @@ func Info(w io.Writer, conf *config.AgentConfig) error {
 		// these parameters. We display the port as a hint on where to
 		// debug further, this is where the expvar JSON should come from.
 		program, banner := getProgramBanner(Version)
-		_ = infoNotRunningTmpl.Execute(w, struct {
+		_ = notRunningTmpl.Execute(w, struct {
 			Banner       string
 			Program      string
 			ReceiverPort int
@@ -394,7 +376,7 @@ func Info(w io.Writer, conf *config.AgentConfig) error {
 	var info StatusInfo
 	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
 		program, banner := getProgramBanner(Version)
-		_ = infoErrorTmpl.Execute(w, struct {
+		_ = errorTmpl.Execute(w, struct {
 			Banner  string
 			Program string
 			Error   error
