@@ -39,6 +39,12 @@ type Span struct {
 
 // String formats a Span struct to be displayed as a string
 func (s Span) String() string {
+	res := ""
+	if s.Type == "sql" {
+		res = "REDACTED SQL"
+	} else {
+		res = s.Resource
+	}
 	return fmt.Sprintf(
 		"Span[t_id:%d,s_id:%d,p_id:%d,ser:%s,name:%s,res:%s]",
 		s.TraceID,
@@ -46,7 +52,7 @@ func (s Span) String() string {
 		s.ParentID,
 		s.Service,
 		s.Name,
-		s.Resource,
+		res,
 	)
 }
 

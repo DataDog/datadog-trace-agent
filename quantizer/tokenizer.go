@@ -83,7 +83,7 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 	tkn.skipBlank()
 
 	switch ch := tkn.lastChar; {
-	case isLetter(ch):
+	case isLeadingLetter(ch):
 		return tkn.scanIdentifier()
 	case isDigit(ch):
 		return tkn.scanNumber(false)
@@ -118,6 +118,9 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 				return tkn.scanCommentType1("--")
 			}
 			return int(ch), []byte{byte(ch)}
+		case '#':
+			tkn.next()
+			return tkn.scanCommentType1("#")
 		case '<':
 			switch tkn.lastChar {
 			case '>':
@@ -452,8 +455,12 @@ func skipNonLiteralIdentifier(ch uint16) bool {
 	return isLetter(ch) || isDigit(ch) || '.' == ch || '-' == ch
 }
 
+func isLeadingLetter(ch uint16) bool {
+	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_' || ch == '@'
+}
+
 func isLetter(ch uint16) bool {
-	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_' || ch == '@' || ch == '#'
+	return isLeadingLetter(ch) || ch == '#'
 }
 
 func digitVal(ch uint16) int {
