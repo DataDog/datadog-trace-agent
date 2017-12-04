@@ -67,6 +67,7 @@ EXCLUDE_LINT = [
     'model/services_gen.go',
     'model/trace_gen.go',
     'model/span_gen.go',
+    'model/span.pb.go',
 ]
 
 task :default => [:ci]
@@ -167,4 +168,9 @@ task :ci => [:fmt, :vet, :lint, :test, :build, :windows]
 
 task :err do
   sh "errcheck github.com/DataDog/datadog-trace-agent"
+end
+
+task :protobuf do
+  # be sure to have protobuf 3.x and go vendor installed
+  sh "protoc -I=model -I=vendor --gogofaster_out=model model/*.proto"
 end

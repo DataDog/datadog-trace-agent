@@ -44,27 +44,30 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	now := model.Now()
 	alignedNow := now - now%c.bsize
 
-	testTrace := processedTrace{
-		Env: "none",
-		Trace: model.Trace{
-			// first bucket
-			testSpan(c, 1, 24, 3, "A1", "resource1", 0),
-			testSpan(c, 2, 12, 3, "A1", "resource1", 2),
-			testSpan(c, 3, 40, 3, "A2", "resource2", 2),
-			testSpan(c, 4, 300000000000, 3, "A2", "resource2", 2), // 5 minutes trace
-			testSpan(c, 5, 30, 3, "A2", "resourcefoo", 0),
-			// second bucket
-			testSpan(c, 6, 24, 2, "A1", "resource2", 0),
-			testSpan(c, 7, 12, 2, "A1", "resource1", 2),
-			testSpan(c, 8, 40, 2, "A2", "resource1", 2),
-			testSpan(c, 9, 30, 2, "A2", "resource2", 2),
-			testSpan(c, 10, 3600000000000, 2, "A2", "resourcefoo", 0), // 1 hour trace
-			// third bucket - but should not be flushed because it's the second to last
-			testSpan(c, 6, 24, 1, "A1", "resource2", 0),
-		},
+	trace := model.Trace{
+		// first bucket
+		testSpan(c, 1, 24, 3, "A1", "resource1", 0),
+		testSpan(c, 2, 12, 3, "A1", "resource1", 2),
+		testSpan(c, 3, 40, 3, "A2", "resource2", 2),
+		testSpan(c, 4, 300000000000, 3, "A2", "resource2", 2), // 5 minutes trace
+		testSpan(c, 5, 30, 3, "A2", "resourcefoo", 0),
+		// second bucket
+		testSpan(c, 6, 24, 2, "A1", "resource2", 0),
+		testSpan(c, 7, 12, 2, "A1", "resource1", 2),
+		testSpan(c, 8, 40, 2, "A2", "resource1", 2),
+		testSpan(c, 9, 30, 2, "A2", "resource2", 2),
+		testSpan(c, 10, 3600000000000, 2, "A2", "resourcefoo", 0), // 1 hour trace
+		// third bucket - but should not be flushed because it's the second to last
+		testSpan(c, 6, 24, 1, "A1", "resource2", 0),
 	}
-	testTrace.Trace.ComputeWeight(*testTrace.Trace.GetRoot())
-	testTrace.Trace.ComputeTopLevel()
+	trace.ComputeTopLevel()
+	wt := model.NewWeightedTrace(trace, trace.GetRoot())
+
+	testTrace := processedTrace{
+		Env:           "none",
+		Trace:         trace,
+		WeightedTrace: wt,
+	}
 
 	c.Add(testTrace)
 	stats := c.Flush()

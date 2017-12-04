@@ -6,8 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func testSpan() Span {
-	return Span{
+func testSpan() *Span {
+	return &Span{
 		Duration: 10000000,
 		Error:    0,
 		Resource: "GET /some/raclette",

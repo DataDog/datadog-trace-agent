@@ -163,18 +163,18 @@ func buildTraceTimestamps(trace Trace) []int64 {
 // activeSpansMap is used by buildTraceActiveSpansMapping and is just
 // a map with a add function setting the key to the empty slice of no
 // entry exists
-type activeSpansMap map[int64]Spans
+type activeSpansMap map[int64][]*Span
 
 func (a activeSpansMap) Add(ts int64, span *Span) {
 	if _, ok := a[ts]; !ok {
-		a[ts] = make(Spans, 0, 1)
+		a[ts] = make([]*Span, 0, 1)
 	}
 	a[ts] = append(a[ts], span)
 }
 
 // buildTraceActiveSpansMapping returns a mappging from timestamps to
 // a set of active spans
-func buildTraceActiveSpansMapping(trace Trace, timestamps []int64) map[int64]Spans {
+func buildTraceActiveSpansMapping(trace Trace, timestamps []int64) map[int64][]*Span {
 	activeSpans := make(activeSpansMap, len(timestamps))
 
 	tsToIdx := make(map[int64]int, len(timestamps))

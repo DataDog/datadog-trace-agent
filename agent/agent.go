@@ -24,10 +24,11 @@ const (
 )
 
 type processedTrace struct {
-	Trace     model.Trace
-	Root      *model.Span
-	Env       string
-	Sublayers []model.SublayerValue
+	Trace         model.Trace
+	WeightedTrace model.WeightedTrace
+	Root          *model.Span
+	Env           string
+	Sublayers     []model.SublayerValue
 }
 
 func (pt *processedTrace) weight() float64 {
@@ -217,7 +218,10 @@ func (a *Agent) Process(t model.Trace) {
 	rate *= a.Receiver.preSampler.Rate()
 	sampler.SetTraceAppliedSampleRate(root, rate)
 
+	// Need to do this computation before entering the concentrator
+	// as they access the Metrics map, which is not thread safe.
 	t.ComputeTopLevel()
+	wt := model.NewWeightedTrace(t, root)
 
 	sublayers := model.ComputeSublayers(t)
 	model.SetSublayersOnSpan(root, sublayers)
@@ -228,19 +232,16 @@ func (a *Agent) Process(t model.Trace) {
 	}
 
 	pt := processedTrace{
-		Trace:     t,
-		Root:      root,
-		Env:       a.conf.DefaultEnv,
-		Sublayers: sublayers,
+		Trace:         t,
+		WeightedTrace: wt,
+		Root:          root,
+		Env:           a.conf.DefaultEnv,
+		Sublayers:     sublayers,
 	}
 	if tenv := t.GetEnv(); tenv != "" {
 		pt.Env = tenv
 	}
 
-	// Need to do this computation before entering the concentrator
-	// as they access the Metrics map, which is not thread safe.
-	t.ComputeWeight(*root)
-	t.ComputeTopLevel()
 	go func() {
 		defer watchdog.LogOnPanic()
 		a.Concentrator.Add(pt)

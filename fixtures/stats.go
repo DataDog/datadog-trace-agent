@@ -2,6 +2,7 @@ package fixtures
 
 import (
 	"encoding/json"
+
 	"github.com/DataDog/datadog-trace-agent/model"
 )
 
@@ -12,7 +13,7 @@ const defaultEnv = "none"
 // TestStatsBucket returns a fixed stats bucket to be used in unit tests
 func TestStatsBucket() model.StatsBucket {
 	srb := model.NewStatsRawBucket(0, 1e9)
-	srb.HandleSpan(TestSpan(), defaultEnv, defaultAggregators, nil)
+	srb.HandleSpan(TestWeightedSpan(), defaultEnv, defaultAggregators, nil)
 	sb := srb.Export()
 
 	// marshalling then unmarshalling data to:
@@ -33,9 +34,9 @@ func TestStatsBucket() model.StatsBucket {
 }
 
 // StatsBucketWithSpans returns a stats bucket populated with spans stats
-func StatsBucketWithSpans(s []model.Span) model.StatsBucket {
+func StatsBucketWithSpans(spans []*model.WeightedSpan) model.StatsBucket {
 	srb := model.NewStatsRawBucket(0, 1e9)
-	for _, s := range s {
+	for _, s := range spans {
 		srb.HandleSpan(s, defaultEnv, defaultAggregators, nil)
 	}
 	return srb.Export()
@@ -43,9 +44,9 @@ func StatsBucketWithSpans(s []model.Span) model.StatsBucket {
 
 // RandomStatsBucket returns a bucket made from n random spans, useful to run benchmarks and tests
 func RandomStatsBucket(n int) model.StatsBucket {
-	spans := make([]model.Span, 0, n)
+	spans := make([]*model.WeightedSpan, 0, n)
 	for i := 0; i < n; i++ {
-		spans = append(spans, RandomSpan())
+		spans = append(spans, RandomWeightedSpan())
 	}
 
 	return StatsBucketWithSpans(spans)

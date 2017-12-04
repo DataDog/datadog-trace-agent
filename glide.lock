@@ -1,5 +1,5 @@
-hash: 34b8446bdae5494c2d28db02226a944af14466e1bb9a9ed1ba28f26a8949780f
-updated: 2017-11-29T12:30:01.732107+01:00
+hash: b5bd8505348ccf843ecec4e5f6c53980dd936c6d950dbaf22d4443ed037e625f
+updated: 2017-12-04T13:48:56.549159484+01:00
 imports:
 - name: github.com/cihub/seelog
   version: d2c6e5aa9fbfdd1c624e140287063c7730654115
@@ -17,6 +17,15 @@ imports:
   version: de8695c8edbf8236f30d6e1376e20b198a028d42
   subpackages:
   - oleutil
+- name: github.com/gogo/protobuf
+  version: 342cbe0a04158f6dcb03ca0079991a51a4248c02
+  subpackages:
+  - gogoproto
+- name: github.com/golang/protobuf
+  version: 1e59b77b52bf8e4b449a57e6f79f21226d571845
+  subpackages:
+  - proto
+  - protoc-gen-go
 - name: github.com/golang/tools
   version: 219e654bb7266d3b73c4610ed24c33d12560826a
   subpackages:

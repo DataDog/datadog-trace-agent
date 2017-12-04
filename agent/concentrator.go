@@ -37,7 +37,7 @@ func NewConcentrator(aggregators []string, bsize int64) *Concentrator {
 func (c *Concentrator) Add(t processedTrace) {
 	c.mu.Lock()
 
-	for _, s := range t.Trace {
+	for _, s := range t.WeightedTrace {
 		btime := s.End() - s.End()%c.bsize
 		b, ok := c.buckets[btime]
 		if !ok {
