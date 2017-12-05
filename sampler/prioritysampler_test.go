@@ -32,8 +32,8 @@ func getTestPriorityEngine() *PriorityEngine {
 func getTestTraceWithService(t *testing.T, service string, s *PriorityEngine) (model.Trace, *model.Span) {
 	tID := randomTraceID()
 	trace := model.Trace{
-		model.Span{TraceID: tID, SpanID: 1, ParentID: 0, Start: 42, Duration: 1000000, Service: service, Type: "web", Meta: map[string]string{"env": defaultEnv}},
-		model.Span{TraceID: tID, SpanID: 2, ParentID: 1, Start: 100, Duration: 200000, Service: service, Type: "sql"},
+		&model.Span{TraceID: tID, SpanID: 1, ParentID: 0, Start: 42, Duration: 1000000, Service: service, Type: "web", Meta: map[string]string{"env": defaultEnv}},
+		&model.Span{TraceID: tID, SpanID: 2, ParentID: 1, Start: 100, Duration: 200000, Service: service, Type: "sql"},
 	}
 	r := rand.Float64()
 	priority := 0.0
@@ -49,7 +49,7 @@ func getTestTraceWithService(t *testing.T, service string, s *PriorityEngine) (m
 		priority = 1
 	}
 	trace[0].Metrics = map[string]float64{samplingPriorityKey: priority}
-	return trace, &trace[0]
+	return trace, trace[0]
 }
 
 func TestMaxTPSByService(t *testing.T) {

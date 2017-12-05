@@ -54,7 +54,7 @@ func computeServiceSignature(root *model.Span, env string) Signature {
 	return Signature(computeServiceHash(*root, env))
 }
 
-func computeSpanHash(span model.Span, env string) spanHash {
+func computeSpanHash(span *model.Span, env string) spanHash {
 	h := fnv.New32a()
 	h.Write([]byte(env))
 	h.Write([]byte(span.Service))

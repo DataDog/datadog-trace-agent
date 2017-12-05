@@ -12,14 +12,14 @@ type WeightedSpan struct {
 type WeightedTrace []*WeightedSpan
 
 // NewWeightedTrace returns a weighted trace, with coefficient required by the concentrator.
-func NewWeightedTrace(trace []Span, root *Span) WeightedTrace {
+func NewWeightedTrace(trace Trace, root *Span) WeightedTrace {
 	wt := make(WeightedTrace, len(trace))
 
 	weight := root.Weight()
 
 	for i := range trace {
 		wt[i] = &WeightedSpan{
-			Span:     &trace[i],
+			Span:     trace[i],
 			Weight:   weight,
 			TopLevel: trace[i].TopLevel(),
 		}

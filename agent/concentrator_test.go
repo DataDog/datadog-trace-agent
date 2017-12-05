@@ -22,11 +22,11 @@ func getTsInBucket(alignedNow int64, bsize int64, offset int64) int64 {
 
 // testSpan avoids typo and inconsistency in test spans (typical pitfall: duration, start time,
 // and end time are aligned, and end time is the one that needs to be aligned
-func testSpan(c *Concentrator, spanID uint64, duration, offset int64, service, resource string, err int32) model.Span {
+func testSpan(c *Concentrator, spanID uint64, duration, offset int64, service, resource string, err int32) *model.Span {
 	now := model.Now()
 	alignedNow := now - now%c.bsize
 
-	return model.Span{
+	return &model.Span{
 		SpanID:   spanID,
 		Duration: duration,
 		Start:    getTsInBucket(alignedNow, c.bsize, offset) - duration,

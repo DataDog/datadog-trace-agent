@@ -85,7 +85,7 @@ func TestFormatTrace(t *testing.T) {
 	rep := strings.Repeat(" AND age = 42", 5000)
 	resource = resource + rep
 	testTrace := model.Trace{
-		model.Span{
+		&model.Span{
 			Resource: resource,
 			Type:     "sql",
 		},
@@ -156,7 +156,7 @@ func BenchmarkWatchdog(b *testing.B) {
 // Mimicks behaviour of agent Process function
 func formatTrace(t model.Trace) model.Trace {
 	for i := range t {
-		t[i] = quantizer.Quantize(t[i])
+		quantizer.Quantize(t[i])
 		t[i].Truncate()
 	}
 	return t

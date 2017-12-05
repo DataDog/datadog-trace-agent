@@ -8,8 +8,8 @@ import (
 	"github.com/DataDog/datadog-trace-agent/model"
 )
 
-func CassSpan(query string) model.Span {
-	return model.Span{
+func CassSpan(query string) *model.Span {
+	return &model.Span{
 		Resource: query,
 		Type:     "cassandra",
 		Meta: map[string]string{
@@ -52,6 +52,8 @@ func TestCassQuantizer(t *testing.T) {
 	}
 
 	for _, testCase := range queryToExpected {
-		assert.Equal(testCase.expected, Quantize(CassSpan(testCase.in)).Resource)
+		s := CassSpan(testCase.in)
+		Quantize(s)
+		assert.Equal(testCase.expected, s.Resource)
 	}
 }

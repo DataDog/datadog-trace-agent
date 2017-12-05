@@ -248,8 +248,8 @@ func RandomSpanType() string {
 }
 
 // RandomSpan generates a wide-variety of spans, useful to test robustness & performance
-func RandomSpan() model.Span {
-	return model.Span{
+func RandomSpan() *model.Span {
+	return &model.Span{
 		Duration: RandomSpanDuration(),
 		Error:    RandomSpanError(),
 		Resource: RandomSpanResource(),
@@ -269,15 +269,15 @@ func RandomSpan() model.Span {
 func RandomWeightedSpan() *model.WeightedSpan {
 	s := RandomSpan()
 	return &model.WeightedSpan{
-		Span:     &s,
+		Span:     s,
 		Weight:   1,
 		TopLevel: true,
 	}
 }
 
 // GetTestSpan returns a Span with different fields set
-func GetTestSpan() model.Span {
-	span := model.Span{
+func GetTestSpan() *model.Span {
+	span := &model.Span{
 		TraceID:  42,
 		SpanID:   52,
 		ParentID: 42,
@@ -296,8 +296,8 @@ func GetTestSpan() model.Span {
 }
 
 // TestSpan returns a fix span with hardcoded info, useful for reproducible tests
-func TestSpan() model.Span {
-	span := model.Span{
+func TestSpan() *model.Span {
+	return &model.Span{
 		Duration: 10000000,
 		Error:    0,
 		Resource: "GET /some/raclette",
@@ -316,14 +316,13 @@ func TestSpan() model.Span {
 		ParentID: 1111,
 		Type:     "http",
 	}
-	return span
 }
 
 // TestWeightedSpan returns a static test weighted span for reproductive stats tests
 func TestWeightedSpan() *model.WeightedSpan {
 	s := TestSpan()
 	return &model.WeightedSpan{
-		Span:     &s,
+		Span:     s,
 		Weight:   1,
 		TopLevel: true,
 	}

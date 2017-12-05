@@ -227,7 +227,7 @@ func TestNormalizeTraceTraceIdMismatch(t *testing.T) {
 	span2 := testSpan()
 	span2.TraceID = 2
 
-	trace := Trace{*span1, *span2}
+	trace := Trace{span1, span2}
 
 	_, err := NormalizeTrace(trace)
 	assert.Error(t, err)
@@ -239,7 +239,7 @@ func TestNormalizeTraceInvalidSpan(t *testing.T) {
 	span2 := testSpan()
 	span2.Name = "" // invalid
 
-	trace := Trace{*span1, *span2}
+	trace := Trace{span1, span2}
 
 	_, err := NormalizeTrace(trace)
 	assert.Error(t, err)
@@ -250,7 +250,7 @@ func TestNormalizeTraceDuplicateSpanID(t *testing.T) {
 	span2 := testSpan()
 	span2.SpanID = span1.SpanID
 
-	trace := Trace{*span1, *span2}
+	trace := Trace{span1, span2}
 
 	_, err := NormalizeTrace(trace)
 	assert.Error(t, err)
@@ -262,7 +262,7 @@ func TestNormalizeTrace(t *testing.T) {
 	span2 := testSpan()
 	span2.SpanID++
 
-	trace := Trace{*span1, *span2}
+	trace := Trace{span1, span2}
 
 	_, err := NormalizeTrace(trace)
 	assert.NoError(t, err)

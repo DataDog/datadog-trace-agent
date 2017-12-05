@@ -18,7 +18,7 @@ var redisCompoundCommandSet = map[string]bool{
 	"CLIENT": true, "CLUSTER": true, "COMMAND": true, "CONFIG": true, "DEBUG": true, "SCRIPT": true}
 
 // QuantizeRedis generates resource for Redis spans
-func QuantizeRedis(span model.Span) model.Span {
+func QuantizeRedis(span *model.Span) {
 	query := compactWhitespaces(span.Resource)
 
 	var resource bytes.Buffer
@@ -75,6 +75,4 @@ func QuantizeRedis(span model.Span) model.Span {
 	}
 
 	span.Resource = strings.Trim(resource.String(), " ")
-
-	return span
 }

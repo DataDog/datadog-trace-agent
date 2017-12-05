@@ -6,9 +6,9 @@ package model
 // clients
 func TracesFromSpans(spans []Span) Traces {
 	traces := Traces{}
-	byID := make(map[uint64][]Span)
+	byID := make(map[uint64][]*Span)
 	for _, s := range spans {
-		byID[s.TraceID] = append(byID[s.TraceID], s)
+		byID[s.TraceID] = append(byID[s.TraceID], &s)
 	}
 	for _, t := range byID {
 		traces = append(traces, t)
