@@ -22,8 +22,8 @@ func (s *Span) IsFlushMarker() bool {
 }
 
 // NewFlushMarker returns a new flush marker
-func NewFlushMarker() Span {
-	return Span{Type: flushMarkerType}
+func NewFlushMarker() *Span {
+	return &Span{Type: flushMarkerType}
 }
 
 // End returns the end time of the span.

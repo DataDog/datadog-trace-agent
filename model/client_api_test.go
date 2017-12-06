@@ -21,7 +21,7 @@ import (
 func getTestTrace() Traces {
 	return Traces{
 		Trace{
-			Span{
+			&Span{
 				TraceID:  math.MaxUint64,
 				SpanID:   math.MaxUint64,
 				ParentID: math.MaxUint64,

@@ -10,11 +10,11 @@ func TestTopLevelTypical(t *testing.T) {
 	assert := assert.New(t)
 
 	tr := Trace{
-		Span{TraceID: 1, SpanID: 1, ParentID: 0, Service: "mcnulty", Type: "web"},
-		Span{TraceID: 1, SpanID: 2, ParentID: 1, Service: "mcnulty", Type: "sql"},
-		Span{TraceID: 1, SpanID: 3, ParentID: 2, Service: "master-db", Type: "sql"},
-		Span{TraceID: 1, SpanID: 4, ParentID: 1, Service: "redis", Type: "redis"},
-		Span{TraceID: 1, SpanID: 5, ParentID: 1, Service: "mcnulty", Type: ""},
+		&Span{TraceID: 1, SpanID: 1, ParentID: 0, Service: "mcnulty", Type: "web"},
+		&Span{TraceID: 1, SpanID: 2, ParentID: 1, Service: "mcnulty", Type: "sql"},
+		&Span{TraceID: 1, SpanID: 3, ParentID: 2, Service: "master-db", Type: "sql"},
+		&Span{TraceID: 1, SpanID: 4, ParentID: 1, Service: "redis", Type: "redis"},
+		&Span{TraceID: 1, SpanID: 5, ParentID: 1, Service: "mcnulty", Type: ""},
 	}
 
 	tr.ComputeTopLevel()
@@ -30,7 +30,7 @@ func TestTopLevelSingle(t *testing.T) {
 	assert := assert.New(t)
 
 	tr := Trace{
-		Span{TraceID: 1, SpanID: 1, ParentID: 0, Service: "mcnulty", Type: "web"},
+		&Span{TraceID: 1, SpanID: 1, ParentID: 0, Service: "mcnulty", Type: "web"},
 	}
 
 	tr.ComputeTopLevel()
@@ -52,11 +52,11 @@ func TestTopLevelOneService(t *testing.T) {
 	assert := assert.New(t)
 
 	tr := Trace{
-		Span{TraceID: 1, SpanID: 2, ParentID: 1, Service: "mcnulty", Type: "web"},
-		Span{TraceID: 1, SpanID: 3, ParentID: 2, Service: "mcnulty", Type: "web"},
-		Span{TraceID: 1, SpanID: 1, ParentID: 0, Service: "mcnulty", Type: "web"},
-		Span{TraceID: 1, SpanID: 4, ParentID: 1, Service: "mcnulty", Type: "web"},
-		Span{TraceID: 1, SpanID: 5, ParentID: 1, Service: "mcnulty", Type: "web"},
+		&Span{TraceID: 1, SpanID: 2, ParentID: 1, Service: "mcnulty", Type: "web"},
+		&Span{TraceID: 1, SpanID: 3, ParentID: 2, Service: "mcnulty", Type: "web"},
+		&Span{TraceID: 1, SpanID: 1, ParentID: 0, Service: "mcnulty", Type: "web"},
+		&Span{TraceID: 1, SpanID: 4, ParentID: 1, Service: "mcnulty", Type: "web"},
+		&Span{TraceID: 1, SpanID: 5, ParentID: 1, Service: "mcnulty", Type: "web"},
 	}
 
 	tr.ComputeTopLevel()
@@ -72,13 +72,13 @@ func TestTopLevelLocalRoot(t *testing.T) {
 	assert := assert.New(t)
 
 	tr := Trace{
-		Span{TraceID: 1, SpanID: 1, ParentID: 0, Service: "mcnulty", Type: "web"},
-		Span{TraceID: 1, SpanID: 2, ParentID: 1, Service: "mcnulty", Type: "sql"},
-		Span{TraceID: 1, SpanID: 3, ParentID: 2, Service: "master-db", Type: "sql"},
-		Span{TraceID: 1, SpanID: 4, ParentID: 1, Service: "redis", Type: "redis"},
-		Span{TraceID: 1, SpanID: 5, ParentID: 1, Service: "mcnulty", Type: ""},
-		Span{TraceID: 1, SpanID: 6, ParentID: 4, Service: "redis", Type: "redis"},
-		Span{TraceID: 1, SpanID: 7, ParentID: 4, Service: "redis", Type: "redis"},
+		&Span{TraceID: 1, SpanID: 1, ParentID: 0, Service: "mcnulty", Type: "web"},
+		&Span{TraceID: 1, SpanID: 2, ParentID: 1, Service: "mcnulty", Type: "sql"},
+		&Span{TraceID: 1, SpanID: 3, ParentID: 2, Service: "master-db", Type: "sql"},
+		&Span{TraceID: 1, SpanID: 4, ParentID: 1, Service: "redis", Type: "redis"},
+		&Span{TraceID: 1, SpanID: 5, ParentID: 1, Service: "mcnulty", Type: ""},
+		&Span{TraceID: 1, SpanID: 6, ParentID: 4, Service: "redis", Type: "redis"},
+		&Span{TraceID: 1, SpanID: 7, ParentID: 4, Service: "redis", Type: "redis"},
 	}
 
 	tr.ComputeTopLevel()
@@ -96,8 +96,8 @@ func TestTopLevelWithTag(t *testing.T) {
 	assert := assert.New(t)
 
 	tr := Trace{
-		Span{TraceID: 1, SpanID: 1, ParentID: 0, Service: "mcnulty", Type: "web", Metrics: map[string]float64{"custom": 42}},
-		Span{TraceID: 1, SpanID: 2, ParentID: 1, Service: "mcnulty", Type: "web", Metrics: map[string]float64{"custom": 42}},
+		&Span{TraceID: 1, SpanID: 1, ParentID: 0, Service: "mcnulty", Type: "web", Metrics: map[string]float64{"custom": 42}},
+		&Span{TraceID: 1, SpanID: 2, ParentID: 1, Service: "mcnulty", Type: "web", Metrics: map[string]float64{"custom": 42}},
 	}
 
 	tr.ComputeTopLevel()

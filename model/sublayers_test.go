@@ -30,8 +30,8 @@ func (values sublayerValues) Less(i, j int) bool {
 func TestComputeSublayers(t *testing.T) {
 	assert := assert.New(t)
 
-	span := func(id, parentId uint64, service, spanType string, start, duration int64) Span {
-		return Span{
+	span := func(id, parentId uint64, service, spanType string, start, duration int64) *Span {
+		return &Span{
 			TraceID:  1,
 			SpanID:   id,
 			ParentID: parentId,
@@ -245,8 +245,8 @@ func TestComputeSublayers(t *testing.T) {
 func TestBuildTraceTimestamps(t *testing.T) {
 	assert := assert.New(t)
 
-	span := func(id, parentId uint64, service, spanType string, start, duration int64) Span {
-		return Span{
+	span := func(id, parentId uint64, service, spanType string, start, duration int64) *Span {
+		return &Span{
 			TraceID:  1,
 			SpanID:   id,
 			ParentID: parentId,
@@ -296,8 +296,8 @@ func TestBuildTraceTimestamps(t *testing.T) {
 func TestBuildTraceActiveSpansMapping(t *testing.T) {
 	assert := assert.New(t)
 
-	span := func(id, parentId uint64, service, spanType string, start, duration int64) Span {
-		return Span{
+	span := func(id, parentId uint64, service, spanType string, start, duration int64) *Span {
+		return &Span{
 			TraceID:  1,
 			SpanID:   id,
 			ParentID: parentId,
@@ -405,8 +405,8 @@ func TestSetSublayersOnSpan(t *testing.T) {
 }
 
 func BenchmarkComputeSublayers(b *testing.B) {
-	span := func(id, parentId uint64, service, spanType string, start, duration int64) Span {
-		return Span{
+	span := func(id, parentId uint64, service, spanType string, start, duration int64) *Span {
+		return &Span{
 			TraceID:  1,
 			SpanID:   id,
 			ParentID: parentId,

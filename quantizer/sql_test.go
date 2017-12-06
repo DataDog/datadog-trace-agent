@@ -16,8 +16,8 @@ type sqlTestCase struct {
 	expected string
 }
 
-func SQLSpan(query string) model.Span {
-	return model.Span{
+func SQLSpan(query string) *model.Span {
+	return &model.Span{
 		Resource: query,
 		Type:     "sql",
 		Meta: map[string]string{
@@ -37,7 +37,7 @@ func TestMain(m *testing.M) {
 
 func TestSQLResourceQuery(t *testing.T) {
 	assert := assert.New(t)
-	span := model.Span{
+	span := &model.Span{
 		Resource: "SELECT * FROM users WHERE id = 42",
 		Type:     "sql",
 		Meta: map[string]string{
@@ -45,21 +45,21 @@ func TestSQLResourceQuery(t *testing.T) {
 		},
 	}
 
-	spanQ := Quantize(span)
-	assert.Equal("SELECT * FROM users WHERE id = ?", spanQ.Resource)
-	assert.Equal("SELECT * FROM users WHERE id = 42", spanQ.Meta["sql.query"])
+	Quantize(span)
+	assert.Equal("SELECT * FROM users WHERE id = ?", span.Resource)
+	assert.Equal("SELECT * FROM users WHERE id = 42", span.Meta["sql.query"])
 }
 
 func TestSQLResourceWithoutQuery(t *testing.T) {
 	assert := assert.New(t)
-	span := model.Span{
+	span := &model.Span{
 		Resource: "SELECT * FROM users WHERE id = 42",
 		Type:     "sql",
 	}
 
-	spanQ := Quantize(span)
-	assert.Equal("SELECT * FROM users WHERE id = ?", spanQ.Resource)
-	assert.Equal("SELECT * FROM users WHERE id = ?", spanQ.Meta["sql.query"])
+	Quantize(span)
+	assert.Equal("SELECT * FROM users WHERE id = ?", span.Resource)
+	assert.Equal("SELECT * FROM users WHERE id = ?", span.Meta["sql.query"])
 }
 
 func TestSQLResourceWithError(t *testing.T) {
@@ -88,10 +88,13 @@ func TestSQLResourceWithError(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		spanQ := Quantize(tc.span)
-		assert.Equal("Non-parsable SQL query", spanQ.Resource)
-		assert.Equal("Query not parsed", spanQ.Meta["agent.parse.error"])
-		assert.Equal(tc.span.Resource, spanQ.Meta["sql.query"])
+		// copy test cases as Quantize mutates
+		testSpan := tc.span
+
+		Quantize(&tc.span)
+		assert.Equal("Non-parsable SQL query", tc.span.Resource)
+		assert.Equal("Query not parsed", tc.span.Meta["agent.parse.error"])
+		assert.Equal(testSpan.Resource, tc.span.Meta["sql.query"])
 	}
 }
 
@@ -260,7 +263,9 @@ func TestSQLQuantizer(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		assert.Equal(c.expected, Quantize(SQLSpan(c.query)).Resource)
+		s := SQLSpan(c.query)
+		Quantize(s)
+		assert.Equal(c.expected, s.Resource)
 	}
 }
 

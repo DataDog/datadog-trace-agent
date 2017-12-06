@@ -17,20 +17,15 @@ const (
 
 var nonUniformSpacesRegexp = regexp.MustCompile("\\s+")
 
-// QuantizeFunction is a function which will return an updated span with a quantized resource
-type QuantizeFunction func(model.Span) model.Span
-
 // Quantize generates meaningful resource for a span, depending on its type
-func Quantize(span model.Span) model.Span {
+func Quantize(span *model.Span) {
 	switch span.Type {
 	case sqlType:
-		return QuantizeSQL(span)
+		QuantizeSQL(span)
 	case cassandraType:
-		return QuantizeSQL(span)
+		QuantizeSQL(span)
 	case redisType:
-		return QuantizeRedis(span)
-	default:
-		return span
+		QuantizeRedis(span)
 	}
 }
 

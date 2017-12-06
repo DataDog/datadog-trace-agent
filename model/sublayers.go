@@ -172,7 +172,7 @@ func (a activeSpansMap) Add(ts int64, span *Span) {
 	a[ts] = append(a[ts], span)
 }
 
-// buildTraceActiveSpansMapping returns a mappging from timestamps to
+// buildTraceActiveSpansMapping returns a mapping from timestamps to
 // a set of active spans
 func buildTraceActiveSpansMapping(trace Trace, timestamps []int64) map[int64][]*Span {
 	activeSpans := make(activeSpansMap, len(timestamps))
@@ -198,7 +198,7 @@ func buildTraceActiveSpansMapping(trace Trace, timestamps []int64) map[int64][]*
 			}
 
 			if !hasChild {
-				activeSpans.Add(ts, &trace[sIdx])
+				activeSpans.Add(ts, trace[sIdx])
 			}
 		}
 	}

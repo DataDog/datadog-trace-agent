@@ -202,9 +202,9 @@ var tokenQuantizer = NewTokenConsumer(
 	})
 
 // QuantizeSQL generates resource and sql.query meta for SQL spans
-func QuantizeSQL(span model.Span) model.Span {
+func QuantizeSQL(span *model.Span) {
 	if span.Resource == "" {
-		return span
+		return
 	}
 
 	quantizedString, err := tokenQuantizer.Process(span.Resource)
@@ -220,7 +220,7 @@ func QuantizeSQL(span model.Span) model.Span {
 			span.Meta[sqlQueryTag] = span.Resource
 		}
 		span.Resource = "Non-parsable SQL query"
-		return span
+		return
 	}
 
 	span.Resource = quantizedString
@@ -232,7 +232,7 @@ func QuantizeSQL(span model.Span) model.Span {
 	// obfuscation == quantization. This is not true in real environments because we're
 	// removing data that could be interesting for users.
 	if span.Meta != nil && span.Meta[sqlQueryTag] != "" {
-		return span
+		return
 	}
 
 	if span.Meta == nil {
@@ -240,5 +240,5 @@ func QuantizeSQL(span model.Span) model.Span {
 	}
 
 	span.Meta[sqlQueryTag] = quantizedString
-	return span
+	return
 }

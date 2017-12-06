@@ -7,9 +7,9 @@ import (
 //go:generate msgp -marshal=false
 
 // Trace is a collection of spans with the same trace ID
-type Trace []Span
+type Trace []*Span
 
-// Traces is a list of traces that represents the  ...
+// Traces is a list of traces. This model matters as this is what we unpack from msgp.
 type Traces []Trace
 
 // GetEnv returns the meta value for the "env" key for
@@ -40,9 +40,9 @@ func (t Trace) GetRoot() *Span {
 		// since some clients report the root last
 		j := len(t) - 1 - i
 		if t[j].ParentID == 0 {
-			return &t[j]
+			return t[j]
 		}
-		parentIDToChild[t[j].ParentID] = &t[j]
+		parentIDToChild[t[j].ParentID] = t[j]
 	}
 
 	for i := range t {
@@ -63,7 +63,7 @@ func (t Trace) GetRoot() *Span {
 	}
 
 	// Gracefully fail with the last span of the trace
-	return &t[len(t)-1]
+	return t[len(t)-1]
 }
 
 // ChildrenMap returns a map containing for each span id the list of its
@@ -72,7 +72,7 @@ func (t Trace) ChildrenMap() map[uint64][]*Span {
 	childrenMap := make(map[uint64][]*Span)
 
 	for i := range t {
-		span := &t[i]
+		span := t[i]
 
 		if span.ParentID == 0 {
 			continue
@@ -97,5 +97,5 @@ func (t Trace) ChildrenMap() map[uint64][]*Span {
 
 // NewTraceFlushMarker returns a trace with a single span as flush marker
 func NewTraceFlushMarker() Trace {
-	return []Span{NewFlushMarker()}
+	return []*Span{NewFlushMarker()}
 }

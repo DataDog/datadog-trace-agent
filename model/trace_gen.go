@@ -4,24 +4,37 @@ package model
 // MSGP CODE GENERATION TOOL (github.com/tinylib/msgp)
 // DO NOT EDIT
 
-import "github.com/tinylib/msgp/msgp"
+import (
+	"github.com/tinylib/msgp/msgp"
+)
 
 // DecodeMsg implements msgp.Decodable
 func (z *Trace) DecodeMsg(dc *msgp.Reader) (err error) {
-	var zbai uint32
-	zbai, err = dc.ReadArrayHeader()
+	var xsz uint32
+	xsz, err = dc.ReadArrayHeader()
 	if err != nil {
 		return
 	}
-	if cap((*z)) >= int(zbai) {
-		(*z) = (*z)[:zbai]
+	if cap((*z)) >= int(xsz) {
+		(*z) = (*z)[:xsz]
 	} else {
-		(*z) = make(Trace, zbai)
+		(*z) = make(Trace, xsz)
 	}
-	for zbzg := range *z {
-		err = (*z)[zbzg].DecodeMsg(dc)
-		if err != nil {
-			return
+	for bzg := range *z {
+		if dc.IsNil() {
+			err = dc.ReadNil()
+			if err != nil {
+				return
+			}
+			(*z)[bzg] = nil
+		} else {
+			if (*z)[bzg] == nil {
+				(*z)[bzg] = new(Span)
+			}
+			err = (*z)[bzg].DecodeMsg(dc)
+			if err != nil {
+				return
+			}
 		}
 	}
 	return
@@ -33,51 +46,72 @@ func (z Trace) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
-	for zcmr := range z {
-		err = z[zcmr].EncodeMsg(en)
-		if err != nil {
-			return
+	for bai := range z {
+		if z[bai] == nil {
+			err = en.WriteNil()
+			if err != nil {
+				return
+			}
+		} else {
+			err = z[bai].EncodeMsg(en)
+			if err != nil {
+				return
+			}
 		}
 	}
 	return
 }
 
-// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z Trace) Msgsize() (s int) {
 	s = msgp.ArrayHeaderSize
-	for zcmr := range z {
-		s += z[zcmr].Msgsize()
+	for bai := range z {
+		if z[bai] == nil {
+			s += msgp.NilSize
+		} else {
+			s += z[bai].Msgsize()
+		}
 	}
 	return
 }
 
 // DecodeMsg implements msgp.Decodable
 func (z *Traces) DecodeMsg(dc *msgp.Reader) (err error) {
-	var zxhx uint32
-	zxhx, err = dc.ReadArrayHeader()
+	var xsz uint32
+	xsz, err = dc.ReadArrayHeader()
 	if err != nil {
 		return
 	}
-	if cap((*z)) >= int(zxhx) {
-		(*z) = (*z)[:zxhx]
+	if cap((*z)) >= int(xsz) {
+		(*z) = (*z)[:xsz]
 	} else {
-		(*z) = make(Traces, zxhx)
+		(*z) = make(Traces, xsz)
 	}
-	for zhct := range *z {
-		var zlqf uint32
-		zlqf, err = dc.ReadArrayHeader()
+	for wht := range *z {
+		var xsz uint32
+		xsz, err = dc.ReadArrayHeader()
 		if err != nil {
 			return
 		}
-		if cap((*z)[zhct]) >= int(zlqf) {
-			(*z)[zhct] = ((*z)[zhct])[:zlqf]
+		if cap((*z)[wht]) >= int(xsz) {
+			(*z)[wht] = (*z)[wht][:xsz]
 		} else {
-			(*z)[zhct] = make(Trace, zlqf)
+			(*z)[wht] = make(Trace, xsz)
 		}
-		for zcua := range (*z)[zhct] {
-			err = (*z)[zhct][zcua].DecodeMsg(dc)
-			if err != nil {
-				return
+		for hct := range (*z)[wht] {
+			if dc.IsNil() {
+				err = dc.ReadNil()
+				if err != nil {
+					return
+				}
+				(*z)[wht][hct] = nil
+			} else {
+				if (*z)[wht][hct] == nil {
+					(*z)[wht][hct] = new(Span)
+				}
+				err = (*z)[wht][hct].DecodeMsg(dc)
+				if err != nil {
+					return
+				}
 			}
 		}
 	}
@@ -90,28 +124,38 @@ func (z Traces) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
-	for zdaf := range z {
-		err = en.WriteArrayHeader(uint32(len(z[zdaf])))
+	for cua := range z {
+		err = en.WriteArrayHeader(uint32(len(z[cua])))
 		if err != nil {
 			return
 		}
-		for zpks := range z[zdaf] {
-			err = z[zdaf][zpks].EncodeMsg(en)
-			if err != nil {
-				return
+		for xhx := range z[cua] {
+			if z[cua][xhx] == nil {
+				err = en.WriteNil()
+				if err != nil {
+					return
+				}
+			} else {
+				err = z[cua][xhx].EncodeMsg(en)
+				if err != nil {
+					return
+				}
 			}
 		}
 	}
 	return
 }
 
-// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z Traces) Msgsize() (s int) {
 	s = msgp.ArrayHeaderSize
-	for zdaf := range z {
+	for cua := range z {
 		s += msgp.ArrayHeaderSize
-		for zpks := range z[zdaf] {
-			s += z[zdaf][zpks].Msgsize()
+		for xhx := range z[cua] {
+			if z[cua][xhx] == nil {
+				s += msgp.NilSize
+			} else {
+				s += z[cua][xhx].Msgsize()
+			}
 		}
 	}
 	return

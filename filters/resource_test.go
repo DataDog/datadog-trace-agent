@@ -41,7 +41,7 @@ func TestRegexCompilationFailure(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		span := fixtures.RandomSpan()
-		assert.True(t, filter.Keep(&span))
+		assert.True(t, filter.Keep(span))
 	}
 }
 
@@ -75,5 +75,5 @@ func newTestFilter(blacklist ...string) Filter {
 func newTestSpan(resource string) *model.Span {
 	span := fixtures.RandomSpan()
 	span.Resource = resource
-	return &span
+	return span
 }

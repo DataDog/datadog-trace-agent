@@ -43,15 +43,15 @@ func testTrace() Trace {
 	// B   |----------------------|                                        duration: 20
 	// C     |-----| |---|                                                 duration: 5+3
 	trace := Trace{
-		Span{TraceID: 42, SpanID: 42, ParentID: 0, Service: "A",
+		&Span{TraceID: 42, SpanID: 42, ParentID: 0, Service: "A",
 			Name: "A.foo", Type: "web", Resource: "α", Start: 0, Duration: 100,
 			Metrics: map[string]float64{SpanSampleRateMetricKey: 0.5}},
-		Span{TraceID: 42, SpanID: 100, ParentID: 42, Service: "B",
+		&Span{TraceID: 42, SpanID: 100, ParentID: 42, Service: "B",
 			Name: "B.bar", Type: "web", Resource: "α", Start: 1, Duration: 20},
-		Span{TraceID: 42, SpanID: 2000, ParentID: 100, Service: "C",
+		&Span{TraceID: 42, SpanID: 2000, ParentID: 100, Service: "C",
 			Name: "sql.query", Type: "sql", Resource: "SELECT value FROM table",
 			Start: 2, Duration: 5},
-		Span{TraceID: 42, SpanID: 3000, ParentID: 100, Service: "C",
+		&Span{TraceID: 42, SpanID: 3000, ParentID: 100, Service: "C",
 			Name: "sql.query", Type: "sql", Resource: "SELECT ololololo... value FROM table",
 			Start: 10, Duration: 3, Error: 1},
 	}
@@ -69,15 +69,15 @@ func testTraceTopLevel() Trace {
 	// B   |----------------------|                                        duration: 20
 	// B     |-----| |---|                                                 duration: 5+3
 	trace := Trace{
-		Span{TraceID: 42, SpanID: 42, ParentID: 0, Service: "A",
+		&Span{TraceID: 42, SpanID: 42, ParentID: 0, Service: "A",
 			Name: "A.foo", Type: "web", Resource: "α", Start: 0, Duration: 100,
 			Metrics: map[string]float64{SpanSampleRateMetricKey: 1}},
-		Span{TraceID: 42, SpanID: 100, ParentID: 42, Service: "B",
+		&Span{TraceID: 42, SpanID: 100, ParentID: 42, Service: "B",
 			Name: "B.bar", Type: "web", Resource: "α", Start: 1, Duration: 20},
-		Span{TraceID: 42, SpanID: 2000, ParentID: 100, Service: "B",
+		&Span{TraceID: 42, SpanID: 2000, ParentID: 100, Service: "B",
 			Name: "B.bar.1", Type: "web", Resource: "α",
 			Start: 2, Duration: 5},
-		Span{TraceID: 42, SpanID: 3000, ParentID: 100, Service: "B",
+		&Span{TraceID: 42, SpanID: 3000, ParentID: 100, Service: "B",
 			Name: "B.bar.2", Type: "web", Resource: "α",
 			Start: 10, Duration: 3, Error: 1},
 	}

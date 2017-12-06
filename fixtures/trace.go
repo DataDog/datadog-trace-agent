@@ -8,8 +8,8 @@ import (
 
 // genNextLevel generates a new level for the trace tree structure,
 // having maxSpans as the max number of spans for this level
-func genNextLevel(prevLevel []model.Span, maxSpans int) []model.Span {
-	var spans []model.Span
+func genNextLevel(prevLevel []*model.Span, maxSpans int) []*model.Span {
+	var spans []*model.Span
 	numSpans := rand.Intn(maxSpans) + 1
 
 	// the spans have to be "nested" in the previous level
@@ -39,7 +39,7 @@ func genNextLevel(prevLevel []model.Span, maxSpans int) []model.Span {
 		timeLeft := prev.Duration
 
 		// create the spans
-		curSpans := make([]model.Span, 0, childSpans)
+		curSpans := make([]*model.Span, 0, childSpans)
 		for j := 0; j < childSpans && timeLeft > 0; j++ {
 			news := RandomSpan()
 			news.TraceID = prev.TraceID

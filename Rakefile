@@ -64,10 +64,16 @@ PACKAGES = %w(
 )
 
 EXCLUDE_LINT = [
-    'model/services_gen.go',
-    'model/trace_gen.go',
-    'model/span_gen.go',
-    'model/span.pb.go',
+  'model/services_gen.go',
+  'model/trace_gen.go',
+  'model/span_gen.go',
+  'model/span.pb.go',
+]
+
+MSGP_MODELS = [
+  'model/span.pb.go',
+  'model/trace.go',
+  'model/services.go',
 ]
 
 task :default => [:ci]
@@ -77,7 +83,7 @@ task :build do
   case os
   when "windows"
     bin = "trace-agent.exe"
-  else 
+  else
     bin = "trace-agent"
   end
   go_build("github.com/DataDog/datadog-trace-agent/agent", {
@@ -170,7 +176,17 @@ task :err do
   sh "errcheck github.com/DataDog/datadog-trace-agent"
 end
 
+desc "Regenerate protobuf files"
 task :protobuf do
   # be sure to have protobuf 3.x and go vendor installed
   sh "protoc -I=model -I=vendor --gogofaster_out=model model/*.proto"
+end
+
+desc "Regenerate msgpack files"
+task :msgp do
+  fail "Don't do it since we modified manually the generated files for services.go and span.go."
+  # TODO: make it clean and automatic again.
+  MSGP_MODELS.each do |file|
+   sh "msgp -file=#{file} -marshal=false"
+  end
 end
