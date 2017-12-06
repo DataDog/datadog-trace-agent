@@ -23,9 +23,9 @@ func BenchmarkHandleSpanRandom(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		trace := fixtures.RandomTrace(10, 8)
 		root := trace.GetRoot()
-		trace.ComputeWeight(*root)
 		trace.ComputeTopLevel()
-		for _, span := range trace {
+		wt := model.NewWeightedTrace(trace, root)
+		for _, span := range wt {
 			sb.HandleSpan(span, defaultEnv, aggr, nil)
 		}
 	}

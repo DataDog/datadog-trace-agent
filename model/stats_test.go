@@ -14,7 +14,7 @@ import (
 
 const defaultEnv = "default"
 
-func testSpans() []Span {
+func testWeightedSpans() WeightedTrace {
 	spans := []Span{
 		Span{Service: "A", Name: "A.foo", Resource: "α", Duration: 1},
 		Span{Service: "A", Name: "A.foo", Resource: "β", Duration: 2, Error: 1},
@@ -25,11 +25,15 @@ func testSpans() []Span {
 		Span{Service: "C", Name: "sql.query", Resource: "δ", Duration: 7},
 		Span{Service: "C", Name: "sql.query", Resource: "δ", Duration: 8},
 	}
+	tws := make(WeightedTrace, len(spans))
 	for i := range spans {
-		spans[i].weight = 1
-		spans[i].topLevel = true
+		tws[i] = &WeightedSpan{
+			Span:     &spans[i],
+			Weight:   1,
+			TopLevel: true,
+		}
 	}
-	return spans
+	return tws
 }
 
 func testTrace() Trace {
@@ -52,7 +56,6 @@ func testTrace() Trace {
 			Start: 10, Duration: 3, Error: 1},
 	}
 
-	trace.ComputeWeight(*trace.GetRoot())
 	trace.ComputeTopLevel()
 	return trace
 }
@@ -79,7 +82,6 @@ func testTraceTopLevel() Trace {
 			Start: 10, Duration: 3, Error: 1},
 	}
 
-	trace.ComputeWeight(*trace.GetRoot())
 	trace.ComputeTopLevel()
 	return trace
 }
@@ -107,8 +109,8 @@ func TestStatsBucketDefault(t *testing.T) {
 
 	// No custom aggregators only the defaults
 	aggr := []string{}
-	for _, s := range testSpans() {
-		t.Logf("weight: %f, topLevel: %v", s.weight, s.topLevel)
+	for _, s := range testWeightedSpans() {
+		t.Logf("weight: %f, topLevel: %v", s.Weight, s.TopLevel)
 		srb.HandleSpan(s, defaultEnv, aggr, nil)
 	}
 	sb := srb.Export()
@@ -215,7 +217,7 @@ func TestStatsBucketExtraAggregators(t *testing.T) {
 
 	// one custom aggregator
 	aggr := []string{"version"}
-	for _, s := range testSpans() {
+	for _, s := range testWeightedSpans() {
 		srb.HandleSpan(s, defaultEnv, aggr, nil)
 	}
 	sb := srb.Export()
@@ -265,7 +267,11 @@ func TestStatsBucketMany(t *testing.T) {
 
 	assert := assert.New(t)
 
-	templateSpan := Span{Service: "A", Name: "A.foo", Resource: "α", Duration: 7, weight: 1}
+	templateSpan := &WeightedSpan{
+		Span:     &Span{Service: "A", Name: "A.foo", Resource: "α", Duration: 7},
+		Weight:   1,
+		TopLevel: true,
+	}
 	const n = 100000
 
 	srb := NewStatsRawBucket(0, 1e9)
@@ -302,13 +308,15 @@ func TestStatsBucketSublayers(t *testing.T) {
 	root := tr.GetRoot()
 	SetSublayersOnSpan(root, sublayers)
 
+	wt := NewWeightedTrace(tr, root)
+
 	assert.NotNil(sublayers)
 
 	srb := NewStatsRawBucket(0, 1e9)
 
 	// No custom aggregators only the defaults
 	aggr := []string{}
-	for _, s := range tr {
+	for _, s := range wt {
 		srb.HandleSpan(s, defaultEnv, aggr, &sublayers)
 	}
 	sb := srb.Export()
@@ -398,13 +406,15 @@ func TestStatsBucketSublayersTopLevel(t *testing.T) {
 	root := tr.GetRoot()
 	SetSublayersOnSpan(root, sublayers)
 
+	wt := NewWeightedTrace(tr, root)
+
 	assert.NotNil(sublayers)
 
 	srb := NewStatsRawBucket(0, 1e9)
 
 	// No custom aggregators only the defaults
 	aggr := []string{}
-	for _, s := range tr {
+	for _, s := range wt {
 		srb.HandleSpan(s, defaultEnv, aggr, &sublayers)
 	}
 	sb := srb.Export()
@@ -513,7 +523,7 @@ func BenchmarkHandleSpan(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		for _, s := range testSpans() {
+		for _, s := range testWeightedSpans() {
 			srb.HandleSpan(s, defaultEnv, aggr, nil)
 		}
 	}
@@ -529,10 +539,12 @@ func BenchmarkHandleSpanSublayers(b *testing.B) {
 	root := tr.GetRoot()
 	SetSublayersOnSpan(root, sublayers)
 
+	wt := NewWeightedTrace(tr, root)
+
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		for _, s := range tr {
+		for _, s := range wt {
 			srb.HandleSpan(s, defaultEnv, aggr, &sublayers)
 		}
 	}

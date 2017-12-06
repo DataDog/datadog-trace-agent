@@ -47,7 +47,6 @@ func (s *Span) setTopLevel(topLevel bool) {
 		if len(s.Metrics) == 0 {
 			s.Metrics = nil
 		}
-		s.topLevel = false
 		return
 	}
 	if s.Metrics == nil {
@@ -56,9 +55,6 @@ func (s *Span) setTopLevel(topLevel bool) {
 	// Setting the metrics value, so that code downstream in the pipeline
 	// can identify this as top-level without recomputing everything.
 	s.Metrics[topLevelKey] = 1
-	// Setting the private attribute, this is used by internal agent code
-	// which can't access the metrics map because of concurrency issues.
-	s.topLevel = true
 }
 
 // TopLevel returns true if span is top-level.

@@ -68,8 +68,8 @@ func (t Trace) GetRoot() *Span {
 
 // ChildrenMap returns a map containing for each span id the list of its
 // direct children.
-func (t Trace) ChildrenMap() map[uint64]Spans {
-	childrenMap := make(map[uint64]Spans)
+func (t Trace) ChildrenMap() map[uint64][]*Span {
+	childrenMap := make(map[uint64][]*Span)
 
 	for i := range t {
 		span := &t[i]
@@ -80,14 +80,14 @@ func (t Trace) ChildrenMap() map[uint64]Spans {
 
 		children, ok := childrenMap[span.SpanID]
 		if !ok {
-			childrenMap[span.SpanID] = Spans{}
+			childrenMap[span.SpanID] = []*Span{}
 		}
 
 		children, ok = childrenMap[span.ParentID]
 		if ok {
 			children = append(children, span)
 		} else {
-			children = Spans{span}
+			children = []*Span{span}
 		}
 		childrenMap[span.ParentID] = children
 	}
@@ -98,15 +98,4 @@ func (t Trace) ChildrenMap() map[uint64]Spans {
 // NewTraceFlushMarker returns a trace with a single span as flush marker
 func NewTraceFlushMarker() Trace {
 	return []Span{NewFlushMarker()}
-}
-
-// ComputeWeight sets the weight private attribute to the weight
-// of the root Span. This is because sampling ratio is stored as a metrics
-// only is the root span, but is required for computing values in any span.
-func (t Trace) ComputeWeight(root Span) {
-	weight := root.Weight()
-
-	for i := range t {
-		t[i].weight = weight
-	}
 }

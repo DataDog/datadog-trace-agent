@@ -265,6 +265,16 @@ func RandomSpan() model.Span {
 	}
 }
 
+// RandomWeightedSpan generates a random weighted span, useful for stats tests
+func RandomWeightedSpan() *model.WeightedSpan {
+	s := RandomSpan()
+	return &model.WeightedSpan{
+		Span:     &s,
+		Weight:   1,
+		TopLevel: true,
+	}
+}
+
 // GetTestSpan returns a Span with different fields set
 func GetTestSpan() model.Span {
 	span := model.Span{
@@ -281,7 +291,6 @@ func GetTestSpan() model.Span {
 		Metrics:  map[string]float64{"http.monitor": 41.99},
 	}
 	trace := model.Trace{span}
-	trace.ComputeWeight(model.Span{})
 	trace.ComputeTopLevel()
 	return trace[0]
 }
@@ -307,8 +316,15 @@ func TestSpan() model.Span {
 		ParentID: 1111,
 		Type:     "http",
 	}
-	trace := model.Trace{span}
-	trace.ComputeWeight(model.Span{})
-	trace.ComputeTopLevel()
-	return trace[0]
+	return span
+}
+
+// TestWeightedSpan returns a static test weighted span for reproductive stats tests
+func TestWeightedSpan() *model.WeightedSpan {
+	s := TestSpan()
+	return &model.WeightedSpan{
+		Span:     &s,
+		Weight:   1,
+		TopLevel: true,
+	}
 }

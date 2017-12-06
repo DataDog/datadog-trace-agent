@@ -184,7 +184,7 @@ func assembleGrain(b *bytes.Buffer, env, resource, service string, m map[string]
 }
 
 // HandleSpan adds the span to this bucket stats, aggregated with the finest grain matching given aggregators
-func (sb *StatsRawBucket) HandleSpan(s Span, env string, aggregators []string, sublayers *[]SublayerValue) {
+func (sb *StatsRawBucket) HandleSpan(s *WeightedSpan, env string, aggregators []string, sublayers *[]SublayerValue) {
 	if env == "" {
 		panic("env should never be empty")
 	}
@@ -210,7 +210,7 @@ func (sb *StatsRawBucket) HandleSpan(s Span, env string, aggregators []string, s
 	}
 }
 
-func (sb *StatsRawBucket) add(s Span, aggr string, tags TagSet) {
+func (sb *StatsRawBucket) add(s *WeightedSpan, aggr string, tags TagSet) {
 	var gs groupedStats
 	var ok bool
 
@@ -219,15 +219,15 @@ func (sb *StatsRawBucket) add(s Span, aggr string, tags TagSet) {
 		gs = newGroupedStats(tags)
 	}
 
-	if s.topLevel {
-		gs.topLevel += s.weight
+	if s.TopLevel {
+		gs.topLevel += s.Weight
 	}
 
-	gs.hits += s.weight
+	gs.hits += s.Weight
 	if s.Error != 0 {
-		gs.errors += s.weight
+		gs.errors += s.Weight
 	}
-	gs.duration += float64(s.Duration) * s.weight
+	gs.duration += float64(s.Duration) * s.Weight
 
 	// TODO add for s.Metrics ability to define arbitrary counts and distros, check some config?
 	// alter resolution of duration distro
@@ -241,7 +241,7 @@ func (sb *StatsRawBucket) add(s Span, aggr string, tags TagSet) {
 	sb.data[key] = gs
 }
 
-func (sb *StatsRawBucket) addSublayer(s Span, aggr string, tags TagSet, sub SublayerValue) {
+func (sb *StatsRawBucket) addSublayer(s *WeightedSpan, aggr string, tags TagSet, sub SublayerValue) {
 	// This is not as efficient as a "regular" add as we don't update
 	// all sublayers at once (one call for HITS, and another one for ERRORS, DURATION...)
 	// when logically, if we have a sublayer for HITS, we also have one for DURATION,
@@ -260,11 +260,11 @@ func (sb *StatsRawBucket) addSublayer(s Span, aggr string, tags TagSet, sub Subl
 		ss = newSublayerStats(subTags)
 	}
 
-	if s.topLevel {
-		ss.topLevel += s.weight
+	if s.TopLevel {
+		ss.topLevel += s.Weight
 	}
 
-	ss.value += int64(s.weight * sub.Value)
+	ss.value += int64(s.Weight * sub.Value)
 
 	sb.sublayerData[key] = ss
 }

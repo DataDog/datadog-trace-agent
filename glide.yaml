@@ -29,6 +29,14 @@ import:
   - windows/svc/debug
   - windows/svc/eventlog
   - windows/svc/mgr
+- package: github.com/golang/protobuf
+  subpackages:
+  - protoc-gen-go
+  - proto
+- package: github.com/gogo/protobuf
+  version: v0.5
+  subpackages:
+  - gogoproto
 testImport:
 - package: github.com/stretchr/testify
   version: v1.1.4
