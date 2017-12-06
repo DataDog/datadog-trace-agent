@@ -12,7 +12,7 @@ def go_build(program, opts={})
     :add_build_vars => true
   }.merge(opts)
 
-  dd = 'info'
+  dd = 'github.com/DataDog/datadog-trace-agent/info'
   commit = `git rev-parse --short HEAD`.strip
   branch = `git rev-parse --abbrev-ref HEAD`.strip
   date = Time.now.iso8601
