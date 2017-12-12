@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"sort"
@@ -195,6 +196,7 @@ func (r *HTTPReceiver) replyTraces(v APIVersion, w http.ResponseWriter) {
 // handleTraces knows how to handle a bunch of traces
 func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *http.Request) {
 	if !r.preSampler.Sample(req) {
+		io.Copy(ioutil.Discard, req.Body)
 		HTTPOK(w)
 		return
 	}
