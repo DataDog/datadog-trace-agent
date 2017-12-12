@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"reflect"
-	"sync"
 	"time"
 
 	log "github.com/cihub/seelog"
@@ -17,29 +16,28 @@ import (
 
 // Sampler chooses wich spans to write to the API
 type Sampler struct {
-	mu            sync.Mutex
-	sampledTraces []model.Trace
-	traceCount    int
-	lastFlush     time.Time
+	sampled chan *model.Trace
 
+	// For stats
+	keptTraceCount  int
+	totalTraceCount int
+	lastFlush       time.Time
+
+	// actual implementation of the sampling logic
 	engine sampler.Engine
 }
 
-// NewScoreEngine creates a new empty sampler ready to be started
-func NewScoreEngine(conf *config.AgentConfig) *Sampler {
+// NewScoreSampler creates a new empty sampler ready to be started
+func NewScoreSampler(conf *config.AgentConfig) *Sampler {
 	return &Sampler{
-		sampledTraces: []model.Trace{},
-		traceCount:    0,
-		engine:        sampler.NewScoreEngine(conf.ExtraSampleRate, conf.MaxTPS),
+		engine: sampler.NewScoreEngine(conf.ExtraSampleRate, conf.MaxTPS),
 	}
 }
 
-// NewPriorityEngine creates a new empty distributed sampler ready to be started
-func NewPriorityEngine(conf *config.AgentConfig, dynConf *config.DynamicConfig) *Sampler {
+// NewPrioritySampler creates a new empty distributed sampler ready to be started
+func NewPrioritySampler(conf *config.AgentConfig, dynConf *config.DynamicConfig) *Sampler {
 	return &Sampler{
-		sampledTraces: []model.Trace{},
-		traceCount:    0,
-		engine:        sampler.NewPriorityEngine(conf.ExtraSampleRate, conf.MaxTPS, &dynConf.RateByService),
+		engine: sampler.NewPriorityEngine(conf.ExtraSampleRate, conf.MaxTPS, &dynConf.RateByService),
 	}
 }
 
@@ -49,62 +47,65 @@ func (s *Sampler) Run() {
 		defer watchdog.LogOnPanic()
 		s.engine.Run()
 	}()
+
+	go func() {
+		defer watchdog.LogOnPanic()
+		s.logStats()
+	}()
 }
 
 // Add samples a trace then keep it until the next flush
 func (s *Sampler) Add(t processedTrace) {
-	s.mu.Lock()
-	s.traceCount++
+	s.totalTraceCount++
 	if s.engine.Sample(t.Trace, t.Root, t.Env) {
-		s.sampledTraces = append(s.sampledTraces, t.Trace)
+		s.keptTraceCount++
+		s.sampled <- &t.Trace
 	}
-	s.mu.Unlock()
 }
 
 // Stop stops the sampler
 func (s *Sampler) Stop() {
 	s.engine.Stop()
+
 }
 
-// Flush returns representative spans based on GetSamples and reset its internal memory
-func (s *Sampler) Flush() []model.Trace {
-	s.mu.Lock()
+// logStats reports statistics and update the info exposed.
+func (s *Sampler) logStats() {
 
-	traces := s.sampledTraces
-	s.sampledTraces = []model.Trace{}
-	traceCount := s.traceCount
-	s.traceCount = 0
+	for now := range time.Tick(10 * time.Second) {
+		keptTraceCount := s.keptTraceCount
+		totalTraceCount := s.totalTraceCount
+		s.keptTraceCount = 0
+		s.totalTraceCount = 0
 
-	now := time.Now()
-	duration := now.Sub(s.lastFlush)
-	s.lastFlush = now
+		duration := now.Sub(s.lastFlush)
+		s.lastFlush = now
 
-	s.mu.Unlock()
-
-	state := s.engine.GetState()
-
-	switch state := state.(type) {
-	case sampler.InternalState:
+		// TODO: do we still want that? figure out how it conflicts with what the `state` exposes / what is public metrics.
 		var stats info.SamplerStats
 		if duration > 0 {
-			stats.KeptTPS = float64(len(traces)) / duration.Seconds()
-			stats.TotalTPS = float64(traceCount) / duration.Seconds()
+			stats.KeptTPS = float64(keptTraceCount) / duration.Seconds()
+			stats.TotalTPS = float64(totalTraceCount) / duration.Seconds()
 		}
+		engineType := fmt.Sprint(reflect.TypeOf(s.engine))
+		log.Debugf("%s: flushed %d sampled traces out of %d", engineType, keptTraceCount, totalTraceCount)
 
-		log.Debugf("flushed %d sampled traces out of %d", len(traces), traceCount)
-		log.Debugf("inTPS: %f, outTPS: %f, maxTPS: %f, offset: %f, slope: %f, cardinality: %d",
-			state.InTPS, state.OutTPS, state.MaxTPS, state.Offset, state.Slope, state.Cardinality)
+		state := s.engine.GetState()
 
-		// publish through expvar
-		switch s.engine.(type) {
-		case *sampler.ScoreEngine:
-			info.UpdateSamplerInfo(info.SamplerInfo{EngineType: fmt.Sprint(reflect.TypeOf(s.engine)), Stats: stats, State: state})
-		case *sampler.PriorityEngine:
-			info.UpdatePrioritySamplerInfo(info.SamplerInfo{EngineType: fmt.Sprint(reflect.TypeOf(s.engine)), Stats: stats, State: state})
+		switch state := state.(type) {
+		case sampler.InternalState:
+			log.Debugf("%s: inTPS: %f, outTPS: %f, maxTPS: %f, offset: %f, slope: %f, cardinality: %d",
+				engineType, state.InTPS, state.OutTPS, state.MaxTPS, state.Offset, state.Slope, state.Cardinality)
+
+			// publish through expvar
+			switch s.engine.(type) {
+			case *sampler.ScoreEngine:
+				info.UpdateSamplerInfo(info.SamplerInfo{EngineType: engineType, Stats: stats, State: state})
+			case *sampler.PriorityEngine:
+				info.UpdatePrioritySamplerInfo(info.SamplerInfo{EngineType: engineType, Stats: stats, State: state})
+			}
+		default:
+			log.Debugf("unhandled sampler engine, can't log state")
 		}
-	default:
-		log.Debugf("unhandled sampler engine, can't log state")
 	}
-
-	return traces
 }

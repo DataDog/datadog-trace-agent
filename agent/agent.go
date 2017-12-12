@@ -1,7 +1,6 @@
 package main
 
 import (
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -40,12 +39,13 @@ func (pt *processedTrace) weight() float64 {
 
 // Agent struct holds all the sub-routines structs and make the data flow between them
 type Agent struct {
-	Receiver       *HTTPReceiver
-	Concentrator   *Concentrator
-	Filters        []filters.Filter
-	ScoreEngine    *Sampler
-	PriorityEngine *Sampler
-	Writer         *writer.Writer
+	Receiver        *HTTPReceiver
+	Concentrator    *Concentrator
+	Filters         []filters.Filter
+	ScoreSampler    *Sampler
+	PrioritySampler *Sampler
+	Writer          *writer.Writer
+	TraceWriter     *writer.TraceWriter
 
 	// config
 	conf    *config.AgentConfig
@@ -66,27 +66,37 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 		conf.BucketInterval.Nanoseconds(),
 	)
 	f := filters.Setup(conf)
-	ss := NewScoreEngine(conf)
+
+	sampledTraceChan := make(chan *model.Trace)
+	ss := NewScoreSampler(conf)
+	ss.sampled = sampledTraceChan
 	var ps *Sampler
 	if conf.PrioritySampling {
 		// Use priority sampling for distributed tracing only if conf says so
-		ps = NewPriorityEngine(conf, dynConf)
+		// TODO: remove the option once confortable ; as it is true by default.
+		ps = NewPrioritySampler(conf, dynConf)
+		ps.sampled = sampledTraceChan
 	}
-
+	// legacy writer, will progressively get replaced by per-endpoint writers
 	w := writer.NewWriter(conf)
 	w.InServices = r.services
 
+	// new set of writers
+	tw := writer.NewTraceWriter(conf)
+	tw.InTraces = sampledTraceChan
+
 	return &Agent{
-		Receiver:       r,
-		Concentrator:   c,
-		Filters:        f,
-		ScoreEngine:    ss,
-		PriorityEngine: ps,
-		Writer:         w,
-		conf:           conf,
-		dynConf:        dynConf,
-		exit:           exit,
-		die:            die,
+		Receiver:        r,
+		Concentrator:    c,
+		Filters:         f,
+		ScoreSampler:    ss,
+		PrioritySampler: ps,
+		Writer:          w,
+		TraceWriter:     tw,
+		conf:            conf,
+		dynConf:         dynConf,
+		exit:            exit,
+		die:             die,
 	}
 }
 
@@ -104,11 +114,14 @@ func (a *Agent) Run() {
 	// update the data served by expvar so that we don't expose a 0 sample rate
 	info.UpdatePreSampler(*a.Receiver.preSampler.Stats())
 
+	// TODO: unify components APIs. Use Start/Stop as non-blocking ways of controlling the blocking Run loop.
+	// Like we do with TraceWriter.
 	a.Receiver.Run()
 	a.Writer.Run()
-	a.ScoreEngine.Run()
-	if a.PriorityEngine != nil {
-		a.PriorityEngine.Run()
+	a.TraceWriter.Start()
+	a.ScoreSampler.Run()
+	if a.PrioritySampler != nil {
+		a.PrioritySampler.Run()
 	}
 
 	for {
@@ -120,26 +133,8 @@ func (a *Agent) Run() {
 				HostName: a.conf.HostName,
 				Env:      a.conf.DefaultEnv,
 			}
-			var wg sync.WaitGroup
-			wg.Add(2)
-			go func() {
-				defer watchdog.LogOnPanic()
-				p.Stats = a.Concentrator.Flush()
-				wg.Done()
-			}()
-			go func() {
-				defer watchdog.LogOnPanic()
-				// Serializing both flushes, classic agent sampler and distributed sampler,
-				// in most cases only one will be used, so in mainstream case there should
-				// be no performance issue, only in transitionnal mode can both contain data.
-				p.Traces = a.ScoreEngine.Flush()
-				if a.PriorityEngine != nil {
-					p.Traces = append(p.Traces, a.PriorityEngine.Flush()...)
-				}
-				wg.Done()
-			}()
+			p.Stats = a.Concentrator.Flush()
 
-			wg.Wait()
 			p.SetExtra(languageHeaderKey, a.Receiver.Languages())
 
 			a.Writer.InPayloads <- p
@@ -149,9 +144,10 @@ func (a *Agent) Run() {
 			log.Info("exiting")
 			close(a.Receiver.exit)
 			a.Writer.Stop()
-			a.ScoreEngine.Stop()
-			if a.PriorityEngine != nil {
-				a.PriorityEngine.Stop()
+			a.TraceWriter.Stop()
+			a.ScoreSampler.Stop()
+			if a.PrioritySampler != nil {
+				a.PrioritySampler.Stop()
 			}
 			return
 		}
@@ -177,11 +173,11 @@ func (a *Agent) Process(t model.Trace) {
 	// We choose the sampler dynamically, depending on trace content,
 	// it has a sampling priority info (wether 0 or 1 or more) we respect
 	// this by using priority sampler. Else, use default score sampler.
-	s := a.ScoreEngine
+	s := a.ScoreSampler
 	priorityPtr := &ts.TracesPriorityNone
-	if a.PriorityEngine != nil {
+	if a.PrioritySampler != nil {
 		if priority, ok := root.Metrics[samplingPriorityKey]; ok {
-			s = a.PriorityEngine
+			s = a.PrioritySampler
 
 			if priority == 0 {
 				priorityPtr = &ts.TracesPriority0

@@ -75,7 +75,7 @@ func NewWriter(conf *config.AgentConfig) *Writer {
 		}
 	} else {
 		log.Info("API interface is disabled, flushing to /dev/null instead")
-		endpoint = NullEndpoint{}
+		endpoint = NullAgentEndpoint{}
 	}
 
 	return &Writer{
