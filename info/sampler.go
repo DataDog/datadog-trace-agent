@@ -2,6 +2,7 @@ package info
 
 import "github.com/DataDog/datadog-trace-agent/sampler"
 
+// SamplerInfo represents internal stats and state of a sampler
 type SamplerInfo struct {
 	// EngineType contains the type of the engine (tells old sampler and new distributed sampler apart)
 	EngineType string
@@ -11,7 +12,7 @@ type SamplerInfo struct {
 	State sampler.InternalState
 }
 
-// samplerStats contains sampler statistics
+// SamplerStats contains sampler statistics
 type SamplerStats struct {
 	// KeptTPS is the number of traces kept (average per second for last flush)
 	KeptTPS float64

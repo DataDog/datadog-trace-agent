@@ -14,7 +14,7 @@ var (
 	GoVersion string
 )
 
-// versionString returns the version information filled in at build time
+// VersionString returns the version information filled in at build time
 func VersionString() string {
 	var buf bytes.Buffer
 

@@ -339,15 +339,15 @@ func TestInfoReceiverStats(t *testing.T) {
 	assert.NotNil(conf)
 
 	stats := NewReceiverStats()
-	t1 := &tagStats{
+	t1 := &TagStats{
 		Tags{Lang: "python"},
 		Stats{TracesReceived: 23, TracesDropped: 2, TracesBytes: 3244, SpansReceived: 213, SpansDropped: 14},
 	}
-	t2 := &tagStats{
+	t2 := &TagStats{
 		Tags{Lang: "go"},
 		Stats{ServicesReceived: 4, ServicesBytes: 1543},
 	}
-	stats.Stats = map[Tags]*tagStats{
+	stats.Stats = map[Tags]*TagStats{
 		t1.Tags: t1,
 		t2.Tags: t2,
 	}
@@ -375,7 +375,7 @@ func TestInfoReceiverStats(t *testing.T) {
 	}
 	s := publishReceiverStats()
 	switch s := s.(type) {
-	case []tagStats:
+	case []TagStats:
 		for _, tagStats := range s {
 			assert.Equal(*stats.Stats[tagStats.Tags], tagStats)
 		}
@@ -386,7 +386,7 @@ func TestInfoReceiverStats(t *testing.T) {
 	UpdateReceiverStats(stats)
 	s = publishReceiverStats()
 	switch s := s.(type) {
-	case []tagStats:
+	case []TagStats:
 		for _, tagStats := range s {
 			if tagStats.Tags == t1.Tags {
 				assert.Equal(t1.Stats.TracesReceived, tagStats.Stats.TracesReceived)
