@@ -4,16 +4,13 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
-	"sync/atomic"
 	"time"
 
 	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/statsd"
-	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
 // timeout is the HTTP timeout for POST requests to the Datadog backend
@@ -51,7 +48,6 @@ type AgentEndpoint interface {
 type APIEndpoint struct {
 	apiKey string
 	url    string
-	stats  info.EndpointStats
 	client *http.Client
 }
 
@@ -70,10 +66,6 @@ func NewAPIEndpoint(url, apiKey string) *APIEndpoint {
 			Timeout: timeout,
 		},
 	}
-	go func() {
-		defer watchdog.LogOnPanic()
-		ae.logStats()
-	}()
 	return &ae
 }
 
@@ -105,9 +97,6 @@ func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 
 	payloadSize := len(data)
 	statsd.Client.Count("datadog.trace_agent.writer.payload_bytes", int64(payloadSize), nil, 1)
-	atomic.AddInt64(&ae.stats.TracesBytes, int64(payloadSize))
-	atomic.AddInt64(&ae.stats.TracesStats, int64(len(p.Stats)))
-	atomic.AddInt64(&ae.stats.TracesPayload, 1)
 
 	// Create the request to be sent to the API
 	url := ae.url + model.AgentPayloadAPIPath()
@@ -117,7 +106,6 @@ func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 	// it will always yield the same result.
 	if err != nil {
 		log.Errorf("could not create request for endpoint %s: %v", url, err)
-		atomic.AddInt64(&ae.stats.TracesPayloadError, 1)
 		return payloadSize, err
 	}
 
@@ -132,7 +120,6 @@ func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 	// If the request fails, we'll try again later.
 	if err != nil {
 		log.Errorf("error when requesting to endpoint %s: %v", url, err)
-		atomic.AddInt64(&ae.stats.TracesPayloadError, 1)
 		return payloadSize, newAPIError(err, ae)
 	}
 	defer resp.Body.Close()
@@ -141,7 +128,6 @@ func (ae *APIEndpoint) Write(p model.AgentPayload) (int, error) {
 	if resp.StatusCode/100 != 2 {
 		err := fmt.Errorf("request to %s responded with %s", url, resp.Status)
 		log.Error(err)
-		atomic.AddInt64(&ae.stats.TracesPayloadError, 1)
 
 		// Only retry for 5xx (server) errors
 		if resp.StatusCode/100 == 5 {
@@ -171,16 +157,11 @@ func (ae *APIEndpoint) WriteServices(s model.ServicesMetadata) {
 		return
 	}
 
-	payloadSize := len(data)
-	atomic.AddInt64(&ae.stats.ServicesBytes, int64(payloadSize))
-	atomic.AddInt64(&ae.stats.ServicesPayload, 1)
-
 	// Create the request
 	url := ae.url + model.ServicesPayloadAPIPath()
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(data))
 	if err != nil {
 		log.Errorf("could not create request for endpoint %s: %v", url, err)
-		atomic.AddInt64(&ae.stats.ServicesPayloadError, 1)
 		return
 	}
 
@@ -192,45 +173,17 @@ func (ae *APIEndpoint) WriteServices(s model.ServicesMetadata) {
 	resp, err := ae.client.Do(req)
 	if err != nil {
 		log.Errorf("error when requesting to endpoint %s: %v", url, err)
-		atomic.AddInt64(&ae.stats.ServicesPayloadError, 1)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode/100 != 2 {
 		log.Errorf("request to %s responded with %s", url, resp.Status)
-		atomic.AddInt64(&ae.stats.ServicesPayloadError, 1)
 		return
 	}
 
 	// Everything went fine.
 	log.Infof("flushed %d services to the API", len(s))
-}
-
-// logStats periodically submits stats about the endpoint to statsd
-func (ae *APIEndpoint) logStats() {
-	var accStats info.EndpointStats
-
-	for range time.Tick(time.Minute) {
-		// Load counters and reset them for the next flush
-		accStats.TracesPayload = atomic.SwapInt64(&ae.stats.TracesPayload, 0)
-		accStats.TracesPayloadError = atomic.SwapInt64(&ae.stats.TracesPayloadError, 0)
-		accStats.TracesBytes = atomic.SwapInt64(&ae.stats.TracesBytes, 0)
-		accStats.TracesStats = atomic.SwapInt64(&ae.stats.TracesStats, 0)
-		accStats.ServicesPayload = atomic.SwapInt64(&ae.stats.ServicesPayload, 0)
-		accStats.ServicesPayloadError = atomic.SwapInt64(&ae.stats.ServicesPayloadError, 0)
-		accStats.ServicesBytes = atomic.SwapInt64(&ae.stats.ServicesBytes, 0)
-
-		statsd.Client.Count("datadog.trace_agent.endpoint.traces_payload", int64(accStats.TracesPayload), nil, 1)
-		statsd.Client.Count("datadog.trace_agent.endpoint.traces_payload_error", int64(accStats.TracesPayloadError), nil, 1)
-		statsd.Client.Count("datadog.trace_agent.endpoint.traces_bytes", int64(accStats.TracesBytes), nil, 1)
-		statsd.Client.Count("datadog.trace_agent.endpoint.traces_stats", int64(accStats.TracesStats), nil, 1)
-		statsd.Client.Count("datadog.trace_agent.endpoint.services_payload", int64(accStats.ServicesPayload), nil, 1)
-		statsd.Client.Count("datadog.trace_agent.endpoint.services_payload_error", int64(accStats.ServicesPayloadError), nil, 1)
-		statsd.Client.Count("datadog.trace_agent.endpoint.services_bytes", int64(accStats.ServicesBytes), nil, 1)
-
-		info.UpdateEndpointStats(accStats)
-	}
 }
 
 // NullAgentEndpoint implements AgentEndpoint, it just logs data

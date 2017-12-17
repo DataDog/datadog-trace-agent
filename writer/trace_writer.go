@@ -3,6 +3,7 @@ package writer
 import (
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	log "github.com/cihub/seelog"
@@ -26,6 +27,8 @@ type TraceWriter struct {
 	InTraces <-chan *model.Trace
 
 	traceBuffer []*model.APITrace
+
+	stats info.TraceWriterInfo
 
 	exit   chan struct{}
 	exitWG *sync.WaitGroup
@@ -75,6 +78,9 @@ func (w *TraceWriter) Run() {
 	flushTicker := time.NewTicker(5 * time.Second)
 	defer flushTicker.Stop()
 
+	updateInfoTicker := time.NewTicker(1 * time.Minute)
+	defer updateInfoTicker.Stop()
+
 	for {
 		select {
 		case trace := <-w.InTraces:
@@ -84,6 +90,8 @@ func (w *TraceWriter) Run() {
 			w.traceBuffer = append(w.traceBuffer, apiTrace)
 		case <-flushTicker.C:
 			w.Flush()
+		case <-updateInfoTicker.C:
+			go w.updateInfo()
 		case <-w.exit:
 			log.Info("exiting, flushing all remaining traces")
 			w.Flush()
@@ -102,6 +110,7 @@ func (w *TraceWriter) Stop() {
 func (w *TraceWriter) Flush() {
 	traces := w.traceBuffer
 	log.Debugf("going to flush %d traces", len(traces))
+	atomic.AddInt64(&w.stats.Traces, int64(len(traces)))
 
 	// Make the new buffer of the size of the previous one.
 	// that's a fair estimation and it should reduce allocations without using too much memory.
@@ -118,6 +127,7 @@ func (w *TraceWriter) Flush() {
 		log.Errorf("failed to serialize trace payload, data got dropped, err: %s", err)
 		return
 	}
+	atomic.AddInt64(&w.stats.Bytes, int64(len(serialized)))
 
 	headers := map[string]string{
 		languageHeaderKey: strings.Join(info.Languages(), "|"),
@@ -126,19 +136,35 @@ func (w *TraceWriter) Flush() {
 	startFlush := time.Now()
 
 	// Send the payload to the endpoint
-	// TODO: track metrics/stats about payload
 	err = w.endpoint.Write(serialized, headers)
 
 	flushTime := time.Since(startFlush)
 
 	// TODO: if error, depending on why, replay later.
 	if err != nil {
-		statsd.Client.Count("datadog.trace_agent.writer.flush", 1, []string{"status:error"}, 1)
+		atomic.AddInt64(&w.stats.Errors, 1)
 		log.Errorf("failed to flush trace payload: %s", err)
 	}
 
 	log.Infof("flushed trace payload to the API, time:%s, size:%d bytes", flushTime, len(serialized))
-	statsd.Client.Count("datadog.trace_agent.writer.flush", 1, []string{"status:success"}, 1)
-	statsd.Client.Gauge("datadog.trace_agent.writer.traces.flush_duration", flushTime.Seconds(), nil, 1)
-	statsd.Client.Count("datadog.trace_agent.writer.payload_bytes", int64(len(serialized)), nil, 1)
+	statsd.Client.Gauge("datadog.trace_agent.trace_writer.flush_duration", flushTime.Seconds(), nil, 1)
+	atomic.AddInt64(&w.stats.Payloads, 1)
+
+}
+
+func (w *TraceWriter) updateInfo() {
+	var twInfo info.TraceWriterInfo
+
+	// Load counters and reset them for the next flush
+	twInfo.Traces = atomic.SwapInt64(&w.stats.Traces, 0)
+	twInfo.Payloads = atomic.SwapInt64(&w.stats.Payloads, 0)
+	twInfo.Bytes = atomic.SwapInt64(&w.stats.Bytes, 0)
+	twInfo.Errors = atomic.SwapInt64(&w.stats.Traces, 0)
+
+	statsd.Client.Count("datadog.trace_agent.trace_writer.traces", int64(twInfo.Traces), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.trace_writer.payloads", int64(twInfo.Payloads), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.trace_writer.bytes", int64(twInfo.Bytes), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.trace_writer.errors", int64(twInfo.Errors), nil, 1)
+
+	info.UpdateTraceWriterInfo(twInfo)
 }
