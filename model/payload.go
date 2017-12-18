@@ -106,9 +106,3 @@ func SetAgentPayloadHeaders(h http.Header, extras map[string]string) {
 	default:
 	}
 }
-
-func SetExtraHeaders(h http.Header, extras map[string]string) {
-	for key, value := range extras {
-		h.Set(key, value)
-	}
-}
