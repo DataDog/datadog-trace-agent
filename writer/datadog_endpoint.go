@@ -48,8 +48,6 @@ func (e *DatadogEndpoint) Write(payload []byte, headers map[string]string) error
 	req.URL.RawQuery = queryParams.Encode()
 
 	SetExtraHeaders(req.Header, headers)
-	req.Header.Set("Content-Type", "application/x-protobuf")
-	req.Header.Set("Content-Encoding", "identity")
 
 	resp, err := e.client.Do(req)
 

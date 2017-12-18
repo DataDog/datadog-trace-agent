@@ -27,10 +27,9 @@ var (
 
 	// TODO: move from package globals to a clean single struct
 
-	traceWriterInfo TraceWriterInfo
-	// anticipate future writers
-	// statsWriterInfo   StatsWriterInfo
-	// serviceWriterInfo ServiceWriterInfo
+	traceWriterInfo   TraceWriterInfo
+	statsWriterInfo   StatsWriterInfo
+	serviceWriterInfo ServiceWriterInfo
 
 	watchdogInfo        watchdog.Info
 	samplerInfo         SamplerInfo
@@ -86,6 +85,10 @@ const (
 
   Traces: {{.Status.TraceWriter.Payloads}} payloads, {{.Status.TraceWriter.Traces}} traces, {{.Status.TraceWriter.Bytes}} bytes
   {{if gt .Status.TraceWriter.Errors 0}}WARNING: Traces API errors (1 min): {{.Status.TraceWriter.Errors}}{{end}}
+  Stats: {{.Status.StatsWriter.Payloads}} payloads, {{.Status.StatsWriter.StatsBuckets}} stats buckets, {{.Status.StatsWriter.Bytes}} bytes
+  {{if gt .Status.StatsWriter.Errors 0}}WARNING: Stats API errors (1 min): {{.Status.StatsWriter.Errors}}{{end}}
+  Services: {{.Status.ServiceWriter.Payloads}} payloads, {{.Status.ServiceWriter.Services}} services, {{.Status.ServiceWriter.Bytes}} bytes
+  {{if gt .Status.ServiceWriter.Errors 0}}WARNING: Services API errors (1 min): {{.Status.ServiceWriter.Errors}}{{end}}
 
 `
 
@@ -234,8 +237,8 @@ func InitInfo(conf *config.AgentConfig) error {
 		expvar.Publish("receiver", expvar.Func(publishReceiverStats))
 		expvar.Publish("sampler", expvar.Func(publishSamplerInfo))
 		expvar.Publish("trace_writer", expvar.Func(publishTraceWriterInfo))
-		// expvar.Publish("writer.stats", expvar.Func(publishStatsWriterInfo))
-		// expvar.Publish("writer.services", expvar.Func(publishServiceWriterInfo))
+		expvar.Publish("stats_writer", expvar.Func(publishStatsWriterInfo))
+		expvar.Publish("service_writer", expvar.Func(publishServiceWriterInfo))
 		expvar.Publish("prioritysampler", expvar.Func(publishPrioritySamplerInfo))
 		expvar.Publish("ratebyservice", expvar.Func(publishRateByService))
 		expvar.Publish("watchdog", expvar.Func(publishWatchdogInfo))
@@ -289,6 +292,8 @@ type StatusInfo struct {
 	Receiver      []TagStats              `json:"receiver"`
 	RateByService map[string]float64      `json:"ratebyservice"`
 	TraceWriter   TraceWriterInfo         `json:"trace_writer"`
+	StatsWriter   StatsWriterInfo         `json:"stats_writer"`
+	ServiceWriter ServiceWriterInfo       `json:"service_writer"`
 	Watchdog      watchdog.Info           `json:"watchdog"`
 	PreSampler    sampler.PreSamplerStats `json:"presampler"`
 	Config        config.AgentConfig      `json:"config"`

@@ -18,7 +18,6 @@ import (
 
 const (
 	processStatsInterval = time.Minute
-	languageHeaderKey    = "X-Datadog-Reported-Languages"
 	samplingPriorityKey  = "_sampling_priority_v1"
 )
 
@@ -44,8 +43,9 @@ type Agent struct {
 	Filters         []filters.Filter
 	ScoreSampler    *Sampler
 	PrioritySampler *Sampler
-	Writer          *writer.Writer
 	TraceWriter     *writer.TraceWriter
+	ServiceWriter   *writer.ServiceWriter
+	StatsWriter     *writer.StatsWriter
 
 	// config
 	conf    *config.AgentConfig
@@ -60,6 +60,14 @@ type Agent struct {
 // NewAgent returns a new Agent object, ready to be started
 func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 	dynConf := config.NewDynamicConfig()
+
+	// inter-component channels
+	rawTraceChan := make(chan model.Trace, 5000) // about 1000 traces/sec for 5 sec
+	sampledTraceChan := make(chan *model.Trace)
+	statsChan := make(chan []model.StatsBucket)
+	serviceChan := make(chan model.ServicesMetadata, 50)
+
+	// create components
 	r := NewHTTPReceiver(conf, dynConf)
 	c := NewConcentrator(
 		conf.ExtraAggregators,
@@ -67,23 +75,28 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 	)
 	f := filters.Setup(conf)
 
-	sampledTraceChan := make(chan *model.Trace)
 	ss := NewScoreSampler(conf)
-	ss.sampled = sampledTraceChan
 	var ps *Sampler
 	if conf.PrioritySampling {
 		// Use priority sampling for distributed tracing only if conf says so
-		// TODO: remove the option once confortable ; as it is true by default.
+		// TODO: remove the option once comfortable ; as it is true by default.
 		ps = NewPrioritySampler(conf, dynConf)
+	}
+	tw := writer.NewTraceWriter(conf)
+	sw := writer.NewStatsWriter(conf)
+	svcW := writer.NewServiceWriter(conf)
+
+	// wire components together
+	r.traces = rawTraceChan
+	r.services = serviceChan
+	tw.InTraces = sampledTraceChan
+	ss.sampled = sampledTraceChan
+	if conf.PrioritySampling {
 		ps.sampled = sampledTraceChan
 	}
-	// legacy writer, will progressively get replaced by per-endpoint writers
-	w := writer.NewWriter(conf)
-	w.InServices = r.services
-
-	// new set of writers
-	tw := writer.NewTraceWriter(conf)
-	tw.InTraces = sampledTraceChan
+	c.OutStats = statsChan
+	sw.InStats = statsChan
+	svcW.InServices = serviceChan
 
 	return &Agent{
 		Receiver:        r,
@@ -91,8 +104,9 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 		Filters:         f,
 		ScoreSampler:    ss,
 		PrioritySampler: ps,
-		Writer:          w,
 		TraceWriter:     tw,
+		StatsWriter:     sw,
+		ServiceWriter:   svcW,
 		conf:            conf,
 		dynConf:         dynConf,
 		exit:            exit,
@@ -102,9 +116,6 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 
 // Run starts routers routines and individual pieces then stop them when the exit order is received
 func (a *Agent) Run() {
-	flushTicker := time.NewTicker(a.conf.BucketInterval)
-	defer flushTicker.Stop()
-
 	// it's really important to use a ticker for this, and with a not too short
 	// interval, for this is our garantee that the process won't start and kill
 	// itself too fast (nightmare loop)
@@ -117,8 +128,10 @@ func (a *Agent) Run() {
 	// TODO: unify components APIs. Use Start/Stop as non-blocking ways of controlling the blocking Run loop.
 	// Like we do with TraceWriter.
 	a.Receiver.Run()
-	a.Writer.Run()
 	a.TraceWriter.Start()
+	a.StatsWriter.Start()
+	a.ServiceWriter.Start()
+	a.Concentrator.Start()
 	a.ScoreSampler.Run()
 	if a.PrioritySampler != nil {
 		a.PrioritySampler.Run()
@@ -128,23 +141,15 @@ func (a *Agent) Run() {
 		select {
 		case t := <-a.Receiver.traces:
 			a.Process(t)
-		case <-flushTicker.C:
-			p := model.AgentPayload{
-				HostName: a.conf.HostName,
-				Env:      a.conf.DefaultEnv,
-			}
-			p.Stats = a.Concentrator.Flush()
-
-			p.SetExtra(languageHeaderKey, a.Receiver.Languages())
-
-			a.Writer.InPayloads <- p
 		case <-watchdogTicker.C:
 			a.watchdog()
 		case <-a.exit:
 			log.Info("exiting")
 			close(a.Receiver.exit)
-			a.Writer.Stop()
+			a.Concentrator.Stop()
 			a.TraceWriter.Stop()
+			a.StatsWriter.Stop()
+			a.ServiceWriter.Stop()
 			a.ScoreSampler.Stop()
 			if a.PrioritySampler != nil {
 				a.PrioritySampler.Stop()

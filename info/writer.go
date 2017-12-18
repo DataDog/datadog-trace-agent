@@ -8,21 +8,21 @@ type TraceWriterInfo struct {
 	Bytes    int64
 }
 
-// // ServiceWriterInfo represents statistics from the service writer.
-// type ServiceWriterInfo struct {
-// 	Payload  int64
-// 	Services int64
-// 	Errors   int64
-// 	Bytes    int64
-// }
+// ServiceWriterInfo represents statistics from the service writer.
+type ServiceWriterInfo struct {
+	Payloads int64
+	Services int64
+	Errors   int64
+	Bytes    int64
+}
 
-// // StatsWriterInfo represents statistics from the stats writer.
-// type StatsWriterInfo struct {
-// 	Payload      int64
-// 	StatsBuckets int64
-// 	Errors       int64
-// 	Bytes        int64
-// }
+// StatsWriterInfo represents statistics from the stats writer.
+type StatsWriterInfo struct {
+	Payloads     int64
+	StatsBuckets int64
+	Errors       int64
+	Bytes        int64
+}
 
 // UpdateTraceWriterInfo updates internal trace writer stats
 func UpdateTraceWriterInfo(tws TraceWriterInfo) {
@@ -37,28 +37,28 @@ func publishTraceWriterInfo() interface{} {
 	return traceWriterInfo
 }
 
-// // UpdateStatsWriterInfo updates internal stats writer stats
-// func UpdateStatsWriterInfo(sws StatsWriterInfo) {
-// 	infoMu.Lock()
-// 	defer infoMu.Unlock()
-// 	statsWriterInfo = sws
-// }
+// UpdateStatsWriterInfo updates internal stats writer stats
+func UpdateStatsWriterInfo(sws StatsWriterInfo) {
+	infoMu.Lock()
+	defer infoMu.Unlock()
+	statsWriterInfo = sws
+}
 
-// func publishStatsWriterInfo() interface{} {
-// 	infoMu.RLock()
-// 	defer infoMu.RUnlock()
-// 	return statsWriterInfo
-// }
+func publishStatsWriterInfo() interface{} {
+	infoMu.RLock()
+	defer infoMu.RUnlock()
+	return statsWriterInfo
+}
 
-// // UpdateServiceWriterInfo updates internal service writer stats
-// func UpdateServiceWriterInfo(sws ServiceWriterInfo) {
-// 	infoMu.Lock()
-// 	defer infoMu.Unlock()
-// 	serviceWriterInfo = sws
-// }
+// UpdateServiceWriterInfo updates internal service writer stats
+func UpdateServiceWriterInfo(sws ServiceWriterInfo) {
+	infoMu.Lock()
+	defer infoMu.Unlock()
+	serviceWriterInfo = sws
+}
 
-// func publishServiceWriterInfo() interface{} {
-// 	infoMu.RLock()
-// 	defer infoMu.RUnlock()
-// 	return serviceWriterInfo
-// }
+func publishServiceWriterInfo() interface{} {
+	infoMu.RLock()
+	defer infoMu.RUnlock()
+	return serviceWriterInfo
+}

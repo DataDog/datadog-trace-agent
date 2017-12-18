@@ -16,10 +16,6 @@ import (
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
-const (
-	languageHeaderKey = "X-Datadog-Reported-Languages"
-)
-
 // TraceWriter ingests sampled traces and flush them to the API.
 type TraceWriter struct {
 	endpoint Endpoint
@@ -81,6 +77,8 @@ func (w *TraceWriter) Run() {
 	updateInfoTicker := time.NewTicker(1 * time.Minute)
 	defer updateInfoTicker.Stop()
 
+	log.Debug("starting trace writer")
+
 	for {
 		select {
 		case trace := <-w.InTraces:
@@ -93,7 +91,7 @@ func (w *TraceWriter) Run() {
 		case <-updateInfoTicker.C:
 			go w.updateInfo()
 		case <-w.exit:
-			log.Info("exiting, flushing all remaining traces")
+			log.Info("exiting trace writer, flushing all remaining traces")
 			w.Flush()
 			return
 		}
@@ -109,6 +107,11 @@ func (w *TraceWriter) Stop() {
 // Flush flushes traces the data in the API
 func (w *TraceWriter) Flush() {
 	traces := w.traceBuffer
+
+	if len(traces) == 0 {
+		log.Debugf("no trace to flush")
+		return
+	}
 	log.Debugf("going to flush %d traces", len(traces))
 	atomic.AddInt64(&w.stats.Traces, int64(len(traces)))
 
@@ -130,7 +133,9 @@ func (w *TraceWriter) Flush() {
 	atomic.AddInt64(&w.stats.Bytes, int64(len(serialized)))
 
 	headers := map[string]string{
-		languageHeaderKey: strings.Join(info.Languages(), "|"),
+		languageHeaderKey:  strings.Join(info.Languages(), "|"),
+		"Content-Type":     "application/x-protobuf",
+		"Content-Encoding": "identity",
 	}
 
 	startFlush := time.Now()
@@ -143,7 +148,8 @@ func (w *TraceWriter) Flush() {
 	// TODO: if error, depending on why, replay later.
 	if err != nil {
 		atomic.AddInt64(&w.stats.Errors, 1)
-		log.Errorf("failed to flush trace payload: %s", err)
+		log.Errorf("failed to flush trace payload, time:%s, size:%d bytes, error: %s", flushTime, len(serialized), err)
+		return
 	}
 
 	log.Infof("flushed trace payload to the API, time:%s, size:%d bytes", flushTime, len(serialized))
@@ -156,13 +162,13 @@ func (w *TraceWriter) updateInfo() {
 	var twInfo info.TraceWriterInfo
 
 	// Load counters and reset them for the next flush
-	twInfo.Traces = atomic.SwapInt64(&w.stats.Traces, 0)
 	twInfo.Payloads = atomic.SwapInt64(&w.stats.Payloads, 0)
+	twInfo.Traces = atomic.SwapInt64(&w.stats.Traces, 0)
 	twInfo.Bytes = atomic.SwapInt64(&w.stats.Bytes, 0)
 	twInfo.Errors = atomic.SwapInt64(&w.stats.Traces, 0)
 
-	statsd.Client.Count("datadog.trace_agent.trace_writer.traces", int64(twInfo.Traces), nil, 1)
 	statsd.Client.Count("datadog.trace_agent.trace_writer.payloads", int64(twInfo.Payloads), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.trace_writer.traces", int64(twInfo.Traces), nil, 1)
 	statsd.Client.Count("datadog.trace_agent.trace_writer.bytes", int64(twInfo.Bytes), nil, 1)
 	statsd.Client.Count("datadog.trace_agent.trace_writer.errors", int64(twInfo.Errors), nil, 1)
 

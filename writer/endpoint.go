@@ -6,6 +6,8 @@ import (
 	log "github.com/cihub/seelog"
 )
 
+const languageHeaderKey = "X-Datadog-Reported-Languages"
+
 // Endpoint is an interface where we send the data from the Agent.
 type Endpoint interface {
 	Write(payload []byte, headers map[string]string) error

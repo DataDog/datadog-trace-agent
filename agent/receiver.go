@@ -71,8 +71,6 @@ type HTTPReceiver struct {
 func NewHTTPReceiver(conf *config.AgentConfig, dynConf *config.DynamicConfig) *HTTPReceiver {
 	// use buffered channels so that handlers are not waiting on downstream processing
 	return &HTTPReceiver{
-		traces:     make(chan model.Trace, 5000), // about 1000 traces/sec for 5 sec
-		services:   make(chan model.ServicesMetadata, 50),
 		conf:       conf,
 		dynConf:    dynConf,
 		stats:      info.NewReceiverStats(),
