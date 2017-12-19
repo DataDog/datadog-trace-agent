@@ -32,9 +32,9 @@ var headerFields = map[string]string{
 func NewTestReceiverFromConfig(conf *config.AgentConfig) *HTTPReceiver {
 	dynConf := config.NewDynamicConfig()
 
-	receiver := NewHTTPReceiver(conf, dynConf)
 	rawTraceChan := make(chan model.Trace, 5000)
 	serviceChan := make(chan model.ServicesMetadata, 50)
+	receiver := NewHTTPReceiver(conf, dynConf, rawTraceChan, serviceChan)
 
 	receiver.traces = rawTraceChan
 	receiver.services = serviceChan

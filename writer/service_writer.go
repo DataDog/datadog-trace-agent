@@ -33,7 +33,7 @@ type ServiceWriter struct {
 }
 
 // NewServiceWriter returns a new writer for services.
-func NewServiceWriter(conf *config.AgentConfig) *ServiceWriter {
+func NewServiceWriter(conf *config.AgentConfig, InServices <-chan model.ServicesMetadata) *ServiceWriter {
 	var endpoint Endpoint
 
 	if conf.APIEnabled {
@@ -46,6 +46,8 @@ func NewServiceWriter(conf *config.AgentConfig) *ServiceWriter {
 
 	return &ServiceWriter{
 		endpoint: endpoint,
+
+		InServices: InServices,
 
 		serviceBuffer: make(model.ServicesMetadata),
 

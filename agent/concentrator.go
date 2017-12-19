@@ -32,11 +32,13 @@ type Concentrator struct {
 }
 
 // NewConcentrator initializes a new concentrator ready to be started
-func NewConcentrator(aggregators []string, bsize int64) *Concentrator {
+func NewConcentrator(aggregators []string, bsize int64, out chan []model.StatsBucket) *Concentrator {
 	c := Concentrator{
 		aggregators: aggregators,
 		bsize:       bsize,
 		buckets:     make(map[int64]*model.StatsRawBucket),
+
+		OutStats: out,
 
 		exit:   make(chan struct{}),
 		exitWG: &sync.WaitGroup{},

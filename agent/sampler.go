@@ -28,16 +28,18 @@ type Sampler struct {
 }
 
 // NewScoreSampler creates a new empty sampler ready to be started
-func NewScoreSampler(conf *config.AgentConfig) *Sampler {
+func NewScoreSampler(conf *config.AgentConfig, sampled chan *model.Trace) *Sampler {
 	return &Sampler{
-		engine: sampler.NewScoreEngine(conf.ExtraSampleRate, conf.MaxTPS),
+		engine:  sampler.NewScoreEngine(conf.ExtraSampleRate, conf.MaxTPS),
+		sampled: sampled,
 	}
 }
 
 // NewPrioritySampler creates a new empty distributed sampler ready to be started
-func NewPrioritySampler(conf *config.AgentConfig, dynConf *config.DynamicConfig) *Sampler {
+func NewPrioritySampler(conf *config.AgentConfig, dynConf *config.DynamicConfig, sampled chan *model.Trace) *Sampler {
 	return &Sampler{
-		engine: sampler.NewPriorityEngine(conf.ExtraSampleRate, conf.MaxTPS, &dynConf.RateByService),
+		engine:  sampler.NewPriorityEngine(conf.ExtraSampleRate, conf.MaxTPS, &dynConf.RateByService),
+		sampled: sampled,
 	}
 }
 

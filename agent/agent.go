@@ -62,39 +62,33 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 	dynConf := config.NewDynamicConfig()
 
 	// inter-component channels
-	rawTraceChan := make(chan model.Trace, 5000) // about 1000 traces/sec for 5 sec
+	rawTraceChan := make(chan model.Trace, 5000) // about 1000 traces/sec for 5 sec, TODO: move to *model.Trace
 	sampledTraceChan := make(chan *model.Trace)
 	statsChan := make(chan []model.StatsBucket)
 	serviceChan := make(chan model.ServicesMetadata, 50)
 
 	// create components
-	r := NewHTTPReceiver(conf, dynConf)
+	r := NewHTTPReceiver(conf, dynConf, rawTraceChan, serviceChan)
 	c := NewConcentrator(
 		conf.ExtraAggregators,
 		conf.BucketInterval.Nanoseconds(),
+		statsChan,
 	)
 	f := filters.Setup(conf)
 
-	ss := NewScoreSampler(conf)
+	ss := NewScoreSampler(conf, sampledTraceChan)
 	var ps *Sampler
 	if conf.PrioritySampling {
 		// Use priority sampling for distributed tracing only if conf says so
 		// TODO: remove the option once comfortable ; as it is true by default.
-		ps = NewPrioritySampler(conf, dynConf)
+		ps = NewPrioritySampler(conf, dynConf, sampledTraceChan)
 	}
-	tw := writer.NewTraceWriter(conf)
-	sw := writer.NewStatsWriter(conf)
-	svcW := writer.NewServiceWriter(conf)
+	tw := writer.NewTraceWriter(conf, sampledTraceChan)
+	sw := writer.NewStatsWriter(conf, statsChan)
+	svcW := writer.NewServiceWriter(conf, serviceChan)
 
 	// wire components together
-	r.traces = rawTraceChan
-	r.services = serviceChan
 	tw.InTraces = sampledTraceChan
-	ss.sampled = sampledTraceChan
-	if conf.PrioritySampling {
-		ps.sampled = sampledTraceChan
-	}
-	c.OutStats = statsChan
 	sw.InStats = statsChan
 	svcW.InServices = serviceChan
 

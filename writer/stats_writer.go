@@ -30,7 +30,7 @@ type StatsWriter struct {
 }
 
 // NewStatsWriter returns a new writer for services.
-func NewStatsWriter(conf *config.AgentConfig) *StatsWriter {
+func NewStatsWriter(conf *config.AgentConfig, InStats <-chan []model.StatsBucket) *StatsWriter {
 	var endpoint Endpoint
 
 	if conf.APIEnabled {
@@ -43,6 +43,8 @@ func NewStatsWriter(conf *config.AgentConfig) *StatsWriter {
 
 	return &StatsWriter{
 		endpoint: endpoint,
+
+		InStats: InStats,
 
 		exit:   make(chan struct{}),
 		exitWG: &sync.WaitGroup{},

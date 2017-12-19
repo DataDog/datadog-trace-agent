@@ -33,7 +33,7 @@ type TraceWriter struct {
 }
 
 // NewTraceWriter returns a new writer for traces.
-func NewTraceWriter(conf *config.AgentConfig) *TraceWriter {
+func NewTraceWriter(conf *config.AgentConfig, InTraces <-chan *model.Trace) *TraceWriter {
 	var endpoint Endpoint
 
 	if conf.APIEnabled {
@@ -51,6 +51,8 @@ func NewTraceWriter(conf *config.AgentConfig) *TraceWriter {
 
 		exit:   make(chan struct{}),
 		exitWG: &sync.WaitGroup{},
+
+		InTraces: InTraces,
 
 		conf: conf,
 	}
