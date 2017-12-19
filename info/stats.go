@@ -11,15 +11,16 @@ import (
 // ReceiverStats is used to store all the stats per tags.
 type ReceiverStats struct {
 	sync.RWMutex
-	Stats map[Tags]*tagStats
+	Stats map[Tags]*TagStats
 }
 
+// NewReceiverStats returns a new ReceiverStats
 func NewReceiverStats() *ReceiverStats {
-	return &ReceiverStats{sync.RWMutex{}, map[Tags]*tagStats{}}
+	return &ReceiverStats{sync.RWMutex{}, map[Tags]*TagStats{}}
 }
 
 // GetTagStats returns the struct in which the stats will be stored depending of their tags.
-func (rs *ReceiverStats) GetTagStats(tags Tags) *tagStats {
+func (rs *ReceiverStats) GetTagStats(tags Tags) *TagStats {
 	rs.Lock()
 	tagStats, ok := rs.Stats[tags]
 	if !ok {
@@ -41,6 +42,7 @@ func (rs *ReceiverStats) Acc(recent *ReceiverStats) {
 	recent.Unlock()
 }
 
+// Publish updates stats about per-tag stats
 func (rs *ReceiverStats) Publish() {
 	rs.RLock()
 	for _, tagStats := range rs.Stats {
@@ -49,6 +51,7 @@ func (rs *ReceiverStats) Publish() {
 	rs.RUnlock()
 }
 
+// Reset resets the ReceiverStats internal data
 func (rs *ReceiverStats) Reset() {
 	rs.Lock()
 	for key, tagStats := range rs.Stats {
@@ -81,17 +84,17 @@ func (rs *ReceiverStats) Strings() []string {
 	return strings
 }
 
-// tagStats is the struct used to associate the stats with their set of tags.
-type tagStats struct {
+// TagStats is the struct used to associate the stats with their set of tags.
+type TagStats struct {
 	Tags
 	Stats
 }
 
-func newTagStats(tags Tags) *tagStats {
-	return &tagStats{tags, Stats{}}
+func newTagStats(tags Tags) *TagStats {
+	return &TagStats{tags, Stats{}}
 }
 
-func (ts *tagStats) publish() {
+func (ts *TagStats) publish() {
 	// Atomically load the stats from ts
 	tracesReceived := atomic.LoadInt64(&ts.TracesReceived)
 	tracesDropped := atomic.LoadInt64(&ts.TracesDropped)

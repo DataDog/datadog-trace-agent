@@ -55,12 +55,14 @@ PACKAGES = %w(
   ./config
   ./filters
   ./fixtures
+  ./info
   ./model
   ./quantile
   ./quantizer
   ./sampler
   ./statsd
   ./watchdog
+  ./writer
 )
 
 EXCLUDE_LINT = [
