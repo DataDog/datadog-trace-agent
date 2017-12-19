@@ -135,7 +135,6 @@ func (w *ServiceWriter) Flush() {
 	startFlush := time.Now()
 
 	// Send the payload to the endpoint
-	// TODO: track metrics/stats about payload
 	err = w.endpoint.Write(data, headers)
 
 	flushTime := time.Since(startFlush)

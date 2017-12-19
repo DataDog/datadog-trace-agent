@@ -6,6 +6,8 @@ import (
 	"net/http"
 )
 
+const apiHTTPHeaderKey = "DD-Api-Key"
+
 // DatadogEndpoint sends payloads to Datadog API.
 type DatadogEndpoint struct {
 	apiKey string
@@ -35,17 +37,12 @@ func (e *DatadogEndpoint) Write(payload []byte, headers map[string]string) error
 	url := e.url + e.path
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 
-	// If the request cannot be created, there is no point in trying again later,
-	// it will always yield the same result.
 	if err != nil {
-		// atomic.AddInt64(&ae.stats.TracesPayloadError, 1)
 		return err
 	}
 
 	// Set API key in the header and issue the request
-	queryParams := req.URL.Query()
-	queryParams.Add("api_key", e.apiKey)
-	req.URL.RawQuery = queryParams.Encode()
+	req.Header.Set(apiHTTPHeaderKey, e.apiKey)
 
 	SetExtraHeaders(req.Header, headers)
 
@@ -57,6 +54,7 @@ func (e *DatadogEndpoint) Write(payload []byte, headers map[string]string) error
 	defer resp.Body.Close()
 
 	// We check the status code to see if the request has succeeded.
+	// TODO: define all legit status code and behave accordingly.
 	if resp.StatusCode/100 != 2 {
 		return fmt.Errorf("request to %s responded with %s", url, resp.Status)
 	}
