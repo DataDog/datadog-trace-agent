@@ -89,7 +89,6 @@ const (
   {{if gt .Status.StatsWriter.Errors 0}}WARNING: Stats API errors (1 min): {{.Status.StatsWriter.Errors}}{{end}}
   Services: {{.Status.ServiceWriter.Payloads}} payloads, {{.Status.ServiceWriter.Services}} services, {{.Status.ServiceWriter.Bytes}} bytes
   {{if gt .Status.ServiceWriter.Errors 0}}WARNING: Services API errors (1 min): {{.Status.ServiceWriter.Errors}}{{end}}
-
 `
 
 	notRunningTmplSrc = `{{.Banner}}
@@ -312,65 +311,6 @@ func getProgramBanner(version string) (string, string) {
 //
 // If error is nil, means the program is running.
 // If not, it displays a pretty-printed message anyway (for support)
-//
-// Typical output of 'trace-agent -info' when agent is running:
-//
-// -----8<-------------------------------------------------------
-// ======================
-// Trace Agent (v 0.99.0)
-// ======================
-//
-//   Pid: 38149
-//   Uptime: 15 seconds
-//   Mem alloc: 773552 bytes
-//
-//   Hostname: localhost.localdomain
-//   Receiver: localhost:8126
-//   API Endpoint: https://trace.agent.datadoghq.com
-//
-//   Bytes received (1 min): 10000
-//   Traces received (1 min): 240
-//   Spans received (1 min): 360
-//   WARNING: Traces dropped (1 min): 5
-//   WARNING: Spans dropped (1 min): 10
-//   WARNING: Pre-sampling traces: 26.0 %
-//   WARNING: Pre-sampler: raising pre-sampling rate from 2.9 % to 5.0 %
-//
-//   Bytes sent (1 min): 3245
-//   Traces sent (1 min): 6
-//   Stats sent (1 min): 60
-//   WARNING: Traces API errors (1 min): 1/3
-//   WARNING: Services API errors (1 min): 1/1
-//
-// -----8<-------------------------------------------------------
-//
-// The "WARNING:" lines are hidden if there's nothing dropped or no errors.
-//
-// Typical output of 'trace-agent -info' when agent is not running:
-//
-// -----8<-------------------------------------------------------
-// ======================
-// Trace Agent (v 0.99.0)
-// ======================
-//
-//   Not running (port 8126)
-//
-// -----8<-------------------------------------------------------
-//
-// Typical output of 'trace-agent -info' when something unexpected happened,
-// for instance we're connecting to an HTTP server that serves an inadequate
-// response, or there's a bug, or... :
-//
-// -----8<-------------------------------------------------------
-// ======================
-// Trace Agent (v 0.99.0)
-// ======================
-//
-//   Error: json: cannot unmarshal number into Go value of type main.StatusInfo
-//   URL: http://localhost:8126/debug/vars
-//
-// -----8<-------------------------------------------------------
-//
 func Info(w io.Writer, conf *config.AgentConfig) error {
 	host := conf.ReceiverHost
 	if host == "0.0.0.0" {
