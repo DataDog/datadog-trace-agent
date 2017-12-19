@@ -98,6 +98,7 @@ func (s *Sampler) logStats() {
 				engineType, state.InTPS, state.OutTPS, state.MaxTPS, state.Offset, state.Slope, state.Cardinality)
 
 			// publish through expvar
+			// TODO: avoid type switch, prefer engine method
 			switch s.engine.(type) {
 			case *sampler.ScoreEngine:
 				info.UpdateSamplerInfo(info.SamplerInfo{EngineType: engineType, Stats: stats, State: state})

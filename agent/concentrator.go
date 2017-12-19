@@ -45,7 +45,7 @@ func NewConcentrator(aggregators []string, bsize int64) *Concentrator {
 	return &c
 }
 
-// Start starts the writer.
+// Start starts the concentrator.
 func (c *Concentrator) Start() {
 	go func() {
 		defer watchdog.LogOnPanic()
