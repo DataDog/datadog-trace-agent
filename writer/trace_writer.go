@@ -134,6 +134,8 @@ func (w *TraceWriter) Flush() {
 	}
 	atomic.AddInt64(&w.stats.Bytes, int64(len(serialized)))
 
+	// TODO: benchmark and pick the right encoding
+
 	headers := map[string]string{
 		languageHeaderKey:  strings.Join(info.Languages(), "|"),
 		"Content-Type":     "application/x-protobuf",

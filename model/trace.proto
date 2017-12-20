@@ -8,5 +8,5 @@ message APITrace {
 	uint64 traceID = 1;
 	repeated Span spans = 2;
 	int64 startTime = 6;
-    int64 endTime = 7;
+	int64 endTime = 7;
 }

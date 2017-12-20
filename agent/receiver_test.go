@@ -36,9 +36,6 @@ func NewTestReceiverFromConfig(conf *config.AgentConfig) *HTTPReceiver {
 	serviceChan := make(chan model.ServicesMetadata, 50)
 	receiver := NewHTTPReceiver(conf, dynConf, rawTraceChan, serviceChan)
 
-	receiver.traces = rawTraceChan
-	receiver.services = serviceChan
-
 	return receiver
 }
 
