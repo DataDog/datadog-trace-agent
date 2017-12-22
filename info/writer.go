@@ -4,7 +4,9 @@ package info
 type TraceWriterInfo struct {
 	Payloads int64
 	Traces   int64
+	Spans    int64
 	Errors   int64
+	Retries  int64
 	Bytes    int64
 }
 
@@ -13,6 +15,7 @@ type ServiceWriterInfo struct {
 	Payloads int64
 	Services int64
 	Errors   int64
+	Retries  int64
 	Bytes    int64
 }
 
@@ -21,6 +24,7 @@ type StatsWriterInfo struct {
 	Payloads     int64
 	StatsBuckets int64
 	Errors       int64
+	Retries      int64
 	Bytes        int64
 }
 

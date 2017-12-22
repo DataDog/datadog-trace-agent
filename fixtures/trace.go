@@ -69,7 +69,7 @@ func RandomTrace(maxLevels, maxSpans int) model.Trace {
 	t := model.Trace{RandomSpan()}
 
 	prevLevel := t
-	maxDepth := rand.Intn(maxLevels)
+	maxDepth := 1 + rand.Intn(maxLevels)
 
 	for i := 0; i < maxDepth; i++ {
 		if len(prevLevel) > 0 {

@@ -2,7 +2,6 @@ package writer
 
 import (
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -15,51 +14,51 @@ import (
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
+// ServiceWriterConfig contains the configuration to customize the behaviour of a ServiceWriter.
+type ServiceWriterConfig struct {
+	FlushPeriod      time.Duration
+	UpdateInfoPeriod time.Duration
+	StatsClient      statsd.StatsClient
+}
+
+// DefaultServiceWriterConfig creates a new instance of a ServiceWriterConfig using default values.
+func DefaultServiceWriterConfig() ServiceWriterConfig {
+	return ServiceWriterConfig{
+		FlushPeriod:      5 * time.Second,
+		UpdateInfoPeriod: 1 * time.Minute,
+		StatsClient:      statsd.Client,
+	}
+}
+
 // ServiceWriter ingests service metadata and flush them to the API.
 type ServiceWriter struct {
-	endpoint Endpoint
-
+	conf       ServiceWriterConfig
 	InServices <-chan model.ServicesMetadata
+	stats      info.ServiceWriterInfo
 
 	serviceBuffer model.ServicesMetadata
 	updated       bool
 
-	stats info.ServiceWriterInfo
-
-	exit   chan struct{}
-	exitWG *sync.WaitGroup
-
-	conf *config.AgentConfig
+	BaseWriter
 }
 
 // NewServiceWriter returns a new writer for services.
 func NewServiceWriter(conf *config.AgentConfig, InServices <-chan model.ServicesMetadata) *ServiceWriter {
-	var endpoint Endpoint
-
-	if conf.APIEnabled {
-		client := NewClient(conf)
-		endpoint = NewDatadogEndpoint(client, conf.APIEndpoint, "/api/v0.2/services", conf.APIKey)
-	} else {
-		log.Info("API interface is disabled, flushing to /dev/null instead")
-		endpoint = &NullEndpoint{}
-	}
-
 	return &ServiceWriter{
-		endpoint: endpoint,
-
-		InServices: InServices,
-
-		serviceBuffer: make(model.ServicesMetadata),
-
-		exit:   make(chan struct{}),
-		exitWG: &sync.WaitGroup{},
-
-		conf: conf,
+		conf:          DefaultServiceWriterConfig(),
+		InServices:    InServices,
+		serviceBuffer: model.ServicesMetadata{},
+		BaseWriter: *NewCustomSenderBaseWriter(conf, "/api/v0.2/services", func(endpoint Endpoint) PayloadSender {
+			conf := DefaultQueuablePayloadSenderConf()
+			conf.MaxQueuedPayloads = 1
+			return NewCustomQueuablePayloadSender(endpoint, conf)
+		}),
 	}
 }
 
 // Start starts the writer.
 func (w *ServiceWriter) Start() {
+	w.BaseWriter.Start()
 	go func() {
 		defer watchdog.LogOnPanic()
 		w.Run()
@@ -73,29 +72,54 @@ func (w *ServiceWriter) Run() {
 	defer w.exitWG.Done()
 
 	// for now, simply flush every x seconds
-	flushTicker := time.NewTicker(5 * time.Second)
+	flushTicker := time.NewTicker(w.conf.FlushPeriod)
 	defer flushTicker.Stop()
 
-	updateInfoTicker := time.NewTicker(1 * time.Minute)
+	updateInfoTicker := time.NewTicker(w.conf.UpdateInfoPeriod)
 	defer updateInfoTicker.Stop()
 
 	log.Debug("starting service writer")
 
+	// Monitor sender for events
+	go func() {
+		for event := range w.payloadSender.Monitor() {
+			if event == nil {
+				continue
+			}
+
+			switch event := event.(type) {
+			case SenderSuccessEvent:
+				log.Infof("flushed service payload to the API, time:%s, size:%d bytes", event.SendStats.SendTime,
+					len(event.Payload.Bytes))
+				w.conf.StatsClient.Gauge("datadog.trace_agent.service_writer.flush_duration",
+					event.SendStats.SendTime.Seconds(), nil, 1)
+				atomic.AddInt64(&w.stats.Payloads, 1)
+			case SenderFailureEvent:
+				log.Errorf("failed to flush service payload, time:%s, size:%d bytes, error: %s",
+					event.SendStats.SendTime, len(event.Payload.Bytes), event.Error)
+				atomic.AddInt64(&w.stats.Errors, 1)
+			case SenderRetryEvent:
+				log.Errorf("retrying flush service payload, retryNum: %d, delay:%s, error: %s",
+					event.RetryNum, event.RetryDelay, event.Error)
+				atomic.AddInt64(&w.stats.Retries, 1)
+			default:
+				log.Debugf("don't know how to handle event with type %T", event)
+			}
+		}
+	}()
+
+	// Main loop
 	for {
 		select {
 		case sm := <-w.InServices:
-			updated := w.serviceBuffer.Update(sm)
-			if updated {
-				w.updated = updated
-				statsd.Client.Count("datadog.trace_agent.writer.services.updated", 1, nil, 1)
-			}
+			w.handleServiceMetadata(sm)
 		case <-flushTicker.C:
-			w.Flush()
+			w.flush()
 		case <-updateInfoTicker.C:
 			go w.updateInfo()
 		case <-w.exit:
 			log.Info("exiting service writer, flushing all modified services")
-			w.Flush()
+			w.flush()
 			return
 		}
 	}
@@ -105,23 +129,29 @@ func (w *ServiceWriter) Run() {
 func (w *ServiceWriter) Stop() {
 	close(w.exit)
 	w.exitWG.Wait()
+	w.BaseWriter.Stop()
 }
 
-// Flush flushes service metadata, if they changed, to the API
-func (w *ServiceWriter) Flush() {
+func (w *ServiceWriter) handleServiceMetadata(metadata model.ServicesMetadata) {
+	if w.serviceBuffer.Update(metadata) {
+		w.updated = true
+		w.conf.StatsClient.Count("datadog.trace_agent.writer.services.updated", 1, nil, 1)
+	}
+}
+
+func (w *ServiceWriter) flush() {
+	// If no services, we can't construct anything
 	if !w.updated {
 		return
 	}
-	w.updated = false
 
-	serviceBuffer := w.serviceBuffer
+	numServices := len(w.serviceBuffer)
+	log.Debugf("going to flush updated service metadata, %d services", numServices)
+	atomic.StoreInt64(&w.stats.Services, int64(numServices))
 
-	log.Debugf("going to flush updated service metadata, %d services", len(serviceBuffer))
-	atomic.StoreInt64(&w.stats.Services, int64(len(serviceBuffer)))
-
-	data, err := model.EncodeServicesPayload(serviceBuffer)
+	data, err := model.EncodeServicesPayload(w.serviceBuffer)
 	if err != nil {
-		log.Errorf("encoding issue: %v", err)
+		log.Errorf("error while encoding service payload: %v", err)
 		return
 	}
 
@@ -132,23 +162,10 @@ func (w *ServiceWriter) Flush() {
 
 	atomic.AddInt64(&w.stats.Bytes, int64(len(data)))
 
-	startFlush := time.Now()
+	payload := NewPayload(data, headers)
+	w.payloadSender.Send(payload)
 
-	// Send the payload to the endpoint
-	err = w.endpoint.Write(data, headers)
-
-	flushTime := time.Since(startFlush)
-
-	// TODO: if error, depending on why, replay later.
-	if err != nil {
-		atomic.AddInt64(&w.stats.Errors, 1)
-		log.Errorf("failed to flush service payload, time:%s, size:%d bytes, error: %s", flushTime, len(data), err)
-		return
-	}
-
-	log.Infof("flushed service payload to the API, time:%s, size:%d bytes", flushTime, len(data))
-	statsd.Client.Gauge("datadog.trace_agent.service_writer.flush_duration", flushTime.Seconds(), nil, 1)
-	atomic.AddInt64(&w.stats.Payloads, 1)
+	w.updated = false
 }
 
 func (w *ServiceWriter) updateInfo() {
@@ -159,11 +176,13 @@ func (w *ServiceWriter) updateInfo() {
 	swInfo.Services = atomic.SwapInt64(&w.stats.Services, 0)
 	swInfo.Bytes = atomic.SwapInt64(&w.stats.Bytes, 0)
 	swInfo.Errors = atomic.SwapInt64(&w.stats.Errors, 0)
+	swInfo.Retries = atomic.SwapInt64(&w.stats.Retries, 0)
 
-	statsd.Client.Count("datadog.trace_agent.service_writer.payloads", int64(swInfo.Payloads), nil, 1)
-	statsd.Client.Gauge("datadog.trace_agent.service_writer.services", float64(swInfo.Services), nil, 1)
-	statsd.Client.Count("datadog.trace_agent.service_writer.bytes", int64(swInfo.Bytes), nil, 1)
-	statsd.Client.Count("datadog.trace_agent.service_writer.errors", int64(swInfo.Errors), nil, 1)
+	w.conf.StatsClient.Count("datadog.trace_agent.service_writer.payloads", int64(swInfo.Payloads), nil, 1)
+	w.conf.StatsClient.Gauge("datadog.trace_agent.service_writer.services", float64(swInfo.Services), nil, 1)
+	w.conf.StatsClient.Count("datadog.trace_agent.service_writer.bytes", int64(swInfo.Bytes), nil, 1)
+	w.conf.StatsClient.Count("datadog.trace_agent.service_writer.retries", int64(swInfo.Retries), nil, 1)
+	w.conf.StatsClient.Count("datadog.trace_agent.service_writer.errors", int64(swInfo.Errors), nil, 1)
 
 	info.UpdateServiceWriterInfo(swInfo)
 }
