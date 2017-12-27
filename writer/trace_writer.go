@@ -20,9 +20,11 @@ import (
 type TraceWriter struct {
 	endpoint Endpoint
 
-	InTraces <-chan *model.Trace
+	InTraces       <-chan *model.Trace
+	InTransactions <-chan *model.Span
 
-	traceBuffer []*model.APITrace
+	traceBuffer       []*model.APITrace
+	transactionBuffer []*model.Span
 
 	stats info.TraceWriterInfo
 
@@ -33,7 +35,7 @@ type TraceWriter struct {
 }
 
 // NewTraceWriter returns a new writer for traces.
-func NewTraceWriter(conf *config.AgentConfig, InTraces <-chan *model.Trace) *TraceWriter {
+func NewTraceWriter(conf *config.AgentConfig, InTraces <-chan *model.Trace, InTransactions <-chan *model.Span) *TraceWriter {
 	var endpoint Endpoint
 
 	if conf.APIEnabled {
@@ -47,12 +49,14 @@ func NewTraceWriter(conf *config.AgentConfig, InTraces <-chan *model.Trace) *Tra
 	return &TraceWriter{
 		endpoint: endpoint,
 
-		traceBuffer: []*model.APITrace{},
+		traceBuffer:       []*model.APITrace{},
+		transactionBuffer: []*model.Span{},
 
 		exit:   make(chan struct{}),
 		exitWG: &sync.WaitGroup{},
 
-		InTraces: InTraces,
+		InTraces:       InTraces,
+		InTransactions: InTransactions,
 
 		conf: conf,
 	}
@@ -88,6 +92,10 @@ func (w *TraceWriter) Run() {
 			// TODO: async flush/retry
 			apiTrace := trace.APITrace()
 			w.traceBuffer = append(w.traceBuffer, apiTrace)
+		case transaction := <-w.InTransactions:
+			// no need for lock for now as flush is sequential
+			// TODO: async flush/retry
+			w.transactionBuffer = append(w.transactionBuffer, transaction)
 		case <-flushTicker.C:
 			w.Flush()
 		case <-updateInfoTicker.C:
@@ -109,22 +117,27 @@ func (w *TraceWriter) Stop() {
 // Flush flushes traces the data in the API
 func (w *TraceWriter) Flush() {
 	traces := w.traceBuffer
+	transactions := w.transactionBuffer
 
-	if len(traces) == 0 {
-		log.Debugf("no trace to flush")
+	if len(traces) == 0 && len(transactions) == 0 {
+		log.Debugf("nothing to flush")
 		return
 	}
-	log.Debugf("going to flush %d traces", len(traces))
+
+	log.Debugf("going to flush %d traces, %d transactions", len(traces), len(transactions))
+
 	atomic.AddInt64(&w.stats.Traces, int64(len(traces)))
 
 	// Make the new buffer of the size of the previous one.
 	// that's a fair estimation and it should reduce allocations without using too much memory.
 	w.traceBuffer = make([]*model.APITrace, 0, len(traces))
+	w.transactionBuffer = make([]*model.Span, 0, len(transactions))
 
 	tracePayload := model.TracePayload{
-		HostName: w.conf.HostName,
-		Env:      w.conf.DefaultEnv,
-		Traces:   traces,
+		HostName:     w.conf.HostName,
+		Env:          w.conf.DefaultEnv,
+		Traces:       traces,
+		Transactions: transactions,
 	}
 
 	serialized, err := proto.Marshal(&tracePayload)

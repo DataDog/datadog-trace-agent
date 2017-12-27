@@ -14,9 +14,12 @@ import (
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
+const SpanAnalyzedTransaction = "_analyzed_transaction"
+
 // Sampler chooses wich spans to write to the API
 type Sampler struct {
-	sampled chan *model.Trace
+	sampled  chan *model.Trace
+	analyzed chan *model.Span
 
 	// For stats
 	keptTraceCount  int
@@ -28,18 +31,20 @@ type Sampler struct {
 }
 
 // NewScoreSampler creates a new empty sampler ready to be started
-func NewScoreSampler(conf *config.AgentConfig, sampled chan *model.Trace) *Sampler {
+func NewScoreSampler(conf *config.AgentConfig, sampled chan *model.Trace, analyzed chan *model.Span) *Sampler {
 	return &Sampler{
-		engine:  sampler.NewScoreEngine(conf.ExtraSampleRate, conf.MaxTPS),
-		sampled: sampled,
+		engine:   sampler.NewScoreEngine(conf.ExtraSampleRate, conf.MaxTPS),
+		sampled:  sampled,
+		analyzed: analyzed,
 	}
 }
 
 // NewPrioritySampler creates a new empty distributed sampler ready to be started
-func NewPrioritySampler(conf *config.AgentConfig, dynConf *config.DynamicConfig, sampled chan *model.Trace) *Sampler {
+func NewPrioritySampler(conf *config.AgentConfig, dynConf *config.DynamicConfig, sampled chan *model.Trace, analyzed chan *model.Span) *Sampler {
 	return &Sampler{
-		engine:  sampler.NewPriorityEngine(conf.ExtraSampleRate, conf.MaxTPS, &dynConf.RateByService),
-		sampled: sampled,
+		engine:   sampler.NewPriorityEngine(conf.ExtraSampleRate, conf.MaxTPS, &dynConf.RateByService),
+		sampled:  sampled,
+		analyzed: analyzed,
 	}
 }
 
@@ -61,8 +66,12 @@ func (s *Sampler) Add(t processedTrace) {
 	s.totalTraceCount++
 	if s.engine.Sample(t.Trace, t.Root, t.Env) {
 		s.keptTraceCount++
+		t.Root.Metrics[SpanAnalyzedTransaction] = 1
 		s.sampled <- &t.Trace
 	}
+
+	// TODO: should this stream be inclusive or exclusive of sampled traces
+	s.analyzed <- t.Root
 }
 
 // Stop stops the sampler

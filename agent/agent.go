@@ -64,6 +64,7 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 	// inter-component channels
 	rawTraceChan := make(chan model.Trace, 5000) // about 1000 traces/sec for 5 sec, TODO: move to *model.Trace
 	sampledTraceChan := make(chan *model.Trace)
+	analyzedTransactionChan := make(chan *model.Span)
 	statsChan := make(chan []model.StatsBucket)
 	serviceChan := make(chan model.ServicesMetadata, 50)
 
@@ -76,14 +77,14 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 	)
 	f := filters.Setup(conf)
 
-	ss := NewScoreSampler(conf, sampledTraceChan)
+	ss := NewScoreSampler(conf, sampledTraceChan, analyzedTransactionChan)
 	var ps *Sampler
 	if conf.PrioritySampling {
 		// Use priority sampling for distributed tracing only if conf says so
 		// TODO: remove the option once comfortable ; as it is true by default.
-		ps = NewPrioritySampler(conf, dynConf, sampledTraceChan)
+		ps = NewPrioritySampler(conf, dynConf, sampledTraceChan, analyzedTransactionChan)
 	}
-	tw := writer.NewTraceWriter(conf, sampledTraceChan)
+	tw := writer.NewTraceWriter(conf, sampledTraceChan, analyzedTransactionChan)
 	sw := writer.NewStatsWriter(conf, statsChan)
 	svcW := writer.NewServiceWriter(conf, serviceChan)
 
@@ -111,7 +112,7 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 // Run starts routers routines and individual pieces then stop them when the exit order is received
 func (a *Agent) Run() {
 	// it's really important to use a ticker for this, and with a not too short
-	// interval, for this is our garantee that the process won't start and kill
+	// interval, for this is our guarantee that the process won't start and kill
 	// itself too fast (nightmare loop)
 	watchdogTicker := time.NewTicker(a.conf.WatchdogInterval)
 	defer watchdogTicker.Stop()
