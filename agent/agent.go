@@ -174,22 +174,29 @@ func (a *Agent) Process(t model.Trace) {
 	// TODO: get the real tagStats related to this trace payload.
 	ts := a.Receiver.stats.GetTagStats(info.Tags{})
 
-	// We choose the sampler dynamically, depending on trace content,
-	// it has a sampling priority info (wether 0 or 1 or more) we respect
-	// this by using priority sampler. Else, use default score sampler.
-	s := a.ScoreEngine
-	priorityPtr := &ts.TracesPriorityNone
-	if a.PriorityEngine != nil {
-		if priority, ok := root.Metrics[samplingPriorityKey]; ok {
-			s = a.PriorityEngine
+	var samplers []*Sampler
+	priority, ok := root.Metrics[samplingPriorityKey]
+	if priority == 0 {
+		// Use score engine for traces with no priority or priority set to 0
+		samplers = append(samplers, a.ScoreEngine)
+	}
+	if a.PriorityEngine != nil && ok {
+		// If Priority is defined, send to priority sampling, regardless of priority value.
+		// The sampler will keep or discard the trace, but we send everything so that it
+		// gets the big picture and can set the sampling rates accordingly.
+		samplers = append(samplers, a.PriorityEngine)
+	}
 
-			if priority == 0 {
-				priorityPtr = &ts.TracesPriority0
-			} else if priority == 1 {
-				priorityPtr = &ts.TracesPriority1
-			} else {
-				priorityPtr = &ts.TracesPriority2
-			}
+	priorityPtr := &ts.TracesPriorityNone
+	if ok {
+		if priority < 0 {
+			priorityPtr = &ts.TracesPriorityNeg
+		} else if priority == 0 {
+			priorityPtr = &ts.TracesPriority0
+		} else if priority == 1 {
+			priorityPtr = &ts.TracesPriority1
+		} else {
+			priorityPtr = &ts.TracesPriority2
 		}
 	}
 	atomic.AddInt64(priorityPtr, 1)
@@ -244,13 +251,17 @@ func (a *Agent) Process(t model.Trace) {
 
 	go func() {
 		defer watchdog.LogOnPanic()
+		// Everything is sent to concentrator for stats, regardless of sampling.
 		a.Concentrator.Add(pt)
 
 	}()
-	go func() {
-		defer watchdog.LogOnPanic()
-		s.Add(pt)
-	}()
+	for _, s := range samplers {
+		sampler := s
+		go func() {
+			defer watchdog.LogOnPanic()
+			sampler.Add(pt)
+		}()
+	}
 }
 
 func (a *Agent) watchdog() {
