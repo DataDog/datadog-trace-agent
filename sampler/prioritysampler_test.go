@@ -52,6 +52,30 @@ func getTestTraceWithService(t *testing.T, service string, s *PriorityEngine) (m
 	return trace, trace[0]
 }
 
+func TestPrioritySample(t *testing.T) {
+	// Simple sample unit test
+	assert := assert.New(t)
+
+	s := getTestPriorityEngine()
+	trace, root := getTestTraceWithService(t, "my-service", s)
+	env := defaultEnv
+
+	root.Metrics[samplingPriorityKey] = -1
+	assert.False(s.Sample(trace, root, env), "trace with negative priority is dropped")
+	root.Metrics[samplingPriorityKey] = 0
+	assert.False(s.Sample(trace, root, env), "trace with priority 0 is dropped")
+
+	root.Metrics[samplingPriorityKey] = 1
+	assert.True(s.Sample(trace, root, env), "trace with priority 1 is kept")
+	root.Metrics[samplingPriorityKey] = 2
+	assert.True(s.Sample(trace, root, env), "trace with priority 2 is kept")
+	root.Metrics[samplingPriorityKey] = 999
+	assert.True(s.Sample(trace, root, env), "trace with high priority is kept")
+
+	delete(root.Metrics, samplingPriorityKey)
+	assert.False(s.Sample(trace, root, env), "this should not happen but a trace without priority sampling set should be dropped")
+}
+
 func TestMaxTPSByService(t *testing.T) {
 	// Test the "effectiveness" of the maxTPS option.
 	assert := assert.New(t)
