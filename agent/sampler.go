@@ -14,7 +14,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
-const SpanAnalyzedTransaction = "_analyzed_transaction"
+const spanAnalyzedTransaction = "_analyzed_transaction"
 
 // Sampler chooses wich spans to write to the API
 type Sampler struct {
@@ -69,7 +69,7 @@ func (s *Sampler) Add(t processedTrace) {
 	s.totalTraceCount++
 	if s.engine.Sample(t.Trace, t.Root, t.Env) {
 		s.keptTraceCount++
-		t.Root.Metrics[SpanAnalyzedTransaction] = 1
+		t.Root.Metrics[spanAnalyzedTransaction] = 1
 		s.sampled <- &t.Trace
 	}
 
