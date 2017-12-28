@@ -67,7 +67,12 @@ type AgentConfig struct {
 	// http/s proxying
 	Proxy *ProxySettings
 
+	// filtering
 	Ignore map[string][]string
+
+	// transaction analytics
+	AnalyzedRateByService map[string]float64
+	AnalyzeWebServices    bool
 }
 
 // mergeEnv applies overrides from environment variables to the trace agent configuration
@@ -192,7 +197,9 @@ func NewDefaultAgentConfig() *AgentConfig {
 		MaxConnections:   200, // in practice, rarely goes over 20
 		WatchdogInterval: time.Minute,
 
-		Ignore: make(map[string][]string),
+		Ignore:                make(map[string][]string),
+		AnalyzedRateByService: make(map[string]float64),
+		AnalyzeWebServices:    true,
 	}
 
 	return ac
@@ -277,6 +284,23 @@ APM_CONF:
 
 	if v, e := conf.GetStrArray("trace.ignore", "resource", ','); e == nil {
 		c.Ignore["resource"] = v
+	}
+
+	if v := strings.ToLower(conf.GetDefault("trace.analytics", "analyze_web_transactions", "")); v == "no" || v == "false" {
+		c.AnalyzeWebServices = false
+	}
+
+	if v, e := conf.GetSection("trace.analyzed_rate_by_service"); e == nil {
+		rates := v.KeysHash()
+		for service, rate := range rates {
+			rate, err := strconv.ParseFloat(rate, 64)
+			if err != nil {
+				log.Infof("failed to parse rate for analyzed service: %v", service)
+				continue
+			}
+
+			c.AnalyzedRateByService[service] = rate
+		}
 	}
 
 	if v := strings.ToLower(conf.GetDefault("trace.config", "log_throttling", "")); v == "no" || v == "false" {
