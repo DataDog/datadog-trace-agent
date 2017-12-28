@@ -18,8 +18,9 @@ const SpanAnalyzedTransaction = "_analyzed_transaction"
 
 // Sampler chooses wich spans to write to the API
 type Sampler struct {
-	sampled  chan *model.Trace
-	analyzed chan *model.Span
+	sampled               chan *model.Trace
+	analyzed              chan *model.Span
+	analyzedRateByService map[string]float64
 
 	// For stats
 	keptTraceCount  int
@@ -33,18 +34,20 @@ type Sampler struct {
 // NewScoreSampler creates a new empty sampler ready to be started
 func NewScoreSampler(conf *config.AgentConfig, sampled chan *model.Trace, analyzed chan *model.Span) *Sampler {
 	return &Sampler{
-		engine:   sampler.NewScoreEngine(conf.ExtraSampleRate, conf.MaxTPS),
-		sampled:  sampled,
-		analyzed: analyzed,
+		engine:                sampler.NewScoreEngine(conf.ExtraSampleRate, conf.MaxTPS),
+		sampled:               sampled,
+		analyzed:              analyzed,
+		analyzedRateByService: conf.AnalyzedRateByService,
 	}
 }
 
 // NewPrioritySampler creates a new empty distributed sampler ready to be started
 func NewPrioritySampler(conf *config.AgentConfig, dynConf *config.DynamicConfig, sampled chan *model.Trace, analyzed chan *model.Span) *Sampler {
 	return &Sampler{
-		engine:   sampler.NewPriorityEngine(conf.ExtraSampleRate, conf.MaxTPS, &dynConf.RateByService),
-		sampled:  sampled,
-		analyzed: analyzed,
+		engine:                sampler.NewPriorityEngine(conf.ExtraSampleRate, conf.MaxTPS, &dynConf.RateByService),
+		sampled:               sampled,
+		analyzed:              analyzed,
+		analyzedRateByService: conf.AnalyzedRateByService,
 	}
 }
 
@@ -70,8 +73,19 @@ func (s *Sampler) Add(t processedTrace) {
 		s.sampled <- &t.Trace
 	}
 
-	// TODO: should this stream be inclusive or exclusive of sampled traces
-	s.analyzed <- t.Root
+	s.Analyze(t.Root)
+}
+
+// Analyze queues a span for analysis, applying any sample rate specified
+func (s *Sampler) Analyze(t *model.Span) {
+	sampleRate, ok := s.analyzedRateByService[t.Service]
+	if !ok {
+		return
+	}
+
+	if sampler.SampleByRate(t.TraceID, sampleRate) {
+		s.analyzed <- t
+	}
 }
 
 // Stop stops the sampler
