@@ -91,10 +91,19 @@ func (s *PriorityEngine) Sample(trace model.Trace, root *model.Span, env string)
 		return false
 	}
 
+	samplingPriority := root.Metrics[samplingPriorityKey]
+
 	// Regardless of rates, sampling here is based on the metadata set
 	// by the client library. Which, is turn, is based on agent hints,
 	// but the rule of thumb is: respect client choice.
-	sampled := root.Metrics[samplingPriorityKey] > 0
+	sampled := samplingPriority > 0
+
+	if samplingPriority < 0 || samplingPriority > 1 {
+		// Short-circuit and return without counting the trace in the sampling rate logic
+		// if its value has not been set automaticallt by the client lib.
+		// The feedback loop should be scoped to the values it can act upon.
+		return sampled
+	}
 
 	signature := computeServiceSignature(root, env)
 	s.catalogMu.Lock()
