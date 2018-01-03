@@ -86,10 +86,23 @@ func RandomTrace(maxLevels, maxSpans int) model.Trace {
 func GetTestTrace(traceN, size int) model.Traces {
 	traces := model.Traces{}
 
+	r := rand.New(rand.NewSource(42))
+
 	for i := 0; i < traceN; i++ {
+		// Calculate a trace ID which is predictable (this is why we seed)
+		// but still spreads on a wide spectrum so that, among other things,
+		// sampling algorithms work in a realistic way.
+		traceID := r.Uint64()
+
 		trace := model.Trace{}
 		for j := 0; j < size; j++ {
-			trace = append(trace, GetTestSpan())
+			span := GetTestSpan()
+			// Need to have different span IDs else traces are rejected
+			// because they are not correct (indeed, a trace with several
+			// spans boasting the same span ID is not valid)
+			span.SpanID += uint64(j)
+			span.TraceID = traceID
+			trace = append(trace, span)
 		}
 		traces = append(traces, trace)
 	}
