@@ -67,11 +67,7 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 	)
 	f := filters.Setup(conf)
 	ss := NewScoreEngine(conf)
-	var ps *Sampler
-	if conf.PrioritySampling {
-		// Use priority sampling for distributed tracing only if conf says so
-		ps = NewPriorityEngine(conf, dynConf)
-	}
+	ps := NewPriorityEngine(conf, dynConf)
 
 	w := writer.NewWriter(conf)
 	w.InServices = r.services
@@ -107,9 +103,7 @@ func (a *Agent) Run() {
 	a.Receiver.Run()
 	a.Writer.Run()
 	a.ScoreEngine.Run()
-	if a.PriorityEngine != nil {
-		a.PriorityEngine.Run()
-	}
+	a.PriorityEngine.Run()
 
 	for {
 		select {
@@ -133,9 +127,7 @@ func (a *Agent) Run() {
 				// in most cases only one will be used, so in mainstream case there should
 				// be no performance issue, only in transitionnal mode can both contain data.
 				p.Traces = a.ScoreEngine.Flush()
-				if a.PriorityEngine != nil {
-					p.Traces = append(p.Traces, a.PriorityEngine.Flush()...)
-				}
+				p.Traces = append(p.Traces, a.PriorityEngine.Flush()...)
 				wg.Done()
 			}()
 
@@ -150,9 +142,7 @@ func (a *Agent) Run() {
 			close(a.Receiver.exit)
 			a.Writer.Stop()
 			a.ScoreEngine.Stop()
-			if a.PriorityEngine != nil {
-				a.PriorityEngine.Stop()
-			}
+			a.PriorityEngine.Stop()
 			return
 		}
 	}
@@ -174,22 +164,30 @@ func (a *Agent) Process(t model.Trace) {
 	// TODO: get the real tagStats related to this trace payload.
 	ts := a.Receiver.stats.GetTagStats(info.Tags{})
 
-	// We choose the sampler dynamically, depending on trace content,
-	// it has a sampling priority info (wether 0 or 1 or more) we respect
-	// this by using priority sampler. Else, use default score sampler.
-	s := a.ScoreEngine
-	priorityPtr := &ts.TracesPriorityNone
-	if a.PriorityEngine != nil {
-		if priority, ok := root.Metrics[samplingPriorityKey]; ok {
-			s = a.PriorityEngine
+	var samplers []*Sampler
+	priority, ok := root.Metrics[samplingPriorityKey]
+	// Send traces to possibly several score engines.
+	if ok {
+		// If Priority is defined, send to priority sampling, regardless of priority value.
+		// The sampler will keep or discard the trace, but we send everything so that it
+		// gets the big picture and can set the sampling rates accordingly.
+		samplers = append(samplers, a.PriorityEngine)
+	}
+	if priority == 0 {
+		// Use score engine for traces with no priority or priority set to 0
+		samplers = append(samplers, a.ScoreEngine)
+	}
 
-			if priority == 0 {
-				priorityPtr = &ts.TracesPriority0
-			} else if priority == 1 {
-				priorityPtr = &ts.TracesPriority1
-			} else {
-				priorityPtr = &ts.TracesPriority2
-			}
+	priorityPtr := &ts.TracesPriorityNone
+	if ok {
+		if priority < 0 {
+			priorityPtr = &ts.TracesPriorityNeg
+		} else if priority == 0 {
+			priorityPtr = &ts.TracesPriority0
+		} else if priority == 1 {
+			priorityPtr = &ts.TracesPriority1
+		} else {
+			priorityPtr = &ts.TracesPriority2
 		}
 	}
 	atomic.AddInt64(priorityPtr, 1)
@@ -244,13 +242,17 @@ func (a *Agent) Process(t model.Trace) {
 
 	go func() {
 		defer watchdog.LogOnPanic()
+		// Everything is sent to concentrator for stats, regardless of sampling.
 		a.Concentrator.Add(pt)
 
 	}()
-	go func() {
-		defer watchdog.LogOnPanic()
-		s.Add(pt)
-	}()
+	for _, s := range samplers {
+		sampler := s
+		go func() {
+			defer watchdog.LogOnPanic()
+			sampler.Add(pt)
+		}()
+	}
 }
 
 func (a *Agent) watchdog() {
