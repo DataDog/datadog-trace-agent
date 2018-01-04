@@ -67,11 +67,7 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 	)
 	f := filters.Setup(conf)
 	ss := NewScoreEngine(conf)
-	var ps *Sampler
-	if conf.PrioritySampling {
-		// Use priority sampling for distributed tracing only if conf says so
-		ps = NewPriorityEngine(conf, dynConf)
-	}
+	ps := NewPriorityEngine(conf, dynConf)
 
 	w := writer.NewWriter(conf)
 	w.InServices = r.services
@@ -107,9 +103,7 @@ func (a *Agent) Run() {
 	a.Receiver.Run()
 	a.Writer.Run()
 	a.ScoreEngine.Run()
-	if a.PriorityEngine != nil {
-		a.PriorityEngine.Run()
-	}
+	a.PriorityEngine.Run()
 
 	for {
 		select {
@@ -133,9 +127,7 @@ func (a *Agent) Run() {
 				// in most cases only one will be used, so in mainstream case there should
 				// be no performance issue, only in transitionnal mode can both contain data.
 				p.Traces = a.ScoreEngine.Flush()
-				if a.PriorityEngine != nil {
-					p.Traces = append(p.Traces, a.PriorityEngine.Flush()...)
-				}
+				p.Traces = append(p.Traces, a.PriorityEngine.Flush()...)
 				wg.Done()
 			}()
 
@@ -150,9 +142,7 @@ func (a *Agent) Run() {
 			close(a.Receiver.exit)
 			a.Writer.Stop()
 			a.ScoreEngine.Stop()
-			if a.PriorityEngine != nil {
-				a.PriorityEngine.Stop()
-			}
+			a.PriorityEngine.Stop()
 			return
 		}
 	}
@@ -176,25 +166,16 @@ func (a *Agent) Process(t model.Trace) {
 
 	var samplers []*Sampler
 	priority, ok := root.Metrics[samplingPriorityKey]
-	if a.conf.ScorePriority0Traces {
-		// Send traces to possibly several score engines.
-		if ok && a.PriorityEngine != nil {
-			// If Priority is defined, send to priority sampling, regardless of priority value.
-			// The sampler will keep or discard the trace, but we send everything so that it
-			// gets the big picture and can set the sampling rates accordingly.
-			samplers = append(samplers, a.PriorityEngine)
-		}
-		if priority == 0 {
-			// Use score engine for traces with no priority or priority set to 0
-			samplers = append(samplers, a.ScoreEngine)
-		}
-	} else {
-		// Send traces to one single engine, either Priority or Score
-		if ok && a.PriorityEngine != nil {
-			samplers = []*Sampler{a.PriorityEngine}
-		} else {
-			samplers = []*Sampler{a.ScoreEngine}
-		}
+	// Send traces to possibly several score engines.
+	if ok {
+		// If Priority is defined, send to priority sampling, regardless of priority value.
+		// The sampler will keep or discard the trace, but we send everything so that it
+		// gets the big picture and can set the sampling rates accordingly.
+		samplers = append(samplers, a.PriorityEngine)
+	}
+	if priority == 0 {
+		// Use score engine for traces with no priority or priority set to 0
+		samplers = append(samplers, a.ScoreEngine)
 	}
 
 	priorityPtr := &ts.TracesPriorityNone

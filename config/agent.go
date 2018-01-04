@@ -38,11 +38,9 @@ type AgentConfig struct {
 	ExtraAggregators []string
 
 	// Sampler configuration
-	ExtraSampleRate      float64
-	PreSampleRate        float64
-	MaxTPS               float64
-	PrioritySampling     bool
-	ScorePriority0Traces bool
+	ExtraSampleRate float64
+	PreSampleRate   float64
+	MaxTPS          float64
 
 	// Receiver
 	ReceiverHost    string
@@ -172,11 +170,9 @@ func NewDefaultAgentConfig() *AgentConfig {
 		BucketInterval:   time.Duration(10) * time.Second,
 		ExtraAggregators: []string{"http.status_code"},
 
-		ExtraSampleRate:      1.0,
-		PreSampleRate:        1.0,
-		MaxTPS:               10,
-		PrioritySampling:     true,
-		ScorePriority0Traces: true,
+		ExtraSampleRate: 1.0,
+		PreSampleRate:   1.0,
+		MaxTPS:          10,
 
 		ReceiverHost:    "localhost",
 		ReceiverPort:    8126,
@@ -325,12 +321,6 @@ APM_CONF:
 	}
 	if v, e := conf.GetFloat("trace.sampler", "max_traces_per_second"); e == nil {
 		c.MaxTPS = v
-	}
-	if v := strings.ToLower(conf.GetDefault("trace.sampler", "priority_sampling", "yes")); v != "yes" && v != "true" {
-		c.PrioritySampling = false
-	}
-	if v := strings.ToLower(conf.GetDefault("trace.sampler", "score_priority_0_traces", "yes")); v != "yes" && v != "true" {
-		c.ScorePriority0Traces = false
 	}
 
 	if v, e := conf.GetInt("trace.receiver", "receiver_port"); e == nil {
