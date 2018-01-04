@@ -160,15 +160,15 @@ func TestReceiverJSONDecoder(t *testing.T) {
 		contentType string
 		traces      []model.Trace
 	}{
-		{"v02 with empty content-type", NewHTTPReceiver(conf, dynConf), v02, "", fixtures.GetTestTrace(1, 1)},
-		{"v03 with empty content-type", NewHTTPReceiver(conf, dynConf), v03, "", fixtures.GetTestTrace(1, 1)},
-		{"v04 with empty content-type", NewHTTPReceiver(conf, dynConf), v04, "", fixtures.GetTestTrace(1, 1)},
-		{"v02 with application/json", NewHTTPReceiver(conf, dynConf), v02, "application/json", fixtures.GetTestTrace(1, 1)},
-		{"v03 with application/json", NewHTTPReceiver(conf, dynConf), v03, "application/json", fixtures.GetTestTrace(1, 1)},
-		{"v04 with application/json", NewHTTPReceiver(conf, dynConf), v04, "application/json", fixtures.GetTestTrace(1, 1)},
-		{"v02 with text/json", NewHTTPReceiver(conf, dynConf), v02, "text/json", fixtures.GetTestTrace(1, 1)},
-		{"v03 with text/json", NewHTTPReceiver(conf, dynConf), v03, "text/json", fixtures.GetTestTrace(1, 1)},
-		{"v04 with text/json", NewHTTPReceiver(conf, dynConf), v04, "text/json", fixtures.GetTestTrace(1, 1)},
+		{"v02 with empty content-type", NewHTTPReceiver(conf, dynConf), v02, "", fixtures.GetTestTrace(1, 1, false)},
+		{"v03 with empty content-type", NewHTTPReceiver(conf, dynConf), v03, "", fixtures.GetTestTrace(1, 1, false)},
+		{"v04 with empty content-type", NewHTTPReceiver(conf, dynConf), v04, "", fixtures.GetTestTrace(1, 1, false)},
+		{"v02 with application/json", NewHTTPReceiver(conf, dynConf), v02, "application/json", fixtures.GetTestTrace(1, 1, false)},
+		{"v03 with application/json", NewHTTPReceiver(conf, dynConf), v03, "application/json", fixtures.GetTestTrace(1, 1, false)},
+		{"v04 with application/json", NewHTTPReceiver(conf, dynConf), v04, "application/json", fixtures.GetTestTrace(1, 1, false)},
+		{"v02 with text/json", NewHTTPReceiver(conf, dynConf), v02, "text/json", fixtures.GetTestTrace(1, 1, false)},
+		{"v03 with text/json", NewHTTPReceiver(conf, dynConf), v03, "text/json", fixtures.GetTestTrace(1, 1, false)},
+		{"v04 with text/json", NewHTTPReceiver(conf, dynConf), v04, "text/json", fixtures.GetTestTrace(1, 1, false)},
 	}
 
 	for _, tc := range testCases {
@@ -225,10 +225,10 @@ func TestReceiverMsgpackDecoder(t *testing.T) {
 		contentType string
 		traces      model.Traces
 	}{
-		{"v01 with application/msgpack", NewHTTPReceiver(conf, dynConf), v01, "application/msgpack", fixtures.GetTestTrace(1, 1)},
-		{"v02 with application/msgpack", NewHTTPReceiver(conf, dynConf), v02, "application/msgpack", fixtures.GetTestTrace(1, 1)},
-		{"v03 with application/msgpack", NewHTTPReceiver(conf, dynConf), v03, "application/msgpack", fixtures.GetTestTrace(1, 1)},
-		{"v04 with application/msgpack", NewHTTPReceiver(conf, dynConf), v04, "application/msgpack", fixtures.GetTestTrace(1, 1)},
+		{"v01 with application/msgpack", NewHTTPReceiver(conf, dynConf), v01, "application/msgpack", fixtures.GetTestTrace(1, 1, false)},
+		{"v02 with application/msgpack", NewHTTPReceiver(conf, dynConf), v02, "application/msgpack", fixtures.GetTestTrace(1, 1, false)},
+		{"v03 with application/msgpack", NewHTTPReceiver(conf, dynConf), v03, "application/msgpack", fixtures.GetTestTrace(1, 1, false)},
+		{"v04 with application/msgpack", NewHTTPReceiver(conf, dynConf), v04, "application/msgpack", fixtures.GetTestTrace(1, 1, false)},
 	}
 
 	for _, tc := range testCases {
@@ -486,7 +486,7 @@ func TestHandleTraces(t *testing.T) {
 
 	// prepare the msgpack payload
 	var buf bytes.Buffer
-	msgp.Encode(&buf, fixtures.GetTestTrace(10, 10))
+	msgp.Encode(&buf, fixtures.GetTestTrace(10, 10, true))
 
 	// prepare the receiver
 	conf := config.NewDefaultAgentConfig()
@@ -523,7 +523,7 @@ func TestHandleTraces(t *testing.T) {
 		ts, ok := rs.Stats[info.Tags{Lang: lang}]
 		assert.True(ok)
 		assert.Equal(int64(20), ts.TracesReceived)
-		assert.Equal(int64(57622), ts.TracesBytes)
+		assert.Equal(int64(59222), ts.TracesBytes)
 	}
 	// make sure we have all our languages registered
 	assert.Equal("C#|go|java|python|ruby", receiver.Languages())
@@ -552,7 +552,7 @@ func TestReceiverPreSamplerCancel(t *testing.T) {
 	var buf bytes.Buffer
 
 	n := 100 // Payloads need to be big enough, else bug is not triggered
-	msgp.Encode(&buf, fixtures.GetTestTrace(n, n))
+	msgp.Encode(&buf, fixtures.GetTestTrace(n, n, true))
 
 	conf := config.NewDefaultAgentConfig()
 	conf.APIKey = "test"
@@ -596,7 +596,7 @@ func BenchmarkHandleTracesFromOneApp(b *testing.B) {
 	// prepare the payload
 	// msgpack payload
 	var buf bytes.Buffer
-	msgp.Encode(&buf, fixtures.GetTestTrace(1, 1))
+	msgp.Encode(&buf, fixtures.GetTestTrace(1, 1, true))
 
 	// prepare the receiver
 	conf := config.NewDefaultAgentConfig()
@@ -638,7 +638,7 @@ func BenchmarkHandleTracesFromMultipleApps(b *testing.B) {
 	// prepare the payload
 	// msgpack payload
 	var buf bytes.Buffer
-	msgp.Encode(&buf, fixtures.GetTestTrace(1, 1))
+	msgp.Encode(&buf, fixtures.GetTestTrace(1, 1, true))
 
 	// prepare the receiver
 	conf := config.NewDefaultAgentConfig()
@@ -678,7 +678,7 @@ func BenchmarkHandleTracesFromMultipleApps(b *testing.B) {
 
 func BenchmarkDecoderJSON(b *testing.B) {
 	assert := assert.New(b)
-	traces := fixtures.GetTestTrace(150, 66)
+	traces := fixtures.GetTestTrace(150, 66, true)
 
 	// json payload
 	payload, err := json.Marshal(traces)
@@ -703,7 +703,7 @@ func BenchmarkDecoderMsgpack(b *testing.B) {
 
 	// msgpack payload
 	var buf bytes.Buffer
-	err := msgp.Encode(&buf, fixtures.GetTestTrace(150, 66))
+	err := msgp.Encode(&buf, fixtures.GetTestTrace(150, 66, true))
 	assert.Nil(err)
 
 	// benchmark
