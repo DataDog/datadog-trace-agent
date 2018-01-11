@@ -14,8 +14,6 @@ import (
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
-const spanAnalyzeRate = "_analyze_rate"
-
 // Sampler chooses wich spans to write to the API
 type Sampler struct {
 	sampled               chan *model.Trace
