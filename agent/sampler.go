@@ -72,23 +72,22 @@ func (s *Sampler) Add(t processedTrace) {
 	}
 
 	// inspect the WeightedTrace so that we can identify top-level spans
-	// Only top-level spans are eligible to be analyzed
 	for _, span := range t.WeightedTrace {
-		if analyzeRate, ok := s.analyzedRateByService[span.Service]; ok {
-			s.Analyze(span, analyzeRate)
-		}
+		s.Analyze(span)
 	}
 }
 
 // Analyze queues a span for analysis, applying any sample rate specified
 // Only top-level spans are eligible to be analyzed
-func (s *Sampler) Analyze(span *model.WeightedSpan, sampleRate float64) {
+func (s *Sampler) Analyze(span *model.WeightedSpan) {
 	if !span.TopLevel {
 		return
 	}
 
-	if sampler.SampleByRate(span.TraceID, sampleRate) {
-		s.analyzed <- span.Span
+	if analyzeRate, ok := s.analyzedRateByService[span.Service]; ok {
+		if sampler.SampleByRate(span.TraceID, analyzeRate) {
+			s.analyzed <- span.Span
+		}
 	}
 }
 
