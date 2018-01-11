@@ -67,32 +67,30 @@ func (s *Sampler) Run() {
 // Add samples a trace then keep it until the next flush
 func (s *Sampler) Add(t processedTrace) {
 	s.totalTraceCount++
-	sampled := s.engine.Sample(t.Trace, t.Root, t.Env)
-	analyzeRate, shouldAnalyze := s.analyzedRateByService[t.Service]
 
-	// split the stream between sampled traces and analyzed
-	// but unsampled transactions.
-	if sampled {
+	if s.engine.Sample(t.Trace, t.Root, t.Env) {
 		s.keptTraceCount++
-		// traces sampled here might still be discarded by the server
-		// pass along the analyze rate so that the server can still guarantee
-		// the requested rate on the stream of transactions
-		if shouldAnalyze {
-			t.Root.Metrics[spanAnalyzeRate] = analyzeRate
-		}
-
 		s.sampled <- &t.Trace
-	} else {
-		if shouldAnalyze {
-			s.Analyze(t.Root, analyzeRate)
+	}
+
+	// inspect the WeightedTrace so that we can identify top-level spans
+	// Only top-level spans are eligible to be analyzed
+	for _, span := range t.WeightedTrace {
+		if analyzeRate, ok := s.analyzedRateByService[span.Service]; ok {
+			s.Analyze(span, analyzeRate)
 		}
 	}
 }
 
 // Analyze queues a span for analysis, applying any sample rate specified
-func (s *Sampler) Analyze(t *model.Span, sampleRate float64) {
-	if sampler.SampleByRate(t.TraceID, sampleRate) {
-		s.analyzed <- t
+// Only top-level spans are eligible to be analyzed
+func (s *Sampler) Analyze(span *model.WeightedSpan, sampleRate float64) {
+	if !span.TopLevel {
+		return
+	}
+
+	if sampler.SampleByRate(span.TraceID, sampleRate) {
+		s.analyzed <- span.Span
 	}
 }
 
