@@ -69,16 +69,19 @@ type HTTPReceiver struct {
 }
 
 // NewHTTPReceiver returns a pointer to a new HTTPReceiver
-func NewHTTPReceiver(conf *config.AgentConfig, dynConf *config.DynamicConfig) *HTTPReceiver {
+func NewHTTPReceiver(
+	conf *config.AgentConfig, dynConf *config.DynamicConfig, traces chan model.Trace, services chan model.ServicesMetadata,
+) *HTTPReceiver {
 	// use buffered channels so that handlers are not waiting on downstream processing
 	return &HTTPReceiver{
-		traces:     make(chan model.Trace, 5000), // about 1000 traces/sec for 5 sec
-		services:   make(chan model.ServicesMetadata, 50),
 		conf:       conf,
 		dynConf:    dynConf,
 		stats:      info.NewReceiverStats(),
 		preSampler: sampler.NewPreSampler(conf.PreSampleRate),
 		exit:       make(chan struct{}),
+
+		traces:   traces,
+		services: services,
 
 		maxRequestBodyLength: maxRequestBodyLength,
 		debug:                strings.ToLower(conf.LogLevel) == "debug",

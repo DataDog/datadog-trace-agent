@@ -148,7 +148,7 @@ func runAgent(exit chan struct{}) {
 
 	if opts.info {
 		if err := info.Info(os.Stdout, agentConf); err != nil {
-			// need not display the error, Info should do it already
+			os.Stdout.WriteString(fmt.Sprintf("failed to print info: %s\n", err))
 			os.Exit(1)
 		}
 		return

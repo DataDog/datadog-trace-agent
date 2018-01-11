@@ -12,9 +12,6 @@ type EndpointStats struct {
 	// If several URLs are given, it does not change the size (shared for all).
 	// This is the raw data, encoded, compressed.
 	TracesBytes int64
-	// TracesCount is the number of traces in the traces payload data sent, including errors.
-	// If several URLs are given, it does not change the size (shared for all).
-	TracesCount int64
 	// TracesStats is the number of stats in the traces payload data sent, including errors.
 	// If several URLs are given, it does not change the size (shared for all).
 	TracesStats int64

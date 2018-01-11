@@ -3,11 +3,13 @@ package main
 import (
 	"sort"
 	"sync"
+	"time"
 
 	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/statsd"
+	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
 // Concentrator produces time bucketed statistics from a stream of raw traces.
@@ -15,22 +17,72 @@ import (
 // Gets an imperial shitton of traces, and outputs pre-computed data structures
 // allowing to find the gold (stats) amongst the traces.
 type Concentrator struct {
+	// list of attributes to use for extra aggregation
 	aggregators []string
-	bsize       int64
+	// bucket duration in nanoseconds
+	bsize int64
+
+	OutStats chan []model.StatsBucket
+
+	exit   chan struct{}
+	exitWG *sync.WaitGroup
 
 	buckets map[int64]*model.StatsRawBucket // buckets used to aggregate stats per timestamp
 	mu      sync.Mutex
 }
 
 // NewConcentrator initializes a new concentrator ready to be started
-func NewConcentrator(aggregators []string, bsize int64) *Concentrator {
+func NewConcentrator(aggregators []string, bsize int64, out chan []model.StatsBucket) *Concentrator {
 	c := Concentrator{
 		aggregators: aggregators,
 		bsize:       bsize,
 		buckets:     make(map[int64]*model.StatsRawBucket),
+
+		OutStats: out,
+
+		exit:   make(chan struct{}),
+		exitWG: &sync.WaitGroup{},
 	}
 	sort.Strings(c.aggregators)
 	return &c
+}
+
+// Start starts the concentrator.
+func (c *Concentrator) Start() {
+	go func() {
+		defer watchdog.LogOnPanic()
+		c.Run()
+	}()
+}
+
+// Run runs the main loop of the concentrator goroutine. Traces are received
+// through `Add`, this loop only deals with flushing.
+func (c *Concentrator) Run() {
+	c.exitWG.Add(1)
+	defer c.exitWG.Done()
+
+	// flush with the same period as stats buckets
+	flushTicker := time.NewTicker(time.Duration(c.bsize) * time.Nanosecond)
+	defer flushTicker.Stop()
+
+	log.Debug("starting concentrator")
+
+	for {
+		select {
+		case <-flushTicker.C:
+			c.OutStats <- c.Flush()
+		case <-c.exit:
+			log.Info("exiting concentrator, computing remaining stats")
+			c.OutStats <- c.Flush()
+			return
+		}
+	}
+}
+
+// Stop stops the main Run loop.
+func (c *Concentrator) Stop() {
+	close(c.exit)
+	c.exitWG.Wait()
 }
 
 // Add appends to the proper stats bucket this trace's statistics

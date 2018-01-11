@@ -17,6 +17,7 @@ desc 'Bootstrap CI environment'
 task :bootstrap do
   tools = {
     'github.com/golang/lint' => {
+      # TODO: upgrade golint
       version: 'b8599f7d71e7fead76b25aeb919c0e2558672f4a',
       main_pkg: './golint',
       check_cmd: 'golint',
@@ -68,6 +69,8 @@ PACKAGES = %w(
 EXCLUDE_LINT = [
   'model/services_gen.go',
   'model/trace_gen.go',
+  'model/trace.pb.go',
+  'model/trace_payload.pb.go',
   'model/span_gen.go',
   'model/span.pb.go',
 ]

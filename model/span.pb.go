@@ -12,7 +12,7 @@
 
 	It has these top-level messages:
 		Span
-		Trace
+		APITrace
 		TracePayload
 */
 package model

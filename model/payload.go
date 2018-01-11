@@ -11,7 +11,8 @@ import (
 )
 
 // AgentPayload is the main payload to carry data that has been
-// pre-processed to the Datadog mothership
+// pre-processed to the Datadog mothership.
+// This is a legacy payload format, used in API v0.1.
 type AgentPayload struct {
 	HostName string        `json:"hostname"` // the host name that will be resolved by the API
 	Env      string        `json:"env"`      // the default environment this agent uses

@@ -1,12 +1,14 @@
 package info
 
 import (
+	"bytes"
 	"encoding/json"
 	"expvar" // automatically publish `/debug/vars` on HTTP port
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,9 +21,16 @@ import (
 )
 
 var (
-	infoMu              sync.RWMutex
-	receiverStats       []TagStats    // only for the last minute
-	endpointStats       EndpointStats // only for the last minute
+	infoMu        sync.RWMutex
+	receiverStats []TagStats // only for the last minute
+	languages     []string
+
+	// TODO: move from package globals to a clean single struct
+
+	traceWriterInfo   TraceWriterInfo
+	statsWriterInfo   StatsWriterInfo
+	serviceWriterInfo ServiceWriterInfo
+
 	watchdogInfo        watchdog.Info
 	samplerInfo         SamplerInfo
 	prioritySamplerInfo SamplerInfo
@@ -45,35 +54,43 @@ const (
 
   Hostname: {{.Status.Config.HostName}}
   Receiver: {{.Status.Config.ReceiverHost}}:{{.Status.Config.ReceiverPort}}
-  API Endpoint: {{.Status.Config.APIEndpoint}}{{ range $i, $ts := .Status.Receiver }}
+  API Endpoint: {{.Status.Config.APIEndpoint}}
 
   --- Receiver stats (1 min) ---
 
-  -> tags: {{if $ts.Tags.Lang}}{{ $ts.Tags.Lang }}, {{ $ts.Tags.LangVersion }}, {{ $ts.Tags.Interpreter }}, {{ $ts.Tags.TracerVersion }}{{else}}None{{end}}
-
+  {{ range $i, $ts := .Status.Receiver }}
+  From {{if $ts.Tags.Lang}}{{ $ts.Tags.Lang }} {{ $ts.Tags.LangVersion }} ({{ $ts.Tags.Interpreter }}), client {{ $ts.Tags.TracerVersion }}{{else}}unknown clients{{end}}
     Traces received: {{ $ts.Stats.TracesReceived }} ({{ $ts.Stats.TracesBytes }} bytes)
     Spans received: {{ $ts.Stats.SpansReceived }}
     Services received: {{ $ts.Stats.ServicesReceived }} ({{ $ts.Stats.ServicesBytes }} bytes)
-    Total data received: {{ add $ts.Stats.TracesBytes $ts.Stats.ServicesBytes }} bytes{{if gt $ts.Stats.TracesDropped 0}}
-
+    {{if gt $ts.Stats.TracesDropped 0}}
     WARNING: Traces dropped: {{ $ts.Stats.TracesDropped }}
-    {{end}}{{if gt $ts.Stats.SpansDropped 0}}WARNING: Spans dropped: {{ $ts.Stats.SpansDropped }}{{end}}
+    {{end}}
+    {{if gt $ts.Stats.SpansDropped 0}}
+    WARNING: Spans dropped: {{ $ts.Stats.SpansDropped }}
+    {{end}}
 
-  ------------------------------{{end}}
-{{ range $key, $value := .Status.RateByService }}
-  Sample rate for '{{ $key }}': {{percent $value}} %{{ end }}{{if lt .Status.PreSampler.Rate 1.0}}
-
+  {{end}}
+  {{ range $key, $value := .Status.RateByService }}
+  Priority sampling rate for '{{ $key }}': {{percent $value}} %
+  {{ end }}
+  {{if lt .Status.PreSampler.Rate 1.0}}
   WARNING: Pre-sampling traces: {{percent .Status.PreSampler.Rate}} %
-{{end}}{{if .Status.PreSampler.Error}}  WARNING: Pre-sampler: {{.Status.PreSampler.Error}}
-{{end}}
+  {{end}}
+  {{if .Status.PreSampler.Error}}
+  WARNING: Pre-sampler: {{.Status.PreSampler.Error}}
+  {{end}}
 
-  Bytes sent (1 min): {{add .Status.Endpoint.TracesBytes .Status.Endpoint.ServicesBytes}}
-  Traces sent (1 min): {{.Status.Endpoint.TracesCount}}
-  Stats sent (1 min): {{.Status.Endpoint.TracesStats}}
-{{if gt .Status.Endpoint.TracesPayloadError 0}}  WARNING: Traces API errors (1 min): {{.Status.Endpoint.TracesPayloadError}}/{{.Status.Endpoint.TracesPayload}}
-{{end}}{{if gt .Status.Endpoint.ServicesPayloadError 0}}  WARNING: Services API errors (1 min): {{.Status.Endpoint.ServicesPayloadError}}/{{.Status.Endpoint.ServicesPayload}}
-{{end}}
+  --- Writer stats (1 min) ---
+
+  Traces: {{.Status.TraceWriter.Payloads}} payloads, {{.Status.TraceWriter.Traces}} traces, {{.Status.TraceWriter.Bytes}} bytes
+  {{if gt .Status.TraceWriter.Errors 0}}WARNING: Traces API errors (1 min): {{.Status.TraceWriter.Errors}}{{end}}
+  Stats: {{.Status.StatsWriter.Payloads}} payloads, {{.Status.StatsWriter.StatsBuckets}} stats buckets, {{.Status.StatsWriter.Bytes}} bytes
+  {{if gt .Status.StatsWriter.Errors 0}}WARNING: Stats API errors (1 min): {{.Status.StatsWriter.Errors}}{{end}}
+  Services: {{.Status.ServiceWriter.Payloads}} payloads, {{.Status.ServiceWriter.Services}} services, {{.Status.ServiceWriter.Bytes}} bytes
+  {{if gt .Status.ServiceWriter.Errors 0}}WARNING: Services API errors (1 min): {{.Status.ServiceWriter.Errors}}{{end}}
 `
+
 	notRunningTmplSrc = `{{.Banner}}
 {{.Program}}
 {{.Banner}}
@@ -81,6 +98,7 @@ const (
   Not running (port {{.ReceiverPort}})
 
 `
+
 	errorTmplSrc = `{{.Banner}}
 {{.Program}}
 {{.Banner}}
@@ -106,25 +124,21 @@ func UpdateReceiverStats(rs *ReceiverStats) {
 	}
 
 	receiverStats = s
+	languages = rs.Languages()
+}
+
+// Languages exposes languages reporting traces to the Agent
+func Languages() []string {
+	infoMu.Lock()
+	defer infoMu.Unlock()
+
+	return languages
 }
 
 func publishReceiverStats() interface{} {
 	infoMu.RLock()
 	defer infoMu.RUnlock()
 	return receiverStats
-}
-
-// UpdateEndpointStats updates internal stats about API endpoints
-func UpdateEndpointStats(es EndpointStats) {
-	infoMu.Lock()
-	defer infoMu.Unlock()
-	endpointStats = es
-}
-
-func publishEndpointStats() interface{} {
-	infoMu.RLock()
-	defer infoMu.RUnlock()
-	return endpointStats
 }
 
 // UpdateSamplerInfo updates internal stats about signature sampling
@@ -220,8 +234,10 @@ func InitInfo(conf *config.AgentConfig) error {
 		expvar.Publish("uptime", expvar.Func(publishUptime))
 		expvar.Publish("version", expvar.Func(publishVersion))
 		expvar.Publish("receiver", expvar.Func(publishReceiverStats))
-		expvar.Publish("endpoint", expvar.Func(publishEndpointStats))
 		expvar.Publish("sampler", expvar.Func(publishSamplerInfo))
+		expvar.Publish("trace_writer", expvar.Func(publishTraceWriterInfo))
+		expvar.Publish("stats_writer", expvar.Func(publishStatsWriterInfo))
+		expvar.Publish("service_writer", expvar.Func(publishServiceWriterInfo))
 		expvar.Publish("prioritysampler", expvar.Func(publishPrioritySamplerInfo))
 		expvar.Publish("ratebyservice", expvar.Func(publishRateByService))
 		expvar.Publish("watchdog", expvar.Func(publishWatchdogInfo))
@@ -274,7 +290,9 @@ type StatusInfo struct {
 	Version       infoVersion             `json:"version"`
 	Receiver      []TagStats              `json:"receiver"`
 	RateByService map[string]float64      `json:"ratebyservice"`
-	Endpoint      EndpointStats           `json:"endpoint"`
+	TraceWriter   TraceWriterInfo         `json:"trace_writer"`
+	StatsWriter   StatsWriterInfo         `json:"stats_writer"`
+	ServiceWriter ServiceWriterInfo       `json:"service_writer"`
 	Watchdog      watchdog.Info           `json:"watchdog"`
 	PreSampler    sampler.PreSamplerStats `json:"presampler"`
 	Config        config.AgentConfig      `json:"config"`
@@ -293,65 +311,6 @@ func getProgramBanner(version string) (string, string) {
 //
 // If error is nil, means the program is running.
 // If not, it displays a pretty-printed message anyway (for support)
-//
-// Typical output of 'trace-agent -info' when agent is running:
-//
-// -----8<-------------------------------------------------------
-// ======================
-// Trace Agent (v 0.99.0)
-// ======================
-//
-//   Pid: 38149
-//   Uptime: 15 seconds
-//   Mem alloc: 773552 bytes
-//
-//   Hostname: localhost.localdomain
-//   Receiver: localhost:8126
-//   API Endpoint: https://trace.agent.datadoghq.com
-//
-//   Bytes received (1 min): 10000
-//   Traces received (1 min): 240
-//   Spans received (1 min): 360
-//   WARNING: Traces dropped (1 min): 5
-//   WARNING: Spans dropped (1 min): 10
-//   WARNING: Pre-sampling traces: 26.0 %
-//   WARNING: Pre-sampler: raising pre-sampling rate from 2.9 % to 5.0 %
-//
-//   Bytes sent (1 min): 3245
-//   Traces sent (1 min): 6
-//   Stats sent (1 min): 60
-//   WARNING: Traces API errors (1 min): 1/3
-//   WARNING: Services API errors (1 min): 1/1
-//
-// -----8<-------------------------------------------------------
-//
-// The "WARNING:" lines are hidden if there's nothing dropped or no errors.
-//
-// Typical output of 'trace-agent -info' when agent is not running:
-//
-// -----8<-------------------------------------------------------
-// ======================
-// Trace Agent (v 0.99.0)
-// ======================
-//
-//   Not running (port 8126)
-//
-// -----8<-------------------------------------------------------
-//
-// Typical output of 'trace-agent -info' when something unexpected happened,
-// for instance we're connecting to an HTTP server that serves an inadequate
-// response, or there's a bug, or... :
-//
-// -----8<-------------------------------------------------------
-// ======================
-// Trace Agent (v 0.99.0)
-// ======================
-//
-//   Error: json: cannot unmarshal number into Go value of type main.StatusInfo
-//   URL: http://localhost:8126/debug/vars
-//
-// -----8<-------------------------------------------------------
-//
 func Info(w io.Writer, conf *config.AgentConfig) error {
 	host := conf.ReceiverHost
 	if host == "0.0.0.0" {
@@ -403,12 +362,14 @@ func Info(w io.Writer, conf *config.AgentConfig) error {
 	// remove the default service and env, it can be inferred from other
 	// values so has little added-value and could be confusing for users.
 	// Besides, if one still really wants it:
-	// curl http://localhost:8126/degug/vars would show it.
+	// curl http://localhost:8126/debug/vars would show it.
 	if info.RateByService != nil {
 		delete(info.RateByService, "service:,env:")
 	}
 
-	err = infoTmpl.Execute(w, struct {
+	var buffer bytes.Buffer
+
+	err = infoTmpl.Execute(&buffer, struct {
 		Banner  string
 		Program string
 		Status  *StatusInfo
@@ -420,5 +381,20 @@ func Info(w io.Writer, conf *config.AgentConfig) error {
 	if err != nil {
 		return err
 	}
+
+	cleanInfo := CleanInfoExtraLines(buffer.String())
+
+	w.Write([]byte(cleanInfo))
+	// w.Write(buffer.Bytes())
+
 	return nil
+}
+
+// CleanInfoExtraLines removes empty lines from template code indentation.
+// The idea is that an indented empty line (only indentation spaces) is because of code indentation,
+// so we remove it.
+// Real legit empty lines contain no space.
+func CleanInfoExtraLines(info string) string {
+	var indentedEmptyLines = regexp.MustCompile("\n( +\n)+")
+	return indentedEmptyLines.ReplaceAllString(info, "\n")
 }

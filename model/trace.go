@@ -99,3 +99,24 @@ func (t Trace) ChildrenMap() map[uint64][]*Span {
 func NewTraceFlushMarker() Trace {
 	return []*Span{NewFlushMarker()}
 }
+
+// APITrace returns an APITrace from the trace, as required by the Datadog API.
+func (t Trace) APITrace() *APITrace {
+	start := t[0].Start
+	end := t[0].End()
+	for i := range t {
+		if t[i].Start < start {
+			start = t[i].Start
+		}
+		if t[i].End() < end {
+			end = t[i].End()
+		}
+	}
+
+	return &APITrace{
+		TraceID:   t[0].TraceID,
+		Spans:     t,
+		StartTime: start,
+		EndTime:   end,
+	}
+}

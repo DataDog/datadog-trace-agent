@@ -12,7 +12,8 @@ import (
 var testBucketInterval = time.Duration(2 * time.Second).Nanoseconds()
 
 func NewTestConcentrator() *Concentrator {
-	return NewConcentrator([]string{}, time.Second.Nanoseconds())
+	statsChan := make(chan []model.StatsBucket)
+	return NewConcentrator([]string{}, time.Second.Nanoseconds(), statsChan)
 }
 
 // getTsInBucket gives a timestamp in ns which is `offset` buckets late
@@ -39,7 +40,8 @@ func testSpan(c *Concentrator, spanID uint64, duration, offset int64, service, r
 
 func TestConcentratorStatsCounts(t *testing.T) {
 	assert := assert.New(t)
-	c := NewConcentrator([]string{}, testBucketInterval)
+	statsChan := make(chan []model.StatsBucket)
+	c := NewConcentrator([]string{}, testBucketInterval, statsChan)
 
 	now := model.Now()
 	alignedNow := now - now%c.bsize
