@@ -14,7 +14,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
-const spanAnalyzedTransaction = "_analyzed_transaction"
+const spanAnalyzeRate = "_analyze_rate"
 
 // Sampler chooses wich spans to write to the API
 type Sampler struct {
@@ -67,22 +67,30 @@ func (s *Sampler) Run() {
 // Add samples a trace then keep it until the next flush
 func (s *Sampler) Add(t processedTrace) {
 	s.totalTraceCount++
-	if s.engine.Sample(t.Trace, t.Root, t.Env) {
-		s.keptTraceCount++
-		t.Root.Metrics[spanAnalyzedTransaction] = 1
-		s.sampled <- &t.Trace
-	}
+	sampled := s.engine.Sample(t.Trace, t.Root, t.Env)
+	analyzeRate, shouldAnalyze := s.analyzedRateByService[t.Service]
 
-	s.Analyze(t.Root)
+	// split the stream between sampled traces and analyzed
+	// but unsampled transactions.
+	if sampled {
+		s.keptTraceCount++
+		// traces sampled here might still be discarded by the server
+		// pass along the analyze rate so that the server can still guarantee
+		// the requested rate on the stream of transactions
+		if shouldAnalyze {
+			t.Root.Metrics[spanAnalyzeRate] = analyzeRate
+		}
+
+		s.sampled <- &t.Trace
+	} else {
+		if shouldAnalyze {
+			s.Analyze(t.Root, analyzeRate)
+		}
+	}
 }
 
 // Analyze queues a span for analysis, applying any sample rate specified
-func (s *Sampler) Analyze(t *model.Span) {
-	sampleRate, ok := s.analyzedRateByService[t.Service]
-	if !ok {
-		return
-	}
-
+func (s *Sampler) Analyze(t *model.Span, sampleRate float64) {
 	if sampler.SampleByRate(t.TraceID, sampleRate) {
 		s.analyzed <- t
 	}
