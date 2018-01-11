@@ -60,6 +60,19 @@ func TestExponentialDelay(t *testing.T) {
 	}
 }
 
+func TestExponentialOverflow(t *testing.T) {
+	assert := assert.New(t)
+
+	delayProvider := DefaultExponentialDelayProvider()
+
+	assert.NotPanics(func() {
+		min, max := minMaxForSample(delayProvider, 300, 1024)
+
+		assert.True(min >= 0, "Min should be greater or equal to 0")
+		assert.True(max <= int64(DefaultExponentialConfig().MaxDuration), "Min should be greater or equal to 0")
+	})
+}
+
 func minMaxForSample(delayProvider DelayProvider, n int, numTries int) (min, max int64) {
 	max = 0
 	min = math.MaxInt64

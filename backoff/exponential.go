@@ -32,8 +32,21 @@ func DefaultExponentialDelayProvider() DelayProvider {
 // ExponentialDelayProvider creates a new instance of an ExponentialDelayProvider using the provided config.
 func ExponentialDelayProvider(conf ExponentialConfig) DelayProvider {
 	return func(numRetries int, _ error) time.Duration {
-		newExpDuration := time.Duration(int64(math.Pow(float64(conf.GrowthBase), float64(numRetries))) *
-			int64(conf.Base))
+		pow := math.Pow(float64(conf.GrowthBase), float64(numRetries))
+
+		// Correctly handle overflowing pow
+		if pow < 0 || pow > math.MaxInt64 {
+			pow = math.MaxInt64
+		}
+
+		mul := int64(pow) * int64(conf.Base)
+
+		// Correctly handle overflowing mul
+		if pow != 0 && mul/int64(pow) != int64(conf.Base) {
+			mul = math.MaxInt64
+		}
+
+		newExpDuration := time.Duration(mul)
 
 		if newExpDuration > conf.MaxDuration {
 			newExpDuration = conf.MaxDuration
