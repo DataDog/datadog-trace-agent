@@ -237,7 +237,7 @@ func (w *TraceWriter) flush() {
 
 	payload := NewPayload(serialized, headers)
 
-	log.Debugf("flushing traces=%v transactions %v", len(w.traces), len(w.transactions))
+	log.Debugf("flushing traces=%v transactions=%v", len(w.traces), len(w.transactions))
 	w.payloadSender.Send(payload)
 
 	// Reset traces

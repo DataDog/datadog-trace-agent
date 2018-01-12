@@ -315,7 +315,8 @@ func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expecte
 
 func testTraceWriter() (*TraceWriter, chan *model.Trace, *TestEndpoint, *statsd.TestStatsClient) {
 	traceChannel := make(chan *model.Trace)
-	traceWriter := NewTraceWriter(&config.AgentConfig{HostName: testHostName, DefaultEnv: testEnv}, traceChannel)
+	transactionChannel := make(chan *model.Span)
+	traceWriter := NewTraceWriter(&config.AgentConfig{HostName: testHostName, DefaultEnv: testEnv}, traceChannel, transactionChannel)
 	testEndpoint := &TestEndpoint{}
 	traceWriter.BaseWriter.payloadSender.setEndpoint(testEndpoint)
 	testStatsClient := &statsd.TestStatsClient{}
