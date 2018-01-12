@@ -209,3 +209,19 @@ func TestGetHostname(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotEqual(t, "", h)
 }
+
+func TestAnalyzedRateByService(t *testing.T) {
+	assert := assert.New(t)
+	config, _ := ini.Load([]byte(strings.Join([]string{
+		"[trace.analyzed_rate_by_service]",
+		"web = 0.8",
+		"intake = 0.05",
+		"bad_service = ",
+	}, "\n")))
+
+	conf := &File{instance: config, Path: "whatever"}
+	agentConfig, _ := NewAgentConfig(conf, nil)
+
+	assert.Equal(agentConfig.AnalyzedRateByService["web"], 0.8)
+	assert.Equal(agentConfig.AnalyzedRateByService["intake"], 0.05)
+}

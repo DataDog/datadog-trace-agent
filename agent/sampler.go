@@ -16,7 +16,9 @@ import (
 
 // Sampler chooses wich spans to write to the API
 type Sampler struct {
-	sampled chan *model.Trace
+	sampled               chan *model.Trace
+	analyzed              chan *model.Span
+	analyzedRateByService map[string]float64
 
 	// For stats
 	keptTraceCount  int
@@ -28,18 +30,22 @@ type Sampler struct {
 }
 
 // NewScoreSampler creates a new empty sampler ready to be started
-func NewScoreSampler(conf *config.AgentConfig, sampled chan *model.Trace) *Sampler {
+func NewScoreSampler(conf *config.AgentConfig, sampled chan *model.Trace, analyzed chan *model.Span) *Sampler {
 	return &Sampler{
-		engine:  sampler.NewScoreEngine(conf.ExtraSampleRate, conf.MaxTPS),
-		sampled: sampled,
+		engine:                sampler.NewScoreEngine(conf.ExtraSampleRate, conf.MaxTPS),
+		sampled:               sampled,
+		analyzed:              analyzed,
+		analyzedRateByService: conf.AnalyzedRateByService,
 	}
 }
 
 // NewPrioritySampler creates a new empty distributed sampler ready to be started
-func NewPrioritySampler(conf *config.AgentConfig, dynConf *config.DynamicConfig, sampled chan *model.Trace) *Sampler {
+func NewPrioritySampler(conf *config.AgentConfig, dynConf *config.DynamicConfig, sampled chan *model.Trace, analyzed chan *model.Span) *Sampler {
 	return &Sampler{
-		engine:  sampler.NewPriorityEngine(conf.ExtraSampleRate, conf.MaxTPS, &dynConf.RateByService),
-		sampled: sampled,
+		engine:                sampler.NewPriorityEngine(conf.ExtraSampleRate, conf.MaxTPS, &dynConf.RateByService),
+		sampled:               sampled,
+		analyzed:              analyzed,
+		analyzedRateByService: conf.AnalyzedRateByService,
 	}
 }
 
@@ -59,9 +65,29 @@ func (s *Sampler) Run() {
 // Add samples a trace then keep it until the next flush
 func (s *Sampler) Add(t processedTrace) {
 	s.totalTraceCount++
+
 	if s.engine.Sample(t.Trace, t.Root, t.Env) {
 		s.keptTraceCount++
 		s.sampled <- &t.Trace
+	}
+
+	// inspect the WeightedTrace so that we can identify top-level spans
+	for _, span := range t.WeightedTrace {
+		s.Analyze(span)
+	}
+}
+
+// Analyze queues a span for analysis, applying any sample rate specified
+// Only top-level spans are eligible to be analyzed
+func (s *Sampler) Analyze(span *model.WeightedSpan) {
+	if !span.TopLevel {
+		return
+	}
+
+	if analyzeRate, ok := s.analyzedRateByService[span.Service]; ok {
+		if sampler.SampleByRate(span.TraceID, analyzeRate) {
+			s.analyzed <- span.Span
+		}
 	}
 }
 

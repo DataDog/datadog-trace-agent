@@ -15,6 +15,23 @@ import (
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
+// TraceWriter ingests sampled traces and flush them to the API.
+// TraceWriter ingests sampled traces and flushes them to the API.
+type TraceWriter struct {
+	hostName       string
+	env            string
+	conf           TraceWriterConfig
+	InTraces       <-chan *model.Trace
+	InTransactions <-chan *model.Span
+	stats          info.TraceWriterInfo
+
+	traces        []*model.APITrace
+	transactions  []*model.Span
+	spansInBuffer int
+
+	BaseWriter
+}
+
 // TraceWriterConfig contains the configuration to customize the behaviour of a TraceWriter.
 type TraceWriterConfig struct {
 	MaxSpansPerPayload int
@@ -33,29 +50,20 @@ func DefaultTraceWriterConfig() TraceWriterConfig {
 	}
 }
 
-// TraceWriter ingests sampled traces and flushes them to the API.
-type TraceWriter struct {
-	hostName string
-	env      string
-	conf     TraceWriterConfig
-	InTraces <-chan *model.Trace
-	stats    info.TraceWriterInfo
-
-	traces        []*model.APITrace
-	spansInBuffer int
-
-	BaseWriter
-}
-
-// NewTraceWriter returns a new writer for traces following the provided agent configuration and using the provided
-// input trace channel.
-func NewTraceWriter(conf *config.AgentConfig, InTraces <-chan *model.Trace) *TraceWriter {
+// NewTraceWriter returns a new writer for traces.
+func NewTraceWriter(conf *config.AgentConfig, InTraces <-chan *model.Trace, InTransactions <-chan *model.Span) *TraceWriter {
 	return &TraceWriter{
-		hostName:   conf.HostName,
-		env:        conf.DefaultEnv,
-		conf:       DefaultTraceWriterConfig(),
-		InTraces:   InTraces,
+		hostName: conf.HostName,
+		env:      conf.DefaultEnv,
+
+		traces:       []*model.APITrace{},
+		transactions: []*model.Span{},
+
+		InTraces:       InTraces,
+		InTransactions: InTransactions,
+
 		BaseWriter: *NewBaseWriter(conf, "/api/v0.2/traces"),
+		conf:       DefaultTraceWriterConfig(),
 	}
 }
 
@@ -118,6 +126,10 @@ func (w *TraceWriter) Run() {
 				continue
 			}
 			w.handleTrace(trace)
+		case transaction := <-w.InTransactions:
+			// no need for lock for now as flush is sequential
+			// TODO: async flush/retry
+			w.transactions = append(w.transactions, transaction)
 		case <-flushTicker.C:
 			log.Debug("Flushing current traces")
 			w.flush()
@@ -190,9 +202,10 @@ func (w *TraceWriter) handleTrace(trace *model.Trace) {
 
 func (w *TraceWriter) flush() {
 	numTraces := len(w.traces)
+	numTransactions := len(w.transactions)
 
 	// If no traces, we can't construct anything
-	if numTraces == 0 {
+	if numTraces == 0 && numTransactions == 0 {
 		return
 	}
 
@@ -200,9 +213,10 @@ func (w *TraceWriter) flush() {
 	atomic.AddInt64(&w.stats.Spans, int64(w.spansInBuffer))
 
 	tracePayload := model.TracePayload{
-		HostName: w.hostName,
-		Env:      w.env,
-		Traces:   w.traces,
+		HostName:     w.hostName,
+		Env:          w.env,
+		Traces:       w.traces,
+		Transactions: w.transactions,
 	}
 
 	serialized, err := proto.Marshal(&tracePayload)
@@ -223,10 +237,12 @@ func (w *TraceWriter) flush() {
 
 	payload := NewPayload(serialized, headers)
 
+	log.Debugf("flushing traces=%v transactions=%v", len(w.traces), len(w.transactions))
 	w.payloadSender.Send(payload)
 
 	// Reset traces
 	w.traces = w.traces[:0]
+	w.transactions = w.transactions[:0]
 	w.spansInBuffer = 0
 }
 
