@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,6 +17,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/fixtures"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/stretchr/testify/assert"
 	"github.com/tinylib/msgp/msgp"
 )
@@ -168,15 +172,15 @@ func TestReceiverJSONDecoder(t *testing.T) {
 		contentType string
 		traces      []model.Trace
 	}{
-		{"v02 with empty content-type", NewTestReceiverFromConfig(conf), v02, "", fixtures.GetTestTrace(1, 1)},
-		{"v03 with empty content-type", NewTestReceiverFromConfig(conf), v03, "", fixtures.GetTestTrace(1, 1)},
-		{"v04 with empty content-type", NewTestReceiverFromConfig(conf), v04, "", fixtures.GetTestTrace(1, 1)},
-		{"v02 with application/json", NewTestReceiverFromConfig(conf), v02, "application/json", fixtures.GetTestTrace(1, 1)},
-		{"v03 with application/json", NewTestReceiverFromConfig(conf), v03, "application/json", fixtures.GetTestTrace(1, 1)},
-		{"v04 with application/json", NewTestReceiverFromConfig(conf), v04, "application/json", fixtures.GetTestTrace(1, 1)},
-		{"v02 with text/json", NewTestReceiverFromConfig(conf), v02, "text/json", fixtures.GetTestTrace(1, 1)},
-		{"v03 with text/json", NewTestReceiverFromConfig(conf), v03, "text/json", fixtures.GetTestTrace(1, 1)},
-		{"v04 with text/json", NewTestReceiverFromConfig(conf), v04, "text/json", fixtures.GetTestTrace(1, 1)},
+		{"v02 with empty content-type", NewTestReceiverFromConfig(conf), v02, "", fixtures.GetTestTrace(1, 1, false)},
+		{"v03 with empty content-type", NewTestReceiverFromConfig(conf), v03, "", fixtures.GetTestTrace(1, 1, false)},
+		{"v04 with empty content-type", NewTestReceiverFromConfig(conf), v04, "", fixtures.GetTestTrace(1, 1, false)},
+		{"v02 with application/json", NewTestReceiverFromConfig(conf), v02, "application/json", fixtures.GetTestTrace(1, 1, false)},
+		{"v03 with application/json", NewTestReceiverFromConfig(conf), v03, "application/json", fixtures.GetTestTrace(1, 1, false)},
+		{"v04 with application/json", NewTestReceiverFromConfig(conf), v04, "application/json", fixtures.GetTestTrace(1, 1, false)},
+		{"v02 with text/json", NewTestReceiverFromConfig(conf), v02, "text/json", fixtures.GetTestTrace(1, 1, false)},
+		{"v03 with text/json", NewTestReceiverFromConfig(conf), v03, "text/json", fixtures.GetTestTrace(1, 1, false)},
+		{"v04 with text/json", NewTestReceiverFromConfig(conf), v04, "text/json", fixtures.GetTestTrace(1, 1, false)},
 	}
 
 	for _, tc := range testCases {
@@ -232,10 +236,10 @@ func TestReceiverMsgpackDecoder(t *testing.T) {
 		contentType string
 		traces      model.Traces
 	}{
-		{"v01 with application/msgpack", NewTestReceiverFromConfig(conf), v01, "application/msgpack", fixtures.GetTestTrace(1, 1)},
-		{"v02 with application/msgpack", NewTestReceiverFromConfig(conf), v02, "application/msgpack", fixtures.GetTestTrace(1, 1)},
-		{"v03 with application/msgpack", NewTestReceiverFromConfig(conf), v03, "application/msgpack", fixtures.GetTestTrace(1, 1)},
-		{"v04 with application/msgpack", NewTestReceiverFromConfig(conf), v04, "application/msgpack", fixtures.GetTestTrace(1, 1)},
+		{"v01 with application/msgpack", NewTestReceiverFromConfig(conf), v01, "application/msgpack", fixtures.GetTestTrace(1, 1, false)},
+		{"v02 with application/msgpack", NewTestReceiverFromConfig(conf), v02, "application/msgpack", fixtures.GetTestTrace(1, 1, false)},
+		{"v03 with application/msgpack", NewTestReceiverFromConfig(conf), v03, "application/msgpack", fixtures.GetTestTrace(1, 1, false)},
+		{"v04 with application/msgpack", NewTestReceiverFromConfig(conf), v04, "application/msgpack", fixtures.GetTestTrace(1, 1, false)},
 	}
 
 	for _, tc := range testCases {
@@ -491,7 +495,7 @@ func TestHandleTraces(t *testing.T) {
 
 	// prepare the msgpack payload
 	var buf bytes.Buffer
-	msgp.Encode(&buf, fixtures.GetTestTrace(10, 10))
+	msgp.Encode(&buf, fixtures.GetTestTrace(10, 10, true))
 
 	// prepare the receiver
 	conf := NewTestReceiverConfig()
@@ -526,17 +530,78 @@ func TestHandleTraces(t *testing.T) {
 		ts, ok := rs.Stats[info.Tags{Lang: lang}]
 		assert.True(ok)
 		assert.Equal(int64(20), ts.TracesReceived)
-		assert.Equal(int64(57622), ts.TracesBytes)
+		assert.Equal(int64(59222), ts.TracesBytes)
 	}
 	// make sure we have all our languages registered
 	assert.Equal("C#|go|java|python|ruby", receiver.Languages())
+}
+
+// chunkedReader is a reader which forces partial reads, this is required
+// to trigger some network related bugs, such as body not being read fully by server.
+// Without this, all the data could be read/written at once, not triggering the issue.
+type chunkedReader struct {
+	reader io.Reader
+}
+
+func (sr *chunkedReader) Read(p []byte) (n int, err error) {
+	size := 1024
+	if size > len(p) {
+		size = len(p)
+	}
+	buf := p[0:size]
+	return sr.reader.Read(buf)
+}
+
+func TestReceiverPreSamplerCancel(t *testing.T) {
+	assert := assert.New(t)
+
+	var wg sync.WaitGroup
+	var buf bytes.Buffer
+
+	n := 100 // Payloads need to be big enough, else bug is not triggered
+	msgp.Encode(&buf, fixtures.GetTestTrace(n, n, true))
+
+	conf := NewTestReceiverConfig()
+	conf.PreSampleRate = 0.000001 // Make sure we sample aggressively
+	receiver := NewTestReceiverFromConfig(conf)
+
+	server := httptest.NewServer(http.HandlerFunc(receiver.httpHandleWithVersion(v04, receiver.handleTraces)))
+
+	defer server.Close()
+	url := server.URL + "/v0.4/traces"
+
+	// Make sure we use share clients, and they are reused.
+	client := &http.Client{Transport: &http.Transport{
+		MaxIdleConnsPerHost: 100,
+	}}
+	for i := 0; i < 3; i++ {
+		wg.Add(1)
+		go func() {
+			for j := 0; j < 3; j++ {
+				reader := &chunkedReader{reader: bytes.NewReader(buf.Bytes())}
+				req, err := http.NewRequest("POST", url, reader)
+				req.Header.Set("Content-Type", "application/msgpack")
+				req.Header.Set(sampler.TraceCountHeader, strconv.Itoa(n))
+				assert.Nil(err)
+
+				resp, err := client.Do(req)
+				assert.Nil(err)
+				assert.NotNil(resp)
+				if resp != nil {
+					assert.Equal(http.StatusOK, resp.StatusCode)
+				}
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
 }
 
 func BenchmarkHandleTracesFromOneApp(b *testing.B) {
 	// prepare the payload
 	// msgpack payload
 	var buf bytes.Buffer
-	msgp.Encode(&buf, fixtures.GetTestTrace(1, 1))
+	msgp.Encode(&buf, fixtures.GetTestTrace(1, 1, true))
 
 	// prepare the receiver
 	conf := NewTestReceiverConfig()
@@ -576,7 +641,7 @@ func BenchmarkHandleTracesFromMultipleApps(b *testing.B) {
 	// prepare the payload
 	// msgpack payload
 	var buf bytes.Buffer
-	msgp.Encode(&buf, fixtures.GetTestTrace(1, 1))
+	msgp.Encode(&buf, fixtures.GetTestTrace(1, 1, true))
 
 	// prepare the receiver
 	conf := NewTestReceiverConfig()
@@ -614,7 +679,7 @@ func BenchmarkHandleTracesFromMultipleApps(b *testing.B) {
 
 func BenchmarkDecoderJSON(b *testing.B) {
 	assert := assert.New(b)
-	traces := fixtures.GetTestTrace(150, 66)
+	traces := fixtures.GetTestTrace(150, 66, true)
 
 	// json payload
 	payload, err := json.Marshal(traces)
@@ -639,7 +704,7 @@ func BenchmarkDecoderMsgpack(b *testing.B) {
 
 	// msgpack payload
 	var buf bytes.Buffer
-	err := msgp.Encode(&buf, fixtures.GetTestTrace(150, 66))
+	err := msgp.Encode(&buf, fixtures.GetTestTrace(150, 66, true))
 	assert.Nil(err)
 
 	// benchmark

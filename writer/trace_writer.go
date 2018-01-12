@@ -2,7 +2,6 @@ package writer
 
 import (
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -17,92 +16,130 @@ import (
 )
 
 // TraceWriter ingests sampled traces and flush them to the API.
+// TraceWriter ingests sampled traces and flushes them to the API.
 type TraceWriter struct {
-	endpoint Endpoint
-
+	hostName       string
+	env            string
+	conf           TraceWriterConfig
 	InTraces       <-chan *model.Trace
 	InTransactions <-chan *model.Span
+	stats          info.TraceWriterInfo
 
-	traceBuffer       []*model.APITrace
-	transactionBuffer []*model.Span
+	traces        []*model.APITrace
+	transactions  []*model.Span
+	spansInBuffer int
 
-	stats info.TraceWriterInfo
+	BaseWriter
+}
 
-	exit   chan struct{}
-	exitWG *sync.WaitGroup
+// TraceWriterConfig contains the configuration to customize the behaviour of a TraceWriter.
+type TraceWriterConfig struct {
+	MaxSpansPerPayload int
+	FlushPeriod        time.Duration
+	UpdateInfoPeriod   time.Duration
+	StatsClient        statsd.StatsClient
+}
 
-	conf *config.AgentConfig
+// DefaultTraceWriterConfig creates a new instance of a TraceWriterConfig using default values.
+func DefaultTraceWriterConfig() TraceWriterConfig {
+	return TraceWriterConfig{
+		MaxSpansPerPayload: 1000,
+		FlushPeriod:        5 * time.Second,
+		UpdateInfoPeriod:   1 * time.Minute,
+		StatsClient:        statsd.Client,
+	}
 }
 
 // NewTraceWriter returns a new writer for traces.
 func NewTraceWriter(conf *config.AgentConfig, InTraces <-chan *model.Trace, InTransactions <-chan *model.Span) *TraceWriter {
-	var endpoint Endpoint
-
-	if conf.APIEnabled {
-		client := NewClient(conf)
-		endpoint = NewDatadogEndpoint(client, conf.APIEndpoint, "/api/v0.2/traces", conf.APIKey)
-	} else {
-		log.Info("API interface is disabled, flushing to /dev/null instead")
-		endpoint = &NullEndpoint{}
-	}
-
 	return &TraceWriter{
-		endpoint: endpoint,
+		hostName: conf.HostName,
+		env:      conf.DefaultEnv,
 
-		traceBuffer:       []*model.APITrace{},
-		transactionBuffer: []*model.Span{},
-
-		exit:   make(chan struct{}),
-		exitWG: &sync.WaitGroup{},
+		traces:       []*model.APITrace{},
+		transactions: []*model.Span{},
 
 		InTraces:       InTraces,
 		InTransactions: InTransactions,
 
-		conf: conf,
+		BaseWriter: *NewBaseWriter(conf, "/api/v0.2/traces"),
+		conf:       DefaultTraceWriterConfig(),
 	}
 }
 
 // Start starts the writer.
 func (w *TraceWriter) Start() {
+	w.BaseWriter.Start()
 	go func() {
 		defer watchdog.LogOnPanic()
 		w.Run()
 	}()
 }
 
-// Run runs the main loop of the writer goroutine. If buffers payloads and
-// services read from input chans and flushes them when necessary.
+// Run runs the main loop of the writer goroutine. It sends traces to the payload constructor, flushing it periodically
+// and collects stats which are also reported periodically.
 func (w *TraceWriter) Run() {
 	w.exitWG.Add(1)
 	defer w.exitWG.Done()
 
 	// for now, simply flush every x seconds
-	flushTicker := time.NewTicker(5 * time.Second)
+	flushTicker := time.NewTicker(w.conf.FlushPeriod)
 	defer flushTicker.Stop()
 
-	updateInfoTicker := time.NewTicker(1 * time.Minute)
+	updateInfoTicker := time.NewTicker(w.conf.UpdateInfoPeriod)
 	defer updateInfoTicker.Stop()
+
+	// Monitor sender for events
+	go func() {
+		for event := range w.payloadSender.Monitor() {
+			if event == nil {
+				continue
+			}
+
+			switch event := event.(type) {
+			case SenderSuccessEvent:
+				log.Infof("flushed trace payload to the API, time:%s, size:%d bytes", event.SendStats.SendTime,
+					len(event.Payload.Bytes))
+				w.conf.StatsClient.Gauge("datadog.trace_agent.trace_writer.flush_duration",
+					event.SendStats.SendTime.Seconds(), nil, 1)
+				atomic.AddInt64(&w.stats.Payloads, 1)
+			case SenderFailureEvent:
+				log.Errorf("failed to flush trace payload, time:%s, size:%d bytes, error: %s",
+					event.SendStats.SendTime, len(event.Payload.Bytes), event.Error)
+				atomic.AddInt64(&w.stats.Errors, 1)
+			case SenderRetryEvent:
+				log.Errorf("retrying flush trace payload, retryNum: %d, delay:%s, error: %s",
+					event.RetryNum, event.RetryDelay, event.Error)
+				atomic.AddInt64(&w.stats.Retries, 1)
+			default:
+				log.Debugf("don't know how to handle event with type %T", event)
+			}
+		}
+	}()
 
 	log.Debug("starting trace writer")
 
 	for {
 		select {
 		case trace := <-w.InTraces:
-			// no need for lock for now as flush is sequential
-			// TODO: async flush/retry
-			apiTrace := trace.APITrace()
-			w.traceBuffer = append(w.traceBuffer, apiTrace)
+			if trace == nil {
+				continue
+			}
+			w.handleTrace(trace)
 		case transaction := <-w.InTransactions:
 			// no need for lock for now as flush is sequential
 			// TODO: async flush/retry
-			w.transactionBuffer = append(w.transactionBuffer, transaction)
+			w.transactions = append(w.transactions, transaction)
 		case <-flushTicker.C:
-			w.Flush()
+			log.Debug("Flushing current traces")
+			w.flush()
 		case <-updateInfoTicker.C:
+			log.Debug("Updating info")
 			go w.updateInfo()
 		case <-w.exit:
 			log.Info("exiting trace writer, flushing all remaining traces")
-			w.Flush()
+			w.flush()
+			log.Info("Flushed. Exiting")
 			return
 		}
 	}
@@ -112,32 +149,74 @@ func (w *TraceWriter) Run() {
 func (w *TraceWriter) Stop() {
 	close(w.exit)
 	w.exitWG.Wait()
+	w.BaseWriter.Stop()
 }
 
-// Flush flushes traces the data in the API
-func (w *TraceWriter) Flush() {
-	traces := w.traceBuffer
-	transactions := w.transactionBuffer
-
-	if len(traces) == 0 && len(transactions) == 0 {
-		log.Debugf("nothing to flush")
+func (w *TraceWriter) handleTrace(trace *model.Trace) {
+	if len(*trace) == 0 {
+		log.Debugf("Ignoring 0-length trace")
 		return
 	}
 
-	log.Debugf("going to flush %d traces, %d transactions", len(traces), len(transactions))
+	log.Tracef("Handling new trace with %d spans: %v", len(*trace), trace)
 
-	atomic.AddInt64(&w.stats.Traces, int64(len(traces)))
+	spanOverflow := w.spansInBuffer + len(*trace) - w.conf.MaxSpansPerPayload
 
-	// Make the new buffer of the size of the previous one.
-	// that's a fair estimation and it should reduce allocations without using too much memory.
-	w.traceBuffer = make([]*model.APITrace, 0, len(traces))
-	w.transactionBuffer = make([]*model.Span, 0, len(transactions))
+	var splitTrace model.Trace
+
+	// If we overflow max spans per payload split last trace
+	// (necessarily the one that went over the limit otherwise we'd have split earlier)
+	if spanOverflow > 0 {
+		log.Debugf("Detected span overflow. Splitting trace: MaxSpansPerPayload=%d, len(trace)=%d, spanOverflow=%d",
+			w.conf.MaxSpansPerPayload, len(*trace), spanOverflow)
+		// Find the split index
+		splitIndex := len(*trace) - spanOverflow
+		log.Debugf("Splitting trace at index %d", splitIndex)
+		// Set the spans of the split trace to the ones over the split index
+		splitTrace = (*trace)[splitIndex:]
+		// Set the spans of the original to the ones below the split index so it ends up with a non-overflowing amount
+		// of traces
+		truncatedTrace := (*trace)[:splitIndex]
+		trace = &truncatedTrace
+	}
+
+	w.traces = append(w.traces, trace.APITrace())
+	w.spansInBuffer += len(*trace)
+	log.Debugf("Added new trace to buffer. spansInBuffer=%d, len(w.traces)=%d", w.spansInBuffer, len(w.traces))
+
+	if w.spansInBuffer == w.conf.MaxSpansPerPayload {
+		log.Debugf("Flushing because we reached max per payload")
+		// If current number of spans in buffer reached the limit, flush
+		w.flush()
+	} else if w.spansInBuffer > w.conf.MaxSpansPerPayload {
+		// Should never happen due to overflow detection above but just in case
+		panic("Number of spans in buffer went over the limit")
+	}
+
+	// Handle the split trace if it exists (this allows a single trace to be split multiple times)
+	if len(splitTrace) > 0 {
+		log.Debugf("Found split trace, handling it")
+		w.handleTrace(&splitTrace)
+	}
+}
+
+func (w *TraceWriter) flush() {
+	numTraces := len(w.traces)
+	numTransactions := len(w.transactions)
+
+	// If no traces, we can't construct anything
+	if numTraces == 0 && numTransactions == 0 {
+		return
+	}
+
+	atomic.AddInt64(&w.stats.Traces, int64(numTraces))
+	atomic.AddInt64(&w.stats.Spans, int64(w.spansInBuffer))
 
 	tracePayload := model.TracePayload{
-		HostName:     w.conf.HostName,
-		Env:          w.conf.DefaultEnv,
-		Traces:       traces,
-		Transactions: transactions,
+		HostName:     w.hostName,
+		Env:          w.env,
+		Traces:       w.traces,
+		Transactions: w.transactions,
 	}
 
 	serialized, err := proto.Marshal(&tracePayload)
@@ -145,6 +224,7 @@ func (w *TraceWriter) Flush() {
 		log.Errorf("failed to serialize trace payload, data got dropped, err: %s", err)
 		return
 	}
+
 	atomic.AddInt64(&w.stats.Bytes, int64(len(serialized)))
 
 	// TODO: benchmark and pick the right encoding
@@ -155,24 +235,15 @@ func (w *TraceWriter) Flush() {
 		"Content-Encoding": "identity",
 	}
 
-	startFlush := time.Now()
+	payload := NewPayload(serialized, headers)
 
-	// Send the payload to the endpoint
-	err = w.endpoint.Write(serialized, headers)
+	log.Debugf("flushing traces=%v transactions %v", len(w.traces), len(w.transactions))
+	w.payloadSender.Send(payload)
 
-	flushTime := time.Since(startFlush)
-
-	// TODO: if error, depending on why, replay later.
-	if err != nil {
-		atomic.AddInt64(&w.stats.Errors, 1)
-		log.Errorf("failed to flush trace payload, time:%s, size:%d bytes, error: %s", flushTime, len(serialized), err)
-		return
-	}
-
-	log.Infof("flushed trace payload to the API, time:%s, size:%d bytes", flushTime, len(serialized))
-	statsd.Client.Gauge("datadog.trace_agent.trace_writer.flush_duration", flushTime.Seconds(), nil, 1)
-	atomic.AddInt64(&w.stats.Payloads, 1)
-
+	// Reset traces
+	w.traces = w.traces[:0]
+	w.transactions = w.transactions[:0]
+	w.spansInBuffer = 0
 }
 
 func (w *TraceWriter) updateInfo() {
@@ -181,13 +252,17 @@ func (w *TraceWriter) updateInfo() {
 	// Load counters and reset them for the next flush
 	twInfo.Payloads = atomic.SwapInt64(&w.stats.Payloads, 0)
 	twInfo.Traces = atomic.SwapInt64(&w.stats.Traces, 0)
+	twInfo.Spans = atomic.SwapInt64(&w.stats.Spans, 0)
 	twInfo.Bytes = atomic.SwapInt64(&w.stats.Bytes, 0)
-	twInfo.Errors = atomic.SwapInt64(&w.stats.Traces, 0)
+	twInfo.Retries = atomic.SwapInt64(&w.stats.Retries, 0)
+	twInfo.Errors = atomic.SwapInt64(&w.stats.Errors, 0)
 
-	statsd.Client.Count("datadog.trace_agent.trace_writer.payloads", int64(twInfo.Payloads), nil, 1)
-	statsd.Client.Count("datadog.trace_agent.trace_writer.traces", int64(twInfo.Traces), nil, 1)
-	statsd.Client.Count("datadog.trace_agent.trace_writer.bytes", int64(twInfo.Bytes), nil, 1)
-	statsd.Client.Count("datadog.trace_agent.trace_writer.errors", int64(twInfo.Errors), nil, 1)
+	w.conf.StatsClient.Count("datadog.trace_agent.trace_writer.payloads", int64(twInfo.Payloads), nil, 1)
+	w.conf.StatsClient.Count("datadog.trace_agent.trace_writer.traces", int64(twInfo.Traces), nil, 1)
+	w.conf.StatsClient.Count("datadog.trace_agent.trace_writer.spans", int64(twInfo.Spans), nil, 1)
+	w.conf.StatsClient.Count("datadog.trace_agent.trace_writer.bytes", int64(twInfo.Bytes), nil, 1)
+	w.conf.StatsClient.Count("datadog.trace_agent.trace_writer.retries", int64(twInfo.Retries), nil, 1)
+	w.conf.StatsClient.Count("datadog.trace_agent.trace_writer.errors", int64(twInfo.Errors), nil, 1)
 
 	info.UpdateTraceWriterInfo(twInfo)
 }

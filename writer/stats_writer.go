@@ -2,7 +2,6 @@ package writer
 
 import (
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -15,46 +14,45 @@ import (
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
-// StatsWriter ingests service metadata and flush them to the API.
+// StatsWriterConfig contains the configuration to customize the behaviour of a TraceWriter.
+type StatsWriterConfig struct {
+	UpdateInfoPeriod time.Duration
+	StatsClient      statsd.StatsClient
+}
+
+// DefaultStatsWriterConfig creates a new instance of a StatsWriterConfig using default values.
+func DefaultStatsWriterConfig() StatsWriterConfig {
+	return StatsWriterConfig{
+		UpdateInfoPeriod: 1 * time.Minute,
+		StatsClient:      statsd.Client,
+	}
+}
+
+// StatsWriter ingests stats buckets and flushes their aggregation to the API.
 type StatsWriter struct {
-	endpoint Endpoint
+	hostName string
+	env      string
+	conf     StatsWriterConfig
+	InStats  <-chan []model.StatsBucket
+	stats    info.StatsWriterInfo
 
-	InStats <-chan []model.StatsBucket
-
-	stats info.StatsWriterInfo
-
-	exit   chan struct{}
-	exitWG *sync.WaitGroup
-
-	conf *config.AgentConfig
+	BaseWriter
 }
 
 // NewStatsWriter returns a new writer for services.
 func NewStatsWriter(conf *config.AgentConfig, InStats <-chan []model.StatsBucket) *StatsWriter {
-	var endpoint Endpoint
-
-	if conf.APIEnabled {
-		client := NewClient(conf)
-		endpoint = NewDatadogEndpoint(client, conf.APIEndpoint, "/api/v0.2/stats", conf.APIKey)
-	} else {
-		log.Info("API interface is disabled, flushing to /dev/null instead")
-		endpoint = &NullEndpoint{}
-	}
-
 	return &StatsWriter{
-		endpoint: endpoint,
-
-		InStats: InStats,
-
-		exit:   make(chan struct{}),
-		exitWG: &sync.WaitGroup{},
-
-		conf: conf,
+		hostName:   conf.HostName,
+		env:        conf.DefaultEnv,
+		conf:       DefaultStatsWriterConfig(),
+		InStats:    InStats,
+		BaseWriter: *NewBaseWriter(conf, "/api/v0.2/stats"),
 	}
 }
 
 // Start starts the writer.
 func (w *StatsWriter) Start() {
+	w.BaseWriter.Start()
 	go func() {
 		defer watchdog.LogOnPanic()
 		w.Run()
@@ -69,14 +67,41 @@ func (w *StatsWriter) Run() {
 
 	log.Debug("starting stats writer")
 
-	updateInfoTicker := time.NewTicker(1 * time.Minute)
+	updateInfoTicker := time.NewTicker(w.conf.UpdateInfoPeriod)
 	defer updateInfoTicker.Stop()
+
+	// Monitor sender for events
+	go func() {
+		for event := range w.payloadSender.Monitor() {
+			if event == nil {
+				continue
+			}
+
+			switch event := event.(type) {
+			case SenderSuccessEvent:
+				log.Infof("flushed stat payload to the API, time:%s, size:%d bytes", event.SendStats.SendTime,
+					len(event.Payload.Bytes))
+				w.conf.StatsClient.Gauge("datadog.trace_agent.stats_writer.flush_duration",
+					event.SendStats.SendTime.Seconds(), nil, 1)
+				atomic.AddInt64(&w.stats.Payloads, 1)
+			case SenderFailureEvent:
+				log.Errorf("failed to flush stat payload, time:%s, size:%d bytes, error: %s",
+					event.SendStats.SendTime, len(event.Payload.Bytes), event.Error)
+				atomic.AddInt64(&w.stats.Errors, 1)
+			case SenderRetryEvent:
+				log.Errorf("retrying flush stat payload, retryNum: %d, delay:%s, error: %s",
+					event.RetryNum, event.RetryDelay, event.Error)
+				atomic.AddInt64(&w.stats.Retries, 1)
+			default:
+				log.Debugf("don't know how to handle event with type %T", event)
+			}
+		}
+	}()
 
 	for {
 		select {
 		case stats := <-w.InStats:
-			// TODO: have a buffer with replay abilities
-			w.Flush(stats)
+			w.handleStats(stats)
 		case <-updateInfoTicker.C:
 			go w.updateInfo()
 		case <-w.exit:
@@ -90,20 +115,22 @@ func (w *StatsWriter) Run() {
 func (w *StatsWriter) Stop() {
 	close(w.exit)
 	w.exitWG.Wait()
+	w.BaseWriter.Stop()
 }
 
-// Flush flushes received stats
-func (w *StatsWriter) Flush(stats []model.StatsBucket) {
-	if len(stats) == 0 {
-		log.Debugf("no stats to flush")
+func (w *StatsWriter) handleStats(stats []model.StatsBucket) {
+	numStats := len(stats)
+
+	// If no stats, we can't construct anything
+	if numStats == 0 {
 		return
 	}
-	log.Debugf("going to flush stats buckets, %d buckets", len(stats))
-	atomic.AddInt64(&w.stats.StatsBuckets, int64(len(stats)))
+	log.Debugf("going to flush stats buckets, %d buckets", numStats)
+	atomic.AddInt64(&w.stats.StatsBuckets, int64(numStats))
 
 	statsPayload := &model.StatsPayload{
-		HostName: w.conf.HostName,
-		Env:      w.conf.DefaultEnv,
+		HostName: w.hostName,
+		Env:      w.env,
 		Stats:    stats,
 	}
 
@@ -121,23 +148,9 @@ func (w *StatsWriter) Flush(stats []model.StatsBucket) {
 
 	atomic.AddInt64(&w.stats.Bytes, int64(len(data)))
 
-	startFlush := time.Now()
+	payload := NewPayload(data, headers)
 
-	// Send the payload to the endpoint
-	err = w.endpoint.Write(data, headers)
-
-	flushTime := time.Since(startFlush)
-
-	// TODO: if error, depending on why, replay later.
-	if err != nil {
-		atomic.AddInt64(&w.stats.Errors, 1)
-		log.Errorf("failed to flush service payload, time:%s, size:%d bytes, error: %s", flushTime, len(data), err)
-		return
-	}
-
-	log.Infof("flushed service payload to the API, time:%s, size:%d bytes", flushTime, len(data))
-	statsd.Client.Gauge("datadog.trace_agent.stats_writer.flush_duration", flushTime.Seconds(), nil, 1)
-	atomic.AddInt64(&w.stats.Payloads, 1)
+	w.payloadSender.Send(payload)
 }
 
 func (w *StatsWriter) updateInfo() {
@@ -147,12 +160,14 @@ func (w *StatsWriter) updateInfo() {
 	swInfo.Payloads = atomic.SwapInt64(&w.stats.Payloads, 0)
 	swInfo.StatsBuckets = atomic.SwapInt64(&w.stats.StatsBuckets, 0)
 	swInfo.Bytes = atomic.SwapInt64(&w.stats.Bytes, 0)
+	swInfo.Retries = atomic.SwapInt64(&w.stats.Retries, 0)
 	swInfo.Errors = atomic.SwapInt64(&w.stats.Errors, 0)
 
-	statsd.Client.Count("datadog.trace_agent.stats_writer.payloads", int64(swInfo.Payloads), nil, 1)
-	statsd.Client.Count("datadog.trace_agent.stats_writer.stats_buckets", int64(swInfo.StatsBuckets), nil, 1)
-	statsd.Client.Count("datadog.trace_agent.stats_writer.bytes", int64(swInfo.Bytes), nil, 1)
-	statsd.Client.Count("datadog.trace_agent.stats_writer.errors", int64(swInfo.Errors), nil, 1)
+	w.conf.StatsClient.Count("datadog.trace_agent.stats_writer.payloads", int64(swInfo.Payloads), nil, 1)
+	w.conf.StatsClient.Count("datadog.trace_agent.stats_writer.stats_buckets", int64(swInfo.StatsBuckets), nil, 1)
+	w.conf.StatsClient.Count("datadog.trace_agent.stats_writer.bytes", int64(swInfo.Bytes), nil, 1)
+	w.conf.StatsClient.Count("datadog.trace_agent.stats_writer.retries", int64(swInfo.Retries), nil, 1)
+	w.conf.StatsClient.Count("datadog.trace_agent.stats_writer.errors", int64(swInfo.Errors), nil, 1)
 
 	info.UpdateStatsWriterInfo(swInfo)
 }

@@ -120,6 +120,7 @@ func (ts *TagStats) publish() {
 	tracesDropped := atomic.LoadInt64(&ts.TracesDropped)
 	tracesFiltered := atomic.LoadInt64(&ts.TracesFiltered)
 	tracesPriorityNone := atomic.LoadInt64(&ts.TracesPriorityNone)
+	tracesPriorityNeg := atomic.LoadInt64(&ts.TracesPriorityNeg)
 	tracesPriority0 := atomic.LoadInt64(&ts.TracesPriority0)
 	tracesPriority1 := atomic.LoadInt64(&ts.TracesPriority1)
 	tracesPriority2 := atomic.LoadInt64(&ts.TracesPriority2)
@@ -138,6 +139,7 @@ func (ts *TagStats) publish() {
 	statsd.Client.Count("datadog.trace_agent.receiver.traces_dropped", tracesDropped, tags, 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.traces_filtered", tracesFiltered, tags, 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.traces_priority", tracesPriorityNone, append(tags, "priority:none"), 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.traces_priority", tracesPriorityNeg, append(tags, "priority:neg"), 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.traces_priority", tracesPriority0, append(tags, "priority:0"), 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.traces_priority", tracesPriority1, append(tags, "priority:1"), 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.traces_priority", tracesPriority2, append(tags, "priority:2"), 1)
@@ -160,6 +162,8 @@ type Stats struct {
 	TracesFiltered int64
 	// TracesPriorityNone is the number of traces with no sampling priority.
 	TracesPriorityNone int64
+	// TracesPriorityNeg is the number of traces with a negative sampling priority.
+	TracesPriorityNeg int64
 	// TracesPriority0 is the number of traces with sampling priority set to zero.
 	TracesPriority0 int64
 	// TracesPriority1 is the number of traces with sampling priority automatically set to 1.
@@ -185,6 +189,7 @@ func (s *Stats) update(recent Stats) {
 	atomic.AddInt64(&s.TracesDropped, recent.TracesDropped)
 	atomic.AddInt64(&s.TracesFiltered, recent.TracesFiltered)
 	atomic.AddInt64(&s.TracesPriorityNone, recent.TracesPriorityNone)
+	atomic.AddInt64(&s.TracesPriorityNeg, recent.TracesPriorityNeg)
 	atomic.AddInt64(&s.TracesPriority0, recent.TracesPriority0)
 	atomic.AddInt64(&s.TracesPriority1, recent.TracesPriority1)
 	atomic.AddInt64(&s.TracesPriority2, recent.TracesPriority2)
@@ -201,6 +206,7 @@ func (s *Stats) reset() {
 	atomic.StoreInt64(&s.TracesDropped, 0)
 	atomic.StoreInt64(&s.TracesFiltered, 0)
 	atomic.StoreInt64(&s.TracesPriorityNone, 0)
+	atomic.StoreInt64(&s.TracesPriorityNeg, 0)
 	atomic.StoreInt64(&s.TracesPriority0, 0)
 	atomic.StoreInt64(&s.TracesPriority1, 0)
 	atomic.StoreInt64(&s.TracesPriority2, 0)
