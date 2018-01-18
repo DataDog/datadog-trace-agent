@@ -12,6 +12,9 @@ import (
 // ServicesMetadata is a standard key/val meta map attached to each named service
 type ServicesMetadata map[string]map[string]string
 
+// AppType is one of the pieces of information embedded in ServiceMetadata
+const AppType = "app_type"
+
 // Update compares this metadata blob with the one given in the argument
 // if different, update s1 and return true. If equal, return false
 func (s1 ServicesMetadata) Update(s2 ServicesMetadata) bool {
