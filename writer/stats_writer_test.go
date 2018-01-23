@@ -14,6 +14,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/statsd"
+	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -200,11 +201,16 @@ func assertStatsPayload(assert *assert.Assertions, headers map[string]string, bu
 
 func testStatsWriter() (*StatsWriter, chan []model.StatsBucket, *TestEndpoint, *statsd.TestStatsClient) {
 	statsChannel := make(chan []model.StatsBucket)
-	statsWriter := NewStatsWriter(&config.AgentConfig{HostName: testHostName, DefaultEnv: testEnv}, statsChannel)
+	conf := &config.AgentConfig{
+		HostName:          testHostName,
+		DefaultEnv:        testEnv,
+		StatsWriterConfig: writerconfig.DefaultStatsWriterConfig(),
+	}
+	statsWriter := NewStatsWriter(conf, statsChannel)
 	testEndpoint := &TestEndpoint{}
 	statsWriter.BaseWriter.payloadSender.setEndpoint(testEndpoint)
 	testStatsClient := &statsd.TestStatsClient{}
-	statsWriter.conf.StatsClient = testStatsClient
+	statsWriter.statsClient = testStatsClient
 
 	return statsWriter, statsChannel, testEndpoint, testStatsClient
 }

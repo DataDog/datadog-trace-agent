@@ -11,7 +11,6 @@ type ExponentialConfig struct {
 	MaxDuration time.Duration
 	GrowthBase  int
 	Base        time.Duration
-	Random      *rand.Rand
 }
 
 // DefaultExponentialConfig creates an ExponentialConfig with default values.
@@ -19,8 +18,7 @@ func DefaultExponentialConfig() ExponentialConfig {
 	return ExponentialConfig{
 		MaxDuration: 120 * time.Second,
 		GrowthBase:  2,
-		Base:        time.Second,
-		Random:      rand.New(rand.NewSource(time.Now().UnixNano())),
+		Base:        200 * time.Millisecond,
 	}
 }
 
@@ -31,6 +29,12 @@ func DefaultExponentialDelayProvider() DelayProvider {
 
 // ExponentialDelayProvider creates a new instance of an ExponentialDelayProvider using the provided config.
 func ExponentialDelayProvider(conf ExponentialConfig) DelayProvider {
+	return ExponentialDelayProviderCustomRandom(conf, rand.New(rand.NewSource(time.Now().UnixNano())))
+}
+
+// ExponentialDelayProviderCustomRandom creates a new instance of ExponentialDelayProvider using the provided config
+// and random number generator.
+func ExponentialDelayProviderCustomRandom(conf ExponentialConfig, rand *rand.Rand) DelayProvider {
 	return func(numRetries int, _ error) time.Duration {
 		pow := math.Pow(float64(conf.GrowthBase), float64(numRetries))
 
@@ -52,7 +56,7 @@ func ExponentialDelayProvider(conf ExponentialConfig) DelayProvider {
 			newExpDuration = conf.MaxDuration
 		}
 
-		return time.Duration(conf.Random.Int63n(int64(newExpDuration)))
+		return time.Duration(rand.Int63n(int64(newExpDuration)))
 	}
 }
 

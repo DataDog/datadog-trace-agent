@@ -30,11 +30,10 @@ func TestExponentialDelay(t *testing.T) {
 		MaxDuration: 120 * time.Nanosecond,
 		GrowthBase:  2,
 		Base:        time.Nanosecond,
-		// Use fixed random to prevent flakiness in case the CI has very bad luck
-		Random: rand.New(rand.NewSource(1234)),
 	}
 
-	delayProvider := ExponentialDelayProvider(conf)
+	// Use fixed random to prevent flakiness in case the CI has very bad luck
+	delayProvider := ExponentialDelayProviderCustomRandom(conf, rand.New(rand.NewSource(1234)))
 
 	prevMax := int64(0)
 

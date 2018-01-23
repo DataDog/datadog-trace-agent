@@ -9,7 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/backoff"
 	"github.com/DataDog/datadog-trace-agent/model"
+	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 
 	log "github.com/cihub/seelog"
 	"github.com/go-ini/ini"
@@ -47,6 +49,11 @@ type AgentConfig struct {
 	ReceiverPort    int
 	ConnectionLimit int // for rate-limiting, how many unique connections to allow in a lease period (30s)
 	ReceiverTimeout int
+
+	// Writers
+	ServiceWriterConfig writerconfig.ServiceWriterConfig
+	StatsWriterConfig   writerconfig.StatsWriterConfig
+	TraceWriterConfig   writerconfig.TraceWriterConfig
 
 	// internal telemetry
 	StatsdHost string
@@ -181,6 +188,10 @@ func NewDefaultAgentConfig() *AgentConfig {
 		ReceiverHost:    "localhost",
 		ReceiverPort:    8126,
 		ConnectionLimit: 2000,
+
+		ServiceWriterConfig: writerconfig.DefaultServiceWriterConfig(),
+		StatsWriterConfig:   writerconfig.DefaultStatsWriterConfig(),
+		TraceWriterConfig:   writerconfig.DefaultTraceWriterConfig(),
 
 		StatsdHost: "localhost",
 		StatsdPort: 8125,
@@ -353,6 +364,10 @@ APM_CONF:
 		c.ReceiverTimeout = v
 	}
 
+	c.ServiceWriterConfig = readServiceWriterConfig(conf, "trace.writer.services")
+	c.StatsWriterConfig = readStatsWriterConfig(conf, "trace.writer.stats")
+	c.TraceWriterConfig = readTraceWriterConfig(conf, "trace.writer.traces")
+
 	if v, e := conf.GetFloat("trace.watchdog", "max_memory"); e == nil {
 		c.MaxMemory = v
 	}
@@ -379,4 +394,89 @@ ENV_CONF:
 	}
 
 	return c, nil
+}
+
+func readServiceWriterConfig(confFile *File, section string) writerconfig.ServiceWriterConfig {
+	c := writerconfig.DefaultServiceWriterConfig()
+
+	if v, e := confFile.GetInt(section, "flush_period_seconds"); e == nil {
+		c.FlushPeriod = time.Duration(v) * time.Second
+	}
+
+	if v, e := confFile.GetInt(section, "update_info_period_seconds"); e == nil {
+		c.UpdateInfoPeriod = time.Duration(v) * time.Second
+	}
+
+	c.SenderConfig = readQueueablePayloadSenderConfig(confFile, section)
+
+	return c
+}
+
+func readStatsWriterConfig(confFile *File, section string) writerconfig.StatsWriterConfig {
+	c := writerconfig.DefaultStatsWriterConfig()
+
+	if v, e := confFile.GetInt(section, "update_info_period_seconds"); e == nil {
+		c.UpdateInfoPeriod = time.Duration(v) * time.Second
+	}
+
+	c.SenderConfig = readQueueablePayloadSenderConfig(confFile, section)
+
+	return c
+}
+
+func readTraceWriterConfig(confFile *File, section string) writerconfig.TraceWriterConfig {
+	c := writerconfig.DefaultTraceWriterConfig()
+
+	if v, e := confFile.GetInt(section, "max_spans_per_payload"); e == nil {
+		c.MaxSpansPerPayload = v
+	}
+
+	if v, e := confFile.GetInt(section, "flush_period_seconds"); e == nil {
+		c.FlushPeriod = time.Duration(v) * time.Second
+	}
+	if v, e := confFile.GetInt(section, "update_info_period_seconds"); e == nil {
+		c.UpdateInfoPeriod = time.Duration(v) * time.Second
+	}
+
+	c.SenderConfig = readQueueablePayloadSenderConfig(confFile, section)
+
+	return c
+}
+
+func readQueueablePayloadSenderConfig(conf *File, section string) writerconfig.QueuablePayloadSenderConf {
+	c := writerconfig.DefaultQueuablePayloadSenderConf()
+
+	if v, e := conf.GetInt(section, "queue_max_age_seconds"); e == nil {
+		c.MaxAge = time.Duration(v) * time.Second
+	}
+
+	if v, e := conf.GetInt64(section, "queue_max_bytes"); e == nil {
+		c.MaxQueuedBytes = v
+	}
+
+	if v, e := conf.GetInt(section, "queue_max_payloads"); e == nil {
+		c.MaxQueuedPayloads = v
+	}
+
+	c.ExponentialBackoff = readExponentialBackoffConfig(conf, section)
+
+	return c
+}
+
+func readExponentialBackoffConfig(conf *File, section string) backoff.ExponentialConfig {
+	c := backoff.DefaultExponentialConfig()
+
+	if v, e := conf.GetInt(section, "exp_backoff_max_duration_seconds"); e == nil {
+		c.MaxDuration = time.Duration(v) * time.Second
+	}
+
+	if v, e := conf.GetInt(section, "exp_backoff_base_milliseconds"); e == nil {
+		c.Base = time.Duration(v) * time.Millisecond
+	}
+
+	if v, e := conf.GetInt(section, "exp_backoff_growth_base"); e == nil {
+		c.GrowthBase = v
+	}
+
+	return c
 }

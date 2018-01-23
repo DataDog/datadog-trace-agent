@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/backoff"
+	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -69,9 +70,9 @@ func TestQueuablePayloadSender_FlakyEndpoint(t *testing.T) {
 	testBackoffTimer := backoff.NewTestBackoffTimer()
 
 	// And a queuable sender using said endpoint and timer
-	conf := DefaultQueuablePayloadSenderConf()
-	conf.BackoffTimer = testBackoffTimer
+	conf := writerconfig.DefaultQueuablePayloadSenderConf()
 	queuableSender := NewCustomQueuablePayloadSender(flakyEndpoint, conf)
+	queuableSender.backoffTimer = testBackoffTimer
 	syncBarrier := make(chan interface{})
 	queuableSender.syncBarrier = syncBarrier
 
@@ -168,10 +169,10 @@ func TestQueuablePayloadSender_MaxQueuedPayloads(t *testing.T) {
 	testBackoffTimer := backoff.NewTestBackoffTimer()
 
 	// And a queuable sender using said endpoint and timer and with a meager max queued payloads value of 1
-	conf := DefaultQueuablePayloadSenderConf()
+	conf := writerconfig.DefaultQueuablePayloadSenderConf()
 	conf.MaxQueuedPayloads = 1
-	conf.BackoffTimer = testBackoffTimer
 	queuableSender := NewCustomQueuablePayloadSender(flakyEndpoint, conf)
+	queuableSender.backoffTimer = testBackoffTimer
 	syncBarrier := make(chan interface{})
 	queuableSender.syncBarrier = syncBarrier
 
@@ -238,10 +239,10 @@ func TestQueuablePayloadSender_MaxQueuedBytes(t *testing.T) {
 	testBackoffTimer := backoff.NewTestBackoffTimer()
 
 	// And a queuable sender using said endpoint and timer and with a meager max size of 10 bytes
-	conf := DefaultQueuablePayloadSenderConf()
+	conf := writerconfig.DefaultQueuablePayloadSenderConf()
 	conf.MaxQueuedBytes = 10
-	conf.BackoffTimer = testBackoffTimer
 	queuableSender := NewCustomQueuablePayloadSender(flakyEndpoint, conf)
+	queuableSender.backoffTimer = testBackoffTimer
 	syncBarrier := make(chan interface{})
 	queuableSender.syncBarrier = syncBarrier
 
@@ -307,10 +308,10 @@ func TestQueuablePayloadSender_DropBigPayloadsOnRetry(t *testing.T) {
 	testBackoffTimer := backoff.NewTestBackoffTimer()
 
 	// And a queuable sender using said endpoint and timer and with a meager max size of 10 bytes
-	conf := DefaultQueuablePayloadSenderConf()
+	conf := writerconfig.DefaultQueuablePayloadSenderConf()
 	conf.MaxQueuedBytes = 10
-	conf.BackoffTimer = testBackoffTimer
 	queuableSender := NewCustomQueuablePayloadSender(flakyEndpoint, conf)
+	queuableSender.backoffTimer = testBackoffTimer
 	syncBarrier := make(chan interface{})
 	queuableSender.syncBarrier = syncBarrier
 
@@ -363,10 +364,10 @@ func TestQueuablePayloadSender_SendBigPayloadsIfNoRetry(t *testing.T) {
 	testBackoffTimer := backoff.NewTestBackoffTimer()
 
 	// And a queuable sender using said endpoint and timer and with a meager max size of 10 bytes
-	conf := DefaultQueuablePayloadSenderConf()
+	conf := writerconfig.DefaultQueuablePayloadSenderConf()
 	conf.MaxQueuedBytes = 10
-	conf.BackoffTimer = testBackoffTimer
 	queuableSender := NewCustomQueuablePayloadSender(workingEndpoint, conf)
+	queuableSender.backoffTimer = testBackoffTimer
 	syncBarrier := make(chan interface{})
 	queuableSender.syncBarrier = syncBarrier
 
@@ -409,10 +410,10 @@ func TestQueuablePayloadSender_MaxAge(t *testing.T) {
 	testBackoffTimer := backoff.NewTestBackoffTimer()
 
 	// And a queuable sender using said endpoint and timer and with a meager max age of 100ms
-	conf := DefaultQueuablePayloadSenderConf()
+	conf := writerconfig.DefaultQueuablePayloadSenderConf()
 	conf.MaxAge = 100 * time.Millisecond
-	conf.BackoffTimer = testBackoffTimer
 	queuableSender := NewCustomQueuablePayloadSender(flakyEndpoint, conf)
+	queuableSender.backoffTimer = testBackoffTimer
 	syncBarrier := make(chan interface{})
 	queuableSender.syncBarrier = syncBarrier
 
