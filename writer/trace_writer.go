@@ -15,7 +15,6 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-// TraceWriter ingests sampled traces and flush them to the API.
 // TraceWriter ingests sampled traces and flushes them to the API.
 type TraceWriter struct {
 	hostName       string
