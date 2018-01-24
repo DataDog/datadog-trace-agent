@@ -28,6 +28,7 @@ type StatsWriter struct {
 // NewStatsWriter returns a new writer for services.
 func NewStatsWriter(conf *config.AgentConfig, InStats <-chan []model.StatsBucket) *StatsWriter {
 	writerConf := conf.StatsWriterConfig
+	log.Infof("Stats writer initializing with config: %+v", writerConf)
 
 	return &StatsWriter{
 		hostName: conf.HostName,

@@ -35,6 +35,7 @@ type TraceWriter struct {
 // NewTraceWriter returns a new writer for traces.
 func NewTraceWriter(conf *config.AgentConfig, InTraces <-chan *model.Trace, InTransactions <-chan *model.Span) *TraceWriter {
 	writerConf := conf.TraceWriterConfig
+	log.Infof("Trace writer initializing with config: %+v", writerConf)
 
 	return &TraceWriter{
 		conf:     writerConf,

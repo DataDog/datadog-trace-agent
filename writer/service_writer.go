@@ -29,6 +29,8 @@ type ServiceWriter struct {
 // NewServiceWriter returns a new writer for services.
 func NewServiceWriter(conf *config.AgentConfig, InServices <-chan model.ServicesMetadata) *ServiceWriter {
 	writerConf := conf.ServiceWriterConfig
+	log.Infof("Service writer initializing with config: %+v", writerConf)
+
 	return &ServiceWriter{
 		conf:          writerConf,
 		InServices:    InServices,
