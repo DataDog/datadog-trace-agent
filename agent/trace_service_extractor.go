@@ -15,11 +15,11 @@ func NewTraceServiceExtractor(out chan<- model.ServicesMetadata) *TraceServiceEx
 }
 
 // Process extracts service metadata from top-level spans and sends it downstream
-func (ts *TraceServiceExtractor) Process(t model.Trace) {
+func (ts *TraceServiceExtractor) Process(t model.WeightedTrace) {
 	meta := make(model.ServicesMetadata)
 
 	for _, s := range t {
-		if !s.TopLevel() {
+		if !s.TopLevel {
 			continue
 		}
 

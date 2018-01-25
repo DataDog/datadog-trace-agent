@@ -247,7 +247,7 @@ func (a *Agent) Process(t model.Trace) {
 
 	go func() {
 		defer watchdog.LogOnPanic()
-		a.ServiceExtractor.Process(t)
+		a.ServiceExtractor.Process(wt)
 	}()
 
 	go func() {

@@ -21,9 +21,10 @@ func TestTracerServiceExtractor(t *testing.T) {
 	}
 
 	trace.ComputeTopLevel()
+	wt := model.NewWeightedTrace(trace, trace[0])
 
 	go func() {
-		testExtractor.Process(trace)
+		testExtractor.Process(wt)
 	}()
 
 	metadata := <-testChan
