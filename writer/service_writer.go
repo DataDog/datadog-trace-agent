@@ -21,7 +21,6 @@ type ServiceWriter struct {
 	stats      info.ServiceWriterInfo
 
 	serviceBuffer model.ServicesMetadata
-	updated       bool
 
 	BaseWriter
 }
@@ -124,15 +123,12 @@ func (w *ServiceWriter) Stop() {
 }
 
 func (w *ServiceWriter) handleServiceMetadata(metadata model.ServicesMetadata) {
-	if w.serviceBuffer.Update(metadata) {
-		w.updated = true
-		w.statsClient.Count("datadog.trace_agent.writer.services.updated", 1, nil, 1)
-	}
+	w.serviceBuffer.Merge(metadata)
 }
 
 func (w *ServiceWriter) flush() {
 	// If no services, we can't construct anything
-	if !w.updated {
+	if len(w.serviceBuffer) == 0 {
 		return
 	}
 
@@ -156,7 +152,7 @@ func (w *ServiceWriter) flush() {
 	payload := NewPayload(data, headers)
 	w.payloadSender.Send(payload)
 
-	w.updated = false
+	w.serviceBuffer = make(model.ServicesMetadata)
 }
 
 func (w *ServiceWriter) updateInfo() {
@@ -170,7 +166,7 @@ func (w *ServiceWriter) updateInfo() {
 	swInfo.Retries = atomic.SwapInt64(&w.stats.Retries, 0)
 
 	w.statsClient.Count("datadog.trace_agent.service_writer.payloads", int64(swInfo.Payloads), nil, 1)
-	w.statsClient.Gauge("datadog.trace_agent.service_writer.services", float64(swInfo.Services), nil, 1)
+	w.statsClient.Count("datadog.trace_agent.service_writer.services", int64(swInfo.Services), nil, 1)
 	w.statsClient.Count("datadog.trace_agent.service_writer.bytes", int64(swInfo.Bytes), nil, 1)
 	w.statsClient.Count("datadog.trace_agent.service_writer.retries", int64(swInfo.Retries), nil, 1)
 	w.statsClient.Count("datadog.trace_agent.service_writer.errors", int64(swInfo.Errors), nil, 1)

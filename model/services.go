@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"reflect"
 )
 
 //go:generate msgp -marshal=false
@@ -14,21 +13,6 @@ type ServicesMetadata map[string]map[string]string
 
 // AppType is one of the pieces of information embedded in ServiceMetadata
 const AppType = "app_type"
-
-// Update compares this metadata blob with the one given in the argument
-// if different, update s1 and return true. If equal, return false
-func (s1 ServicesMetadata) Update(s2 ServicesMetadata) bool {
-	updated := false
-
-	for s, metas := range s2 {
-		if !reflect.DeepEqual(s1[s], metas) {
-			s1[s] = metas
-			updated = true
-		}
-	}
-
-	return updated
-}
 
 // Merge adds all entries from s2 to s1
 func (s1 ServicesMetadata) Merge(s2 ServicesMetadata) {
