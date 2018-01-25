@@ -30,6 +30,13 @@ func (s1 ServicesMetadata) Update(s2 ServicesMetadata) bool {
 	return updated
 }
 
+// Merge adds all entries from s2 to s1
+func (s1 ServicesMetadata) Merge(s2 ServicesMetadata) {
+	for k, v := range s2 {
+		s1[k] = v
+	}
+}
+
 // EncodeServicesPayload will return a slice of bytes representing the
 // services metadata, this uses the same versioned endpoint that AgentPayload
 // uses for serialization.
