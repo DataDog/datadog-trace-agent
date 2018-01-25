@@ -47,6 +47,7 @@ type Agent struct {
 	ServiceWriter    *writer.ServiceWriter
 	StatsWriter      *writer.StatsWriter
 	ServiceExtractor *TraceServiceExtractor
+	ServiceMapper    *ServiceMapper
 
 	// config
 	conf    *config.AgentConfig
@@ -68,6 +69,7 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 	analyzedTransactionChan := make(chan *model.Span)
 	statsChan := make(chan []model.StatsBucket)
 	serviceChan := make(chan model.ServicesMetadata, 50)
+	filteredServiceChan := make(chan model.ServicesMetadata, 50)
 
 	// create components
 	r := NewHTTPReceiver(conf, dynConf, rawTraceChan, serviceChan)
@@ -81,9 +83,10 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 	ss := NewScoreSampler(conf, sampledTraceChan, analyzedTransactionChan)
 	ps := NewPrioritySampler(conf, dynConf, sampledTraceChan, analyzedTransactionChan)
 	se := NewTraceServiceExtractor(serviceChan)
+	sm := NewServiceMapper(serviceChan, filteredServiceChan)
 	tw := writer.NewTraceWriter(conf, sampledTraceChan, analyzedTransactionChan)
 	sw := writer.NewStatsWriter(conf, statsChan)
-	svcW := writer.NewServiceWriter(conf, serviceChan)
+	svcW := writer.NewServiceWriter(conf, filteredServiceChan)
 
 	// wire components together
 	tw.InTraces = sampledTraceChan
@@ -100,6 +103,7 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 		StatsWriter:      sw,
 		ServiceWriter:    svcW,
 		ServiceExtractor: se,
+		ServiceMapper:    sm,
 		conf:             conf,
 		dynConf:          dynConf,
 		exit:             exit,
@@ -123,6 +127,7 @@ func (a *Agent) Run() {
 	a.Receiver.Run()
 	a.TraceWriter.Start()
 	a.StatsWriter.Start()
+	a.ServiceMapper.Start()
 	a.ServiceWriter.Start()
 	a.Concentrator.Start()
 	a.ScoreSampler.Run()
