@@ -91,7 +91,6 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 	// wire components together
 	tw.InTraces = sampledTraceChan
 	sw.InStats = statsChan
-	svcW.InServices = serviceChan
 
 	return &Agent{
 		Receiver:         r,
