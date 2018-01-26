@@ -145,6 +145,7 @@ func (a *Agent) Run() {
 			a.Concentrator.Stop()
 			a.TraceWriter.Stop()
 			a.StatsWriter.Stop()
+			a.ServiceMapper.Stop()
 			a.ServiceWriter.Stop()
 			a.ScoreSampler.Stop()
 			a.PrioritySampler.Stop()
