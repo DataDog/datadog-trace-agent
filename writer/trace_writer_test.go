@@ -12,6 +12,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/statsd"
+	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 )
@@ -316,11 +317,16 @@ func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expecte
 func testTraceWriter() (*TraceWriter, chan *model.Trace, *TestEndpoint, *statsd.TestStatsClient) {
 	traceChannel := make(chan *model.Trace)
 	transactionChannel := make(chan *model.Span)
-	traceWriter := NewTraceWriter(&config.AgentConfig{HostName: testHostName, DefaultEnv: testEnv}, traceChannel, transactionChannel)
+	conf := &config.AgentConfig{
+		HostName:          testHostName,
+		DefaultEnv:        testEnv,
+		TraceWriterConfig: writerconfig.DefaultTraceWriterConfig(),
+	}
+	traceWriter := NewTraceWriter(conf, traceChannel, transactionChannel)
 	testEndpoint := &TestEndpoint{}
 	traceWriter.BaseWriter.payloadSender.setEndpoint(testEndpoint)
 	testStatsClient := &statsd.TestStatsClient{}
-	traceWriter.conf.StatsClient = testStatsClient
+	traceWriter.statsClient = testStatsClient
 
 	return traceWriter, traceChannel, testEndpoint, testStatsClient
 }

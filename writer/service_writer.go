@@ -10,29 +10,13 @@ import (
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
+	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 )
-
-// ServiceWriterConfig contains the configuration to customize the behaviour of a ServiceWriter.
-type ServiceWriterConfig struct {
-	FlushPeriod      time.Duration
-	UpdateInfoPeriod time.Duration
-	StatsClient      statsd.StatsClient
-}
-
-// DefaultServiceWriterConfig creates a new instance of a ServiceWriterConfig using default values.
-func DefaultServiceWriterConfig() ServiceWriterConfig {
-	return ServiceWriterConfig{
-		FlushPeriod:      5 * time.Second,
-		UpdateInfoPeriod: 1 * time.Minute,
-		StatsClient:      statsd.Client,
-	}
-}
 
 // ServiceWriter ingests service metadata and flush them to the API.
 type ServiceWriter struct {
-	conf       ServiceWriterConfig
+	conf       writerconfig.ServiceWriterConfig
 	InServices <-chan model.ServicesMetadata
 	stats      info.ServiceWriterInfo
 
@@ -44,14 +28,21 @@ type ServiceWriter struct {
 
 // NewServiceWriter returns a new writer for services.
 func NewServiceWriter(conf *config.AgentConfig, InServices <-chan model.ServicesMetadata) *ServiceWriter {
+	writerConf := conf.ServiceWriterConfig
+	log.Infof("Service writer initializing with config: %+v", writerConf)
+
 	return &ServiceWriter{
-		conf:          DefaultServiceWriterConfig(),
+		conf:          writerConf,
 		InServices:    InServices,
 		serviceBuffer: model.ServicesMetadata{},
-		BaseWriter: *NewCustomSenderBaseWriter(conf, "/api/v0.2/services", func(endpoint Endpoint) PayloadSender {
-			conf := DefaultQueuablePayloadSenderConf()
-			conf.MaxQueuedPayloads = 1
-			return NewCustomQueuablePayloadSender(endpoint, conf)
+		BaseWriter: *NewBaseWriter(conf, "/api/v0.2/services", func(endpoint Endpoint) PayloadSender {
+			senderConf := writerConf.SenderConfig
+			// Hardcode service sender configuration as the latest payload supplants older ones. So we don't really
+			// need more than 1 payload in the queue.
+			senderConf.MaxQueuedPayloads = 1
+			senderConf.MaxQueuedBytes = -1
+			senderConf.MaxAge = -1
+			return NewCustomQueuablePayloadSender(endpoint, senderConf)
 		}),
 	}
 }
@@ -91,7 +82,7 @@ func (w *ServiceWriter) Run() {
 			case SenderSuccessEvent:
 				log.Infof("flushed service payload to the API, time:%s, size:%d bytes", event.SendStats.SendTime,
 					len(event.Payload.Bytes))
-				w.conf.StatsClient.Gauge("datadog.trace_agent.service_writer.flush_duration",
+				w.statsClient.Gauge("datadog.trace_agent.service_writer.flush_duration",
 					event.SendStats.SendTime.Seconds(), nil, 1)
 				atomic.AddInt64(&w.stats.Payloads, 1)
 			case SenderFailureEvent:
@@ -135,7 +126,7 @@ func (w *ServiceWriter) Stop() {
 func (w *ServiceWriter) handleServiceMetadata(metadata model.ServicesMetadata) {
 	if w.serviceBuffer.Update(metadata) {
 		w.updated = true
-		w.conf.StatsClient.Count("datadog.trace_agent.writer.services.updated", 1, nil, 1)
+		w.statsClient.Count("datadog.trace_agent.writer.services.updated", 1, nil, 1)
 	}
 }
 
@@ -178,11 +169,11 @@ func (w *ServiceWriter) updateInfo() {
 	swInfo.Errors = atomic.SwapInt64(&w.stats.Errors, 0)
 	swInfo.Retries = atomic.SwapInt64(&w.stats.Retries, 0)
 
-	w.conf.StatsClient.Count("datadog.trace_agent.service_writer.payloads", int64(swInfo.Payloads), nil, 1)
-	w.conf.StatsClient.Gauge("datadog.trace_agent.service_writer.services", float64(swInfo.Services), nil, 1)
-	w.conf.StatsClient.Count("datadog.trace_agent.service_writer.bytes", int64(swInfo.Bytes), nil, 1)
-	w.conf.StatsClient.Count("datadog.trace_agent.service_writer.retries", int64(swInfo.Retries), nil, 1)
-	w.conf.StatsClient.Count("datadog.trace_agent.service_writer.errors", int64(swInfo.Errors), nil, 1)
+	w.statsClient.Count("datadog.trace_agent.service_writer.payloads", int64(swInfo.Payloads), nil, 1)
+	w.statsClient.Gauge("datadog.trace_agent.service_writer.services", float64(swInfo.Services), nil, 1)
+	w.statsClient.Count("datadog.trace_agent.service_writer.bytes", int64(swInfo.Bytes), nil, 1)
+	w.statsClient.Count("datadog.trace_agent.service_writer.retries", int64(swInfo.Retries), nil, 1)
+	w.statsClient.Count("datadog.trace_agent.service_writer.errors", int64(swInfo.Errors), nil, 1)
 
 	info.UpdateServiceWriterInfo(swInfo)
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/statsd"
+	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -192,11 +193,14 @@ func assertMetadata(assert *assert.Assertions, expectedHeaders map[string]string
 
 func testServiceWriter() (*ServiceWriter, chan model.ServicesMetadata, *TestEndpoint, *statsd.TestStatsClient) {
 	serviceChannel := make(chan model.ServicesMetadata)
-	serviceWriter := NewServiceWriter(&config.AgentConfig{HostName: testHostName, DefaultEnv: testEnv}, serviceChannel)
+	conf := &config.AgentConfig{
+		ServiceWriterConfig: writerconfig.DefaultServiceWriterConfig(),
+	}
+	serviceWriter := NewServiceWriter(conf, serviceChannel)
 	testEndpoint := &TestEndpoint{}
 	serviceWriter.BaseWriter.payloadSender.setEndpoint(testEndpoint)
 	testStatsClient := &statsd.TestStatsClient{}
-	serviceWriter.conf.StatsClient = testStatsClient
+	serviceWriter.statsClient = testStatsClient
 
 	return serviceWriter, serviceChannel, testEndpoint, testStatsClient
 }

@@ -80,6 +80,16 @@ func (c *File) GetInt(section, name string) (int, error) {
 	return value, nil
 }
 
+// GetInt64 gets a 64-bit integer value from section/name, or an error if it is missing
+// or cannot be converted to an integer.
+func (c *File) GetInt64(section, name string) (int64, error) {
+	value, err := c.instance.Section(section).Key(name).Int64()
+	if err != nil {
+		return 0, fmt.Errorf("missing `%s` value in [%s] section", name, section)
+	}
+	return value, nil
+}
+
 // GetFloat gets an float value from section/name, or an error if it is missing
 // or cannot be converted to an float.
 func (c *File) GetFloat(section, name string) (float64, error) {

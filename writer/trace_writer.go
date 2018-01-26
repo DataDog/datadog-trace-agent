@@ -6,21 +6,20 @@ import (
 	"time"
 
 	log "github.com/cihub/seelog"
-	"github.com/golang/protobuf/proto"
 
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
+	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
+	"github.com/golang/protobuf/proto"
 )
 
-// TraceWriter ingests sampled traces and flush them to the API.
 // TraceWriter ingests sampled traces and flushes them to the API.
 type TraceWriter struct {
 	hostName       string
 	env            string
-	conf           TraceWriterConfig
+	conf           writerconfig.TraceWriterConfig
 	InTraces       <-chan *model.Trace
 	InTransactions <-chan *model.Span
 	stats          info.TraceWriterInfo
@@ -32,27 +31,13 @@ type TraceWriter struct {
 	BaseWriter
 }
 
-// TraceWriterConfig contains the configuration to customize the behaviour of a TraceWriter.
-type TraceWriterConfig struct {
-	MaxSpansPerPayload int
-	FlushPeriod        time.Duration
-	UpdateInfoPeriod   time.Duration
-	StatsClient        statsd.StatsClient
-}
-
-// DefaultTraceWriterConfig creates a new instance of a TraceWriterConfig using default values.
-func DefaultTraceWriterConfig() TraceWriterConfig {
-	return TraceWriterConfig{
-		MaxSpansPerPayload: 1000,
-		FlushPeriod:        5 * time.Second,
-		UpdateInfoPeriod:   1 * time.Minute,
-		StatsClient:        statsd.Client,
-	}
-}
-
 // NewTraceWriter returns a new writer for traces.
 func NewTraceWriter(conf *config.AgentConfig, InTraces <-chan *model.Trace, InTransactions <-chan *model.Span) *TraceWriter {
+	writerConf := conf.TraceWriterConfig
+	log.Infof("Trace writer initializing with config: %+v", writerConf)
+
 	return &TraceWriter{
+		conf:     writerConf,
 		hostName: conf.HostName,
 		env:      conf.DefaultEnv,
 
@@ -62,8 +47,9 @@ func NewTraceWriter(conf *config.AgentConfig, InTraces <-chan *model.Trace, InTr
 		InTraces:       InTraces,
 		InTransactions: InTransactions,
 
-		BaseWriter: *NewBaseWriter(conf, "/api/v0.2/traces"),
-		conf:       DefaultTraceWriterConfig(),
+		BaseWriter: *NewBaseWriter(conf, "/api/v0.2/traces", func(endpoint Endpoint) PayloadSender {
+			return NewCustomQueuablePayloadSender(endpoint, writerConf.SenderConfig)
+		}),
 	}
 }
 
@@ -100,7 +86,7 @@ func (w *TraceWriter) Run() {
 			case SenderSuccessEvent:
 				log.Infof("flushed trace payload to the API, time:%s, size:%d bytes", event.SendStats.SendTime,
 					len(event.Payload.Bytes))
-				w.conf.StatsClient.Gauge("datadog.trace_agent.trace_writer.flush_duration",
+				w.statsClient.Gauge("datadog.trace_agent.trace_writer.flush_duration",
 					event.SendStats.SendTime.Seconds(), nil, 1)
 				atomic.AddInt64(&w.stats.Payloads, 1)
 			case SenderFailureEvent:
@@ -257,12 +243,12 @@ func (w *TraceWriter) updateInfo() {
 	twInfo.Retries = atomic.SwapInt64(&w.stats.Retries, 0)
 	twInfo.Errors = atomic.SwapInt64(&w.stats.Errors, 0)
 
-	w.conf.StatsClient.Count("datadog.trace_agent.trace_writer.payloads", int64(twInfo.Payloads), nil, 1)
-	w.conf.StatsClient.Count("datadog.trace_agent.trace_writer.traces", int64(twInfo.Traces), nil, 1)
-	w.conf.StatsClient.Count("datadog.trace_agent.trace_writer.spans", int64(twInfo.Spans), nil, 1)
-	w.conf.StatsClient.Count("datadog.trace_agent.trace_writer.bytes", int64(twInfo.Bytes), nil, 1)
-	w.conf.StatsClient.Count("datadog.trace_agent.trace_writer.retries", int64(twInfo.Retries), nil, 1)
-	w.conf.StatsClient.Count("datadog.trace_agent.trace_writer.errors", int64(twInfo.Errors), nil, 1)
+	w.statsClient.Count("datadog.trace_agent.trace_writer.payloads", int64(twInfo.Payloads), nil, 1)
+	w.statsClient.Count("datadog.trace_agent.trace_writer.traces", int64(twInfo.Traces), nil, 1)
+	w.statsClient.Count("datadog.trace_agent.trace_writer.spans", int64(twInfo.Spans), nil, 1)
+	w.statsClient.Count("datadog.trace_agent.trace_writer.bytes", int64(twInfo.Bytes), nil, 1)
+	w.statsClient.Count("datadog.trace_agent.trace_writer.retries", int64(twInfo.Retries), nil, 1)
+	w.statsClient.Count("datadog.trace_agent.trace_writer.errors", int64(twInfo.Errors), nil, 1)
 
 	info.UpdateTraceWriterInfo(twInfo)
 }

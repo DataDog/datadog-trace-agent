@@ -10,29 +10,15 @@ import (
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
+	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 )
-
-// StatsWriterConfig contains the configuration to customize the behaviour of a TraceWriter.
-type StatsWriterConfig struct {
-	UpdateInfoPeriod time.Duration
-	StatsClient      statsd.StatsClient
-}
-
-// DefaultStatsWriterConfig creates a new instance of a StatsWriterConfig using default values.
-func DefaultStatsWriterConfig() StatsWriterConfig {
-	return StatsWriterConfig{
-		UpdateInfoPeriod: 1 * time.Minute,
-		StatsClient:      statsd.Client,
-	}
-}
 
 // StatsWriter ingests stats buckets and flushes their aggregation to the API.
 type StatsWriter struct {
 	hostName string
 	env      string
-	conf     StatsWriterConfig
+	conf     writerconfig.StatsWriterConfig
 	InStats  <-chan []model.StatsBucket
 	stats    info.StatsWriterInfo
 
@@ -41,12 +27,17 @@ type StatsWriter struct {
 
 // NewStatsWriter returns a new writer for services.
 func NewStatsWriter(conf *config.AgentConfig, InStats <-chan []model.StatsBucket) *StatsWriter {
+	writerConf := conf.StatsWriterConfig
+	log.Infof("Stats writer initializing with config: %+v", writerConf)
+
 	return &StatsWriter{
-		hostName:   conf.HostName,
-		env:        conf.DefaultEnv,
-		conf:       DefaultStatsWriterConfig(),
-		InStats:    InStats,
-		BaseWriter: *NewBaseWriter(conf, "/api/v0.2/stats"),
+		hostName: conf.HostName,
+		env:      conf.DefaultEnv,
+		conf:     writerConf,
+		InStats:  InStats,
+		BaseWriter: *NewBaseWriter(conf, "/api/v0.2/stats", func(endpoint Endpoint) PayloadSender {
+			return NewCustomQueuablePayloadSender(endpoint, writerConf.SenderConfig)
+		}),
 	}
 }
 
@@ -81,7 +72,7 @@ func (w *StatsWriter) Run() {
 			case SenderSuccessEvent:
 				log.Infof("flushed stat payload to the API, time:%s, size:%d bytes", event.SendStats.SendTime,
 					len(event.Payload.Bytes))
-				w.conf.StatsClient.Gauge("datadog.trace_agent.stats_writer.flush_duration",
+				w.statsClient.Gauge("datadog.trace_agent.stats_writer.flush_duration",
 					event.SendStats.SendTime.Seconds(), nil, 1)
 				atomic.AddInt64(&w.stats.Payloads, 1)
 			case SenderFailureEvent:
@@ -163,11 +154,11 @@ func (w *StatsWriter) updateInfo() {
 	swInfo.Retries = atomic.SwapInt64(&w.stats.Retries, 0)
 	swInfo.Errors = atomic.SwapInt64(&w.stats.Errors, 0)
 
-	w.conf.StatsClient.Count("datadog.trace_agent.stats_writer.payloads", int64(swInfo.Payloads), nil, 1)
-	w.conf.StatsClient.Count("datadog.trace_agent.stats_writer.stats_buckets", int64(swInfo.StatsBuckets), nil, 1)
-	w.conf.StatsClient.Count("datadog.trace_agent.stats_writer.bytes", int64(swInfo.Bytes), nil, 1)
-	w.conf.StatsClient.Count("datadog.trace_agent.stats_writer.retries", int64(swInfo.Retries), nil, 1)
-	w.conf.StatsClient.Count("datadog.trace_agent.stats_writer.errors", int64(swInfo.Errors), nil, 1)
+	w.statsClient.Count("datadog.trace_agent.stats_writer.payloads", int64(swInfo.Payloads), nil, 1)
+	w.statsClient.Count("datadog.trace_agent.stats_writer.stats_buckets", int64(swInfo.StatsBuckets), nil, 1)
+	w.statsClient.Count("datadog.trace_agent.stats_writer.bytes", int64(swInfo.Bytes), nil, 1)
+	w.statsClient.Count("datadog.trace_agent.stats_writer.retries", int64(swInfo.Retries), nil, 1)
+	w.statsClient.Count("datadog.trace_agent.stats_writer.errors", int64(swInfo.Errors), nil, 1)
 
 	info.UpdateStatsWriterInfo(swInfo)
 }

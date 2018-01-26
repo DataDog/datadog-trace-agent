@@ -10,6 +10,7 @@ import (
 
 	"github.com/DataDog/datadog-trace-agent/backoff"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
+	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 )
 
 // Payload represents a data payload to be sent to some endpoint
@@ -148,31 +149,15 @@ func (s *BasePayloadSender) notifyRetry(payload *Payload, err error, delay time.
 	}
 }
 
-// QueuablePayloadSenderConf contains the configuration needed by a QueuablePayloadSender to operate.
-type QueuablePayloadSenderConf struct {
-	MaxAge            time.Duration
-	MaxQueuedBytes    int64
-	MaxQueuedPayloads int
-	BackoffTimer      backoff.Timer
-}
-
-// DefaultQueuablePayloadSenderConf constructs a QueuablePayloadSenderConf with default sane options.
-func DefaultQueuablePayloadSenderConf() QueuablePayloadSenderConf {
-	return QueuablePayloadSenderConf{
-		MaxAge:            20 * time.Minute,
-		MaxQueuedBytes:    256 * 1024 * 1024, // 256 MB
-		MaxQueuedPayloads: -1,                // Unlimited
-		BackoffTimer:      backoff.NewExponentialTimer(),
-	}
-}
-
 // QueuablePayloadSender is a specific implementation of a PayloadSender that will queue new payloads on error and
 // retry sending them according to some configurable BackoffTimer.
 type QueuablePayloadSender struct {
-	conf              QueuablePayloadSenderConf
+	conf              writerconfig.QueuablePayloadSenderConf
 	queuedPayloads    *list.List
 	queuing           bool
 	currentQueuedSize int64
+
+	backoffTimer backoff.Timer
 
 	// Test helper
 	syncBarrier <-chan interface{}
@@ -183,15 +168,16 @@ type QueuablePayloadSender struct {
 // NewQueuablePayloadSender constructs a new QueuablePayloadSender with default configuration to send payloads to the
 // provided endpoint.
 func NewQueuablePayloadSender(endpoint Endpoint) *QueuablePayloadSender {
-	return NewCustomQueuablePayloadSender(endpoint, DefaultQueuablePayloadSenderConf())
+	return NewCustomQueuablePayloadSender(endpoint, writerconfig.DefaultQueuablePayloadSenderConf())
 }
 
 // NewCustomQueuablePayloadSender constructs a new QueuablePayloadSender with custom configuration to send payloads to
 // the provided endpoint.
-func NewCustomQueuablePayloadSender(endpoint Endpoint, conf QueuablePayloadSenderConf) *QueuablePayloadSender {
+func NewCustomQueuablePayloadSender(endpoint Endpoint, conf writerconfig.QueuablePayloadSenderConf) *QueuablePayloadSender {
 	return &QueuablePayloadSender{
 		conf:              conf,
 		queuedPayloads:    list.New(),
+		backoffTimer:      backoff.NewCustomExponentialTimer(conf.ExponentialBackoff),
 		BasePayloadSender: *NewBasePayloadSender(endpoint),
 	}
 }
@@ -216,7 +202,7 @@ func (s *QueuablePayloadSender) Run() {
 				log.Errorf("Error while sending or queueing payload. err=%v", err)
 				s.notifyError(payload, err, stats)
 			}
-		case <-s.conf.BackoffTimer.ReceiveTick():
+		case <-s.backoffTimer.ReceiveTick():
 			s.flushQueue()
 		case <-s.syncBarrier:
 			// TODO: Is there a way of avoiding this? I want Promises in Go :(((
@@ -249,7 +235,7 @@ func (s *QueuablePayloadSender) sendOrQueue(payload *Payload) (SendStats, error)
 		if stats, err = s.send(payload); err != nil {
 			if _, ok := err.(*RetriableError); ok {
 				// If error is retriable, start a queue and schedule a retry
-				retryNum, delay := s.conf.BackoffTimer.ScheduleRetry(err)
+				retryNum, delay := s.backoffTimer.ScheduleRetry(err)
 				log.Debugf("Got retriable error. Starting a queue. delay=%s, err=%v", delay, err)
 				s.notifyRetry(payload, err, delay, retryNum)
 				return stats, s.enqueue(payload)
@@ -280,7 +266,7 @@ func (s *QueuablePayloadSender) enqueue(payload *Payload) error {
 
 	newPayloadSize := int64(len(payload.Bytes))
 
-	if newPayloadSize > s.conf.MaxQueuedBytes {
+	if s.conf.MaxQueuedBytes > 0 && newPayloadSize > s.conf.MaxQueuedBytes {
 		log.Debugf("Payload bigger than max size: size=%d, max size=%d", newPayloadSize, s.conf.MaxQueuedBytes)
 		return fmt.Errorf("unable to queue payload bigger than max size: payload size=%d, max size=%d",
 			newPayloadSize, s.conf.MaxQueuedBytes)
@@ -317,7 +303,7 @@ func (s *QueuablePayloadSender) flushQueue() error {
 		if stats, err = s.send(payload); err != nil {
 			if _, ok := err.(*RetriableError); ok {
 				// If send failed due to a retriable error, retry flush later
-				retryNum, delay := s.conf.BackoffTimer.ScheduleRetry(err)
+				retryNum, delay := s.backoffTimer.ScheduleRetry(err)
 				log.Errorf("Got retriable error. Retrying flush later: retry=%d, delay=%s, err=%v",
 					retryNum, delay, err)
 				s.discardOldPayloads()
@@ -341,7 +327,7 @@ func (s *QueuablePayloadSender) flushQueue() error {
 	}
 
 	s.queuing = false
-	s.conf.BackoffTimer.Reset()
+	s.backoffTimer.Reset()
 
 	return nil
 }
@@ -356,6 +342,11 @@ func (s *QueuablePayloadSender) removeQueuedPayload(e *list.Element) *list.Eleme
 
 // Discard those payloads that are older than max age.
 func (s *QueuablePayloadSender) discardOldPayloads() {
+	// If MaxAge <= 0 then age limitation is disabled so do nothing
+	if s.conf.MaxAge <= 0 {
+		return
+	}
+
 	var next *list.Element
 
 	for e := s.queuedPayloads.Front(); e != nil; e = next {
