@@ -38,6 +38,36 @@ func TestServiceMapper(t *testing.T) {
 	assert.Len(mapper.cache, 2)
 }
 
+func TestCachePolicy(t *testing.T) {
+	assert := assert.New(t)
+
+	mapper, in, out := testMapper()
+	mapper.Start()
+	defer mapper.Stop()
+
+	input := model.ServicesMetadata{"service-a": {"app_type": "type-a"}}
+	in <- input
+	output := <-out
+
+	// A new service entry should propagate the metadata the the outbound channel
+	assert.Equal(input, output)
+
+	// A service entry that is already in cache should only be propagated IF:
+	// - Current version does NOT have "app"
+	// - New version DOES have "app"
+
+	// This first attempt won't be propagated to the writer
+	firstAttempt := model.ServicesMetadata{"service-a": {"app_type": "FIRST_ATTEMPT"}}
+	in <- firstAttempt
+
+	// But this second will
+	secondAttempt := model.ServicesMetadata{"service-a": {"app_type": "SECOND_ATTEMPT", "app": "app-a"}}
+	in <- secondAttempt
+
+	output = <-out
+	assert.Equal(secondAttempt, output)
+}
+
 func testMapper() (mapper *ServiceMapper, in, out chan model.ServicesMetadata) {
 	in = make(chan model.ServicesMetadata, 1)
 	out = make(chan model.ServicesMetadata, 1)

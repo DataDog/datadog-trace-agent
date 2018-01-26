@@ -14,6 +14,9 @@ type ServicesMetadata map[string]map[string]string
 // AppType is one of the pieces of information embedded in ServiceMetadata
 const AppType = "app_type"
 
+// ServiceApp represents the app to which certain integration belongs to
+const ServiceApp = "app"
+
 // Merge adds all entries from s2 to s1
 func (s1 ServicesMetadata) Merge(s2 ServicesMetadata) {
 	for k, v := range s2 {

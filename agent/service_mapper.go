@@ -67,7 +67,7 @@ func (s *ServiceMapper) update(metadata model.ServicesMetadata) {
 	var changes model.ServicesMetadata
 
 	for k, v := range metadata {
-		if _, ok := s.cache[k]; ok {
+		if !s.shouldAdd(k, metadata) {
 			continue
 		}
 
@@ -86,4 +86,23 @@ func (s *ServiceMapper) update(metadata model.ServicesMetadata) {
 
 	s.out <- changes
 	s.cache.Merge(changes)
+}
+
+func (s *ServiceMapper) shouldAdd(service string, metadata model.ServicesMetadata) bool {
+	cacheEntry, ok := s.cache[service]
+
+	// No cache entry?
+	if !ok {
+		return true
+	}
+
+	// Cache entry came from service API?
+	if _, ok = cacheEntry[model.ServiceApp]; ok {
+		return false
+	}
+
+	// New metadata value came from service API?
+	_, ok = metadata[service][model.ServiceApp]
+
+	return ok
 }
