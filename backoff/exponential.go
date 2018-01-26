@@ -29,12 +29,12 @@ func DefaultExponentialDelayProvider() DelayProvider {
 
 // ExponentialDelayProvider creates a new instance of an ExponentialDelayProvider using the provided config.
 func ExponentialDelayProvider(conf ExponentialConfig) DelayProvider {
-	return ExponentialDelayProviderCustomRandom(conf, rand.New(rand.NewSource(time.Now().UnixNano())))
+	return exponentialDelayProviderCustomRandom(conf, rand.New(rand.NewSource(time.Now().UnixNano())))
 }
 
-// ExponentialDelayProviderCustomRandom creates a new instance of ExponentialDelayProvider using the provided config
+// exponentialDelayProviderCustomRandom creates a new instance of ExponentialDelayProvider using the provided config
 // and random number generator.
-func ExponentialDelayProviderCustomRandom(conf ExponentialConfig, rand *rand.Rand) DelayProvider {
+func exponentialDelayProviderCustomRandom(conf ExponentialConfig, rand *rand.Rand) DelayProvider {
 	return func(numRetries int, _ error) time.Duration {
 		pow := math.Pow(float64(conf.GrowthBase), float64(numRetries))
 

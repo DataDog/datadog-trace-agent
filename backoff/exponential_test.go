@@ -33,7 +33,7 @@ func TestExponentialDelay(t *testing.T) {
 	}
 
 	// Use fixed random to prevent flakiness in case the CI has very bad luck
-	delayProvider := ExponentialDelayProviderCustomRandom(conf, rand.New(rand.NewSource(1234)))
+	delayProvider := exponentialDelayProviderCustomRandom(conf, rand.New(rand.NewSource(1234)))
 
 	prevMax := int64(0)
 
