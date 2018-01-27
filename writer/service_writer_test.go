@@ -88,8 +88,8 @@ func TestServiceWriter_UpdateInfoHandling(t *testing.T) {
 	expectedNumPayloads++
 	metadata1 := fixtures.RandomServices(10, 10)
 	serviceChannel <- metadata1
-	mergedMetadata := metadata1
-	expectedNumBytes += calculateMetadataPayloadSize(mergedMetadata)
+	expectedNumServices += int64(len(metadata1))
+	expectedNumBytes += calculateMetadataPayloadSize(metadata1)
 
 	// And waiting for twice the flush period to trigger payload sending and info updating
 	time.Sleep(2 * serviceWriter.conf.FlushPeriod)
@@ -98,8 +98,8 @@ func TestServiceWriter_UpdateInfoHandling(t *testing.T) {
 	expectedNumPayloads++
 	metadata2 := fixtures.RandomServices(10, 10)
 	serviceChannel <- metadata2
-	mergedMetadata = mergeMetadataInOrder(mergedMetadata, metadata2)
-	expectedNumBytes += calculateMetadataPayloadSize(mergedMetadata)
+	expectedNumServices += int64(len(metadata2))
+	expectedNumBytes += calculateMetadataPayloadSize(metadata2)
 
 	// And waiting for twice the flush period to trigger payload sending and info updating
 	time.Sleep(2 * serviceWriter.conf.FlushPeriod)
@@ -109,8 +109,8 @@ func TestServiceWriter_UpdateInfoHandling(t *testing.T) {
 	expectedNumErrors++
 	metadata3 := fixtures.RandomServices(10, 10)
 	serviceChannel <- metadata3
-	mergedMetadata = mergeMetadataInOrder(mergedMetadata, metadata3)
-	expectedNumBytes += calculateMetadataPayloadSize(mergedMetadata)
+	expectedNumServices += int64(len(metadata3))
+	expectedNumBytes += calculateMetadataPayloadSize(metadata3)
 
 	// And waiting for twice the flush period to trigger payload sending and info updating
 	time.Sleep(2 * serviceWriter.conf.FlushPeriod)
@@ -123,8 +123,8 @@ func TestServiceWriter_UpdateInfoHandling(t *testing.T) {
 	expectedMinNumRetries++
 	metadata4 := fixtures.RandomServices(10, 10)
 	serviceChannel <- metadata4
-	mergedMetadata = mergeMetadataInOrder(mergedMetadata, metadata4)
-	expectedNumBytes += calculateMetadataPayloadSize(mergedMetadata)
+	expectedNumServices += int64(len(metadata4))
+	expectedNumBytes += calculateMetadataPayloadSize(metadata4)
 
 	// And waiting for twice the flush period to trigger payload sending and info updating
 	time.Sleep(2 * serviceWriter.conf.FlushPeriod)
@@ -135,18 +135,16 @@ func TestServiceWriter_UpdateInfoHandling(t *testing.T) {
 	// Then we expect some counts and gauges to have been sent to the stats client for each update tick (there should
 	// have been at least 3 ticks)
 	countSummaries := statsClient.GetCountSummaries()
-	gaugeSummaries := statsClient.GetGaugeSummaries()
 
 	// Payload counts
 	payloadSummary := countSummaries["datadog.trace_agent.service_writer.payloads"]
 	assert.True(len(payloadSummary.Calls) >= 3, "There should have been multiple payload count calls")
 	assert.Equal(expectedNumPayloads, payloadSummary.Sum)
 
-	// Services gauge
-	expectedNumServices = int64(len(mergedMetadata))
-	servicesSummary := gaugeSummaries["datadog.trace_agent.service_writer.services"]
+	// Services count
+	servicesSummary := countSummaries["datadog.trace_agent.service_writer.services"]
 	assert.True(len(servicesSummary.Calls) >= 3, "There should have been multiple services gauge calls")
-	assert.EqualValues(expectedNumServices, servicesSummary.Max)
+	assert.EqualValues(expectedNumServices, servicesSummary.Sum)
 
 	// Bytes counts
 	bytesSummary := countSummaries["datadog.trace_agent.service_writer.bytes"]

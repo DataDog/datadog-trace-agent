@@ -38,14 +38,16 @@ func (pt *processedTrace) weight() float64 {
 
 // Agent struct holds all the sub-routines structs and make the data flow between them
 type Agent struct {
-	Receiver        *HTTPReceiver
-	Concentrator    *Concentrator
-	Filters         []filters.Filter
-	ScoreSampler    *Sampler
-	PrioritySampler *Sampler
-	TraceWriter     *writer.TraceWriter
-	ServiceWriter   *writer.ServiceWriter
-	StatsWriter     *writer.StatsWriter
+	Receiver         *HTTPReceiver
+	Concentrator     *Concentrator
+	Filters          []filters.Filter
+	ScoreSampler     *Sampler
+	PrioritySampler  *Sampler
+	TraceWriter      *writer.TraceWriter
+	ServiceWriter    *writer.ServiceWriter
+	StatsWriter      *writer.StatsWriter
+	ServiceExtractor *TraceServiceExtractor
+	ServiceMapper    *ServiceMapper
 
 	// config
 	conf    *config.AgentConfig
@@ -67,6 +69,7 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 	analyzedTransactionChan := make(chan *model.Span)
 	statsChan := make(chan []model.StatsBucket)
 	serviceChan := make(chan model.ServicesMetadata, 50)
+	filteredServiceChan := make(chan model.ServicesMetadata, 50)
 
 	// create components
 	r := NewHTTPReceiver(conf, dynConf, rawTraceChan, serviceChan)
@@ -79,28 +82,31 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 
 	ss := NewScoreSampler(conf, sampledTraceChan, analyzedTransactionChan)
 	ps := NewPrioritySampler(conf, dynConf, sampledTraceChan, analyzedTransactionChan)
+	se := NewTraceServiceExtractor(serviceChan)
+	sm := NewServiceMapper(serviceChan, filteredServiceChan)
 	tw := writer.NewTraceWriter(conf, sampledTraceChan, analyzedTransactionChan)
 	sw := writer.NewStatsWriter(conf, statsChan)
-	svcW := writer.NewServiceWriter(conf, serviceChan)
+	svcW := writer.NewServiceWriter(conf, filteredServiceChan)
 
 	// wire components together
 	tw.InTraces = sampledTraceChan
 	sw.InStats = statsChan
-	svcW.InServices = serviceChan
 
 	return &Agent{
-		Receiver:        r,
-		Concentrator:    c,
-		Filters:         f,
-		ScoreSampler:    ss,
-		PrioritySampler: ps,
-		TraceWriter:     tw,
-		StatsWriter:     sw,
-		ServiceWriter:   svcW,
-		conf:            conf,
-		dynConf:         dynConf,
-		exit:            exit,
-		die:             die,
+		Receiver:         r,
+		Concentrator:     c,
+		Filters:          f,
+		ScoreSampler:     ss,
+		PrioritySampler:  ps,
+		TraceWriter:      tw,
+		StatsWriter:      sw,
+		ServiceWriter:    svcW,
+		ServiceExtractor: se,
+		ServiceMapper:    sm,
+		conf:             conf,
+		dynConf:          dynConf,
+		exit:             exit,
+		die:              die,
 	}
 }
 
@@ -120,6 +126,7 @@ func (a *Agent) Run() {
 	a.Receiver.Run()
 	a.TraceWriter.Start()
 	a.StatsWriter.Start()
+	a.ServiceMapper.Start()
 	a.ServiceWriter.Start()
 	a.Concentrator.Start()
 	a.ScoreSampler.Run()
@@ -137,6 +144,7 @@ func (a *Agent) Run() {
 			a.Concentrator.Stop()
 			a.TraceWriter.Stop()
 			a.StatsWriter.Stop()
+			a.ServiceMapper.Stop()
 			a.ServiceWriter.Stop()
 			a.ScoreSampler.Stop()
 			a.PrioritySampler.Stop()
@@ -236,6 +244,11 @@ func (a *Agent) Process(t model.Trace) {
 	if tenv := t.GetEnv(); tenv != "" {
 		pt.Env = tenv
 	}
+
+	go func() {
+		defer watchdog.LogOnPanic()
+		a.ServiceExtractor.Process(wt)
+	}()
 
 	go func() {
 		defer watchdog.LogOnPanic()
