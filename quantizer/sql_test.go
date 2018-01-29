@@ -260,6 +260,37 @@ func TestSQLQuantizer(t *testing.T) {
 			"INSERT INTO user (id, email, name) VALUES (null, ?, ?)",
 			"INSERT INTO user ( id, email, name ) VALUES ( ? )",
 		},
+		{
+			"select * from users where id = 214325346     # This comment continues to the end of line",
+			"select * from users where id = ?",
+		},
+		{
+			"select * from users where id = 214325346     -- This comment continues to the end of line",
+			"select * from users where id = ?",
+		},
+		{
+			"SELECT * FROM /* this is an in-line comment */ users;",
+			"SELECT * FROM users",
+		},
+		{
+			"SELECT /*! STRAIGHT_JOIN */ col1 FROM table1",
+			"SELECT col1 FROM table1",
+		},
+		{
+			`DELETE FROM t1
+			WHERE s11 > ANY
+			(SELECT COUNT(*) /* no hint */ FROM t2
+			WHERE NOT EXISTS
+			(SELECT * FROM t3
+			WHERE ROW(5*t2.s1,77)=
+			(SELECT 50,11*s1 FROM t4 UNION SELECT 50,77 FROM
+			(SELECT * FROM t5) AS t5)));`,
+			"DELETE FROM t1 WHERE s11 > ANY ( SELECT COUNT ( * ) FROM t2 WHERE NOT EXISTS ( SELECT * FROM t3 WHERE ROW ( ? * t2.s1, ? ) = ( SELECT ? * s1 FROM t4 UNION SELECT ? FROM ( SELECT * FROM t5 ) ) ) )",
+		},
+		{
+			"SET @g = 'POLYGON((0 0,10 0,10 10,0 10,0 0),(5 5,7 5,7 7,5 7, 5 5))';",
+			"SET @g = ?",
+		},
 	}
 
 	for _, c := range cases {
