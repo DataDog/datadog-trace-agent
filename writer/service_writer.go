@@ -36,11 +36,6 @@ func NewServiceWriter(conf *config.AgentConfig, InServices <-chan model.Services
 		serviceBuffer: model.ServicesMetadata{},
 		BaseWriter: *NewBaseWriter(conf, "/api/v0.2/services", func(endpoint Endpoint) PayloadSender {
 			senderConf := writerConf.SenderConfig
-			// Hardcode service sender configuration as the latest payload supplants older ones. So we don't really
-			// need more than 1 payload in the queue.
-			senderConf.MaxQueuedPayloads = 1
-			senderConf.MaxQueuedBytes = -1
-			senderConf.MaxAge = -1
 			return NewCustomQueuablePayloadSender(endpoint, senderConf)
 		}),
 	}
