@@ -1,6 +1,8 @@
 package writer
 
 import (
+	"bytes"
+	"compress/gzip"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -211,14 +213,31 @@ func (w *TraceWriter) flush() {
 		return
 	}
 
-	atomic.AddInt64(&w.stats.Bytes, int64(len(serialized)))
+	encoding := "identity"
 
-	// TODO: benchmark and pick the right encoding
+	// Try to compress payload before sending
+	compressionBuffer := bytes.Buffer{}
+	gz, err := gzip.NewWriterLevel(&compressionBuffer, gzip.BestSpeed)
+	if err != nil {
+		log.Errorf("failed to get compressor, sending uncompressed: %s", err)
+	} else {
+		_, err := gz.Write(serialized)
+		gz.Close()
+
+		if err != nil {
+			log.Errorf("failed to compress payload, sending uncompressed: %s", err)
+		} else {
+			serialized = compressionBuffer.Bytes()
+			encoding = "gzip"
+		}
+	}
+
+	atomic.AddInt64(&w.stats.Bytes, int64(len(serialized)))
 
 	headers := map[string]string{
 		languageHeaderKey:  strings.Join(info.Languages(), "|"),
 		"Content-Type":     "application/x-protobuf",
-		"Content-Encoding": "identity",
+		"Content-Encoding": encoding,
 	}
 
 	payload := NewPayload(serialized, headers)
