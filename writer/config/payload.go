@@ -18,8 +18,8 @@ type QueuablePayloadSenderConf struct {
 func DefaultQueuablePayloadSenderConf() QueuablePayloadSenderConf {
 	return QueuablePayloadSenderConf{
 		MaxAge:             20 * time.Minute,
-		MaxQueuedBytes:     256 * 1024 * 1024, // 256 MB
-		MaxQueuedPayloads:  -1,                // Unlimited
+		MaxQueuedBytes:     64 * 1024 * 1024, // 64 MB
+		MaxQueuedPayloads:  -1,               // Unlimited
 		ExponentialBackoff: backoff.DefaultExponentialConfig(),
 	}
 }
