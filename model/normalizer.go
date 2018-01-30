@@ -76,7 +76,7 @@ func (s *Span) Normalize() error {
 	// root span's ``trace id = span id`` has been removed
 	if s.ParentID == s.TraceID && s.ParentID == s.SpanID {
 		s.ParentID = 0
-		log.Debugf("span.normalize: `ParentID`, `TraceID` and `SpanID` are the same; `ParentID` set to 0: %s", s.TraceID)
+		log.Debugf("span.normalize: `ParentID`, `TraceID` and `SpanID` are the same; `ParentID` set to 0: %d", s.TraceID)
 	}
 
 	// Start & Duration as nanoseconds timestamps

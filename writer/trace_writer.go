@@ -120,7 +120,6 @@ func (w *TraceWriter) Run() {
 			log.Debug("Flushing current traces")
 			w.flush()
 		case <-updateInfoTicker.C:
-			log.Debug("Updating info")
 			go w.updateInfo()
 		case <-w.exit:
 			log.Info("exiting trace writer, flushing all remaining traces")
@@ -168,7 +167,7 @@ func (w *TraceWriter) handleTrace(trace *model.Trace) {
 
 	w.traces = append(w.traces, trace.APITrace())
 	w.spansInBuffer += len(*trace)
-	log.Debugf("Added new trace to buffer. spansInBuffer=%d, len(w.traces)=%d", w.spansInBuffer, len(w.traces))
+	log.Tracef("Added new trace to buffer. spansInBuffer=%d, len(w.traces)=%d", w.spansInBuffer, len(w.traces))
 
 	if w.spansInBuffer == w.conf.MaxSpansPerPayload {
 		log.Debugf("Flushing because we reached max per payload")
