@@ -199,7 +199,7 @@ func (s *QueuablePayloadSender) Run() {
 		select {
 		case payload := <-s.in:
 			if stats, err := s.sendOrQueue(payload); err != nil {
-				log.Errorf("Error while sending or queueing payload. err=%v", err)
+				log.Debugf("Error while sending or queueing payload. err=%v", err)
 				s.notifyError(payload, err, stats)
 			}
 		case <-s.backoffTimer.ReceiveTick():
@@ -304,7 +304,7 @@ func (s *QueuablePayloadSender) flushQueue() error {
 			if _, ok := err.(*RetriableError); ok {
 				// If send failed due to a retriable error, retry flush later
 				retryNum, delay := s.backoffTimer.ScheduleRetry(err)
-				log.Errorf("Got retriable error. Retrying flush later: retry=%d, delay=%s, err=%v",
+				log.Debugf("Got retriable error. Retrying flush later: retry=%d, delay=%s, err=%v",
 					retryNum, delay, err)
 				s.discardOldPayloads()
 				s.notifyRetry(payload, err, delay, retryNum)
@@ -313,7 +313,7 @@ func (s *QueuablePayloadSender) flushQueue() error {
 			}
 
 			// If send failed due to non-retriable error, notify error and drop it
-			log.Errorf("Dropping payload due to non-retriable error: err=%v, payload=%v", err, payload)
+			log.Debugf("Dropping payload due to non-retriable error: err=%v, payload=%v", err, payload)
 			s.notifyError(payload, err, stats)
 			next = s.removeQueuedPayload(e)
 			// Try sending next ones
