@@ -21,6 +21,6 @@ Trace Agent (v 0.99.0)
 
   --- Writer stats (1 min) ---
 
-  Traces: 4 payloads, 26 traces, 3245 bytes
+  Traces: 4 payloads, 26 traces, 123 transactions, 3245 bytes
   Stats: 6 payloads, 12 stats buckets, 8329 bytes
   Services: 1 payloads, 2 services, 1234 bytes

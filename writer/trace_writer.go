@@ -197,6 +197,7 @@ func (w *TraceWriter) flush() {
 	}
 
 	atomic.AddInt64(&w.stats.Traces, int64(numTraces))
+	atomic.AddInt64(&w.stats.Transactions, int64(numTransactions))
 	atomic.AddInt64(&w.stats.Spans, int64(w.spansInBuffer))
 
 	tracePayload := model.TracePayload{
@@ -256,6 +257,7 @@ func (w *TraceWriter) updateInfo() {
 	// Load counters and reset them for the next flush
 	twInfo.Payloads = atomic.SwapInt64(&w.stats.Payloads, 0)
 	twInfo.Traces = atomic.SwapInt64(&w.stats.Traces, 0)
+	twInfo.Transactions = atomic.SwapInt64(&w.stats.Transactions, 0)
 	twInfo.Spans = atomic.SwapInt64(&w.stats.Spans, 0)
 	twInfo.Bytes = atomic.SwapInt64(&w.stats.Bytes, 0)
 	twInfo.Retries = atomic.SwapInt64(&w.stats.Retries, 0)
@@ -263,6 +265,7 @@ func (w *TraceWriter) updateInfo() {
 
 	w.statsClient.Count("datadog.trace_agent.trace_writer.payloads", int64(twInfo.Payloads), nil, 1)
 	w.statsClient.Count("datadog.trace_agent.trace_writer.traces", int64(twInfo.Traces), nil, 1)
+	w.statsClient.Count("datadog.trace_agent.trace_writer.transactions", int64(twInfo.Transactions), nil, 1)
 	w.statsClient.Count("datadog.trace_agent.trace_writer.spans", int64(twInfo.Spans), nil, 1)
 	w.statsClient.Count("datadog.trace_agent.trace_writer.bytes", int64(twInfo.Bytes), nil, 1)
 	w.statsClient.Count("datadog.trace_agent.trace_writer.retries", int64(twInfo.Retries), nil, 1)
