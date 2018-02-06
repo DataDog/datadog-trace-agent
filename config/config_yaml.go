@@ -1,44 +1,43 @@
 package config
 
 import (
-	"fmt"
-	"os"
 	"bufio"
-	"strings"
-	"gopkg.in/yaml.v2"
+	"fmt"
 	ddconfig "github.com/DataDog/datadog-agent/pkg/config"
+	"gopkg.in/yaml.v2"
+	"os"
+	"strings"
 )
 
 // YamlAgentConfig is a structure used for marshaling the datadog.yaml configuration
 // available in Agent versions >= 6
 type YamlAgentConfig struct {
-	APIKey       string `yaml:"api_key"`
-	Enabled      bool `yaml:"apm_enabled"`
-	HostName     string `yaml:"hostname"`
+	APIKey          string `yaml:"api_key"`
+	Enabled         bool   `yaml:"apm_enabled"`
+	HostName        string `yaml:"hostname"`
 	NonLocalTraffic string `yaml:"non_local_traffic"`
 
-	StatsdHost    string  `yaml:"bind_host"`
-	ReceiverHost  string  ""
+	StatsdHost   string `yaml:"bind_host"`
+	ReceiverHost string ""
 
-	StatsdPort    int     `yaml:"StatsdPort"`
-	LogLevel      string  `yaml:"log_level"`
+	StatsdPort int    `yaml:"StatsdPort"`
+	LogLevel   string `yaml:"log_level"`
 
-	DefaultEnv    string `yaml:"env"`
+	DefaultEnv string `yaml:"env"`
 
-	TraceAgent     struct {
-		Env            string `yaml:"env"`
-		ExtraSampleRate float64 `yaml:"extra_sample_rate"`
+	TraceAgent struct {
+		Env                string  `yaml:"env"`
+		ExtraSampleRate    float64 `yaml:"extra_sample_rate"`
 		MaxTracesPerSecond float64 `yaml:"max_traces_per_second"`
-		TraceIgnore    struct {
-			Ignore      map[string][]string `yaml:"resource"`
-		}`yaml:"trace_ignore"`
-		TraceReceiver   struct {
-			ReceiverPort  int `yaml:"receiver_port"`
+		TraceIgnore        struct {
+			Ignore map[string][]string `yaml:"resource"`
+		} `yaml:"trace_ignore"`
+		TraceReceiver struct {
+			ReceiverPort    int `yaml:"receiver_port"`
 			ConnectionLimit int `yaml:"connection_limit"`
-		}`yaml:"trace_receiver"`
-	}`yaml:"trace_config"`
+		} `yaml:"trace_receiver"`
+	} `yaml:"trace_config"`
 }
-
 
 // ReadLines reads contents from a file and splits them by new lines.
 func ReadLines(filename string) ([]string, error) {

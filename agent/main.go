@@ -15,13 +15,12 @@ import (
 
 	log "github.com/cihub/seelog"
 
+	ddconfig "github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/pidfile"
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
-	ddconfig "github.com/DataDog/datadog-agent/pkg/config"
-
 )
 
 // handleSignal closes a channel to exit cleanly from routines
