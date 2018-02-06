@@ -4,12 +4,7 @@ import (
 	"fmt"
   "os"
   "bufio"
-	// "net/url"
-	// "regexp"
 	"strings"
-	// "time"
-	// ddconfig "github.com/DataDog/datadog-agent/pkg/config"
-	// log "github.com/cihub/seelog"
 	"gopkg.in/yaml.v2"
 )
 
@@ -19,7 +14,7 @@ type YamlAgentConfig struct {
 	APIKey       string `yaml:"api_key"`
 	Enabled      bool `yaml:"apm_enabled"`
 	HostName     string `yaml:"hostname"`
-	Non_Local_Traffic string `yaml:"non_local_traffic"`
+	NonLocalTraffic string `yaml:"non_local_traffic"`
 
 	StatsdHost    string  `yaml:"bind_host"`
   ReceiverHost  string  ""
@@ -90,28 +85,30 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) (*AgentConfig,
 	agentConf.Enabled = yc.Enabled
 	agentConf.DefaultEnv = yc.DefaultEnv
 
+	agentConf.ReceiverPort = yc.TraceAgent.TraceReceiver.ReceiverPort
+	agentConf.ExtraSampleRate = yc.TraceAgent.ExtraSampleRate
+  agentConf.MaxTPS = yc.TraceAgent.MaxTracesPerSecond
+	agentConf.Ignore = yc.TraceAgent.TraceIgnore.Ignore
+	agentConf.ConnectionLimit = yc.TraceAgent.TraceReceiver.ConnectionLimit
+
+
 	//Allow user to specify a different ENV for APM Specifically
 	if yc.TraceAgent.Env != "" {
 		agentConf.DefaultEnv = yc.TraceAgent.Env
 	}
-	agentConf.ConnectionLimit = yc.TraceAgent.TraceReceiver.ConnectionLimit
 
 	if yc.StatsdHost != "" {
 		yc.ReceiverHost = yc.StatsdHost
 	}
 
 	//Respect non_local_traffic
-	if v := strings.ToLower(yc.Non_Local_Traffic); v == "yes" || v == "true" {
+	if v := strings.ToLower(yc.NonLocalTraffic); v == "yes" || v == "true" {
 		yc.StatsdHost = "0.0.0.0"
 		yc.ReceiverHost = "0.0.0.0"
 	}
+	
 	agentConf.StatsdHost = yc.StatsdHost
 	agentConf.ReceiverHost = yc.ReceiverHost
-
-	agentConf.ReceiverPort = yc.TraceAgent.TraceReceiver.ReceiverPort
-	agentConf.ExtraSampleRate = yc.TraceAgent.ExtraSampleRate
-  agentConf.MaxTPS = yc.TraceAgent.MaxTracesPerSecond
-	agentConf.Ignore = yc.TraceAgent.TraceIgnore.Ignore
 
 	return agentConf, nil
 }

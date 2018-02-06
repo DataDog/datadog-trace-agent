@@ -71,7 +71,6 @@ apm_enabled: true
 to your datadog.conf file.
 Exiting.`
 
-//[FIXME] Move to some helper file
 // SetupDDAgentConfig initializes the datadog-agent config with a YAML file.
 // This is required for configuration to be available for container listeners.
 func SetupDDAgentConfig(configPath string) error {
@@ -151,9 +150,6 @@ func runAgent(exit chan struct{}) {
 	if err != nil {
 		log.Errorf("%s: %v", opts.ddConfigFile, err)
 		log.Warnf("ignoring %s", opts.ddConfigFile)
-	}
-	if conf != nil {
-		log.Infof("using configuration from %s", opts.ddConfigFile)
 	}
 
 	yamlConf, err := config.NewYamlIfExists(opts.ddConfigFile)
