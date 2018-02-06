@@ -13,6 +13,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/model"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 
+
 	log "github.com/cihub/seelog"
 	"github.com/go-ini/ini"
 )
@@ -213,53 +214,62 @@ func NewDefaultAgentConfig() *AgentConfig {
 }
 
 // NewAgentConfig creates the AgentConfig from the standard config
-func NewAgentConfig(conf *File, legacyConf *File) (*AgentConfig, error) {
+func NewAgentConfig(conf *File, legacyConf *File, agentYaml *YamlAgentConfig) (*AgentConfig, error) {
 	c := NewDefaultAgentConfig()
 	var m *ini.Section
 	var err error
 
-	if conf == nil {
+	if conf == nil && agentYaml == nil {
 		goto APM_CONF
 	}
 
-	// Inherit all relevant config from dd-agent
-	m, err = conf.GetSection("Main")
-	if err == nil {
-		if v := m.Key("hostname").MustString(""); v != "" {
-			c.HostName = v
-		} else {
-			log.Info("Failed to parse hostname from dd-agent config")
-		}
+  if agentYaml != nil {
+		//Agent 6
+		c, err = mergeYamlConfig(c, agentYaml)
+		if err != nil {
+			return nil, err
+ 		}
+	} else if conf != nil {
+	  //Agent 5
+	  // Inherit all relevant config from dd-agent
+	  m, err = conf.GetSection("Main")
+	  if err == nil {
+		  if v := m.Key("hostname").MustString(""); v != "" {
+			  c.HostName = v
+		  } else {
+			  log.Info("Failed to parse hostname from dd-agent config")
+		  }
 
-		if v := m.Key("api_key").Strings(","); len(v) != 0 {
-			c.APIKey = v[0]
-		} else {
-			log.Info("Failed to parse api_key from dd-agent config")
-		}
+		  if v := m.Key("api_key").Strings(","); len(v) != 0 {
+			  c.APIKey = v[0]
+		  } else {
+			  log.Info("Failed to parse api_key from dd-agent config")
+		  }
 
-		if v := m.Key("bind_host").MustString(""); v != "" {
-			c.StatsdHost = v
-			c.ReceiverHost = v
-		}
+		  if v := m.Key("bind_host").MustString(""); v != "" {
+			  c.StatsdHost = v
+			  c.ReceiverHost = v
+		  }
 
-		// non_local_traffic is a shorthand in dd-agent configuration that is
-		// equivalent to setting `bind_host: 0.0.0.0`. Respect this flag
-		// since it defaults to true in Docker and saves us a command-line param
-		if v := strings.ToLower(m.Key("non_local_traffic").MustString("")); v == "yes" || v == "true" {
-			c.StatsdHost = "0.0.0.0"
-			c.ReceiverHost = "0.0.0.0"
-		}
+		  // non_local_traffic is a shorthand in dd-agent configuration that is
+		  // equivalent to setting `bind_host: 0.0.0.0`. Respect this flag
+		  // since it defaults to true in Docker and saves us a command-line param
+		  if v := strings.ToLower(m.Key("non_local_traffic").MustString("")); v == "yes" || v == "true" {
+			  c.StatsdHost = "0.0.0.0"
+			  c.ReceiverHost = "0.0.0.0"
+		  }
 
-		if v := m.Key("dogstatsd_port").MustInt(-1); v != -1 {
-			c.StatsdPort = v
-		}
-		if v := m.Key("log_level").MustString(""); v != "" {
-			c.LogLevel = v
-		}
+		  if v := m.Key("dogstatsd_port").MustInt(-1); v != -1 {
+			  c.StatsdPort = v
+		  }
+		  if v := m.Key("log_level").MustString(""); v != "" {
+			  c.LogLevel = v
+		  }
 
-		if p := getProxySettings(m); p.Host != "" {
-			c.Proxy = p
-		}
+		  if p := getProxySettings(m); p.Host != "" {
+			  c.Proxy = p
+		  }
+	  }
 	}
 
 APM_CONF:

@@ -20,6 +20,8 @@ import (
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
+	ddconfig "github.com/DataDog/datadog-agent/pkg/config"
+
 )
 
 // handleSignal closes a channel to exit cleanly from routines
@@ -68,6 +70,24 @@ Set env var DD_APM_ENABLED=true or add
 apm_enabled: true
 to your datadog.conf file.
 Exiting.`
+
+//[FIXME] Move to some helper file
+// SetupDDAgentConfig initializes the datadog-agent config with a YAML file.
+// This is required for configuration to be available for container listeners.
+func SetupDDAgentConfig(configPath string) error {
+	ddconfig.Datadog.AddConfigPath(configPath)
+	// If they set a config file directly, let's try to honor that
+	if strings.HasSuffix(configPath, ".yaml") {
+		ddconfig.Datadog.SetConfigFile(configPath)
+	}
+
+	// load the configuration
+	if err := ddconfig.Datadog.ReadInConfig(); err != nil {
+		return fmt.Errorf("unable to load Datadog config file: %s", err)
+	}
+
+	return nil
+}
 
 // runAgent is the entrypoint of our code
 func runAgent(exit chan struct{}) {
@@ -136,7 +156,14 @@ func runAgent(exit chan struct{}) {
 		log.Infof("using configuration from %s", opts.ddConfigFile)
 	}
 
-	agentConf, err = config.NewAgentConfig(conf, legacyConf)
+	yamlConf, err := config.NewYamlIfExists(opts.ddConfigFile)
+	if err != nil {
+		log.Criticalf("Error reading datadog.yaml: %s", err)
+	}
+
+	log.Infof("Using configuration from: %s", opts.ddConfigFile)
+
+	agentConf, err = config.NewAgentConfig(conf, legacyConf, yamlConf)
 	if err != nil {
 		die("%v", err)
 	}
