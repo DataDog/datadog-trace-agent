@@ -75,7 +75,7 @@ func TestOnlyEnvConfig(t *testing.T) {
 	// setting an API Key should be enough to generate valid config
 	os.Setenv("DD_API_KEY", "apikey_from_env")
 
-	agentConfig, _ := NewAgentConfig(nil, nil)
+	agentConfig, _ := NewAgentConfig(nil, nil, nil)
 	assert.Equal(t, "apikey_from_env", agentConfig.APIKey)
 
 	os.Setenv("DD_API_KEY", "")
@@ -94,7 +94,7 @@ func TestOnlyDDAgentConfig(t *testing.T) {
 		"log_level = DEBUG",
 	}, "\n")))
 	configFile := &File{instance: ddAgentConf, Path: "whatever"}
-	agentConfig, _ := NewAgentConfig(configFile, nil)
+	agentConfig, _ := NewAgentConfig(configFile, nil, nil)
 
 	assert.Equal("thing", agentConfig.HostName)
 	assert.Equal("apikey_12", agentConfig.APIKey)
@@ -108,7 +108,7 @@ func TestDDAgentMultiAPIKeys(t *testing.T) {
 	ddAgentConf, _ := ini.Load([]byte("[Main]\n\napi_key=foo, bar "))
 	configFile := &File{instance: ddAgentConf, Path: "whatever"}
 
-	agentConfig, _ := NewAgentConfig(configFile, nil)
+	agentConfig, _ := NewAgentConfig(configFile, nil, nil)
 	assert.Equal("foo", agentConfig.APIKey)
 }
 
@@ -132,7 +132,7 @@ func TestDDAgentConfigWithLegacy(t *testing.T) {
 	conf := &File{instance: dd, Path: "whatever"}
 	legacyConf := &File{instance: legacy, Path: "whatever"}
 
-	agentConfig, _ := NewAgentConfig(conf, legacyConf)
+	agentConfig, _ := NewAgentConfig(conf, legacyConf, nil)
 
 	// Properly loaded attributes
 	assert.Equal("pommedapi", agentConfig.APIKey)
@@ -161,7 +161,7 @@ func TestDDAgentConfigWithNewOpts(t *testing.T) {
 	}, "\n")))
 
 	conf := &File{instance: dd, Path: "whatever"}
-	agentConfig, _ := NewAgentConfig(conf, nil)
+	agentConfig, _ := NewAgentConfig(conf, nil, nil)
 
 	// ExtraAggregators contains Datadog defaults + user-specified aggregators
 	assert.Equal([]string{"http.status_code", "region", "error"}, agentConfig.ExtraAggregators)
@@ -181,7 +181,7 @@ func TestEmptyExtraAggregatorsFromConfig(t *testing.T) {
 	}, "\n")))
 
 	conf := &File{instance: dd, Path: "whatever"}
-	agentConfig, _ := NewAgentConfig(conf, nil)
+	agentConfig, _ := NewAgentConfig(conf, nil, nil)
 	assert.Equal([]string{"http.status_code"}, agentConfig.ExtraAggregators)
 }
 
@@ -220,7 +220,7 @@ func TestAnalyzedRateByService(t *testing.T) {
 	}, "\n")))
 
 	conf := &File{instance: config, Path: "whatever"}
-	agentConfig, _ := NewAgentConfig(conf, nil)
+	agentConfig, _ := NewAgentConfig(conf, nil, nil)
 
 	assert.Equal(agentConfig.AnalyzedRateByService["web"], 0.8)
 	assert.Equal(agentConfig.AnalyzedRateByService["intake"], 0.05)
