@@ -29,13 +29,9 @@ type YamlAgentConfig struct {
 		Env                string  `yaml:"env"`
 		ExtraSampleRate    float64 `yaml:"extra_sample_rate"`
 		MaxTracesPerSecond float64 `yaml:"max_traces_per_second"`
-		TraceIgnore        struct {
-			Ignore map[string][]string `yaml:"resource"`
-		} `yaml:"trace_ignore"`
-		TraceReceiver struct {
-			ReceiverPort    int `yaml:"receiver_port"`
-			ConnectionLimit int `yaml:"connection_limit"`
-		} `yaml:"trace_receiver"`
+		Ignore             map[string][]string `yaml:"ignore_resource"`
+		ReceiverPort       int `yaml:"receiver_port"`
+		ConnectionLimit    int `yaml:"connection_limit"`
 	} `yaml:"trace_config"`
 }
 
@@ -85,11 +81,11 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) (*AgentConfig,
 	agentConf.Enabled = yc.Enabled
 	agentConf.DefaultEnv = yc.DefaultEnv
 
-	agentConf.ReceiverPort = yc.TraceAgent.TraceReceiver.ReceiverPort
+	agentConf.ReceiverPort = yc.TraceAgent.ReceiverPort
 	agentConf.ExtraSampleRate = yc.TraceAgent.ExtraSampleRate
 	agentConf.MaxTPS = yc.TraceAgent.MaxTracesPerSecond
-	agentConf.Ignore = yc.TraceAgent.TraceIgnore.Ignore
-	agentConf.ConnectionLimit = yc.TraceAgent.TraceReceiver.ConnectionLimit
+	agentConf.Ignore = yc.TraceAgent.Ignore
+	agentConf.ConnectionLimit = yc.TraceAgent.ConnectionLimit
 
 	//Allow user to specify a different ENV for APM Specifically
 	if yc.TraceAgent.Env != "" {
