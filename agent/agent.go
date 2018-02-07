@@ -38,16 +38,17 @@ func (pt *processedTrace) weight() float64 {
 
 // Agent struct holds all the sub-routines structs and make the data flow between them
 type Agent struct {
-	Receiver         *HTTPReceiver
-	Concentrator     *Concentrator
-	Filters          []filters.Filter
-	ScoreSampler     *Sampler
-	PrioritySampler  *Sampler
-	TraceWriter      *writer.TraceWriter
-	ServiceWriter    *writer.ServiceWriter
-	StatsWriter      *writer.StatsWriter
-	ServiceExtractor *TraceServiceExtractor
-	ServiceMapper    *ServiceMapper
+	Receiver           *HTTPReceiver
+	Concentrator       *Concentrator
+	Filters            []filters.Filter
+	ScoreSampler       *Sampler
+	PrioritySampler    *Sampler
+	TransactionSampler *TransactionSampler
+	TraceWriter        *writer.TraceWriter
+	ServiceWriter      *writer.ServiceWriter
+	StatsWriter        *writer.StatsWriter
+	ServiceExtractor   *TraceServiceExtractor
+	ServiceMapper      *ServiceMapper
 
 	// config
 	conf    *config.AgentConfig
@@ -80,8 +81,9 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 	)
 	f := filters.Setup(conf)
 
-	ss := NewScoreSampler(conf, sampledTraceChan, analyzedTransactionChan)
-	ps := NewPrioritySampler(conf, dynConf, sampledTraceChan, analyzedTransactionChan)
+	ss := NewScoreSampler(conf, sampledTraceChan)
+	ps := NewPrioritySampler(conf, dynConf, sampledTraceChan)
+	ts := NewTransactionSampler(conf, analyzedTransactionChan)
 	se := NewTraceServiceExtractor(serviceChan)
 	sm := NewServiceMapper(serviceChan, filteredServiceChan)
 	tw := writer.NewTraceWriter(conf, sampledTraceChan, analyzedTransactionChan)
@@ -93,20 +95,21 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 	sw.InStats = statsChan
 
 	return &Agent{
-		Receiver:         r,
-		Concentrator:     c,
-		Filters:          f,
-		ScoreSampler:     ss,
-		PrioritySampler:  ps,
-		TraceWriter:      tw,
-		StatsWriter:      sw,
-		ServiceWriter:    svcW,
-		ServiceExtractor: se,
-		ServiceMapper:    sm,
-		conf:             conf,
-		dynConf:          dynConf,
-		exit:             exit,
-		die:              die,
+		Receiver:           r,
+		Concentrator:       c,
+		Filters:            f,
+		ScoreSampler:       ss,
+		PrioritySampler:    ps,
+		TransactionSampler: ts,
+		TraceWriter:        tw,
+		StatsWriter:        sw,
+		ServiceWriter:      svcW,
+		ServiceExtractor:   se,
+		ServiceMapper:      sm,
+		conf:               conf,
+		dynConf:            dynConf,
+		exit:               exit,
+		die:                die,
 	}
 }
 
@@ -261,6 +264,12 @@ func (a *Agent) Process(t model.Trace) {
 		go func() {
 			defer watchdog.LogOnPanic()
 			sampler.Add(pt)
+		}()
+	}
+	if a.TransactionSampler.Enabled() {
+		go func() {
+			defer watchdog.LogOnPanic()
+			a.TransactionSampler.Add(pt)
 		}()
 	}
 }
