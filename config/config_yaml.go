@@ -26,12 +26,12 @@ type YamlAgentConfig struct {
 	DefaultEnv string `yaml:"env"`
 
 	TraceAgent struct {
-		Env                string  `yaml:"env"`
-		ExtraSampleRate    float64 `yaml:"extra_sample_rate"`
-		MaxTracesPerSecond float64 `yaml:"max_traces_per_second"`
+		Env                string              `yaml:"env"`
+		ExtraSampleRate    float64             `yaml:"extra_sample_rate"`
+		MaxTracesPerSecond float64             `yaml:"max_traces_per_second"`
 		Ignore             map[string][]string `yaml:"ignore_resource"`
-		ReceiverPort       int `yaml:"receiver_port"`
-		ConnectionLimit    int `yaml:"connection_limit"`
+		ReceiverPort       int                 `yaml:"receiver_port"`
+		ConnectionLimit    int                 `yaml:"connection_limit"`
 	} `yaml:"trace_config"`
 }
 
