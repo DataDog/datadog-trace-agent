@@ -37,12 +37,41 @@ The APM agent (aka Trace Agent) isn't part of the OSX Datadog Agent yet, it need
 
 ## Run on Windows
 
-- Have the [Windows Datadog Agent](https://app.datadoghq.com/account/settings#agent/windows).
-- Download the [latest Windows Trace Agent release](https://github.com/DataDog/datadog-trace-agent/releases/latest).
-- Run the Trace Agent using the Datadog Agent configuration.
+On Windows, the trace agent is shipped together with the Datadog Agent only
+since version 5.19.0, so users must update to 5.19.0 or above. However the
+Windows trace agent is in beta and some manual steps are required.
 
-    `./trace-agent-windows-X.Y.Z.exe -config "%ProgramData%\Datadog\datadog.conf"`
+Update your config file to include:
 
+```
+[Main]
+apm_enabled: yes
+[trace.config]
+log_file = C:\ProgramData\Datadog\logs\trace-agent.log
+```
+
+Restart the datadogagent service:
+
+```
+net stop datadogagent
+net start datadogagent
+```
+
+For this beta the trace agent status and logs are not displayed in the Agent
+Manager GUI.
+
+To see the trace agent status either use the Service tab of the Task Manager or
+run:
+
+```
+sc.exe query datadog-trace-agent
+```
+
+And check that the status is "running".
+
+Note: the Trace Agent is not yet included in the installation from source of
+the Trace Agent. Follow the instructions in [Development](#development) to do
+it manually.
 
 ## Development
 
