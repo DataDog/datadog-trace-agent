@@ -3,19 +3,19 @@ package config
 import (
 	"bufio"
 	"fmt"
-	ddconfig "github.com/DataDog/datadog-agent/pkg/config"
 	"gopkg.in/yaml.v2"
 	"os"
 	"strings"
+	"io/ioutil"
+
+	"github.com/DataDog/datadog-trace-agent/utils"
 )
 
 // YamlAgentConfig is a structure used for marshaling the datadog.yaml configuration
 // available in Agent versions >= 6
 type YamlAgentConfig struct {
 	APIKey          string `yaml:"api_key"`
-	Enabled         bool   `yaml:"apm_enabled"`
 	HostName        string `yaml:"hostname"`
-	NonLocalTraffic string `yaml:"non_local_traffic"`
 
 	StatsdHost   string `yaml:"bind_host"`
 	ReceiverHost string ""
@@ -26,12 +26,14 @@ type YamlAgentConfig struct {
 	DefaultEnv string `yaml:"env"`
 
 	TraceAgent struct {
+		Enabled            bool              `yaml:"enabled"`
 		Env                string              `yaml:"env"`
 		ExtraSampleRate    float64             `yaml:"extra_sample_rate"`
 		MaxTracesPerSecond float64             `yaml:"max_traces_per_second"`
-		Ignore             map[string][]string `yaml:"ignore_resource"`
+		Ignore             string              `yaml:"ignore_resource"`
 		ReceiverPort       int                 `yaml:"receiver_port"`
 		ConnectionLimit    int                 `yaml:"connection_limit"`
+		NonLocalTraffic    string              `yaml:"trace_non_local_traffic"`
 	} `yaml:"trace_config"`
 }
 
@@ -54,12 +56,13 @@ func ReadLines(filename string) ([]string, error) {
 // NewYamlIfExists returns a new YamlAgentConfig if the given configPath is exists.
 func NewYamlIfExists(configPath string) (*YamlAgentConfig, error) {
 	var yamlConf YamlAgentConfig
-	if PathExists(configPath) {
-		lines, err := ReadLines(configPath)
-		if err != nil {
-			return nil, fmt.Errorf("read error: %s", err)
-		}
-		if err = yaml.Unmarshal([]byte(strings.Join(lines, "\n")), &yamlConf); err != nil {
+	if utils.PathExists(configPath) {
+		// lines, err := ReadLines(configPath)
+		// if err != nil {
+		// 	return nil, fmt.Errorf("read error: %s", err)
+		// }
+		fileContent, err := ioutil.ReadFile(configPath)
+		if err = yaml.Unmarshal([]byte(fileContent), &yamlConf); err != nil {
 			return nil, fmt.Errorf("parse error: %s", err)
 		}
 		return &yamlConf, nil
@@ -67,24 +70,18 @@ func NewYamlIfExists(configPath string) (*YamlAgentConfig, error) {
 	return nil, nil
 }
 
-// PathExists returns a boolean indicating if the given path exists on the file system.
-func PathExists(filename string) bool {
-	if _, err := os.Stat(filename); err == nil {
-		return true
-	}
-	return false
-}
-
 func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) (*AgentConfig, error) {
 	agentConf.APIKey = yc.APIKey
 	agentConf.HostName = yc.HostName
-	agentConf.Enabled = yc.Enabled
+	agentConf.Enabled = yc.TraceAgent.Enabled
 	agentConf.DefaultEnv = yc.DefaultEnv
 
 	agentConf.ReceiverPort = yc.TraceAgent.ReceiverPort
 	agentConf.ExtraSampleRate = yc.TraceAgent.ExtraSampleRate
 	agentConf.MaxTPS = yc.TraceAgent.MaxTracesPerSecond
-	agentConf.Ignore = yc.TraceAgent.Ignore
+	
+	agentConf.Ignore["resource"] = strings.Split(yc.TraceAgent.Ignore, ",")
+	
 	agentConf.ConnectionLimit = yc.TraceAgent.ConnectionLimit
 
 	//Allow user to specify a different ENV for APM Specifically
@@ -97,7 +94,7 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) (*AgentConfig,
 	}
 
 	//Respect non_local_traffic
-	if v := strings.ToLower(yc.NonLocalTraffic); v == "yes" || v == "true" {
+	if v := strings.ToLower(yc.TraceAgent.NonLocalTraffic); v == "yes" || v == "true" {
 		yc.StatsdHost = "0.0.0.0"
 		yc.ReceiverHost = "0.0.0.0"
 	}
@@ -106,21 +103,4 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) (*AgentConfig,
 	agentConf.ReceiverHost = yc.ReceiverHost
 
 	return agentConf, nil
-}
-
-// SetupDDAgentConfig initializes the datadog-agent config with a YAML file.
-// This is required for configuration to be available for container listeners.
-func SetupDDAgentConfig(configPath string) error {
-	// ddconfig.Datadog.AddConfigPath(configPath)
-	// If they set a config file directly, let's try to honor that
-	if strings.HasSuffix(configPath, ".yaml") {
-		ddconfig.Datadog.SetConfigFile(configPath)
-	}
-
-	//load the configuration
-	if err := ddconfig.Datadog.ReadInConfig(); err != nil {
-		return fmt.Errorf("unable to load Datadog config file: %s", err)
-	}
-
-	return nil
 }

@@ -10,12 +10,12 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"path/filepath"
 
 	_ "net/http/pprof"
 
 	log "github.com/cihub/seelog"
 
-	ddconfig "github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/pidfile"
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
@@ -70,23 +70,6 @@ apm_enabled: true
 to your datadog.conf file.
 Exiting.`
 
-// SetupDDAgentConfig initializes the datadog-agent config with a YAML file.
-// This is required for configuration to be available for container listeners.
-func SetupDDAgentConfig(configPath string) error {
-	ddconfig.Datadog.AddConfigPath(configPath)
-	// If they set a config file directly, let's try to honor that
-	if strings.HasSuffix(configPath, ".yaml") {
-		ddconfig.Datadog.SetConfigFile(configPath)
-	}
-
-	// load the configuration
-	if err := ddconfig.Datadog.ReadInConfig(); err != nil {
-		return fmt.Errorf("unable to load Datadog config file: %s", err)
-	}
-
-	return nil
-}
-
 // runAgent is the entrypoint of our code
 func runAgent(exit chan struct{}) {
 	// configure a default logger before anything so we can observe initialization
@@ -132,11 +115,14 @@ func runAgent(exit chan struct{}) {
 	// Instantiate the config
 	var agentConf *config.AgentConfig
 	var err error
+	var legacyConf *config.File
+	var yamlConf *config.YamlAgentConfig
+	var conf *config.File
 
 	// if a configuration file cannot be loaded, log an error but do not
 	// panic since the agent can be configured with environment variables
 	// only.
-	legacyConf, err := config.NewIfExists(opts.configFile)
+	legacyConf, err = config.NewIfExists(opts.configFile)
 	if err != nil {
 		log.Errorf("%s: %v", opts.configFile, err)
 		log.Warnf("ignoring %s", opts.configFile)
@@ -145,15 +131,18 @@ func runAgent(exit chan struct{}) {
 		log.Infof("using legacy configuration from %s", opts.configFile)
 	}
 
-	conf, err := config.NewIfExists(opts.ddConfigFile)
-	if err != nil {
-		log.Errorf("%s: %v", opts.ddConfigFile, err)
-		log.Warnf("ignoring %s", opts.ddConfigFile)
+	if filepath.Ext(opts.ddConfigFile) == ".conf" {
+		conf, err = config.NewIfExists(opts.ddConfigFile)
+		if err != nil {
+			log.Errorf("%s: %v", opts.ddConfigFile, err)
+		}
 	}
 
-	yamlConf, err := config.NewYamlIfExists(opts.ddConfigFile)
-	if err != nil {
-		log.Criticalf("Error reading datadog.yaml: %s", err)
+	if filepath.Ext(opts.ddConfigFile) == ".yaml" {
+		yamlConf, err = config.NewYamlIfExists(opts.ddConfigFile)
+		if err != nil {
+			log.Criticalf("Error reading datadog.yaml: %s", err)
+		}
 	}
 
 	log.Infof("Using configuration from: %s", opts.ddConfigFile)
