@@ -37,6 +37,8 @@ import:
   version: v0.5
   subpackages:
   - gogoproto
+- package: github.com/spf13/viper
+  version: v1.0.0
 testImport:
 - package: github.com/stretchr/testify
   version: v1.1.4
