@@ -1,11 +1,9 @@
 package config
 
 import (
-	"bufio"
 	"fmt"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
-	"os"
 	"strings"
 
 	"github.com/DataDog/datadog-trace-agent/utils"
@@ -67,22 +65,6 @@ type YamlAgentConfig struct {
 			BackoffGrowth     int   `yaml:"exp_backoff_growth_base"`
 		} `yaml:"stats_writer"`
 	} `yaml:"trace_config"`
-}
-
-// ReadLines reads contents from a file and splits them by new lines.
-func ReadLines(filename string) ([]string, error) {
-	f, err := os.Open(filename)
-	if err != nil {
-		return []string{""}, err
-	}
-	defer f.Close()
-
-	var ret []string
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		ret = append(ret, scanner.Text())
-	}
-	return ret, scanner.Err()
 }
 
 // NewYamlIfExists returns a new YamlAgentConfig if the given configPath is exists.
