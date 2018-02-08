@@ -134,11 +134,9 @@ func runAgent(exit chan struct{}) {
 	if filepath.Ext(opts.ddConfigFile) == ".conf" {
 		conf, err = config.NewIfExists(opts.ddConfigFile)
 		if err != nil {
-			log.Errorf("%s: %v", opts.ddConfigFile, err)
+			log.Criticalf("Error reading datadog.yaml: %s", err)
 		}
-	}
-
-	if filepath.Ext(opts.ddConfigFile) == ".yaml" {
+	} else if filepath.Ext(opts.ddConfigFile) == ".yaml" {
 		yamlConf, err = config.NewYamlIfExists(opts.ddConfigFile)
 		if err != nil {
 			log.Criticalf("Error reading datadog.yaml: %s", err)

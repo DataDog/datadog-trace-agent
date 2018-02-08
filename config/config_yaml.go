@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"gopkg.in/yaml.v2"
+	"io/ioutil"
 	"os"
 	"strings"
-	"io/ioutil"
 
 	"github.com/DataDog/datadog-trace-agent/utils"
 )
@@ -14,8 +14,8 @@ import (
 // YamlAgentConfig is a structure used for marshaling the datadog.yaml configuration
 // available in Agent versions >= 6
 type YamlAgentConfig struct {
-	APIKey          string `yaml:"api_key"`
-	HostName        string `yaml:"hostname"`
+	APIKey   string `yaml:"api_key"`
+	HostName string `yaml:"hostname"`
 
 	StatsdHost   string `yaml:"bind_host"`
 	ReceiverHost string ""
@@ -26,45 +26,45 @@ type YamlAgentConfig struct {
 	DefaultEnv string `yaml:"env"`
 
 	TraceAgent struct {
-		Enabled            bool              `yaml:"enabled"`
-		Env                string              `yaml:"env"`
-		ExtraSampleRate    float64             `yaml:"extra_sample_rate"`
-		MaxTracesPerSecond float64             `yaml:"max_traces_per_second"`
-		Ignore             string              `yaml:"ignore_resource"`
-		ReceiverPort       int                 `yaml:"receiver_port"`
-		ConnectionLimit    int                 `yaml:"connection_limit"`
-		NonLocalTraffic    string              `yaml:"trace_non_local_traffic"`
-		
+		Enabled            bool    `yaml:"enabled"`
+		Env                string  `yaml:"env"`
+		ExtraSampleRate    float64 `yaml:"extra_sample_rate"`
+		MaxTracesPerSecond float64 `yaml:"max_traces_per_second"`
+		Ignore             string  `yaml:"ignore_resource"`
+		ReceiverPort       int     `yaml:"receiver_port"`
+		ConnectionLimit    int     `yaml:"connection_limit"`
+		NonLocalTraffic    string  `yaml:"trace_non_local_traffic"`
+
 		//TODO Merge these into config
 		TraceWriter struct {
-			MaxSpansPerPayload int            `yaml:"max_spans_per_payload"`
-			FlushPeriod        int            `yaml:"flush_period_seconds"`
-			UpdateInfoPeriod   int            `yaml:"update_info_period_seconds"`
-			MaxAge             int            `yaml:"queue_max_age_seconds"`
-			MaxQueuedBytes     int64            `yaml:"queue_max_bytes"`
-			MaxQueuedPayloads  int            `yaml:"queue_max_payloads"`
-			BackoffDuration    int            `yaml:"exp_backoff_max_duration_seconds"`
-			BackoffBase        int            `yaml:"exp_backoff_base_milliseconds"`
-			BackoffGrowth      int            `yaml:"exp_backoff_growth_base"`
+			MaxSpansPerPayload int   `yaml:"max_spans_per_payload"`
+			FlushPeriod        int   `yaml:"flush_period_seconds"`
+			UpdateInfoPeriod   int   `yaml:"update_info_period_seconds"`
+			MaxAge             int   `yaml:"queue_max_age_seconds"`
+			MaxQueuedBytes     int64 `yaml:"queue_max_bytes"`
+			MaxQueuedPayloads  int   `yaml:"queue_max_payloads"`
+			BackoffDuration    int   `yaml:"exp_backoff_max_duration_seconds"`
+			BackoffBase        int   `yaml:"exp_backoff_base_milliseconds"`
+			BackoffGrowth      int   `yaml:"exp_backoff_growth_base"`
 		} `yaml:"trace_writer"`
 		ServiceWriter struct {
-			FlushPeriod       int             `yaml:"flush_period_seconds"`
-			UpdateInfoPeriod  int             `yaml:"'update_info_period_seconds"`
-			MaxAge             int            `yaml:"queue_max_age_seconds"`
-			MaxQueuedBytes     int64            `yaml:"queue_max_bytes"`
-			MaxQueuedPayloads  int            `yaml:"queue_max_payloads"`
-			BackoffDuration    int            `yaml:"exp_backoff_max_duration_seconds"`
-			BackoffBase        int            `yaml:"exp_backoff_base_milliseconds"`
-			BackoffGrowth      int            `yaml:"exp_backoff_growth_base"`
+			FlushPeriod       int   `yaml:"flush_period_seconds"`
+			UpdateInfoPeriod  int   `yaml:"'update_info_period_seconds"`
+			MaxAge            int   `yaml:"queue_max_age_seconds"`
+			MaxQueuedBytes    int64 `yaml:"queue_max_bytes"`
+			MaxQueuedPayloads int   `yaml:"queue_max_payloads"`
+			BackoffDuration   int   `yaml:"exp_backoff_max_duration_seconds"`
+			BackoffBase       int   `yaml:"exp_backoff_base_milliseconds"`
+			BackoffGrowth     int   `yaml:"exp_backoff_growth_base"`
 		} `yaml:"service_writer"`
 		StatsWriter struct {
-			UpdateInfoPeriod   int            `yaml:"update_info_period_seconds"`
-			MaxAge             int            `yaml:"queue_max_age_seconds"`
-			MaxQueuedBytes     int64            `yaml:"queue_max_bytes"`
-			MaxQueuedPayloads  int            `yaml:"queue_max_payloads"`
-			BackoffDuration    int            `yaml:"exp_backoff_max_duration_seconds"`
-			BackoffBase        int            `yaml:"exp_backoff_base_milliseconds"`
-			BackoffGrowth      int            `yaml:"exp_backoff_growth_base"`
+			UpdateInfoPeriod  int   `yaml:"update_info_period_seconds"`
+			MaxAge            int   `yaml:"queue_max_age_seconds"`
+			MaxQueuedBytes    int64 `yaml:"queue_max_bytes"`
+			MaxQueuedPayloads int   `yaml:"queue_max_payloads"`
+			BackoffDuration   int   `yaml:"exp_backoff_max_duration_seconds"`
+			BackoffBase       int   `yaml:"exp_backoff_base_milliseconds"`
+			BackoffGrowth     int   `yaml:"exp_backoff_growth_base"`
 		} `yaml:"stats_writer"`
 	} `yaml:"trace_config"`
 }
@@ -89,10 +89,6 @@ func ReadLines(filename string) ([]string, error) {
 func NewYamlIfExists(configPath string) (*YamlAgentConfig, error) {
 	var yamlConf YamlAgentConfig
 	if utils.PathExists(configPath) {
-		// lines, err := ReadLines(configPath)
-		// if err != nil {
-		// 	return nil, fmt.Errorf("read error: %s", err)
-		// }
 		fileContent, err := ioutil.ReadFile(configPath)
 		if err = yaml.Unmarshal([]byte(fileContent), &yamlConf); err != nil {
 			return nil, fmt.Errorf("parse error: %s", err)
@@ -111,9 +107,9 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) (*AgentConfig,
 	agentConf.ReceiverPort = yc.TraceAgent.ReceiverPort
 	agentConf.ExtraSampleRate = yc.TraceAgent.ExtraSampleRate
 	agentConf.MaxTPS = yc.TraceAgent.MaxTracesPerSecond
-	
+
 	agentConf.Ignore["resource"] = strings.Split(yc.TraceAgent.Ignore, ",")
-	
+
 	agentConf.ConnectionLimit = yc.TraceAgent.ConnectionLimit
 
 	//Allow user to specify a different ENV for APM Specifically
@@ -156,7 +152,7 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) (*AgentConfig,
 	agentConf.ServiceWriterConfig.SenderConfig.ExponentialBackoff.GrowthBase = yc.TraceAgent.ServiceWriter.BackoffGrowth
 
 	//Stats Writer
-    agentConf.StatsWriterConfig.UpdateInfoPeriod = utils.GetDuration(yc.TraceAgent.StatsWriter.UpdateInfoPeriod)
+	agentConf.StatsWriterConfig.UpdateInfoPeriod = utils.GetDuration(yc.TraceAgent.StatsWriter.UpdateInfoPeriod)
 	agentConf.StatsWriterConfig.SenderConfig.MaxAge = utils.GetDuration(yc.TraceAgent.StatsWriter.MaxAge)
 	agentConf.StatsWriterConfig.SenderConfig.MaxQueuedBytes = yc.TraceAgent.StatsWriter.MaxQueuedBytes
 	agentConf.StatsWriterConfig.SenderConfig.MaxQueuedPayloads = yc.TraceAgent.StatsWriter.MaxQueuedPayloads
