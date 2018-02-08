@@ -5,12 +5,12 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"runtime/pprof"
 	"strings"
 	"syscall"
 	"time"
-	"path/filepath"
 
 	_ "net/http/pprof"
 
