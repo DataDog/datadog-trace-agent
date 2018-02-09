@@ -52,6 +52,8 @@ type traceAgent struct {
 	ReceiverPort       int     `yaml:"receiver_port"`
 	ConnectionLimit    int     `yaml:"connection_limit"`
 	NonLocalTraffic    string  `yaml:"trace_non_local_traffic"`
+	StatsdHost         string  `yaml:"apm_statsd_host"`
+	StatsdPort         int     `yaml:"apm_statsd_port"`
 
 	TraceWriter   traceWriter   `yaml:"trace_writer"`
 	ServiceWriter serviceWriter `yaml:"service_writer"`
@@ -65,15 +67,10 @@ type YamlAgentConfig struct {
 	APIKey   string `yaml:"api_key"`
 	HostName string `yaml:"hostname"`
 
-	StatsdHost   string `yaml:"bind_host"`
-	ReceiverHost string ""
-
-	StatsdPort int    `yaml:"StatsdPort"`
-	LogLevel   string `yaml:"log_level"`
-
-	DefaultEnv string `yaml:"env"`
-
-	TraceAgent traceAgent `yaml:"apm_config"`
+	ReceiverHost string     ""
+	LogLevel     string     `yaml:"log_level"`
+	DefaultEnv   string     `yaml:"env"`
+	TraceAgent   traceAgent `yaml:"apm_config"`
 }
 
 // newYamlIfExists returns a new YamlAgentConfig for the provided byte array.
@@ -107,6 +104,9 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) (*AgentConfig,
 	if yc.TraceAgent.ReceiverPort > 0 {
 		agentConf.ReceiverPort = yc.TraceAgent.ReceiverPort
 	}
+	if yc.TraceAgent.StatsdPort > 0 {
+		agentConf.StatsdPort = yc.TraceAgent.StatsdPort
+	}
 	if yc.TraceAgent.ExtraSampleRate > 0 {
 		agentConf.ExtraSampleRate = yc.TraceAgent.ExtraSampleRate
 	}
@@ -125,8 +125,8 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) (*AgentConfig,
 		agentConf.DefaultEnv = yc.TraceAgent.Env
 	}
 
-	if yc.StatsdHost != "" {
-		yc.ReceiverHost = yc.StatsdHost
+	if yc.TraceAgent.StatsdHost != "" {
+		yc.ReceiverHost = yc.TraceAgent.StatsdHost
 	}
 
 	//Respect non_local_traffic
