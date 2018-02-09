@@ -71,7 +71,52 @@ type YamlAgentConfig struct {
 
 	DefaultEnv string `yaml:"env"`
 
+<<<<<<< HEAD
 	TraceAgent traceAgent `yaml:"apm_config"`
+=======
+	TraceAgent struct {
+		Enabled            bool    `yaml:"enabled"`
+		Env                string  `yaml:"env"`
+		ExtraSampleRate    float64 `yaml:"extra_sample_rate"`
+		MaxTracesPerSecond float64 `yaml:"max_traces_per_second"`
+		Ignore             string  `yaml:"ignore_resource"`
+		ReceiverPort       int     `yaml:"receiver_port"`
+		ConnectionLimit    int     `yaml:"connection_limit"`
+		NonLocalTraffic    string  `yaml:"trace_non_local_traffic"`
+
+		//TODO Merge these into config
+		TraceWriter struct {
+			MaxSpansPerPayload int   `yaml:"max_spans_per_payload"`
+			FlushPeriod        int   `yaml:"flush_period_seconds"`
+			UpdateInfoPeriod   int   `yaml:"update_info_period_seconds"`
+			MaxAge             int   `yaml:"queue_max_age_seconds"`
+			MaxQueuedBytes     int64 `yaml:"queue_max_bytes"`
+			MaxQueuedPayloads  int   `yaml:"queue_max_payloads"`
+			BackoffDuration    int   `yaml:"exp_backoff_max_duration_seconds"`
+			BackoffBase        int   `yaml:"exp_backoff_base_milliseconds"`
+			BackoffGrowth      int   `yaml:"exp_backoff_growth_base"`
+		} `yaml:"trace_writer"`
+		ServiceWriter struct {
+			FlushPeriod       int   `yaml:"flush_period_seconds"`
+			UpdateInfoPeriod  int   `yaml:"'update_info_period_seconds"`
+			MaxAge            int   `yaml:"queue_max_age_seconds"`
+			MaxQueuedBytes    int64 `yaml:"queue_max_bytes"`
+			MaxQueuedPayloads int   `yaml:"queue_max_payloads"`
+			BackoffDuration   int   `yaml:"exp_backoff_max_duration_seconds"`
+			BackoffBase       int   `yaml:"exp_backoff_base_milliseconds"`
+			BackoffGrowth     int   `yaml:"exp_backoff_growth_base"`
+		} `yaml:"service_writer"`
+		StatsWriter struct {
+			UpdateInfoPeriod  int   `yaml:"update_info_period_seconds"`
+			MaxAge            int   `yaml:"queue_max_age_seconds"`
+			MaxQueuedBytes    int64 `yaml:"queue_max_bytes"`
+			MaxQueuedPayloads int   `yaml:"queue_max_payloads"`
+			BackoffDuration   int   `yaml:"exp_backoff_max_duration_seconds"`
+			BackoffBase       int   `yaml:"exp_backoff_base_milliseconds"`
+			BackoffGrowth     int   `yaml:"exp_backoff_growth_base"`
+		} `yaml:"stats_writer"`
+	} `yaml:"apm_config"`
+>>>>>>> 44da32f2a5fc61f55b9c097bb522a9c2288a58b1
 }
 
 // NewYamlIfExists returns a new YamlAgentConfig if the given configPath is exists.
