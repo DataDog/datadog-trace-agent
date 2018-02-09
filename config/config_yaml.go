@@ -76,15 +76,24 @@ type YamlAgentConfig struct {
 	TraceAgent traceAgent `yaml:"apm_config"`
 }
 
+// newYamlIfExists returns a new YamlAgentConfig for the provided byte array.
+func newYamlFromBytes(contents []byte) (*YamlAgentConfig, error) {
+	var yamlConf YamlAgentConfig
+
+	if err := yaml.Unmarshal(contents, &yamlConf); err != nil {
+		return nil, fmt.Errorf("parse error: %s", err)
+	}
+	return &yamlConf, nil
+}
+
 // NewYamlIfExists returns a new YamlAgentConfig if the given configPath is exists.
 func NewYamlIfExists(configPath string) (*YamlAgentConfig, error) {
-	var yamlConf YamlAgentConfig
 	if utils.PathExists(configPath) {
 		fileContent, err := ioutil.ReadFile(configPath)
-		if err = yaml.Unmarshal([]byte(fileContent), &yamlConf); err != nil {
-			return nil, fmt.Errorf("parse error: %s", err)
+		if err != nil {
+			return nil, err
 		}
-		return &yamlConf, nil
+		return newYamlFromBytes([]byte(fileContent))
 	}
 	return nil, nil
 }
@@ -163,7 +172,7 @@ func readTraceWriterConfigYaml(yc traceWriter) writerconfig.TraceWriterConfig {
 	c := writerconfig.DefaultTraceWriterConfig()
 
 	if yc.MaxSpansPerPayload > 0 {
-		c.UpdateInfoPeriod = utils.GetDuration(yc.MaxSpansPerPayload)
+		c.MaxSpansPerPayload = yc.MaxSpansPerPayload
 	}
 	if yc.FlushPeriod > 0 {
 		c.FlushPeriod = utils.GetDuration(yc.FlushPeriod)
