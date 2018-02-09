@@ -131,11 +131,11 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) (*AgentConfig,
 
 	//Respect non_local_traffic
 	if v := strings.ToLower(yc.TraceAgent.NonLocalTraffic); v == "yes" || v == "true" {
-		yc.StatsdHost = "0.0.0.0"
+		yc.TraceAgent.StatsdHost = "0.0.0.0"
 		yc.ReceiverHost = "0.0.0.0"
 	}
 
-	agentConf.StatsdHost = yc.StatsdHost
+	agentConf.StatsdHost = yc.TraceAgent.StatsdHost
 	agentConf.ReceiverHost = yc.ReceiverHost
 
 	agentConf.ServiceWriterConfig = readServiceWriterConfigYaml(yc.TraceAgent.ServiceWriter)
