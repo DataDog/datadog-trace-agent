@@ -20,24 +20,24 @@ type traceWriter struct {
 	MaxSpansPerPayload     int                    `yaml:"max_spans_per_payload"`
 	FlushPeriod            int                    `yaml:"flush_period_seconds"`
 	UpdateInfoPeriod       int                    `yaml:"update_info_period_seconds"`
-	QueueablePayloadSender queueablePayloadSender `yaml:"queueable_payload_sender"`
+	QueueablePayloadSender queueablePayloadSender `yaml:"queue"`
 }
 
 type serviceWriter struct {
 	UpdateInfoPeriod       int                    `yaml:"update_info_period_seconds"`
 	FlushPeriod            int                    `yaml:"flush_period_seconds"`
-	QueueablePayloadSender queueablePayloadSender `yaml:"queueable_payload_sender"`
+	QueueablePayloadSender queueablePayloadSender `yaml:"queue"`
 }
 
 type statsWriter struct {
 	UpdateInfoPeriod       int                    `yaml:"update_info_period_seconds"`
-	QueueablePayloadSender queueablePayloadSender `yaml:"queueable_payload_sender"`
+	QueueablePayloadSender queueablePayloadSender `yaml:"queue"`
 }
 
 type queueablePayloadSender struct {
-	MaxAge            int   `yaml:"queue_max_age_seconds"`
-	MaxQueuedBytes    int64 `yaml:"queue_max_bytes"`
-	MaxQueuedPayloads int   `yaml:"queue_max_payloads"`
+	MaxAge            int   `yaml:"max_age_seconds"`
+	MaxQueuedBytes    int64 `yaml:"max_bytes"`
+	MaxQueuedPayloads int   `yaml:"max_payloads"`
 	BackoffDuration   int   `yaml:"exp_backoff_max_duration_seconds"`
 	BackoffBase       int   `yaml:"exp_backoff_base_milliseconds"`
 	BackoffGrowth     int   `yaml:"exp_backoff_growth_base"`
@@ -104,13 +104,19 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) (*AgentConfig,
 	agentConf.Enabled = yc.TraceAgent.Enabled
 	agentConf.DefaultEnv = yc.DefaultEnv
 
-	agentConf.ReceiverPort = yc.TraceAgent.ReceiverPort
-	agentConf.ExtraSampleRate = yc.TraceAgent.ExtraSampleRate
-	agentConf.MaxTPS = yc.TraceAgent.MaxTracesPerSecond
+	if yc.TraceAgent.ReceiverPort > 0 {
+		agentConf.ReceiverPort = yc.TraceAgent.ReceiverPort
+	}
+	if yc.TraceAgent.ExtraSampleRate > 0 {
+		agentConf.ExtraSampleRate = yc.TraceAgent.ExtraSampleRate
+	}
+	if yc.TraceAgent.MaxTracesPerSecond > 0 {
+		agentConf.MaxTPS = yc.TraceAgent.MaxTracesPerSecond
+	}
 
 	agentConf.Ignore["resource"] = strings.Split(yc.TraceAgent.Ignore, ",")
 
-	if yc.TraceAgent.ConnectionLimit != 0 {
+	if yc.TraceAgent.ConnectionLimit > 0 {
 		agentConf.ConnectionLimit = yc.TraceAgent.ConnectionLimit
 	}
 
