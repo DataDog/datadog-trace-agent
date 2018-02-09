@@ -3,60 +3,12 @@ package config
 import (
 	"os"
 	"strings"
+	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
-	"testing"
-
 	"github.com/go-ini/ini"
+	"github.com/stretchr/testify/assert"
 )
-
-func TestGetStrArray(t *testing.T) {
-	assert := assert.New(t)
-	f, _ := ini.Load([]byte("[Main]\n\nports = 10,15,20,25"))
-	conf := File{
-		f,
-		"some/path",
-	}
-
-	ports, err := conf.GetStrArray("Main", "ports", ',')
-	assert.Nil(err)
-	assert.Equal(ports, []string{"10", "15", "20", "25"})
-}
-
-func TestGetStrArrayWithCommas(t *testing.T) {
-	assert := assert.New(t)
-	f, _ := ini.Load([]byte("[trace.ignore]\n\nresource = \"x,y,z\", foobar"))
-	conf := File{f, "some/path"}
-
-	vals, err := conf.GetStrArray("trace.ignore", "resource", ',')
-	assert.Nil(err)
-	assert.Equal(vals, []string{"x,y,z", "foobar"})
-}
-
-func TestGetStrArrayWithEscapedSequences(t *testing.T) {
-	assert := assert.New(t)
-	f, _ := ini.Load([]byte("[trace.ignore]\n\nresource = \"foo\\.bar\", \"\"\""))
-	conf := File{f, "some/path"}
-
-	vals, err := conf.GetStrArray("trace.ignore", "resource", ',')
-	assert.Nil(err)
-	assert.Equal(vals, []string{`foo\.bar`, `"`})
-}
-
-func TestGetStrArrayEmpty(t *testing.T) {
-	assert := assert.New(t)
-	f, _ := ini.Load([]byte("[Main]\n\nports = "))
-	conf := File{
-		f,
-		"some/path",
-	}
-
-	ports, err := conf.GetStrArray("Main", "ports", ',')
-	assert.Nil(err)
-	assert.Equal([]string{}, ports)
-}
 
 func TestDefaultConfig(t *testing.T) {
 	assert := assert.New(t)
@@ -277,7 +229,7 @@ func TestEmptyExtraAggregatorsFromConfig(t *testing.T) {
 
 func TestConfigNewIfExists(t *testing.T) {
 	// The file does not exist: no error returned
-	conf, err := NewIfExists("/does-not-exist")
+	conf, err := NewIniIfExists("/does-not-exist")
 	assert.Nil(t, err)
 	assert.Nil(t, conf)
 
@@ -288,7 +240,7 @@ func TestConfigNewIfExists(t *testing.T) {
 	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0200) // write only
 	assert.Nil(t, err)
 	f.Close()
-	conf, err = NewIfExists(filename)
+	conf, err = NewIniIfExists(filename)
 	assert.NotNil(t, err)
 	assert.Nil(t, conf)
 	os.Remove(filename)

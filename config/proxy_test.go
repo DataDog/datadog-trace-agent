@@ -17,7 +17,7 @@ func getURL(f *ini.File) (*url.URL, error) {
 		"some/path",
 	}
 	m, _ := conf.GetSection("Main")
-	p := getProxySettings(m)
+	p := readProxySettings(m)
 	return p.URL()
 }
 

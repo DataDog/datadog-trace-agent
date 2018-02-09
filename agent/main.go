@@ -54,14 +54,14 @@ func die(format string, args ...interface{}) {
 
 // opts are the command-line options
 var opts struct {
-	ddConfigFile string
-	configFile   string
-	pidfilePath  string
-	logLevel     string
-	version      bool
-	info         bool
-	cpuprofile   string
-	memprofile   string
+	configFile       string
+	legacyConfigFile string
+	pidfilePath      string
+	logLevel         string
+	version          bool
+	info             bool
+	cpuprofile       string
+	memprofile       string
 }
 
 const agentDisabledMessage = `trace-agent not enabled.
@@ -113,37 +113,36 @@ func runAgent(exit chan struct{}) {
 	}
 
 	// Instantiate the config
-	var agentConf *config.AgentConfig
 	var err error
-	var legacyConf *config.File
+	// trace-agent configuration
+	var agentConf *config.AgentConfig
+	// Agent 6 datadog.yaml config
 	var yamlConf *config.YamlAgentConfig
+	// Agent 5 datadog.conf config
 	var conf *config.File
+	// deprecated Agent 5 trace-agent.ini config
+	var legacyConf *config.File
 
-	// if a configuration file cannot be loaded, log an error but do not
-	// panic since the agent can be configured with environment variables
-	// only.
-	legacyConf, err = config.NewIfExists(opts.configFile)
+	if filepath.Ext(opts.configFile) == ".conf" {
+		conf, err = config.NewIniIfExists(opts.legacyConfigFile)
+		if err != nil {
+			log.Criticalf("Error reading datadog.conf: %s", err)
+		}
+	} else if filepath.Ext(opts.legacyConfigFile) == ".yaml" {
+		yamlConf, err = config.NewYamlIfExists(opts.legacyConfigFile)
+		if err != nil {
+			log.Criticalf("Error reading datadog.yaml: %s", err)
+		}
+	}
+
+	legacyConf, err = config.NewIniIfExists(opts.legacyConfigFile)
 	if err != nil {
 		log.Errorf("%s: %v", opts.configFile, err)
 		log.Warnf("ignoring %s", opts.configFile)
 	}
 	if legacyConf != nil {
-		log.Infof("using legacy configuration from %s", opts.configFile)
+		log.Warnf("using legacy configuration from %s, -ddconfig option is deprecated and will be removed in future versions", opts.configFile)
 	}
-
-	if filepath.Ext(opts.ddConfigFile) == ".conf" {
-		conf, err = config.NewIfExists(opts.ddConfigFile)
-		if err != nil {
-			log.Criticalf("Error reading datadog.yaml: %s", err)
-		}
-	} else if filepath.Ext(opts.ddConfigFile) == ".yaml" {
-		yamlConf, err = config.NewYamlIfExists(opts.ddConfigFile)
-		if err != nil {
-			log.Criticalf("Error reading datadog.yaml: %s", err)
-		}
-	}
-
-	log.Infof("Using configuration from: %s", opts.ddConfigFile)
 
 	agentConf, err = config.NewAgentConfig(conf, legacyConf, yamlConf)
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/DataDog/datadog-trace-agent/backoff"
+	"github.com/DataDog/datadog-trace-agent/model"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 
 	"github.com/DataDog/datadog-trace-agent/utils"
@@ -16,6 +17,33 @@ import (
 
 // YamlAgentConfig is a structure used for marshaling the datadog.yaml configuration
 // available in Agent versions >= 6
+type YamlAgentConfig struct {
+	APIKey   string `yaml:"api_key"`
+	HostName string `yaml:"hostname"`
+
+	ReceiverHost string     ""
+	LogLevel     string     `yaml:"log_level"`
+	TraceAgent   traceAgent `yaml:"apm_config"`
+}
+
+type traceAgent struct {
+	Enabled            bool    `yaml:"enabled"`
+	Env                string  `yaml:"env"`
+	ExtraSampleRate    float64 `yaml:"extra_sample_rate"`
+	MaxTracesPerSecond float64 `yaml:"max_traces_per_second"`
+	Ignore             string  `yaml:"ignore_resource"`
+	ReceiverPort       int     `yaml:"receiver_port"`
+	ConnectionLimit    int     `yaml:"connection_limit"`
+	NonLocalTraffic    string  `yaml:"trace_non_local_traffic"` // TODO: check that
+	StatsdHost         string  `yaml:"apm_statsd_host"`         // TODO: check that
+	StatsdPort         int     `yaml:"apm_statsd_port"`         // TODO: check that
+
+	TraceWriter   traceWriter   `yaml:"trace_writer"`
+	ServiceWriter serviceWriter `yaml:"service_writer"`
+	StatsWriter   statsWriter   `yaml:"stats_writer"`
+
+	AnalyzedRateByService map[string]float64 `yaml:"analyzed_rate_by_service"`
+}
 
 type traceWriter struct {
 	MaxSpansPerPayload     int                    `yaml:"max_spans_per_payload"`
@@ -44,41 +72,11 @@ type queueablePayloadSender struct {
 	BackoffGrowth     int   `yaml:"exp_backoff_growth_base"`
 }
 
-type traceAgent struct {
-	Enabled            bool    `yaml:"enabled"`
-	Env                string  `yaml:"env"`
-	ExtraSampleRate    float64 `yaml:"extra_sample_rate"`
-	MaxTracesPerSecond float64 `yaml:"max_traces_per_second"`
-	Ignore             string  `yaml:"ignore_resource"`
-	ReceiverPort       int     `yaml:"receiver_port"`
-	ConnectionLimit    int     `yaml:"connection_limit"`
-	NonLocalTraffic    string  `yaml:"trace_non_local_traffic"`
-	StatsdHost         string  `yaml:"apm_statsd_host"`
-	StatsdPort         int     `yaml:"apm_statsd_port"`
-
-	TraceWriter   traceWriter   `yaml:"trace_writer"`
-	ServiceWriter serviceWriter `yaml:"service_writer"`
-	StatsWriter   statsWriter   `yaml:"stats_writer"`
-
-	AnalyzedRateByService map[string]float64 `yaml:"analyzed_rate_by_service"`
-}
-
-//YamlAgentConfig is the Primary Object we retrieve from Datadog.yaml
-type YamlAgentConfig struct {
-	APIKey   string `yaml:"api_key"`
-	HostName string `yaml:"hostname"`
-
-	ReceiverHost string     ""
-	LogLevel     string     `yaml:"log_level"`
-	DefaultEnv   string     `yaml:"env"`
-	TraceAgent   traceAgent `yaml:"apm_config"`
-}
-
-// newYamlIfExists returns a new YamlAgentConfig for the provided byte array.
-func newYamlFromBytes(contents []byte) (*YamlAgentConfig, error) {
+// newYamlFromBytes returns a new YamlAgentConfig for the provided byte array.
+func newYamlFromBytes(bytes []byte) (*YamlAgentConfig, error) {
 	var yamlConf YamlAgentConfig
 
-	if err := yaml.Unmarshal(contents, &yamlConf); err != nil {
+	if err := yaml.Unmarshal(bytes, &yamlConf); err != nil {
 		return nil, fmt.Errorf("parse error: %s", err)
 	}
 	return &yamlConf, nil
@@ -91,16 +89,19 @@ func NewYamlIfExists(configPath string) (*YamlAgentConfig, error) {
 		if err != nil {
 			return nil, err
 		}
-		return newYamlFromBytes([]byte(fileContent))
+		return newYamlFromBytes(fileContent)
 	}
 	return nil, nil
 }
 
-func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) (*AgentConfig, error) {
+func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
+	if yc == nil {
+		return nil
+	}
+
 	agentConf.APIKey = yc.APIKey
 	agentConf.HostName = yc.HostName
 	agentConf.Enabled = yc.TraceAgent.Enabled
-	agentConf.DefaultEnv = yc.DefaultEnv
 
 	if yc.TraceAgent.ReceiverPort > 0 {
 		agentConf.ReceiverPort = yc.TraceAgent.ReceiverPort
@@ -123,7 +124,7 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) (*AgentConfig,
 
 	//Allow user to specify a different ENV for APM Specifically
 	if yc.TraceAgent.Env != "" {
-		agentConf.DefaultEnv = yc.TraceAgent.Env
+		agentConf.DefaultEnv = model.NormalizeTag(yc.TraceAgent.Env)
 	}
 
 	if yc.TraceAgent.StatsdHost != "" {
@@ -145,7 +146,7 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) (*AgentConfig,
 
 	agentConf.AnalyzedRateByService = yc.TraceAgent.AnalyzedRateByService
 
-	return agentConf, nil
+	return nil
 }
 
 func readServiceWriterConfigYaml(yc serviceWriter) writerconfig.ServiceWriterConfig {
@@ -213,6 +214,7 @@ func readQueueablePayloadSenderConfigYaml(yc queueablePayloadSender) writerconfi
 	return c
 }
 
+// TODO: maybe this is too many options exposed?
 func readExponentialBackoffConfigYaml(yc queueablePayloadSender) backoff.ExponentialConfig {
 	c := backoff.DefaultExponentialConfig()
 

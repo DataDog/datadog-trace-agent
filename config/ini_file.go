@@ -31,9 +31,9 @@ func New(configPath string) (*File, error) {
 	return globalConfig, nil
 }
 
-// NewIfExists works as New, but does not return an error if the file does not
+// NewIniIfExists works as New, but does not return an error if the file does not
 // exist. Instead, it returns a null File pointer.
-func NewIfExists(configPath string) (*File, error) {
+func NewIniIfExists(configPath string) (*File, error) {
 	config, err := New(configPath)
 	if terr, ok := err.(*os.PathError); ok {
 		if terr, ok := terr.Err.(syscall.Errno); ok && terr == syscall.ENOENT {
