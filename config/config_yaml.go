@@ -56,6 +56,8 @@ type traceAgent struct {
 	TraceWriter   traceWriter   `yaml:"trace_writer"`
 	ServiceWriter serviceWriter `yaml:"service_writer"`
 	StatsWriter   statsWriter   `yaml:"stats_writer"`
+
+	AnalyzedRateByService map[string]float64 `yaml:"analyzed_rate_by_service"`
 }
 
 //YamlAgentConfig is the Primary Object we retrieve from Datadog.yaml
@@ -99,7 +101,9 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) (*AgentConfig,
 
 	agentConf.Ignore["resource"] = strings.Split(yc.TraceAgent.Ignore, ",")
 
-	agentConf.ConnectionLimit = yc.TraceAgent.ConnectionLimit
+	if yc.TraceAgent.ConnectionLimit != 0 {
+		agentConf.ConnectionLimit = yc.TraceAgent.ConnectionLimit
+	}
 
 	//Allow user to specify a different ENV for APM Specifically
 	if yc.TraceAgent.Env != "" {
@@ -122,6 +126,9 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) (*AgentConfig,
 	agentConf.ServiceWriterConfig = readServiceWriterConfigYaml(yc.TraceAgent.ServiceWriter)
 	agentConf.StatsWriterConfig = readStatsWriterConfigYaml(yc.TraceAgent.StatsWriter)
 	agentConf.TraceWriterConfig = readTraceWriterConfigYaml(yc.TraceAgent.TraceWriter)
+
+	agentConf.AnalyzedRateByService = yc.TraceAgent.AnalyzedRateByService
+
 	return agentConf, nil
 }
 
@@ -173,15 +180,15 @@ func readTraceWriterConfigYaml(yc traceWriter) writerconfig.TraceWriterConfig {
 func readQueueablePayloadSenderConfigYaml(yc queueablePayloadSender) writerconfig.QueuablePayloadSenderConf {
 	c := writerconfig.DefaultQueuablePayloadSenderConf()
 
-	if yc.MaxAge > 0 {
+	if yc.MaxAge != 0 {
 		c.MaxAge = utils.GetDuration(yc.MaxAge)
 	}
 
-	if yc.MaxQueuedBytes > 0 {
+	if yc.MaxQueuedBytes != 0 {
 		c.MaxQueuedBytes = yc.MaxQueuedBytes
 	}
 
-	if yc.MaxQueuedPayloads > 0 {
+	if yc.MaxQueuedPayloads != 0 {
 		c.MaxQueuedPayloads = yc.MaxQueuedPayloads
 	}
 

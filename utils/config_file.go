@@ -13,7 +13,7 @@ func PathExists(filename string) bool {
 	return false
 }
 
-// GetDuration returns the duration of the provided value
-func GetDuration(value int) time.Duration {
-	return time.Duration(value) * time.Second
+// GetDuration returns the duration of the provided value in seconds
+func GetDuration(seconds int) time.Duration {
+	return time.Duration(seconds) * time.Second
 }
