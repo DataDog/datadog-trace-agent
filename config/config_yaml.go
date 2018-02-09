@@ -64,7 +64,7 @@ type YamlAgentConfig struct {
 			BackoffBase       int   `yaml:"exp_backoff_base_milliseconds"`
 			BackoffGrowth     int   `yaml:"exp_backoff_growth_base"`
 		} `yaml:"stats_writer"`
-	} `yaml:"trace_config"`
+	} `yaml:"apm_config"`
 }
 
 // NewYamlIfExists returns a new YamlAgentConfig if the given configPath is exists.
