@@ -1,20 +1,16 @@
-hash: 964aef5f496a1bda4edc19fa97ba8a6cf9cec7a96366c2976dab87a66cb2a9c4
-updated: 2018-02-08T17:07:02.827534645Z
+hash: b5bd8505348ccf843ecec4e5f6c53980dd936c6d950dbaf22d4443ed037e625f
+updated: 2018-02-09T15:15:49.88021+01:00
 imports:
 - name: github.com/cihub/seelog
   version: d2c6e5aa9fbfdd1c624e140287063c7730654115
 - name: github.com/DataDog/datadog-agent
   version: ca6610b3233b82d8574fe2d647aa2ca830aee1c9
   subpackages:
-  - pkg/config
   - pkg/pidfile
-  - pkg/version
 - name: github.com/DataDog/datadog-go
   version: a9c7a9896c1847c9cc2b068a2ae68e9d74540a5d
   subpackages:
   - statsd
-- name: github.com/fsnotify/fsnotify
-  version: c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9
 - name: github.com/go-ini/ini
   version: 74bdc99692c3408cb103221e38675ce8fda0a718
 - name: github.com/go-ole/go-ole
@@ -36,23 +32,6 @@ imports:
   version: 219e654bb7266d3b73c4610ed24c33d12560826a
   subpackages:
   - go/gcexportdata
-- name: github.com/hashicorp/hcl
-  version: 23c074d0eceb2b8a5bfdbb271ab780cde70f05a8
-  subpackages:
-  - hcl/ast
-  - hcl/parser
-  - hcl/scanner
-  - hcl/strconv
-  - hcl/token
-  - json/parser
-  - json/scanner
-  - json/token
-- name: github.com/magiconair/properties
-  version: 49d762b9817ba1c2e9d0c69183c2b4a8b8f1d934
-- name: github.com/mitchellh/mapstructure
-  version: a4e142e9c047c904fa2f1e144d9a84e6133024bc
-- name: github.com/pelletier/go-toml
-  version: acdc4509485b587f5e675510c4f2c63e90ff68a8
 - name: github.com/philhofer/fwd
   version: bb6d471dc95d4fe11e432687f8b70ff496cf3136
 - name: github.com/shirou/gopsutil
@@ -66,18 +45,6 @@ imports:
   - process
 - name: github.com/shirou/w32
   version: bb4de0191aa41b5507caa14b0650cdbddcd9280b
-- name: github.com/spf13/afero
-  version: bb8f1927f2a9d3ab41c9340aa034f6b803f4359c
-  subpackages:
-  - mem
-- name: github.com/spf13/cast
-  version: acbeb36b902d72a7a4c18e8f3241075e7ab763e4
-- name: github.com/spf13/jwalterweatherman
-  version: 7c0cea34c8ece3fbeb2b27ab9b59511d360fb394
-- name: github.com/spf13/pflag
-  version: 4c012f6dcd9546820e378d0bdda4d8fc772cdfea
-- name: github.com/spf13/viper
-  version: 25b30aa063fc18e48662b86996252eabdcf2f0c7
 - name: github.com/StackExchange/wmi
   version: 5d049714c4a64225c3c79a7cf7d02f7fb5b96338
 - name: github.com/tinylib/msgp
@@ -87,18 +54,12 @@ imports:
 - name: golang.org/x/sys
   version: 37707fdb30a5b38865cfb95e5aab41707daec7fd
   subpackages:
-  - unix
   - windows
   - windows/registry
   - windows/svc
   - windows/svc/debug
   - windows/svc/eventlog
   - windows/svc/mgr
-- name: golang.org/x/text
-  version: 4e4a3210bb54bb31f6ab2cdca2edcc0b50c420c1
-  subpackages:
-  - transform
-  - unicode/norm
 - name: gopkg.in/yaml.v2
   version: d670f9405373e636a5a2765eea47fac0c9bc91a4
 testImports:
