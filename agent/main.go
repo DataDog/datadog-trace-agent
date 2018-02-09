@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"runtime/pprof"
 	"strings"
@@ -114,11 +115,14 @@ func runAgent(exit chan struct{}) {
 	// Instantiate the config
 	var agentConf *config.AgentConfig
 	var err error
+	var legacyConf *config.File
+	var yamlConf *config.YamlAgentConfig
+	var conf *config.File
 
 	// if a configuration file cannot be loaded, log an error but do not
 	// panic since the agent can be configured with environment variables
 	// only.
-	legacyConf, err := config.NewIfExists(opts.configFile)
+	legacyConf, err = config.NewIfExists(opts.configFile)
 	if err != nil {
 		log.Errorf("%s: %v", opts.configFile, err)
 		log.Warnf("ignoring %s", opts.configFile)
@@ -127,16 +131,21 @@ func runAgent(exit chan struct{}) {
 		log.Infof("using legacy configuration from %s", opts.configFile)
 	}
 
-	conf, err := config.NewIfExists(opts.ddConfigFile)
-	if err != nil {
-		log.Errorf("%s: %v", opts.ddConfigFile, err)
-		log.Warnf("ignoring %s", opts.ddConfigFile)
-	}
-	if conf != nil {
-		log.Infof("using configuration from %s", opts.ddConfigFile)
+	if filepath.Ext(opts.ddConfigFile) == ".conf" {
+		conf, err = config.NewIfExists(opts.ddConfigFile)
+		if err != nil {
+			log.Criticalf("Error reading datadog.yaml: %s", err)
+		}
+	} else if filepath.Ext(opts.ddConfigFile) == ".yaml" {
+		yamlConf, err = config.NewYamlIfExists(opts.ddConfigFile)
+		if err != nil {
+			log.Criticalf("Error reading datadog.yaml: %s", err)
+		}
 	}
 
-	agentConf, err = config.NewAgentConfig(conf, legacyConf)
+	log.Infof("Using configuration from: %s", opts.ddConfigFile)
+
+	agentConf, err = config.NewAgentConfig(conf, legacyConf, yamlConf)
 	if err != nil {
 		die("%v", err)
 	}
