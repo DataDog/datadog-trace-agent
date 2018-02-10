@@ -65,16 +65,40 @@ func mergeIniConfig(c *AgentConfig, conf *File) error {
 		}
 	}
 
+	// [trace.api] section
+	// TODO: deprecate this old api_key location
+	if v, _ := conf.Get("trace.api", "api_key"); v != "" {
+		vals := strings.Split(v, ",")
+		for i := range vals {
+			vals[i] = strings.TrimSpace(vals[i])
+		}
+		c.APIKey = vals[0]
+	}
+	// undocumented
+	if v, _ := conf.Get("trace.api", "endpoint"); v != "" {
+		vals := strings.Split(v, ",")
+		for i := range vals {
+			vals[i] = strings.TrimSpace(vals[i])
+		}
+
+		// Takes the first endpoint
+		c.APIEndpoint = vals[0]
+	}
+
 	// [trace.config] section
 	if v, _ := conf.Get("trace.config", "env"); v != "" {
 		c.DefaultEnv = model.NormalizeTag(v)
 	}
+	// undocumented
+	// TODO: DEPRECATED? do we keep this one?
 	if v, _ := conf.Get("trace.config", "log_level"); v != "" {
 		c.LogLevel = v
 	}
+	// undocumented
 	if v, _ := conf.Get("trace.config", "log_file"); v != "" {
 		c.LogFilePath = v
 	}
+	// undocumented
 	if v := strings.ToLower(conf.GetDefault("trace.config", "log_throttling", "")); v == "no" || v == "false" {
 		c.LogThrottlingEnabled = false
 	}
@@ -85,6 +109,7 @@ func mergeIniConfig(c *AgentConfig, conf *File) error {
 	}
 
 	// [trace.analyzed_rate_by_service] section
+	// undocumented
 	if v, e := conf.GetSection("trace.analyzed_rate_by_service"); e == nil {
 		rates := v.KeysHash()
 		for service, rate := range rates {
@@ -98,28 +123,14 @@ func mergeIniConfig(c *AgentConfig, conf *File) error {
 		}
 	}
 
-	// [trace.api] section
-	if v, _ := conf.Get("trace.api", "api_key"); v != "" {
-		vals := strings.Split(v, ",")
-		for i := range vals {
-			vals[i] = strings.TrimSpace(vals[i])
-		}
-		c.APIKey = vals[0]
-	}
-	if v, _ := conf.Get("trace.api", "endpoint"); v != "" {
-		vals := strings.Split(v, ",")
-		for i := range vals {
-			vals[i] = strings.TrimSpace(vals[i])
-		}
-
-		// Takes the first endpoint
-		c.APIEndpoint = vals[0]
-	}
-
 	// [trace.concentrator] section
+	// undocumented
+	// TODO: remove, should stay internal?
 	if v, e := conf.GetInt("trace.concentrator", "bucket_size_seconds"); e == nil {
 		c.BucketInterval = time.Duration(v) * time.Second
 	}
+	// undocumented
+	// TODO: remove, should stay internal?
 	if v, e := conf.GetStrArray("trace.concentrator", "extra_aggregators", ','); e == nil {
 		c.ExtraAggregators = append(c.ExtraAggregators, v...)
 	} else {
@@ -130,6 +141,8 @@ func mergeIniConfig(c *AgentConfig, conf *File) error {
 	if v, e := conf.GetFloat("trace.sampler", "extra_sample_rate"); e == nil {
 		c.ExtraSampleRate = v
 	}
+	// undocumented
+	// TODO: remove, should stay internal?
 	if v, e := conf.GetFloat("trace.sampler", "pre_sample_rate"); e == nil {
 		c.PreSampleRate = v
 	}
@@ -141,9 +154,11 @@ func mergeIniConfig(c *AgentConfig, conf *File) error {
 	if v, e := conf.GetInt("trace.receiver", "receiver_port"); e == nil {
 		c.ReceiverPort = v
 	}
+	// undocumented
 	if v, e := conf.GetInt("trace.receiver", "connection_limit"); e == nil {
 		c.ConnectionLimit = v
 	}
+	// undocumented
 	if v, e := conf.GetInt("trace.receiver", "timeout"); e == nil {
 		c.ReceiverTimeout = v
 	}
@@ -158,11 +173,14 @@ func mergeIniConfig(c *AgentConfig, conf *File) error {
 	if v, e := conf.GetInt("trace.watchdog", "max_connections"); e == nil {
 		c.MaxConnections = v
 	}
+	// undocumented
+	// TODO: remove, should stay internal?
 	if v, e := conf.GetInt("trace.watchdog", "check_delay_seconds"); e == nil {
 		c.WatchdogInterval = time.Duration(v) * time.Second
 	}
 
 	// [trace.writer.*] sections
+	// undocumented, should they stay all internal?
 	c.ServiceWriterConfig = readServiceWriterConfig(conf, "trace.writer.services")
 	c.StatsWriterConfig = readStatsWriterConfig(conf, "trace.writer.stats")
 	c.TraceWriterConfig = readTraceWriterConfig(conf, "trace.writer.traces")
