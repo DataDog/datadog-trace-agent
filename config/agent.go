@@ -10,8 +10,6 @@ import (
 	"time"
 
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
-
-	log "github.com/cihub/seelog"
 )
 
 // AgentConfig handles the interpretation of the configuration (with default
@@ -78,13 +76,8 @@ type AgentConfig struct {
 
 // NewDefaultAgentConfig returns a configuration with the default values
 func NewDefaultAgentConfig() *AgentConfig {
-	hostname, err := getHostname()
-	if err != nil {
-		hostname = ""
-	}
-	ac := &AgentConfig{
+	return &AgentConfig{
 		Enabled:     true,
-		HostName:    hostname,
 		DefaultEnv:  "none",
 		APIEndpoint: "https://trace.agent.datadoghq.com",
 		APIKey:      "",
@@ -120,8 +113,6 @@ func NewDefaultAgentConfig() *AgentConfig {
 		Ignore:                make(map[string][]string),
 		AnalyzedRateByService: make(map[string]float64),
 	}
-
-	return ac
 }
 
 // getHostname shells out to obtain the hostname used by the infra agent
@@ -139,18 +130,16 @@ func getHostname() (string, error) {
 
 	err := cmd.Run()
 	if err != nil {
-		log.Infof("error retrieving dd-agent hostname, falling back to os.Hostname(): %v", err)
 		return os.Hostname()
 	}
 
 	hostname := strings.TrimSpace(stdout.String())
 
 	if hostname == "" {
-		log.Infof("error retrieving dd-agent hostname, falling back to os.Hostname(): %s", stderr.String())
 		return os.Hostname()
 	}
 
-	return hostname, err
+	return hostname, nil
 }
 
 // NewAgentConfig creates the AgentConfig from the standard config
@@ -187,6 +176,16 @@ func NewAgentConfig(conf *File, legacyConf *File, agentYaml *YamlAgentConfig) (*
 	// check for api-endpoint parity after all possible overrides have been applied
 	if c.APIKey == "" {
 		return c, errors.New("you must specify an API Key, either via a configuration file or the DD_API_KEY env var")
+	}
+
+	// If hostname isn't provided in the configuration, try to guess it.
+	// TODO: rely on Agent 6 code instead.
+	if c.HostName == "" {
+		hostname, err := getHostname()
+		if err != nil {
+			return c, errors.New("failed to automatically set the hostname, you must specify it via configuration for or the DD_HOSTNAME env var")
+		}
+		c.HostName = hostname
 	}
 
 	return c, nil

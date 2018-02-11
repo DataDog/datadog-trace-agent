@@ -20,11 +20,12 @@ import (
 // YamlAgentConfig is a structure used for marshaling the datadog.yaml configuration
 // available in Agent versions >= 6
 type YamlAgentConfig struct {
-	APIKey       string `yaml:"api_key"`
-	HostName     string `yaml:"hostname"`
-	LogLevel     string `yaml:"log_level"`
-	Proxy        proxy  `yaml:"proxy"`
-	ReceiverHost string ""
+	APIKey   string `yaml:"api_key"`
+	HostName string `yaml:"hostname"`
+	LogLevel string `yaml:"log_level"`
+	Proxy    proxy  `yaml:"proxy"`
+
+	StatsdPort int `yaml:"dogstatsd_port"`
 
 	TraceAgent traceAgent `yaml:"apm_config"`
 }
@@ -36,16 +37,14 @@ type proxy struct {
 }
 
 type traceAgent struct {
-	Enabled            bool    `yaml:"enabled"`
+	Enabled            *bool   `yaml:"enabled"`
+	Endpoint           string  `yaml:"apm_dd_url"`
 	Env                string  `yaml:"env"`
 	ExtraSampleRate    float64 `yaml:"extra_sample_rate"`
 	MaxTracesPerSecond float64 `yaml:"max_traces_per_second"`
-	Ignore             string  `yaml:"ignore_resource"`
+	IgnoreResource     string  `yaml:"ignore_resource"`
 	ReceiverPort       int     `yaml:"receiver_port"`
-	ConnectionLimit    int     `yaml:"connection_limit"`
-	NonLocalTraffic    string  `yaml:"trace_non_local_traffic"` // TODO: check that
-	StatsdHost         string  `yaml:"apm_statsd_host"`         // TODO: check that
-	StatsdPort         int     `yaml:"apm_statsd_port"`         // TODO: check that
+	APMNonLocalTraffic *bool   `yaml:"apm_non_local_traffic"`
 
 	TraceWriter   traceWriter   `yaml:"trace_writer"`
 	ServiceWriter serviceWriter `yaml:"service_writer"`
@@ -86,7 +85,7 @@ func newYamlFromBytes(bytes []byte) (*YamlAgentConfig, error) {
 	var yamlConf YamlAgentConfig
 
 	if err := yaml.Unmarshal(bytes, &yamlConf); err != nil {
-		return nil, fmt.Errorf("parse error: %s", err)
+		return nil, fmt.Errorf("failed to parse yaml configuration: %s", err)
 	}
 	return &yamlConf, nil
 }
@@ -108,11 +107,17 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
 		return nil
 	}
 
-	agentConf.APIKey = yc.APIKey
-	agentConf.HostName = yc.HostName
-	agentConf.Enabled = yc.TraceAgent.Enabled
+	if yc.APIKey != "" {
+		agentConf.APIKey = yc.APIKey
+	}
+	if yc.HostName != "" {
+		agentConf.HostName = yc.HostName
+	}
+	if yc.StatsdPort > 0 {
+		agentConf.StatsdPort = yc.StatsdPort
+	}
 
-	// respect Agent proxy configuration in the special case of the Trace Agent API
+	// respect Agent proxy configuration knowing we only have to support the APIEndpoint HTTPS case
 	if yc.Proxy.HTTPS != "" {
 		traceAgentNoProxy := false
 		for _, host := range yc.Proxy.NoProxy {
@@ -133,12 +138,22 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
 		}
 	}
 
+	if yc.TraceAgent.Enabled != nil {
+		agentConf.Enabled = *yc.TraceAgent.Enabled
+	}
+
+	if yc.TraceAgent.Endpoint != "" {
+		agentConf.APIEndpoint = yc.TraceAgent.Endpoint
+	}
+
+	if yc.TraceAgent.Env != "" {
+		agentConf.DefaultEnv = model.NormalizeTag(yc.TraceAgent.Env)
+	}
+
 	if yc.TraceAgent.ReceiverPort > 0 {
 		agentConf.ReceiverPort = yc.TraceAgent.ReceiverPort
 	}
-	if yc.TraceAgent.StatsdPort > 0 {
-		agentConf.StatsdPort = yc.TraceAgent.StatsdPort
-	}
+
 	if yc.TraceAgent.ExtraSampleRate > 0 {
 		agentConf.ExtraSampleRate = yc.TraceAgent.ExtraSampleRate
 	}
@@ -146,33 +161,20 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
 		agentConf.MaxTPS = yc.TraceAgent.MaxTracesPerSecond
 	}
 
-	agentConf.Ignore["resource"] = strings.Split(yc.TraceAgent.Ignore, ",")
-
-	if yc.TraceAgent.ConnectionLimit > 0 {
-		agentConf.ConnectionLimit = yc.TraceAgent.ConnectionLimit
+	if yc.TraceAgent.IgnoreResource != "" {
+		agentConf.Ignore["resource"] = strings.Split(yc.TraceAgent.IgnoreResource, ",")
 	}
 
-	if yc.TraceAgent.Env != "" {
-		agentConf.DefaultEnv = model.NormalizeTag(yc.TraceAgent.Env)
+	if yc.TraceAgent.APMNonLocalTraffic != nil && *yc.TraceAgent.APMNonLocalTraffic {
+		agentConf.ReceiverHost = "0.0.0.0"
 	}
 
-	if yc.TraceAgent.StatsdHost != "" {
-		yc.ReceiverHost = yc.TraceAgent.StatsdHost
-	}
-
-	// Respect non_local_traffic
-	if v := strings.ToLower(yc.TraceAgent.NonLocalTraffic); v == "yes" || v == "true" {
-		yc.TraceAgent.StatsdHost = "0.0.0.0"
-		yc.ReceiverHost = "0.0.0.0"
-	}
-
-	agentConf.StatsdHost = yc.TraceAgent.StatsdHost
-	agentConf.ReceiverHost = yc.ReceiverHost
-
+	// undocumented
 	agentConf.ServiceWriterConfig = readServiceWriterConfigYaml(yc.TraceAgent.ServiceWriter)
 	agentConf.StatsWriterConfig = readStatsWriterConfigYaml(yc.TraceAgent.StatsWriter)
 	agentConf.TraceWriterConfig = readTraceWriterConfigYaml(yc.TraceAgent.TraceWriter)
 
+	// undocumented
 	agentConf.AnalyzedRateByService = yc.TraceAgent.AnalyzedRateByService
 
 	return nil
@@ -243,7 +245,6 @@ func readQueueablePayloadSenderConfigYaml(yc queueablePayloadSender) writerconfi
 	return c
 }
 
-// TODO: maybe this is too many options exposed?
 func readExponentialBackoffConfigYaml(yc queueablePayloadSender) backoff.ExponentialConfig {
 	c := backoff.DefaultExponentialConfig()
 

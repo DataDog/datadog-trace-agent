@@ -17,12 +17,10 @@ func mergeEnv(c *AgentConfig) {
 	}
 
 	if v := os.Getenv("DD_HOSTNAME"); v != "" {
-		log.Error("overriding hostname from env DD_HOSTNAME value")
 		c.HostName = v
 	}
 
 	if v := os.Getenv("DD_API_KEY"); v != "" {
-		log.Error("overriding API key from env API_KEY value")
 		vals := strings.Split(v, ",")
 		for i := range vals {
 			vals[i] = strings.TrimSpace(vals[i])

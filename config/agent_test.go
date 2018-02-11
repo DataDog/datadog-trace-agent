@@ -2,11 +2,9 @@ package config
 
 import (
 	"os"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/go-ini/ini"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,6 +20,8 @@ func TestDefaultConfig(t *testing.T) {
 	assert.Equal(agentConfig.StatsdPort, 8125)
 
 	assert.Equal(agentConfig.LogLevel, "INFO")
+	assert.Equal(agentConfig.Enabled, true)
+
 }
 
 func TestOnlyEnvConfig(t *testing.T) {
@@ -37,17 +37,11 @@ func TestOnlyEnvConfig(t *testing.T) {
 func TestOnlyDDAgentConfig(t *testing.T) {
 	assert := assert.New(t)
 
-	// absent an override by legacy config, reading from dd-agent config should do the right thing
-	ddAgentConf, _ := ini.Load([]byte(strings.Join([]string{
-		"[Main]",
-		"hostname = thing",
-		"api_key = apikey_12",
-		"bind_host = 0.0.0.0",
-		"dogstatsd_port = 28125",
-		"log_level = DEBUG",
-	}, "\n")))
-	configFile := &File{instance: ddAgentConf, Path: "whatever"}
-	agentConfig, _ := NewAgentConfig(configFile, nil, nil)
+	iniConf, err := NewIni("./test_cases/no_apm_config.ini")
+	assert.NoError(err)
+
+	agentConfig, err := NewAgentConfig(iniConf, nil, nil)
+	assert.NoError(err)
 
 	assert.Equal("thing", agentConfig.HostName)
 	assert.Equal("apikey_12", agentConfig.APIKey)
@@ -57,112 +51,79 @@ func TestOnlyDDAgentConfig(t *testing.T) {
 }
 
 func TestDDAgentMultiAPIKeys(t *testing.T) {
+	// old feature Datadog Agent feature, got dropped since
+	// TODO: at some point, expire this case
 	assert := assert.New(t)
-	ddAgentConf, _ := ini.Load([]byte("[Main]\n\napi_key=foo, bar "))
-	configFile := &File{instance: ddAgentConf, Path: "whatever"}
 
-	agentConfig, _ := NewAgentConfig(configFile, nil, nil)
+	iniConf, err := NewIni("./test_cases/multi_api_keys.ini")
+	assert.NoError(err)
+
+	agentConfig, err := NewAgentConfig(iniConf, nil, nil)
+	assert.NoError(err)
+
 	assert.Equal("foo", agentConfig.APIKey)
 }
 
-func TestDDAgentConfigWithLegacy(t *testing.T) {
+func TestFullINiConfig(t *testing.T) {
 	assert := assert.New(t)
 
-	defaultConfig := NewDefaultAgentConfig()
+	iniConf, err := NewIni("./test_cases/full.ini")
+	assert.NoError(err, "failed to parse valid configuration")
 
-	// check that legacy conf file overrides dd-agent.conf
-	dd, _ := ini.Load([]byte("[Main]\n\nhostname=thing\napi_key=apikey_12"))
-	legacy, _ := ini.Load([]byte(strings.Join([]string{
-		"[trace.api]",
-		"api_key = pommedapi",
-		"endpoint = an_endpoint",
-		"[trace.concentrator]",
-		"extra_aggregators=region,error",
-		"[trace.sampler]",
-		"extra_sample_rate=0.33",
-	}, "\n")))
+	c, err := NewAgentConfig(iniConf, nil, nil)
+	assert.NoError(err)
 
-	conf := &File{instance: dd, Path: "whatever"}
-	legacyConf := &File{instance: legacy, Path: "whatever"}
+	assert.Equal("api_key_test", c.APIKey)
+	assert.Equal("mymachine", c.HostName)
+	assert.Equal("https://user:password@proxy_for_https:1234", c.ProxyURL.String())
+	assert.Equal("https://datadog.unittests", c.APIEndpoint)
+	assert.Equal(false, c.Enabled)
+	assert.Equal("test", c.DefaultEnv)
+	assert.Equal(18126, c.ReceiverPort)
+	assert.Equal(0.5, c.ExtraSampleRate)
+	assert.Equal(5.0, c.MaxTPS)
+	assert.Equal("0.0.0.0", c.ReceiverHost)
 
-	agentConfig, _ := NewAgentConfig(conf, legacyConf, nil)
-
-	// Properly loaded attributes
-	assert.Equal("pommedapi", agentConfig.APIKey)
-	assert.Equal("an_endpoint", agentConfig.APIEndpoint)
-
-	// ExtraAggregators contains Datadog defaults + user-specified aggregators
-	assert.Equal([]string{"http.status_code", "region", "error"}, agentConfig.ExtraAggregators)
-	assert.Equal(0.33, agentConfig.ExtraSampleRate)
-
-	// Check some defaults
-	assert.Equal(defaultConfig.BucketInterval, agentConfig.BucketInterval)
-	assert.Equal(defaultConfig.StatsdHost, agentConfig.StatsdHost)
+	assert.EqualValues([]string{"/health", "/500"}, c.Ignore["resource"])
 }
 
-func TestDDAgentConfigWithNewOpts(t *testing.T) {
+func TestFullYamlConfig(t *testing.T) {
 	assert := assert.New(t)
-	// check that providing trace.* options in the dd-agent conf file works
-	dd, _ := ini.Load([]byte(strings.Join([]string{
-		"[Main]",
-		"hostname = thing",
-		"api_key = apikey_12",
-		"[trace.concentrator]",
-		"extra_aggregators=region,error",
-		"[trace.sampler]",
-		"extra_sample_rate=0.33",
-	}, "\n")))
 
-	conf := &File{instance: dd, Path: "whatever"}
-	agentConfig, _ := NewAgentConfig(conf, nil, nil)
+	yamlConf, err := NewYamlIfExists("./test_cases/full.yaml")
+	assert.NoError(err, "failed to parse valid configuration")
 
-	// ExtraAggregators contains Datadog defaults + user-specified aggregators
-	assert.Equal([]string{"http.status_code", "region", "error"}, agentConfig.ExtraAggregators)
-	assert.Equal(0.33, agentConfig.ExtraSampleRate)
+	c, err := NewAgentConfig(nil, nil, yamlConf)
+	assert.NoError(err)
+
+	assert.Equal("api_key_test", c.APIKey)
+	assert.Equal("mymachine", c.HostName)
+	assert.Equal("https://user:password@proxy_for_https:1234", c.ProxyURL.String())
+	assert.Equal("https://datadog.unittests", c.APIEndpoint)
+	assert.Equal(false, c.Enabled)
+	assert.Equal("test", c.DefaultEnv)
+	assert.Equal(18126, c.ReceiverPort)
+	assert.Equal(0.5, c.ExtraSampleRate)
+	assert.Equal(5.0, c.MaxTPS)
+	assert.Equal("0.0.0.0", c.ReceiverHost)
+
+	assert.EqualValues([]string{"/health", "/500"}, c.Ignore["resource"])
 }
 
-func TestDDAgentConfigFromYaml(t *testing.T) {
+func TestUndocumentedYamlConfig(t *testing.T) {
 	assert := assert.New(t)
-	// check that providing trace.* options in the dd-agent conf file works
-	dd, _ := newYamlFromBytes([]byte(strings.Join([]string{
-		"api_key: apikey_12",
-		"hostname: thing",
-		"apm_config: ",
-		"  extra_sample_rate: 0.33",
-		"  max_traces_per_second: 100.0",
-		"  receiver_port: 25",
-		"  connection_limit: 5",
-		"  trace_writer:",
-		"    max_spans_per_payload: 11",
-		"    flush_period_seconds: 22",
-		"    update_info_period_seconds: 33",
-		"    queue:",
-		"      max_age_seconds: 15",
-		"      max_bytes: 2048",
-		"      max_payloads: 100",
-		"  service_writer:",
-		"    update_info_period_seconds: 44",
-		"    flush_period_seconds: 55",
-		"    queue:",
-		"      max_age_seconds: 15",
-		"      max_bytes: 2048",
-		"      max_payloads: 100",
-		"  stats_writer:",
-		"    update_info_period_seconds: 66",
-		"    queue:",
-		"      max_age_seconds: 15",
-		"      max_bytes: 2048",
-		"      max_payloads: 100",
-	}, "\n")))
 
-	agentConfig, _ := NewAgentConfig(nil, nil, dd)
+	yamlConfig, err := NewYamlIfExists("./test_cases/undocumented.yaml")
+	assert.NoError(err)
+
+	agentConfig, err := NewAgentConfig(nil, nil, yamlConfig)
+	assert.NoError(err)
 
 	assert.Equal("thing", agentConfig.HostName)
 	assert.Equal("apikey_12", agentConfig.APIKey)
 	assert.Equal(0.33, agentConfig.ExtraSampleRate)
 	assert.Equal(100.0, agentConfig.MaxTPS)
 	assert.Equal(25, agentConfig.ReceiverPort)
-	assert.Equal(5, agentConfig.ConnectionLimit)
 
 	// Assert Trace Writer
 	assert.Equal(11, agentConfig.TraceWriterConfig.MaxSpansPerPayload)
@@ -182,49 +143,10 @@ func TestDDAgentConfigFromYaml(t *testing.T) {
 	assert.Equal(15*time.Second, agentConfig.StatsWriterConfig.SenderConfig.MaxAge)
 	assert.Equal(int64(2048), agentConfig.StatsWriterConfig.SenderConfig.MaxQueuedBytes)
 	assert.Equal(100, agentConfig.StatsWriterConfig.SenderConfig.MaxQueuedPayloads)
-}
-
-func TestDDAgentConfigFromYamlWithRatesByService(t *testing.T) {
-	assert := assert.New(t)
-	// check that providing trace.* options in the dd-agent conf file works
-	dd, err := newYamlFromBytes([]byte(strings.Join([]string{
-		"api_key: apikey_12",
-		"hostname: thing",
-		"apm_config: ",
-		"  extra_sample_rate: 0.33",
-		"  analyzed_rate_by_service:",
-		"    db: 1",
-		"    web: 0.9",
-		"    index: 0.5",
-	}, "\n")))
-	t.Logf("parsed YAML %v - %v", dd, err)
-
-	agentConfig, _ := NewAgentConfig(nil, nil, dd)
-
-	assert.Equal("thing", agentConfig.HostName)
-	assert.Equal("apikey_12", agentConfig.APIKey)
-	assert.Equal(0.33, agentConfig.ExtraSampleRate)
+	// analysis
 	assert.Equal(1.0, agentConfig.AnalyzedRateByService["db"])
 	assert.Equal(0.9, agentConfig.AnalyzedRateByService["web"])
 	assert.Equal(0.5, agentConfig.AnalyzedRateByService["index"])
-
-}
-
-func TestEmptyExtraAggregatorsFromConfig(t *testing.T) {
-	assert := assert.New(t)
-
-	// providing empty extra_aggregators leaves the Datadog default in place
-	dd, _ := ini.Load([]byte(strings.Join([]string{
-		"[Main]",
-		"hostname = thing",
-		"api_key = apikey_12",
-		"[trace.concentrator]",
-		"extra_aggregators = ",
-	}, "\n")))
-
-	conf := &File{instance: dd, Path: "whatever"}
-	agentConfig, _ := NewAgentConfig(conf, nil, nil)
-	assert.Equal([]string{"http.status_code"}, agentConfig.ExtraAggregators)
 }
 
 func TestConfigNewIfExists(t *testing.T) {
@@ -252,18 +174,15 @@ func TestGetHostname(t *testing.T) {
 	assert.NotEqual(t, "", h)
 }
 
-func TestAnalyzedRateByService(t *testing.T) {
+func TestUndocumentedIni(t *testing.T) {
 	assert := assert.New(t)
-	config, _ := ini.Load([]byte(strings.Join([]string{
-		"[trace.analyzed_rate_by_service]",
-		"web = 0.8",
-		"intake = 0.05",
-		"bad_service = ",
-	}, "\n")))
 
-	conf := &File{instance: config, Path: "whatever"}
-	agentConfig, _ := NewAgentConfig(conf, nil, nil)
+	iniConf, err := NewIni("./test_cases/undocumented.ini")
+	assert.NoError(err, "failed to parse valid configuration")
 
-	assert.Equal(agentConfig.AnalyzedRateByService["web"], 0.8)
-	assert.Equal(agentConfig.AnalyzedRateByService["intake"], 0.05)
+	c, err := NewAgentConfig(iniConf, nil, nil)
+	assert.NoError(err)
+
+	assert.Equal(c.AnalyzedRateByService["web"], 0.8)
+	assert.Equal(c.AnalyzedRateByService["intake"], 0.05)
 }

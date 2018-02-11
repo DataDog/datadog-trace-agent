@@ -33,13 +33,13 @@ func mergeIniConfig(c *AgentConfig, conf *File) error {
 		if v := m.Key("hostname").MustString(""); v != "" {
 			c.HostName = v
 		} else {
-			log.Info("Failed to parse hostname from dd-agent config")
+			log.Error("Failed to parse hostname from dd-agent config")
 		}
 
 		if v := m.Key("api_key").Strings(","); len(v) != 0 {
 			c.APIKey = v[0]
 		} else {
-			log.Info("Failed to parse api_key from dd-agent config")
+			log.Error("Failed to parse api_key from dd-agent config")
 		}
 
 		if v := m.Key("bind_host").MustString(""); v != "" {
@@ -119,7 +119,7 @@ func mergeIniConfig(c *AgentConfig, conf *File) error {
 		for service, rate := range rates {
 			rate, err := strconv.ParseFloat(rate, 64)
 			if err != nil {
-				log.Infof("failed to parse rate for analyzed service: %v", service)
+				log.Errorf("failed to parse rate for analyzed service: %v", service)
 				continue
 			}
 
@@ -137,8 +137,6 @@ func mergeIniConfig(c *AgentConfig, conf *File) error {
 	// TODO: remove, should stay internal?
 	if v, e := conf.GetStrArray("trace.concentrator", "extra_aggregators", ','); e == nil {
 		c.ExtraAggregators = append(c.ExtraAggregators, v...)
-	} else {
-		log.Debug("No aggregator configuration, using defaults")
 	}
 
 	// [trace.sampler] section
