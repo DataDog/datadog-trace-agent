@@ -37,6 +37,7 @@ import:
   version: v0.5
   subpackages:
   - gogoproto
+- package: gopkg.in/yaml.v2
 testImport:
 - package: github.com/stretchr/testify
   version: v1.1.4
