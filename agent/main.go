@@ -124,12 +124,12 @@ func runAgent(exit chan struct{}) {
 	var legacyConf *config.File
 
 	if filepath.Ext(opts.configFile) == ".conf" {
-		conf, err = config.NewIniIfExists(opts.legacyConfigFile)
+		conf, err = config.NewIniIfExists(opts.configFile)
 		if err != nil {
 			log.Criticalf("Error reading datadog.conf: %s", err)
 		}
-	} else if filepath.Ext(opts.legacyConfigFile) == ".yaml" {
-		yamlConf, err = config.NewYamlIfExists(opts.legacyConfigFile)
+	} else if filepath.Ext(opts.configFile) == ".yaml" {
+		yamlConf, err = config.NewYamlIfExists(opts.configFile)
 		if err != nil {
 			log.Criticalf("Error reading datadog.yaml: %s", err)
 		}
@@ -137,11 +137,10 @@ func runAgent(exit chan struct{}) {
 
 	legacyConf, err = config.NewIniIfExists(opts.legacyConfigFile)
 	if err != nil {
-		log.Errorf("%s: %v", opts.configFile, err)
-		log.Warnf("ignoring %s", opts.configFile)
+		log.Errorf("error reading %s: %s", opts.legacyConfigFile, err)
 	}
 	if legacyConf != nil {
-		log.Warnf("using legacy configuration from %s, -ddconfig option is deprecated and will be removed in future versions", opts.configFile)
+		log.Errorf("using legacy configuration from %s, -ddconfig option is deprecated and will be removed in future versions", opts.legacyConfigFile)
 	}
 
 	agentConf, err = config.NewAgentConfig(conf, legacyConf, yamlConf)
