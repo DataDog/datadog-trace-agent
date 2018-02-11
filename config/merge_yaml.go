@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"strings"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/backoff"
 	"github.com/DataDog/datadog-trace-agent/model"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
+	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/datadog-trace-agent/utils"
 )
@@ -18,12 +20,19 @@ import (
 // YamlAgentConfig is a structure used for marshaling the datadog.yaml configuration
 // available in Agent versions >= 6
 type YamlAgentConfig struct {
-	APIKey   string `yaml:"api_key"`
-	HostName string `yaml:"hostname"`
+	APIKey       string `yaml:"api_key"`
+	HostName     string `yaml:"hostname"`
+	LogLevel     string `yaml:"log_level"`
+	Proxy        proxy  `yaml:"proxy"`
+	ReceiverHost string ""
 
-	ReceiverHost string     ""
-	LogLevel     string     `yaml:"log_level"`
-	TraceAgent   traceAgent `yaml:"apm_config"`
+	TraceAgent traceAgent `yaml:"apm_config"`
+}
+
+type proxy struct {
+	HTTP    string   `yaml:"http"`
+	HTTPS   string   `yaml:"https"`
+	NoProxy []string `yaml:"no_proxy"`
 }
 
 type traceAgent struct {
@@ -103,6 +112,27 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
 	agentConf.HostName = yc.HostName
 	agentConf.Enabled = yc.TraceAgent.Enabled
 
+	// respect Agent proxy configuration in the special case of the Trace Agent API
+	if yc.Proxy.HTTPS != "" {
+		traceAgentNoProxy := false
+		for _, host := range yc.Proxy.NoProxy {
+			if host == agentConf.APIEndpoint {
+				log.Info("Trace Agent endpoint matches proxy.no_proxy list item '%s': not using any proxy", host)
+				traceAgentNoProxy = true
+				break
+			}
+		}
+
+		if !traceAgentNoProxy {
+			url, err := url.Parse(yc.Proxy.HTTPS)
+			if err == nil {
+				agentConf.ProxyURL = url
+			} else {
+				log.Errorf("Failed to parse proxy URL from proxy.https configuration: %s", err)
+			}
+		}
+	}
+
 	if yc.TraceAgent.ReceiverPort > 0 {
 		agentConf.ReceiverPort = yc.TraceAgent.ReceiverPort
 	}
@@ -122,7 +152,6 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
 		agentConf.ConnectionLimit = yc.TraceAgent.ConnectionLimit
 	}
 
-	//Allow user to specify a different ENV for APM Specifically
 	if yc.TraceAgent.Env != "" {
 		agentConf.DefaultEnv = model.NormalizeTag(yc.TraceAgent.Env)
 	}
@@ -131,7 +160,7 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
 		yc.ReceiverHost = yc.TraceAgent.StatsdHost
 	}
 
-	//Respect non_local_traffic
+	// Respect non_local_traffic
 	if v := strings.ToLower(yc.TraceAgent.NonLocalTraffic); v == "yes" || v == "true" {
 		yc.TraceAgent.StatsdHost = "0.0.0.0"
 		yc.ReceiverHost = "0.0.0.0"

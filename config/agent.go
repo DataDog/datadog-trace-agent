@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	"errors"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -66,7 +67,7 @@ type AgentConfig struct {
 	WatchdogInterval time.Duration // WatchdogInterval is the delay between 2 watchdog checks
 
 	// http/s proxying
-	Proxy *ProxySettings
+	ProxyURL *url.URL
 
 	// filtering
 	Ignore map[string][]string

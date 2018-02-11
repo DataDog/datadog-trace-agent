@@ -1,6 +1,8 @@
 package config
 
 import (
+	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -60,8 +62,10 @@ func mergeIniConfig(c *AgentConfig, conf *File) error {
 			c.LogLevel = v
 		}
 
-		if p := readProxySettings(m); p.Host != "" {
-			c.Proxy = p
+		if pURL, err := readProxyURL(m); err != nil {
+			log.Errorf("Failed to configure proxy: %s", err)
+		} else if pURL != nil {
+			c.ProxyURL = pURL
 		}
 	}
 
@@ -274,28 +278,56 @@ func readExponentialBackoffConfig(conf *File, section string) backoff.Exponentia
 	return c
 }
 
-func readProxySettings(m *ini.Section) *ProxySettings {
-	p := ProxySettings{Port: defaultProxyPort, Scheme: "http"}
+// readProxyURL generates a URL from an Agent 5 configuration of proxy
+func readProxyURL(m *ini.Section) (*url.URL, error) {
+	// Same defaults as the Agent 5
+	scheme := "http"
+	port := 3128
+	host := ""
+	user := ""
+	password := ""
 
+	// Parse the configuration optiosn
 	if v := m.Key("proxy_host").MustString(""); v != "" {
 		// accept either http://myproxy.com or myproxy.com
 		if i := strings.Index(v, "://"); i != -1 {
 			// when available, parse the scheme from the url
-			p.Scheme = v[0:i]
-			p.Host = v[i+3:]
+			scheme = v[0:i]
+			host = v[i+3:]
 		} else {
-			p.Host = v
+			host = v
 		}
 	}
 	if v := m.Key("proxy_port").MustInt(-1); v != -1 {
-		p.Port = v
+		port = v
 	}
 	if v := m.Key("proxy_user").MustString(""); v != "" {
-		p.User = v
+		user = v
 	}
 	if v := m.Key("proxy_password").MustString(""); v != "" {
-		p.Password = v
+		password = v
 	}
 
-	return &p
+	// No proxy configured
+	if host == "" {
+		return nil, nil
+	}
+
+	// generate the URL
+	var userpass *url.Userinfo
+	if user != "" {
+		if password != "" {
+			userpass = url.UserPassword(user, password)
+		} else {
+			userpass = url.User(user)
+		}
+	}
+	var path string
+	if userpass != nil {
+		path = fmt.Sprintf("%s://%s@%s:%v", scheme, userpass.String(), host, port)
+	} else {
+		path = fmt.Sprintf("%s://%s:%v", scheme, host, port)
+	}
+
+	return url.Parse(path)
 }
