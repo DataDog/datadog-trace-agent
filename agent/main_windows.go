@@ -33,14 +33,14 @@ var winopts struct {
 
 func init() {
 	// command-line arguments
-	flag.StringVar(&opts.ddConfigFile, "ddconfig", "c:\\programdata\\datadog\\datadog.conf", "Classic agent config file location")
-	// FIXME: merge all APM configuration into dd-agent/datadog.conf and deprecate the below flag
-	flag.StringVar(&opts.configFile, "config", "c:\\programdata\\datadog\\trace-agent.ini", "Trace agent ini config file.")
+	flag.StringVar(&opts.configFile, "config", "c:\\programdata\\datadog\\datadog.conf", "Datadog Agent config file location.")
+	flag.StringVar(&opts.legacyConfigFile, "ddconfig", "c:\\programdata\\datadog\\trace-agent.ini", "Deprecated extra configuration option.")
 	flag.StringVar(&opts.pidfilePath, "pid", "", "Path to set pidfile for process")
 	flag.BoolVar(&opts.version, "version", false, "Show version information and exit")
 	flag.BoolVar(&opts.info, "info", false, "Show info about running trace agent process and exit")
 
 	// profiling arguments
+	// TODO: remove it from regular stable build
 	flag.StringVar(&opts.cpuprofile, "cpuprofile", "", "Write cpu profile to file")
 	flag.StringVar(&opts.memprofile, "memprofile", "", "Write memory profile to `file`")
 

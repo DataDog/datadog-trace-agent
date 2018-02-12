@@ -1,5 +1,5 @@
-hash: b5bd8505348ccf843ecec4e5f6c53980dd936c6d950dbaf22d4443ed037e625f
-updated: 2017-12-04T13:48:56.549159484+01:00
+hash: 2d03c6e4ed8dbc960336dcb0536f4835648801d07140320ca7853bc3ad25162e
+updated: 2018-02-11T11:10:50.744329781+01:00
 imports:
 - name: github.com/cihub/seelog
   version: d2c6e5aa9fbfdd1c624e140287063c7730654115
@@ -21,6 +21,8 @@ imports:
   version: 342cbe0a04158f6dcb03ca0079991a51a4248c02
   subpackages:
   - gogoproto
+  - proto
+  - protoc-gen-gogo/descriptor
 - name: github.com/golang/protobuf
   version: 1e59b77b52bf8e4b449a57e6f79f21226d571845
   subpackages:
@@ -58,6 +60,8 @@ imports:
   - windows/svc/debug
   - windows/svc/eventlog
   - windows/svc/mgr
+- name: gopkg.in/yaml.v2
+  version: d670f9405373e636a5a2765eea47fac0c9bc91a4
 testImports:
 - name: github.com/davecgh/go-spew
   version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9

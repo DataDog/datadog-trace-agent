@@ -23,7 +23,7 @@ The APM agent (aka Trace Agent) isn't part of the OSX Datadog Agent yet, it need
 - Download the [latest OSX Trace Agent release](https://github.com/DataDog/datadog-trace-agent/releases/latest).
 - Run the Trace Agent using the Datadog Agent configuration.
 
-    `./trace-agent-osx-X.Y.Z -ddconfig /opt/datadog-agent/etc/datadog.conf`
+    `./trace-agent-osx-X.Y.Z -config /opt/datadog-agent/etc/datadog.conf`
 
 - The Trace Agent should now be running in foreground, with an initial output similar to:
 
@@ -41,7 +41,7 @@ The APM agent (aka Trace Agent) isn't part of the OSX Datadog Agent yet, it need
 - Download the [latest Windows Trace Agent release](https://github.com/DataDog/datadog-trace-agent/releases/latest).
 - Run the Trace Agent using the Datadog Agent configuration.
 
-    `./trace-agent-windows-X.Y.Z.exe -ddconfig "%ProgramData%\Datadog\datadog.conf"`
+    `./trace-agent-windows-X.Y.Z.exe -config "%ProgramData%\Datadog\datadog.conf"`
 
 
 ## Development
@@ -57,7 +57,7 @@ Build and run from source:
   listed in `glide.yaml` in the `vendor` directory with the right version.
 - Run `rake build` to build the `trace-agent` binary from current source
 - Or run `rake install` to install `trace-agent` to your $GOPATH
-- You can then run it with `trace-agent --ddconfig PATH_TO_YOUR_DATADOG_CONFIG_FILE`
+- You can then run it with `trace-agent --config PATH_TO_YOUR_DATADOG_CONFIG_FILE`
 
 
 ## Testing

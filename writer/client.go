@@ -13,18 +13,12 @@ const timeout = 10 * time.Second
 
 // NewClient returns a http.Client configured with the Agent options.
 func NewClient(conf *config.AgentConfig) (client *http.Client) {
-	if conf.Proxy != nil {
-		proxyPath, err := conf.Proxy.URL()
-		if err != nil {
-			log.Errorf("failed to configure proxy: %v", err)
-			return
-		}
-
-		log.Infof("configuring proxy through host %s", conf.Proxy.Host)
+	if conf.ProxyURL != nil {
+		log.Infof("configuring proxy through host %s", conf.ProxyURL.Hostname())
 		client = &http.Client{
 			Timeout: timeout,
 			Transport: &http.Transport{
-				Proxy: http.ProxyURL(proxyPath),
+				Proxy: http.ProxyURL(conf.ProxyURL),
 			},
 		}
 	} else {

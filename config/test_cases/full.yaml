@@ -1,0 +1,20 @@
+dd_url: https://app.datadoghq.com
+api_key: api_key_test
+hostname: mymachine
+proxy:
+  https: https://user:password@proxy_for_https:1234
+use_dogstatsd: yes
+dogstatsd_port: 18125
+dogstatsd_non_local_traffic: yes
+log_level: debug
+apm_config:
+  enabled: false
+  apm_dd_url: https://datadog.unittests
+  env: test
+  receiver_port: 18126
+  apm_non_local_traffic: yes
+  extra_sample_rate: 0.5
+  max_traces_per_second: 5
+  ignore_resources:
+    - /health
+    - /500
