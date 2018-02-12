@@ -123,16 +123,24 @@ func runAgent(exit chan struct{}) {
 	// deprecated Agent 5 trace-agent.ini config
 	var legacyConf *config.File
 
-	if filepath.Ext(opts.configFile) == ".conf" {
+	if filepath.Ext(opts.configFile) == ".conf" || filepath.Ext(opts.configFile) == ".ini" {
 		conf, err = config.NewIniIfExists(opts.configFile)
 		if err != nil {
 			log.Criticalf("Error reading datadog.conf: %s", err)
+		}
+		if conf != nil {
+			log.Infof("Loading configuration from %s", opts.configFile)
 		}
 	} else if filepath.Ext(opts.configFile) == ".yaml" {
 		yamlConf, err = config.NewYamlIfExists(opts.configFile)
 		if err != nil {
 			log.Criticalf("Error reading datadog.yaml: %s", err)
 		}
+		if conf != nil {
+			log.Infof("Loading configuration from %s", opts.configFile)
+		}
+	} else {
+		log.Errorf("Configuration file '%s' not supported, it must be a .yaml or .ini file. File ignored.", opts.configFile)
 	}
 
 	legacyConf, err = config.NewIniIfExists(opts.legacyConfigFile)
