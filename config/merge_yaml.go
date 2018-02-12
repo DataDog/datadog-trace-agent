@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/url"
-	"strings"
 	"time"
 
 	"gopkg.in/yaml.v2"
@@ -37,14 +36,14 @@ type proxy struct {
 }
 
 type traceAgent struct {
-	Enabled            *bool   `yaml:"enabled"`
-	Endpoint           string  `yaml:"apm_dd_url"`
-	Env                string  `yaml:"env"`
-	ExtraSampleRate    float64 `yaml:"extra_sample_rate"`
-	MaxTracesPerSecond float64 `yaml:"max_traces_per_second"`
-	IgnoreResource     string  `yaml:"ignore_resource"`
-	ReceiverPort       int     `yaml:"receiver_port"`
-	APMNonLocalTraffic *bool   `yaml:"apm_non_local_traffic"`
+	Enabled            *bool    `yaml:"enabled"`
+	Endpoint           string   `yaml:"apm_dd_url"`
+	Env                string   `yaml:"env"`
+	ExtraSampleRate    float64  `yaml:"extra_sample_rate"`
+	MaxTracesPerSecond float64  `yaml:"max_traces_per_second"`
+	IgnoreResources    []string `yaml:"ignore_resources"`
+	ReceiverPort       int      `yaml:"receiver_port"`
+	APMNonLocalTraffic *bool    `yaml:"apm_non_local_traffic"`
 
 	WatchdogMaxMemory float64 `yaml:"max_memory"`
 	WatchdogMaxCPUPct float64 `yaml:"max_cpu_percent"`
@@ -165,8 +164,8 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
 		agentConf.MaxTPS = yc.TraceAgent.MaxTracesPerSecond
 	}
 
-	if yc.TraceAgent.IgnoreResource != "" {
-		agentConf.Ignore["resource"] = strings.Split(yc.TraceAgent.IgnoreResource, ",")
+	if len(yc.TraceAgent.IgnoreResources) > 0 {
+		agentConf.Ignore["resource"] = yc.TraceAgent.IgnoreResources
 	}
 
 	if yc.TraceAgent.APMNonLocalTraffic != nil && *yc.TraceAgent.APMNonLocalTraffic {

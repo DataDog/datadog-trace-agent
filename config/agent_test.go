@@ -64,7 +64,7 @@ func TestDDAgentMultiAPIKeys(t *testing.T) {
 	assert.Equal("foo", agentConfig.APIKey)
 }
 
-func TestFullINiConfig(t *testing.T) {
+func TestFullIniConfig(t *testing.T) {
 	assert := assert.New(t)
 
 	iniConf, err := NewIni("./test_cases/full.ini")
