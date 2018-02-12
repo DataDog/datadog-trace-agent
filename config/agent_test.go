@@ -124,6 +124,10 @@ func TestUndocumentedYamlConfig(t *testing.T) {
 	assert.Equal(0.33, agentConfig.ExtraSampleRate)
 	assert.Equal(100.0, agentConfig.MaxTPS)
 	assert.Equal(25, agentConfig.ReceiverPort)
+	// watchdog
+	assert.Equal(0.07, agentConfig.MaxCPU)
+	assert.Equal(30e6, agentConfig.MaxMemory)
+	assert.Equal(50, agentConfig.MaxConnections)
 
 	// Assert Trace Writer
 	assert.Equal(11, agentConfig.TraceWriterConfig.MaxSpansPerPayload)

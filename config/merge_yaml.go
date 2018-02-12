@@ -46,6 +46,10 @@ type traceAgent struct {
 	ReceiverPort       int     `yaml:"receiver_port"`
 	APMNonLocalTraffic *bool   `yaml:"apm_non_local_traffic"`
 
+	WatchdogMaxMemory float64 `yaml:"max_memory"`
+	WatchdogMaxCPUPct float64 `yaml:"max_cpu_percent"`
+	WatchdogMaxConns  int     `yaml:"max_connections"`
+
 	TraceWriter   traceWriter   `yaml:"trace_writer"`
 	ServiceWriter serviceWriter `yaml:"service_writer"`
 	StatsWriter   statsWriter   `yaml:"stats_writer"`
@@ -167,6 +171,17 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
 
 	if yc.TraceAgent.APMNonLocalTraffic != nil && *yc.TraceAgent.APMNonLocalTraffic {
 		agentConf.ReceiverHost = "0.0.0.0"
+	}
+
+	// undocumented
+	if yc.TraceAgent.WatchdogMaxCPUPct > 0 {
+		agentConf.MaxCPU = yc.TraceAgent.WatchdogMaxCPUPct / 100
+	}
+	if yc.TraceAgent.WatchdogMaxMemory > 0 {
+		agentConf.MaxMemory = yc.TraceAgent.WatchdogMaxMemory
+	}
+	if yc.TraceAgent.WatchdogMaxConns > 0 {
+		agentConf.MaxConnections = yc.TraceAgent.WatchdogMaxConns
 	}
 
 	// undocumented
