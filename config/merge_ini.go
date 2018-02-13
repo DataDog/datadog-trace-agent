@@ -166,12 +166,15 @@ func mergeIniConfig(c *AgentConfig, conf *File) error {
 	}
 
 	// [trace.watchdog] section
+	// undocumented
 	if v, e := conf.GetFloat("trace.watchdog", "max_memory"); e == nil {
 		c.MaxMemory = v
 	}
+	// undocumented
 	if v, e := conf.GetFloat("trace.watchdog", "max_cpu_percent"); e == nil {
 		c.MaxCPU = v / 100
 	}
+	// undocumented
 	if v, e := conf.GetInt("trace.watchdog", "max_connections"); e == nil {
 		c.MaxConnections = v
 	}
