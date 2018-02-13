@@ -214,10 +214,10 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 
 	// We parse the tags from the header
 	tags := info.Tags{
-		req.Header.Get("Datadog-Meta-Lang"),
-		req.Header.Get("Datadog-Meta-Lang-Version"),
-		req.Header.Get("Datadog-Meta-Lang-Interpreter"),
-		req.Header.Get("Datadog-Meta-Tracer-Version"),
+		Lang:          req.Header.Get("Datadog-Meta-Lang"),
+		LangVersion:   req.Header.Get("Datadog-Meta-Lang-Version"),
+		Interpreter:   req.Header.Get("Datadog-Meta-Lang-Interpreter"),
+		TracerVersion: req.Header.Get("Datadog-Meta-Tracer-Version"),
 	}
 
 	// We get the address of the struct holding the stats associated to the tags
@@ -280,10 +280,10 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 
 	// We parse the tags from the header
 	tags := info.Tags{
-		req.Header.Get("Datadog-Meta-Lang"),
-		req.Header.Get("Datadog-Meta-Lang-Version"),
-		req.Header.Get("Datadog-Meta-Lang-Interpreter"),
-		req.Header.Get("Datadog-Meta-Tracer-Version"),
+		Lang:          req.Header.Get("Datadog-Meta-Lang"),
+		LangVersion:   req.Header.Get("Datadog-Meta-Lang-Version"),
+		Interpreter:   req.Header.Get("Datadog-Meta-Lang-Interpreter"),
+		TracerVersion: req.Header.Get("Datadog-Meta-Tracer-Version"),
 	}
 
 	// We get the address of the struct holding the stats associated to the tags
