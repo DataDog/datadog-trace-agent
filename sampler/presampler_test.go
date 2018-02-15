@@ -119,7 +119,7 @@ func TestPreSamplerRace(t *testing.T) {
 	}()
 	go func() {
 		for i := 0; i < N; i++ {
-			ps.DecayScore()
+			ps.decayScore()
 			time.Sleep(time.Microsecond)
 		}
 		wg.Done()
@@ -134,22 +134,22 @@ func TestPreSamplerSampleWithCount(t *testing.T) {
 	ps.SetRate(0.2)
 	assert.Equal(0.2, ps.RealRate(), "by default, RealRate returns wished rate")
 	assert.True(ps.sampleWithCount(100), "always accept first payload")
-	ps.DecayScore()
+	ps.decayScore()
 	assert.False(ps.sampleWithCount(10), "refuse as this accepting this would make 100%")
-	ps.DecayScore()
+	ps.decayScore()
 	assert.Equal(0.898876404494382, ps.RealRate())
 	assert.False(ps.sampleWithCount(290), "still refuse")
-	ps.DecayScore()
+	ps.decayScore()
 	assert.False(ps.sampleWithCount(99), "just below the limit")
-	ps.DecayScore()
+	ps.decayScore()
 	assert.True(ps.sampleWithCount(1), "should there be no decay, this one would be dropped, but with decay, the rate decreased as the recently dropped gain importance over the old initially accepted")
-	ps.DecayScore()
+	ps.decayScore()
 	assert.Equal(0.16365162139216005, ps.RealRate(), "well below 20%, again, decay speaks")
 	assert.True(ps.sampleWithCount(1000000), "accepting payload with many traces")
-	ps.DecayScore()
+	ps.decayScore()
 	assert.Equal(0.9997119577953764, ps.RealRate(), "real rate is almost 1, as we accepted a hudge payload")
 	assert.False(ps.sampleWithCount(100000), "rejecting, real rate is too high now")
-	ps.DecayScore()
+	ps.decayScore()
 	assert.Equal(0.8986487877795845, ps.RealRate(), "real rate should be now around 90%")
 	assert.Equal(PreSamplerStats{
 		Rate:                0.2,
