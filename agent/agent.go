@@ -259,13 +259,12 @@ func (a *Agent) Process(t model.Trace) {
 		a.Concentrator.Add(pt)
 
 	}()
-	for _, s := range samplers {
-		sampler := s
-		go func() {
-			defer watchdog.LogOnPanic()
-			sampler.Add(pt)
-		}()
-	}
+	go func() {
+		defer watchdog.LogOnPanic()
+		for _, s := range samplers {
+			s.Add(pt)
+		}
+	}()
 	if a.TransactionSampler.Enabled() {
 		go func() {
 			defer watchdog.LogOnPanic()
