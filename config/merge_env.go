@@ -16,6 +16,12 @@ func mergeEnv(c *AgentConfig) {
 		c.Enabled = false
 	}
 
+	if v := os.Getenv("DD_APM_NON_LOCAL_TRAFFIC"); v == "true" {
+		c.ReceiverHost = "0.0.0.0"
+	} else if v == "false" {
+		c.ReceiverHost = "localhost"
+	}
+
 	if v := os.Getenv("DD_HOSTNAME"); v != "" {
 		c.HostName = v
 	}
