@@ -22,6 +22,7 @@ where env vars are preferrable to static files
 - `DD_API_KEY` - overrides `[Main] api_key`
 - `DD_DOGSTATSD_PORT` - overrides `[Main] dogstatsd_port`
 - `DD_BIND_HOST` - overrides `[Main] bind_host`
+- `DD_APM_NON_LOCAL_TRAFFIC` - overrides `[Main] non_local_traffic`
 - `DD_LOG_LEVEL` - overrides `[Main] log_level`
 - `DD_RECEIVER_PORT` - overrides `[trace.receiver] receiver_port`
 - `DD_IGNORE_RESOURCE` - overrides `[trace.ignore] resource`
