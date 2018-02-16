@@ -9,15 +9,12 @@ import (
 
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
 // Sampler chooses wich spans to write to the API
 type Sampler struct {
-	sampled chan *model.Trace
-
 	// For stats
 	keptTraceCount  int
 	totalTraceCount int
@@ -28,18 +25,16 @@ type Sampler struct {
 }
 
 // NewScoreSampler creates a new empty sampler ready to be started
-func NewScoreSampler(conf *config.AgentConfig, sampled chan *model.Trace) *Sampler {
+func NewScoreSampler(conf *config.AgentConfig) *Sampler {
 	return &Sampler{
-		engine:  sampler.NewScoreEngine(conf.ExtraSampleRate, conf.MaxTPS),
-		sampled: sampled,
+		engine: sampler.NewScoreEngine(conf.ExtraSampleRate, conf.MaxTPS),
 	}
 }
 
 // NewPrioritySampler creates a new empty distributed sampler ready to be started
-func NewPrioritySampler(conf *config.AgentConfig, dynConf *config.DynamicConfig, sampled chan *model.Trace) *Sampler {
+func NewPrioritySampler(conf *config.AgentConfig, dynConf *config.DynamicConfig) *Sampler {
 	return &Sampler{
-		engine:  sampler.NewPriorityEngine(conf.ExtraSampleRate, conf.MaxTPS, &dynConf.RateByService),
-		sampled: sampled,
+		engine: sampler.NewPriorityEngine(conf.ExtraSampleRate, conf.MaxTPS, &dynConf.RateByService),
 	}
 }
 
@@ -56,14 +51,16 @@ func (s *Sampler) Run() {
 	}()
 }
 
-// Add samples a trace then keep it until the next flush
-func (s *Sampler) Add(t processedTrace) {
+// Add samples a trace and returns true if trace was sampled (should be kept), false otherwise
+func (s *Sampler) Add(t processedTrace) bool {
 	s.totalTraceCount++
 
 	if s.engine.Sample(t.Trace, t.Root, t.Env) {
 		s.keptTraceCount++
-		s.sampled <- &t.Trace
+		return true
 	}
+
+	return false
 }
 
 // Stop stops the sampler
