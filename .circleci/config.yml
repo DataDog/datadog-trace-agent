@@ -10,7 +10,7 @@ jobs:
                - checkout
                - run:
                     name: Install Ruby
-                    command: sudo apt-get install ruby-full
+                    command: sudo apt-get install rake
 
                - run:
                     name: Test
