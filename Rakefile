@@ -115,7 +115,7 @@ end
 
 desc "Test Datadog Trace agent"
 task :test do
-  PACKAGES.each { |pkg| go_test(pkg) }
+  go_test("$(go list ./... | grep -v /vendor/)")
 end
 
 desc "Test Datadog Trace agent"
