@@ -1,0 +1,17 @@
+version: 2
+jobs:
+     build:
+          working_directory: /go/src/github.com/DataDog/datadog-trace-agent
+
+          docker:
+               - image: circleci/golang:1.8
+
+          steps:
+               - checkout
+               - run:
+                    name: Install Ruby
+                    command: sudo apt-get install ruby-full
+
+               - run:
+                    name: Test
+                    command: rake restore && rake ci
