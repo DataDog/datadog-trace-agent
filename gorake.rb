@@ -35,13 +35,13 @@ def go_build(program, opts={})
 
   if ENV['windres'] then
     # first compile the message table, as it's an input to the resource file
-    msgcmd = "windmc --target pe-x86-64 -r agent/windows_resources agent/windows_resources/trace-agent-msg.mc"
+    msgcmd = "windmc --target pe-x86-64 -r cmd/trace-agent/windows_resources cmd/trace-agent/windows_resources/trace-agent-msg.mc"
     puts msgcmd
     sh msgcmd
 
     ver_array = agentversion.split(".")
     rescmd = "windres --define MAJ_VER=#{ver_array[0]} --define MIN_VER=#{ver_array[1]} --define PATCH_VER=#{ver_array[2]} "
-    rescmd += "-i agent/windows_resources/trace-agent.rc --target=pe-x86-64 -O coff -o agent/rsrc.syso"
+    rescmd += "-i cmd/trace-agent/windows_resources/trace-agent.rc --target=pe-x86-64 -O coff -o cmd/trace-agent/rsrc.syso"
     sh rescmd
 
   end
