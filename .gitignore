@@ -19,7 +19,7 @@ prof*
 *test
 /vendor
 
-agent/windows_resources/trace-agent-msg.rc
-agent/windows_resources/*.bin
+/cmd/trace-agent/windows_resources/trace-agent-msg.rc
+/cmd/trace-agent/windows_resources/*.bin
 # file generated at build time by message compiler
 trace-agent-msg.h
