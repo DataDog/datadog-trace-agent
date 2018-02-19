@@ -52,7 +52,7 @@ task :restore => [:bootstrap] do
 end
 
 PACKAGES = %w(
-  ./agent
+  ./cmd/trace-agent
   ./config
   ./filters
   ./fixtures
@@ -85,14 +85,8 @@ task :default => [:ci]
 
 desc "Build Datadog Trace agent"
 task :build do
-  case os
-  when "windows"
-    bin = "trace-agent.exe"
-  else
-    bin = "trace-agent"
-  end
-  go_build("github.com/DataDog/datadog-trace-agent/agent", {
-    :cmd => "go build -a -o #{bin}",
+  go_build("github.com/DataDog/datadog-trace-agent/cmd/trace-agent", {
+    :cmd => "go build -a",
     :race => ENV['GO_RACE'] == 'true',
     :add_build_vars => ENV['TRACE_AGENT_ADD_BUILD_VARS'] != 'false'
   })
@@ -107,7 +101,7 @@ task :windows do
     else
         set_env = "GOOS=windows GOARCH=#{arch}"
     end
-    go_build("github.com/DataDog/datadog-trace-agent/agent", {
+    go_build("github.com/DataDog/datadog-trace-agent/cmd/trace-agent", {
                :cmd => set_env + " go build -a -o trace-agent-windows-#{arch}.exe",
                :race => ENV['GO_RACE'] == 'true'
              })
@@ -116,7 +110,7 @@ end
 
 desc "Install Datadog Trace agent"
 task :install do
-  go_build("github.com/DataDog/datadog-trace-agent/agent", :cmd=>"go build -i -o $GOPATH/bin/trace-agent")
+  go_build("github.com/DataDog/datadog-trace-agent/cmd/trace-agent", :cmd=>"go install")
 end
 
 desc "Test Datadog Trace agent"
