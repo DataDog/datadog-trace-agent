@@ -50,6 +50,8 @@ type Agent struct {
 	ServiceExtractor   *TraceServiceExtractor
 	ServiceMapper      *ServiceMapper
 
+	sampledTraceChan chan *model.Trace
+
 	// config
 	conf    *config.AgentConfig
 	dynConf *config.DynamicConfig
@@ -81,18 +83,14 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 	)
 	f := filters.Setup(conf)
 
-	ss := NewScoreSampler(conf, sampledTraceChan)
-	ps := NewPrioritySampler(conf, dynConf, sampledTraceChan)
+	ss := NewScoreSampler(conf)
+	ps := NewPrioritySampler(conf, dynConf)
 	ts := NewTransactionSampler(conf, analyzedTransactionChan)
 	se := NewTraceServiceExtractor(serviceChan)
 	sm := NewServiceMapper(serviceChan, filteredServiceChan)
 	tw := writer.NewTraceWriter(conf, sampledTraceChan, analyzedTransactionChan)
 	sw := writer.NewStatsWriter(conf, statsChan)
 	svcW := writer.NewServiceWriter(conf, filteredServiceChan)
-
-	// wire components together
-	tw.InTraces = sampledTraceChan
-	sw.InStats = statsChan
 
 	return &Agent{
 		Receiver:           r,
@@ -106,6 +104,7 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 		ServiceWriter:      svcW,
 		ServiceExtractor:   se,
 		ServiceMapper:      sm,
+		sampledTraceChan:   sampledTraceChan,
 		conf:               conf,
 		dynConf:            dynConf,
 		exit:               exit,
@@ -172,18 +171,17 @@ func (a *Agent) Process(t model.Trace) {
 	// TODO: get the real tagStats related to this trace payload.
 	ts := a.Receiver.stats.GetTagStats(info.Tags{})
 
-	var samplers []*Sampler
+	samplers := []*Sampler{
+		// Always use score sampler so it has a real idea of trace distribution
+		a.ScoreSampler,
+	}
+
 	priority, ok := root.Metrics[samplingPriorityKey]
-	// Send traces to possibly several score engines.
 	if ok {
 		// If Priority is defined, send to priority sampling, regardless of priority value.
 		// The sampler will keep or discard the trace, but we send everything so that it
 		// gets the big picture and can set the sampling rates accordingly.
 		samplers = append(samplers, a.PrioritySampler)
-	}
-	if priority == 0 {
-		// Use score engine for traces with no priority or priority set to 0
-		samplers = append(samplers, a.ScoreSampler)
 	}
 
 	priorityPtr := &ts.TracesPriorityNone
@@ -261,8 +259,15 @@ func (a *Agent) Process(t model.Trace) {
 	}()
 	go func() {
 		defer watchdog.LogOnPanic()
+		sampled := false
+
 		for _, s := range samplers {
-			s.Add(pt)
+			// Consider trace as sampled if at least one of the samplers kept it
+			sampled = s.Add(pt) || sampled
+		}
+
+		if sampled {
+			a.sampledTraceChan <- &pt.Trace
 		}
 	}()
 	if a.TransactionSampler.Enabled() {
