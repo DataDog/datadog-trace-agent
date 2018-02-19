@@ -65,7 +65,7 @@ func (s *Sampler) GetCountScore(signature Signature) float64 {
 // The score value can be seeing as the sample rate if the count were the only factor
 // Since other factors can intervene (such as extra global sampling), its value can be larger than 1
 func (s *Sampler) GetAllCountScores() map[Signature]float64 {
-	m := s.Backend.GetAllSignatureScores()
+	m := s.Backend.GetSignatureScores()
 	for k, v := range m {
 		m[k] = s.backendScoreToSamplerScore(v)
 	}
