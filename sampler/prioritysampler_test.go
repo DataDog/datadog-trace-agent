@@ -56,34 +56,53 @@ func TestPrioritySample(t *testing.T) {
 	// Simple sample unit test
 	assert := assert.New(t)
 
-	s := getTestPriorityEngine()
-	trace, root := getTestTraceWithService(t, "my-service", s)
 	env := defaultEnv
 
-	assert.Equal(0.0, s.Sampler.Backend.totalScore, "checking fresh backend total score is 0")
-	assert.Equal(0.0, s.Sampler.Backend.sampledScore, "checkeing fresh backend sampled score is 0")
+	s := getTestPriorityEngine()
+	trace, root := getTestTraceWithService(t, "my-service", s)
+
+	assert.Equal(0.0, s.Sampler.Backend.GetTotalScore(), "checking fresh backend total score is 0")
+	assert.Equal(0.0, s.Sampler.Backend.GetSampledScore(), "checkeing fresh backend sampled score is 0")
+
+	s = getTestPriorityEngine()
+	trace, root = getTestTraceWithService(t, "my-service", s)
 
 	root.Metrics[samplingPriorityKey] = -1
 	assert.False(s.Sample(trace, root, env), "trace with negative priority is dropped")
-	assert.Equal(0.0, s.Sampler.Backend.totalScore, "sampling a priority -1 trace should *NOT* impact sampler backend")
-	assert.Equal(0.0, s.Sampler.Backend.sampledScore, "sampling a priority -1 trace should *NOT* impact sampler backend")
+	assert.Equal(0.0, s.Sampler.Backend.GetTotalScore(), "sampling a priority -1 trace should *NOT* impact sampler backend")
+	assert.Equal(0.0, s.Sampler.Backend.GetSampledScore(), "sampling a priority -1 trace should *NOT* impact sampler backend")
+
+	s = getTestPriorityEngine()
+	trace, root = getTestTraceWithService(t, "my-service", s)
+
 	root.Metrics[samplingPriorityKey] = 0
 	assert.False(s.Sample(trace, root, env), "trace with priority 0 is dropped")
-	assert.Equal(1.0, s.Sampler.Backend.totalScore, "sampling a priority 0 trace should increase total score")
-	assert.Equal(0.0, s.Sampler.Backend.sampledScore, "sampling a priority 0 trace should *NOT* increase sampled score")
+	assert.True(0.0 < s.Sampler.Backend.GetTotalScore(), "sampling a priority 0 trace should increase total score")
+	assert.Equal(0.0, s.Sampler.Backend.GetSampledScore(), "sampling a priority 0 trace should *NOT* increase sampled score")
+
+	s = getTestPriorityEngine()
+	trace, root = getTestTraceWithService(t, "my-service", s)
 
 	root.Metrics[samplingPriorityKey] = 1
 	assert.True(s.Sample(trace, root, env), "trace with priority 1 is kept")
-	assert.Equal(2.0, s.Sampler.Backend.totalScore, "sampling a priority 0 trace should increase total score")
-	assert.Equal(1.0, s.Sampler.Backend.sampledScore, "sampling a priority 0 trace should increase sampled score")
+	assert.True(0.0 < s.Sampler.Backend.GetTotalScore(), "sampling a priority 0 trace should increase total score")
+	assert.True(0.0 < s.Sampler.Backend.GetSampledScore(), "sampling a priority 0 trace should increase sampled score")
+
+	s = getTestPriorityEngine()
+	trace, root = getTestTraceWithService(t, "my-service", s)
+
 	root.Metrics[samplingPriorityKey] = 2
 	assert.True(s.Sample(trace, root, env), "trace with priority 2 is kept")
-	assert.Equal(2.0, s.Sampler.Backend.totalScore, "sampling a priority 2 trace should *NOT* increase total score")
-	assert.Equal(1.0, s.Sampler.Backend.sampledScore, "sampling a priority 2 trace should *NOT* increase sampled score")
+	assert.Equal(0.0, s.Sampler.Backend.GetTotalScore(), "sampling a priority 2 trace should *NOT* increase total score")
+	assert.Equal(0.0, s.Sampler.Backend.GetSampledScore(), "sampling a priority 2 trace should *NOT* increase sampled score")
+
+	s = getTestPriorityEngine()
+	trace, root = getTestTraceWithService(t, "my-service", s)
+
 	root.Metrics[samplingPriorityKey] = 999
 	assert.True(s.Sample(trace, root, env), "trace with high priority is kept")
-	assert.Equal(2.0, s.Sampler.Backend.totalScore, "sampling a high priority trace should *NOT* increase total score")
-	assert.Equal(1.0, s.Sampler.Backend.sampledScore, "sampling a high priority trace should *NOT* increase sampled score")
+	assert.Equal(0.0, s.Sampler.Backend.GetTotalScore(), "sampling a high priority trace should *NOT* increase total score")
+	assert.Equal(0.0, s.Sampler.Backend.GetSampledScore(), "sampling a high priority trace should *NOT* increase sampled score")
 
 	delete(root.Metrics, samplingPriorityKey)
 	assert.False(s.Sample(trace, root, env), "this should not happen but a trace without priority sampling set should be dropped")
@@ -120,7 +139,7 @@ func TestMaxTPSByService(t *testing.T) {
 	for _, tc := range testCases {
 		t.Logf("testing maxTPS=%0.1f tps=%0.1f", tc.maxTPS, tc.tps)
 		s.Sampler.maxTPS = tc.maxTPS
-		periodSeconds := s.Sampler.Backend.decayPeriod.Seconds()
+		periodSeconds := defaultDecayPeriod.Seconds()
 		tracesPerPeriod := tc.tps * periodSeconds
 		// Set signature score offset high enough not to kick in during the test.
 		s.Sampler.signatureScoreOffset = 2 * tc.tps
@@ -130,7 +149,7 @@ func TestMaxTPSByService(t *testing.T) {
 		handledCount := 0
 
 		for period := 0; period < initPeriods+periods; period++ {
-			s.Sampler.Backend.DecayScore()
+			s.Sampler.Backend.(*MemoryBackend).decayScore()
 			s.Sampler.AdjustScoring()
 			for i := 0; i < int(tracesPerPeriod); i++ {
 				trace, root := getTestTraceWithService(t, "service-a", s)
@@ -153,7 +172,7 @@ func TestMaxTPSByService(t *testing.T) {
 		if tc.maxTPS > tc.tps {
 			targetTPS = tc.tps
 		} else {
-			relativeError = 0.1 + s.Sampler.Backend.decayFactor - 1
+			relativeError = 0.1 + defaultDecayFactor - 1
 		}
 
 		// Check that the sampled score is roughly equal to maxTPS. This is different from

@@ -67,7 +67,7 @@ func (ps *PreSampler) Run() {
 	for {
 		select {
 		case <-t.C:
-			ps.DecayScore()
+			ps.decayScore()
 		case <-ps.exit:
 			return
 		}
@@ -179,8 +179,8 @@ func (ps *PreSampler) Sample(req *http.Request) bool {
 	return ps.sampleWithCount(traceCount)
 }
 
-// DecayScore applies the decay to the rolling counters
-func (ps *PreSampler) DecayScore() {
+// decayScore applies the decay to the rolling counters
+func (ps *PreSampler) decayScore() {
 	ps.mu.Lock()
 
 	ps.stats.RecentPayloadsSeen /= ps.decayFactor

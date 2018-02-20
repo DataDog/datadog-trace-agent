@@ -23,7 +23,10 @@ import (
 
 const (
 	// Sampler parameters not (yet?) configurable
-	defaultDecayPeriod          time.Duration = 5 * time.Second
+	defaultDecayPeriod time.Duration = 5 * time.Second
+	// With this factor, any past trace counts for less than 50% after 6*decayPeriod and >1% after 39*decayPeriod
+	// We can keep it hardcoded, but having `decayPeriod` configurable should be enough?
+	defaultDecayFactor          float64       = 1.125 // 9/8
 	adjustPeriod                time.Duration = 10 * time.Second
 	initialSignatureScoreOffset float64       = 1
 	minSignatureScoreOffset     float64       = 0.01
@@ -45,7 +48,7 @@ type Engine interface {
 // Sampler is the main component of the sampling logic
 type Sampler struct {
 	// Storage of the state of the sampler
-	Backend *Backend
+	Backend Backend
 
 	// Extra sampling rate to combine to the existing sampling
 	extraRate float64
@@ -66,7 +69,7 @@ type Sampler struct {
 // newSampler returns an initialized Sampler
 func newSampler(extraRate float64, maxTPS float64) *Sampler {
 	s := &Sampler{
-		Backend:   NewBackend(defaultDecayPeriod),
+		Backend:   NewMemoryBackend(defaultDecayPeriod, defaultDecayFactor),
 		extraRate: extraRate,
 		maxTPS:    maxTPS,
 

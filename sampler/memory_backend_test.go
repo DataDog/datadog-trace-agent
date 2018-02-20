@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func getTestBackend() *Backend {
+func getTestBackend() *MemoryBackend {
 	decayPeriod := 5 * time.Second
 
-	return NewBackend(decayPeriod)
+	return NewMemoryBackend(decayPeriod, defaultDecayFactor)
 }
 
 func randomSignature() Signature {
@@ -42,7 +42,7 @@ func TestCountScoreConvergence(t *testing.T) {
 	period := backend.decayPeriod
 
 	for period := 0; period < periods; period++ {
-		backend.DecayScore()
+		backend.decayScore()
 		for i := 0; i < tracesPerPeriod; i++ {
 			backend.CountSignature(sign)
 			backend.CountSample()
@@ -65,7 +65,7 @@ func TestCountScoreOblivion(t *testing.T) {
 	ticks := 50
 
 	for period := 0; period < ticks; period++ {
-		backend.DecayScore()
+		backend.decayScore()
 		for i := 0; i < tracesPerPeriod; i++ {
 			backend.CountSignature(sign)
 		}
@@ -79,13 +79,13 @@ func TestCountScoreOblivion(t *testing.T) {
 	oblivionPeriods := 40
 
 	for period := 0; period < halfLifePeriods; period++ {
-		backend.DecayScore()
+		backend.decayScore()
 	}
 
 	assert.True(backend.GetSignatureScore(sign) < 0.5*float64(tracesPerPeriod))
 
 	for period := 0; period < oblivionPeriods-halfLifePeriods; period++ {
-		backend.DecayScore()
+		backend.decayScore()
 	}
 
 	assert.True(backend.GetSignatureScore(sign) < 0.01*float64(tracesPerPeriod))
