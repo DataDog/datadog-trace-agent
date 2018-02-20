@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/url"
+	"os"
 	"time"
 
 	"gopkg.in/yaml.v2"
@@ -12,8 +13,6 @@ import (
 	"github.com/DataDog/datadog-trace-agent/model"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	log "github.com/cihub/seelog"
-
-	"github.com/DataDog/datadog-trace-agent/utils"
 )
 
 // YamlAgentConfig is a structure used for marshaling the datadog.yaml configuration
@@ -95,14 +94,15 @@ func newYamlFromBytes(bytes []byte) (*YamlAgentConfig, error) {
 
 // NewYamlIfExists returns a new YamlAgentConfig if the given configPath is exists.
 func NewYamlIfExists(configPath string) (*YamlAgentConfig, error) {
-	if utils.PathExists(configPath) {
-		fileContent, err := ioutil.ReadFile(configPath)
-		if err != nil {
-			return nil, err
-		}
-		return newYamlFromBytes(fileContent)
+	if _, err := os.Stat(configPath); err != nil {
+		// file does not exist
+		return nil, nil
 	}
-	return nil, nil
+	fileContent, err := ioutil.ReadFile(configPath)
+	if err != nil {
+		return nil, err
+	}
+	return newYamlFromBytes(fileContent)
 }
 
 func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
@@ -198,11 +198,11 @@ func readServiceWriterConfigYaml(yc serviceWriter) writerconfig.ServiceWriterCon
 	c := writerconfig.DefaultServiceWriterConfig()
 
 	if yc.FlushPeriod > 0 {
-		c.FlushPeriod = utils.GetDuration(yc.FlushPeriod)
+		c.FlushPeriod = getDuration(yc.FlushPeriod)
 	}
 
 	if yc.UpdateInfoPeriod > 0 {
-		c.UpdateInfoPeriod = utils.GetDuration(yc.UpdateInfoPeriod)
+		c.UpdateInfoPeriod = getDuration(yc.UpdateInfoPeriod)
 	}
 
 	c.SenderConfig = readQueueablePayloadSenderConfigYaml(yc.QueueablePayloadSender)
@@ -213,7 +213,7 @@ func readStatsWriterConfigYaml(yc statsWriter) writerconfig.StatsWriterConfig {
 	c := writerconfig.DefaultStatsWriterConfig()
 
 	if yc.UpdateInfoPeriod > 0 {
-		c.UpdateInfoPeriod = utils.GetDuration(yc.UpdateInfoPeriod)
+		c.UpdateInfoPeriod = getDuration(yc.UpdateInfoPeriod)
 	}
 
 	c.SenderConfig = readQueueablePayloadSenderConfigYaml(yc.QueueablePayloadSender)
@@ -228,10 +228,10 @@ func readTraceWriterConfigYaml(yc traceWriter) writerconfig.TraceWriterConfig {
 		c.MaxSpansPerPayload = yc.MaxSpansPerPayload
 	}
 	if yc.FlushPeriod > 0 {
-		c.FlushPeriod = utils.GetDuration(yc.FlushPeriod)
+		c.FlushPeriod = getDuration(yc.FlushPeriod)
 	}
 	if yc.UpdateInfoPeriod > 0 {
-		c.UpdateInfoPeriod = utils.GetDuration(yc.UpdateInfoPeriod)
+		c.UpdateInfoPeriod = getDuration(yc.UpdateInfoPeriod)
 	}
 
 	c.SenderConfig = readQueueablePayloadSenderConfigYaml(yc.QueueablePayloadSender)
@@ -243,7 +243,7 @@ func readQueueablePayloadSenderConfigYaml(yc queueablePayloadSender) writerconfi
 	c := writerconfig.DefaultQueuablePayloadSenderConf()
 
 	if yc.MaxAge != 0 {
-		c.MaxAge = utils.GetDuration(yc.MaxAge)
+		c.MaxAge = getDuration(yc.MaxAge)
 	}
 
 	if yc.MaxQueuedBytes != 0 {
@@ -263,7 +263,7 @@ func readExponentialBackoffConfigYaml(yc queueablePayloadSender) backoff.Exponen
 	c := backoff.DefaultExponentialConfig()
 
 	if yc.BackoffDuration > 0 {
-		c.MaxDuration = utils.GetDuration(yc.BackoffDuration)
+		c.MaxDuration = getDuration(yc.BackoffDuration)
 	}
 	if yc.BackoffBase > 0 {
 		c.Base = time.Duration(yc.BackoffBase) * time.Millisecond
@@ -273,4 +273,9 @@ func readExponentialBackoffConfigYaml(yc queueablePayloadSender) backoff.Exponen
 	}
 
 	return c
+}
+
+// getDuration returns the duration of the provided value in seconds
+func getDuration(seconds int) time.Duration {
+	return time.Duration(seconds) * time.Second
 }
