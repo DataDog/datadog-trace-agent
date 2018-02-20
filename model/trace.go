@@ -4,6 +4,8 @@ import (
 	log "github.com/cihub/seelog"
 )
 
+//go:generate sh -c "protoc -I=. -I=../vendor --gogofaster_out=. *.proto"
+//go:generate msgp -file=span.pb.go -marshal=false
 //go:generate msgp -marshal=false
 
 // Trace is a collection of spans with the same trace ID

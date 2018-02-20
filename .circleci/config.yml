@@ -9,10 +9,14 @@ jobs:
 
           steps:
                - checkout
+
                - run:
-                    name: Install Ruby
-                    command: sudo apt-get install rake
+                    name: Installing golint
+                    command: |
+                         go get -u github.com/golang/lint/golint
 
                - run:
                     name: Test
-                    command: rake restore && rake ci
+                    command: |
+                         $GOPATH/bin/golint ./cmd/trace-agent ./filters ./fixtures ./info ./quantile ./quantizer ./sampler ./statsd ./watchdog ./writer
+                         go test $(go list ./... | grep -v /vendor/)
