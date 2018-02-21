@@ -160,7 +160,7 @@ func (r *HTTPReceiver) Listen(addr, logExtra string) error {
 
 func (r *HTTPReceiver) httpHandle(fn http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		req.Body = model.NewLimitedReader(req.Body, r.maxRequestBodyLength)
+		req.Body = NewLimitedReader(req.Body, r.maxRequestBodyLength)
 		defer req.Body.Close()
 
 		fn(w, req)
@@ -223,7 +223,7 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 	// We get the address of the struct holding the stats associated to the tags
 	ts := r.stats.GetTagStats(tags)
 
-	bytesRead := req.Body.(*model.LimitedReader).Count
+	bytesRead := req.Body.(*LimitedReader).Count
 	if bytesRead > 0 {
 		atomic.AddInt64(&ts.TracesBytes, int64(bytesRead))
 	}
@@ -291,7 +291,7 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 
 	atomic.AddInt64(&ts.ServicesReceived, int64(len(servicesMeta)))
 
-	bytesRead := req.Body.(*model.LimitedReader).Count
+	bytesRead := req.Body.(*LimitedReader).Count
 	if bytesRead > 0 {
 		atomic.AddInt64(&ts.ServicesBytes, int64(bytesRead))
 	}
