@@ -18,21 +18,50 @@ type PayloadConstructedHandlerArgs struct {
 // TestEndpoint represents a mocked endpoint that replies with a configurable error and records successful and failed
 // payloads.
 type TestEndpoint struct {
-	Err             error
-	SuccessPayloads []Payload
-	ErrorPayloads   []Payload
+	sync.RWMutex
+	err             error
+	successPayloads []Payload
+	errorPayloads   []Payload
 }
 
 // Write mocks the writing of a payload to a remote endpoint, recording it and replying with the configured error (or
 // success in its absence).
 func (e *TestEndpoint) Write(payload *Payload) error {
-	if e.Err != nil {
-		e.ErrorPayloads = append(e.ErrorPayloads, *payload)
+	e.Lock()
+	defer e.Unlock()
+	if e.err != nil {
+		e.errorPayloads = append(e.errorPayloads, *payload)
 	} else {
-		e.SuccessPayloads = append(e.SuccessPayloads, *payload)
+		e.successPayloads = append(e.successPayloads, *payload)
 	}
+	return e.err
+}
 
-	return e.Err
+func (e *TestEndpoint) Error() error {
+	e.RLock()
+	defer e.RUnlock()
+	return e.err
+}
+
+// ErrorPayloads returns all the error payloads registered with the test endpoint.
+func (e *TestEndpoint) ErrorPayloads() []Payload {
+	e.RLock()
+	defer e.RUnlock()
+	return e.errorPayloads
+}
+
+// SuccessPayloads returns all the success payloads registered with the test endpoint.
+func (e *TestEndpoint) SuccessPayloads() []Payload {
+	e.RLock()
+	defer e.RUnlock()
+	return e.successPayloads
+}
+
+// SetError sets the passed error on the endpoint.
+func (e *TestEndpoint) SetError(err error) {
+	e.Lock()
+	defer e.Unlock()
+	e.err = err
 }
 
 func (e *TestEndpoint) String() string {
@@ -92,7 +121,7 @@ func (c *TestPayloadSender) Run() {
 
 // Payloads allows access to all payloads recorded as being successfully sent by this sender.
 func (c *TestPayloadSender) Payloads() []Payload {
-	return c.testEndpoint.SuccessPayloads
+	return c.testEndpoint.SuccessPayloads()
 }
 
 // Endpoint allows access to the underlying TestEndpoint.

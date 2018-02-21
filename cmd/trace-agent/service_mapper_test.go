@@ -15,7 +15,7 @@ func TestServiceMapper(t *testing.T) {
 	defer mapper.Stop()
 
 	// Let's ensure we have a proper context
-	assert.Len(mapper.cache, 0)
+	assert.Equal(0, mapper.cacheSize())
 
 	input := model.ServicesMetadata{"service-a": {"app_type": "type-a"}}
 	in <- input
@@ -24,7 +24,7 @@ func TestServiceMapper(t *testing.T) {
 	// When the service is ingested for the first time, we simply propagate it
 	// to the output channel and add an entry to the cache map
 	assert.Equal(input, output)
-	assert.Len(mapper.cache, 1)
+	assert.Equal(1, mapper.cacheSize())
 
 	// This entry will result in a cache-hit and therefore will be filtered out
 	in <- model.ServicesMetadata{"service-a": {"app_type": "SOMETHING_DIFFERENT"}}
@@ -35,7 +35,7 @@ func TestServiceMapper(t *testing.T) {
 	output = <-out
 
 	assert.Equal(newService, output)
-	assert.Len(mapper.cache, 2)
+	assert.Equal(2, mapper.cacheSize())
 }
 
 func TestCachePolicy(t *testing.T) {

@@ -12,10 +12,12 @@ import (
 // ServiceMapper provides a cache layer over model.ServicesMetadata pipeline
 // Used in conjunction with ServiceWriter: in-> ServiceMapper out-> ServiceWriter
 type ServiceMapper struct {
-	in    <-chan model.ServicesMetadata
-	out   chan<- model.ServicesMetadata
-	exit  chan bool
-	done  sync.WaitGroup
+	in   <-chan model.ServicesMetadata
+	out  chan<- model.ServicesMetadata
+	exit chan bool
+	done sync.WaitGroup
+
+	mu    sync.RWMutex // guards cache
 	cache model.ServicesMetadata
 }
 
@@ -56,7 +58,9 @@ func (s *ServiceMapper) Run() {
 		case metadata := <-s.in:
 			s.update(metadata)
 		case <-telemetryTicker.C:
+			s.mu.RLock()
 			log.Infof("total number of tracked services: %d", len(s.cache))
+			s.mu.RUnlock()
 		case <-s.exit:
 			return
 		}
@@ -85,11 +89,21 @@ func (s *ServiceMapper) update(metadata model.ServicesMetadata) {
 	}
 
 	s.out <- changes
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.cache.Merge(changes)
 }
 
+func (s *ServiceMapper) cacheSize() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.cache)
+}
+
 func (s *ServiceMapper) shouldAdd(service string, metadata model.ServicesMetadata) bool {
+	s.mu.RLock()
 	cacheEntry, ok := s.cache[service]
+	s.mu.RUnlock()
 
 	// No cache entry?
 	if !ok {

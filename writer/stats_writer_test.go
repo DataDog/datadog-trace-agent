@@ -46,10 +46,11 @@ func TestStatsWriter_StatHandling(t *testing.T) {
 	close(statsChannel)
 	statsWriter.Stop()
 
-	// Then the endpoint should have received 2 payloads, containing all stat buckets
-	assert.Len(testEndpoint.SuccessPayloads, 2, "There should be 2 payloads")
+	payloads := testEndpoint.SuccessPayloads()
 
-	payloads := testEndpoint.SuccessPayloads
+	// Then the endpoint should have received 2 payloads, containing all stat buckets
+	assert.Len(payloads, 2, "There should be 2 payloads")
+
 	payload1 := payloads[0]
 	payload2 := payloads[1]
 
@@ -104,7 +105,7 @@ func TestStatsWriter_UpdateInfoHandling(t *testing.T) {
 	time.Sleep(2 * statsWriter.conf.UpdateInfoPeriod)
 
 	// And then sending a third payload with other 3 buckets with an errored out endpoint
-	testEndpoint.Err = fmt.Errorf("non retriable error")
+	testEndpoint.SetError(fmt.Errorf("non retriable error"))
 	expectedNumErrors++
 	payload3Buckets := []model.StatsBucket{
 		fixtures.RandomStatsBucket(5),
@@ -119,10 +120,10 @@ func TestStatsWriter_UpdateInfoHandling(t *testing.T) {
 	time.Sleep(2 * statsWriter.conf.UpdateInfoPeriod)
 
 	// And then sending a third payload with other 3 traces with an errored out endpoint with retry
-	testEndpoint.Err = &RetriableError{
+	testEndpoint.SetError(&RetriableError{
 		err:      fmt.Errorf("non retriable error"),
 		endpoint: testEndpoint,
-	}
+	})
 	expectedMinNumRetries++
 	payload4Buckets := []model.StatsBucket{
 		fixtures.RandomStatsBucket(5),

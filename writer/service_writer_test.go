@@ -62,10 +62,11 @@ func TestServiceWriter_ServiceHandling(t *testing.T) {
 	}
 
 	mergedMetadata := mergeMetadataInOrder(metadata1, metadata2)
+	successPayloads := testEndpoint.SuccessPayloads()
 
-	assert.Len(testEndpoint.SuccessPayloads, 2, "There should be 2 payloads")
-	assertMetadata(assert, expectedHeaders, metadata1, testEndpoint.SuccessPayloads[0])
-	assertMetadata(assert, expectedHeaders, mergedMetadata, testEndpoint.SuccessPayloads[1])
+	assert.Len(successPayloads, 2, "There should be 2 payloads")
+	assertMetadata(assert, expectedHeaders, metadata1, successPayloads[0])
+	assertMetadata(assert, expectedHeaders, mergedMetadata, successPayloads[1])
 }
 
 func TestServiceWriter_UpdateInfoHandling(t *testing.T) {
@@ -105,7 +106,7 @@ func TestServiceWriter_UpdateInfoHandling(t *testing.T) {
 	time.Sleep(2 * serviceWriter.conf.FlushPeriod)
 
 	// And then sending a third payload with other 3 traces with an errored out endpoint with no retry
-	testEndpoint.Err = fmt.Errorf("non retriable error")
+	testEndpoint.SetError(fmt.Errorf("non retriable error"))
 	expectedNumErrors++
 	metadata3 := fixtures.RandomServices(10, 10)
 	serviceChannel <- metadata3
@@ -116,10 +117,10 @@ func TestServiceWriter_UpdateInfoHandling(t *testing.T) {
 	time.Sleep(2 * serviceWriter.conf.FlushPeriod)
 
 	// And then sending a third payload with other 3 traces with an errored out endpoint with retry
-	testEndpoint.Err = &RetriableError{
+	testEndpoint.SetError(&RetriableError{
 		err:      fmt.Errorf("retriable error"),
 		endpoint: testEndpoint,
-	}
+	})
 	expectedMinNumRetries++
 	metadata4 := fixtures.RandomServices(10, 10)
 	serviceChannel <- metadata4
