@@ -48,12 +48,10 @@ The APM agent (aka Trace Agent) isn't part of the OSX Datadog Agent yet, it need
 
 Pre-requisites:
 - `go` 1.9+
-- [glide](https://github.com/Masterminds/glide)
 
 
 Build and run from source:
-- Install dependencies by running `glide install`
-- Run `go install ./cmd/...` to install the `trace-agent` binary in $GOPATH/bin
+- Run `make install` to install the `trace-agent` binary in $GOPATH/bin
 - You may then run it with `trace-agent --config PATH_TO_YOUR_DATADOG_CONFIG_FILE`
 
 

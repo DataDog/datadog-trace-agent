@@ -9,16 +9,4 @@ jobs:
 
           steps:
                - checkout
-
-               - run:
-                    name: Install dependencies
-                    command: |
-                         go get -u github.com/Masterminds/glide/...
-                         go get -u github.com/golang/lint/golint/...
-                         glide install
-
-               - run:
-                    name: Test
-                    command: |
-                         $GOPATH/bin/golint ./cmd/trace-agent ./filters ./fixtures ./info ./quantile ./quantizer ./sampler ./statsd ./watchdog ./writer
-                         go test ./...
+               - run: make ci

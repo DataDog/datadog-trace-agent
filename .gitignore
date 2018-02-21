@@ -2,6 +2,7 @@ raclette
 /trace-agent
 /trace-agent-windows-386.exe
 /trace-agent-windows-amd64.exe
+/info/git_version.go
 generator
 *.swp
 *.exe
