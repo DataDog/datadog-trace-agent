@@ -2,6 +2,7 @@ version: 2
 jobs:
      build:
           working_directory: /go/src/github.com/DataDog/datadog-trace-agent
+          resource_class: large
 
           docker:
                - image: circleci/golang:1.8

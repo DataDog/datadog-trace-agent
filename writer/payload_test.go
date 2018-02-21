@@ -55,9 +55,9 @@ func TestQueuablePayloadSender_WorkingEndpoint(t *testing.T) {
 	errorPayloads := monitor.FailurePayloads()
 	assert.Equal([]Payload{*payload1, *payload2, *payload3, *payload4, *payload5}, successPayloads,
 		"Expect all sent payloads to have been successful")
-	assert.Equal(successPayloads, workingEndpoint.SuccessPayloads, "Expect sender and endpoint to match on successful payloads")
+	assert.Equal(successPayloads, workingEndpoint.SuccessPayloads(), "Expect sender and endpoint to match on successful payloads")
 	assert.Len(errorPayloads, 0, "No payloads should have errored out on send")
-	assert.Len(workingEndpoint.ErrorPayloads, 0, "No payloads should have errored out on send")
+	assert.Len(workingEndpoint.ErrorPayloads(), 0, "No payloads should have errored out on send")
 }
 
 func TestQueuablePayloadSender_FlakyEndpoint(t *testing.T) {
@@ -95,7 +95,7 @@ func TestQueuablePayloadSender_FlakyEndpoint(t *testing.T) {
 	assert.Equal(0, queuableSender.NumQueuedPayloads(), "Expect no queued payloads")
 
 	// With a failing endpoint with a retriable error
-	flakyEndpoint.Err = &RetriableError{err: fmt.Errorf("bleh"), endpoint: flakyEndpoint}
+	flakyEndpoint.SetError(&RetriableError{err: fmt.Errorf("bleh"), endpoint: flakyEndpoint})
 	// We send some payloads
 	payload3 := RandomPayload()
 	queuableSender.Send(payload3)
@@ -112,7 +112,7 @@ func TestQueuablePayloadSender_FlakyEndpoint(t *testing.T) {
 	assert.Equal(2, queuableSender.NumQueuedPayloads(), "Expect 2 queued payloads")
 
 	// With the previously failing endpoint working again
-	flakyEndpoint.Err = nil
+	flakyEndpoint.SetError(nil)
 	// We retry for the third time
 	testBackoffTimer.TriggerTick()
 
@@ -122,7 +122,7 @@ func TestQueuablePayloadSender_FlakyEndpoint(t *testing.T) {
 	assert.Equal(0, queuableSender.NumQueuedPayloads(), "Expect no queued payloads")
 
 	// Finally, with a failing endpoint with a non-retriable error
-	flakyEndpoint.Err = fmt.Errorf("non retriable bleh")
+	flakyEndpoint.SetError(fmt.Errorf("non retriable bleh"))
 	// We send some payloads
 	payload5 := RandomPayload()
 	queuableSender.Send(payload5)
@@ -135,7 +135,7 @@ func TestQueuablePayloadSender_FlakyEndpoint(t *testing.T) {
 	assert.Equal(0, queuableSender.NumQueuedPayloads(), "Expect no queued payloads")
 
 	// With the previously failing endpoint working again
-	flakyEndpoint.Err = nil
+	flakyEndpoint.SetError(nil)
 	// We retry just in case there's something in the queue
 	testBackoffTimer.TriggerTick()
 
@@ -151,7 +151,7 @@ func TestQueuablePayloadSender_FlakyEndpoint(t *testing.T) {
 	retryPayloads := monitor.RetryPayloads()
 	assert.Equal([]Payload{*payload1, *payload2, *payload3, *payload4}, successPayloads,
 		"Expect all sent payloads to have been successful")
-	assert.Equal(successPayloads, flakyEndpoint.SuccessPayloads, "Expect sender and endpoint to match on successful payloads")
+	assert.Equal(successPayloads, flakyEndpoint.SuccessPayloads(), "Expect sender and endpoint to match on successful payloads")
 	// Expect 3 retry events for payload 3 (one because of first send, two others because of the two retries)
 	assert.Equal([]Payload{*payload3, *payload3, *payload3}, retryPayloads, "Expect payload 3 to have been retries 3 times")
 	// We expect payloads 5 and 6 to appear in error payloads as they failed for non-retriable errors.
@@ -163,7 +163,7 @@ func TestQueuablePayloadSender_MaxQueuedPayloads(t *testing.T) {
 
 	// Given an endpoint that continuously throws out retriable errors
 	flakyEndpoint := &TestEndpoint{}
-	flakyEndpoint.Err = &RetriableError{err: fmt.Errorf("bleh"), endpoint: flakyEndpoint}
+	flakyEndpoint.SetError(&RetriableError{err: fmt.Errorf("bleh"), endpoint: flakyEndpoint})
 
 	// And a test backoff timer that can be triggered on-demand
 	testBackoffTimer := fixtures.NewTestBackoffTimer()
@@ -198,7 +198,7 @@ func TestQueuablePayloadSender_MaxQueuedPayloads(t *testing.T) {
 	syncBarrier <- nil
 
 	// Then, when the endpoint finally works
-	flakyEndpoint.Err = nil
+	flakyEndpoint.SetError(nil)
 
 	// And we trigger a retry
 	testBackoffTimer.TriggerTick()
@@ -215,7 +215,7 @@ func TestQueuablePayloadSender_MaxQueuedPayloads(t *testing.T) {
 
 	// Then endpoint should have received only payload3. Other should have been discarded because max queued payloads
 	// is 1
-	assert.Equal([]Payload{*payload3}, flakyEndpoint.SuccessPayloads, "Endpoint should have received only payload 3")
+	assert.Equal([]Payload{*payload3}, flakyEndpoint.SuccessPayloads(), "Endpoint should have received only payload 3")
 
 	// Monitor should agree on previous fact
 	assert.Equal([]Payload{*payload3}, monitor.SuccessPayloads(),
@@ -233,7 +233,7 @@ func TestQueuablePayloadSender_MaxQueuedBytes(t *testing.T) {
 
 	// Given an endpoint that continuously throws out retriable errors
 	flakyEndpoint := &TestEndpoint{}
-	flakyEndpoint.Err = &RetriableError{err: fmt.Errorf("bleh"), endpoint: flakyEndpoint}
+	flakyEndpoint.SetError(&RetriableError{err: fmt.Errorf("bleh"), endpoint: flakyEndpoint})
 
 	// And a test backoff timer that can be triggered on-demand
 	testBackoffTimer := fixtures.NewTestBackoffTimer()
@@ -268,7 +268,7 @@ func TestQueuablePayloadSender_MaxQueuedBytes(t *testing.T) {
 	syncBarrier <- nil
 
 	// Then, when the endpoint finally works
-	flakyEndpoint.Err = nil
+	flakyEndpoint.SetError(nil)
 
 	// And we trigger a retry
 	testBackoffTimer.TriggerTick()
@@ -285,7 +285,7 @@ func TestQueuablePayloadSender_MaxQueuedBytes(t *testing.T) {
 
 	// Then endpoint should have received payload2 and payload3. Payload1 should have been discarded because keeping all
 	// 3 would have put us over the max size of sender
-	assert.Equal([]Payload{*payload2, *payload3}, flakyEndpoint.SuccessPayloads,
+	assert.Equal([]Payload{*payload2, *payload3}, flakyEndpoint.SuccessPayloads(),
 		"Endpoint should have received only payload 2 and 3 (in that order)")
 
 	// Monitor should agree on previous fact
@@ -302,7 +302,7 @@ func TestQueuablePayloadSender_DropBigPayloadsOnRetry(t *testing.T) {
 
 	// Given an endpoint that continuously throws out retriable errors
 	flakyEndpoint := &TestEndpoint{}
-	flakyEndpoint.Err = &RetriableError{err: fmt.Errorf("bleh"), endpoint: flakyEndpoint}
+	flakyEndpoint.SetError(&RetriableError{err: fmt.Errorf("bleh"), endpoint: flakyEndpoint})
 
 	// And a test backoff timer that can be triggered on-demand
 	testBackoffTimer := fixtures.NewTestBackoffTimer()
@@ -329,7 +329,7 @@ func TestQueuablePayloadSender_DropBigPayloadsOnRetry(t *testing.T) {
 	syncBarrier <- nil
 
 	// Then, when the endpoint finally works
-	flakyEndpoint.Err = nil
+	flakyEndpoint.SetError(nil)
 
 	// And we trigger a retry
 	testBackoffTimer.TriggerTick()
@@ -345,7 +345,7 @@ func TestQueuablePayloadSender_DropBigPayloadsOnRetry(t *testing.T) {
 	monitor.Stop()
 
 	// Then endpoint should have received no payloads because payload1 was too big to store in queue.
-	assert.Len(flakyEndpoint.SuccessPayloads, 0, "Endpoint should have received no payloads")
+	assert.Len(flakyEndpoint.SuccessPayloads(), 0, "Endpoint should have received no payloads")
 
 	// And monitor should have received failed event for payload1 with correct reason
 	assert.Equal([]Payload{*payload1}, monitor.FailurePayloads(),
@@ -392,7 +392,7 @@ func TestQueuablePayloadSender_SendBigPayloadsIfNoRetry(t *testing.T) {
 	monitor.Stop()
 
 	// Then endpoint should have received payload1 because although it was big, it didn't get queued.
-	assert.Equal([]Payload{*payload1}, workingEndpoint.SuccessPayloads, "Endpoint should have received payload1")
+	assert.Equal([]Payload{*payload1}, workingEndpoint.SuccessPayloads(), "Endpoint should have received payload1")
 
 	// And monitor should have received success event for payload1
 	assert.Equal([]Payload{*payload1}, monitor.SuccessPayloads(),
@@ -404,7 +404,7 @@ func TestQueuablePayloadSender_MaxAge(t *testing.T) {
 
 	// Given an endpoint that continuously throws out retriable errors
 	flakyEndpoint := &TestEndpoint{}
-	flakyEndpoint.Err = &RetriableError{err: fmt.Errorf("bleh"), endpoint: flakyEndpoint}
+	flakyEndpoint.SetError(&RetriableError{err: fmt.Errorf("bleh"), endpoint: flakyEndpoint})
 
 	// And a test backoff timer that can be triggered on-demand
 	testBackoffTimer := fixtures.NewTestBackoffTimer()
@@ -443,7 +443,7 @@ func TestQueuablePayloadSender_MaxAge(t *testing.T) {
 	syncBarrier <- nil
 
 	// Then, when the endpoint finally works
-	flakyEndpoint.Err = nil
+	flakyEndpoint.SetError(nil)
 
 	// And we trigger a retry
 	testBackoffTimer.TriggerTick()
@@ -460,7 +460,7 @@ func TestQueuablePayloadSender_MaxAge(t *testing.T) {
 
 	// Then endpoint should have received only payload3. Because payload1 and payload2 were too old after the failed
 	// retry (first TriggerTick).
-	assert.Equal([]Payload{*payload3}, flakyEndpoint.SuccessPayloads, "Endpoint should have received only payload 3")
+	assert.Equal([]Payload{*payload3}, flakyEndpoint.SuccessPayloads(), "Endpoint should have received only payload 3")
 
 	// And monitor should have received failed events for payload1 and payload2 with correct reason
 	assert.Equal([]Payload{*payload1, *payload2}, monitor.FailurePayloads(),

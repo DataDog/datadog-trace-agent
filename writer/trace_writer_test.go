@@ -66,8 +66,8 @@ func TestTraceWriter_TraceHandling(t *testing.T) {
 		"Content-Encoding":             "gzip",
 	}
 
-	assert.Len(testEndpoint.SuccessPayloads, 2, "There should be 2 payloads")
-	assertPayloads(assert, traceWriter, expectedHeaders, testTraces, testEndpoint.SuccessPayloads)
+	assert.Len(testEndpoint.SuccessPayloads(), 2, "There should be 2 payloads")
+	assertPayloads(assert, traceWriter, expectedHeaders, testTraces, testEndpoint.SuccessPayloads())
 }
 
 func TestTraceWriter_BigTraceHandling(t *testing.T) {
@@ -114,8 +114,8 @@ func TestTraceWriter_BigTraceHandling(t *testing.T) {
 	}
 
 	expectedNumPayloads := int(math.Ceil(float64(numSpans) / float64(traceWriter.conf.MaxSpansPerPayload)))
-	assert.Len(testEndpoint.SuccessPayloads, expectedNumPayloads, "There should be more than 1 payload")
-	assertPayloads(assert, traceWriter, expectedHeaders, testTraces, testEndpoint.SuccessPayloads)
+	assert.Len(testEndpoint.SuccessPayloads(), expectedNumPayloads, "There should be more than 1 payload")
+	assertPayloads(assert, traceWriter, expectedHeaders, testTraces, testEndpoint.SuccessPayloads())
 }
 
 func TestTraceWriter_UpdateInfoHandling(t *testing.T) {
@@ -172,7 +172,7 @@ func TestTraceWriter_UpdateInfoHandling(t *testing.T) {
 	time.Sleep(2 * traceWriter.conf.FlushPeriod)
 
 	// And then sending a third payload with other 3 traces with an errored out endpoint
-	testEndpoint.Err = fmt.Errorf("non retriable error")
+	testEndpoint.SetError(fmt.Errorf("non retriable error"))
 	expectedNumErrors++
 	payload3Traces := []model.Trace{
 		fixtures.RandomTrace(3, 1),
@@ -191,10 +191,10 @@ func TestTraceWriter_UpdateInfoHandling(t *testing.T) {
 	time.Sleep(2 * traceWriter.conf.FlushPeriod)
 
 	// And then sending a fourth payload with other 3 traces with an errored out endpoint but retriable
-	testEndpoint.Err = &RetriableError{
+	testEndpoint.SetError(&RetriableError{
 		err:      fmt.Errorf("non retriable error"),
 		endpoint: testEndpoint,
-	}
+	})
 	expectedMinNumRetries++
 	payload4Traces := []model.Trace{
 		fixtures.RandomTrace(3, 1),

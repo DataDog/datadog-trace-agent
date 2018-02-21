@@ -44,12 +44,14 @@ type GaugeSummary struct {
 
 // TestStatsClient is a mocked StatsClient that records all calls and replies with configurable error return values.
 type TestStatsClient struct {
-	GaugeErr       error
-	GaugeCalls     []StatsClientGaugeArgs
-	gaugeLock      sync.Mutex
-	CountErr       error
-	CountCalls     []StatsClientCountArgs
-	countLock      sync.Mutex
+	gaugeLock  sync.Mutex
+	GaugeErr   error
+	GaugeCalls []StatsClientGaugeArgs
+
+	countLock  sync.RWMutex
+	CountErr   error
+	CountCalls []StatsClientCountArgs
+
 	HistogramErr   error
 	HistogramCalls []StatsClientHistogramArgs
 	histogramLock  sync.Mutex
@@ -83,6 +85,8 @@ func (c *TestStatsClient) Histogram(name string, value float64, tags []string, r
 func (c *TestStatsClient) GetCountSummaries() map[string]*CountSummary {
 	result := map[string]*CountSummary{}
 
+	c.countLock.RLock()
+	defer c.countLock.RUnlock()
 	for _, countCall := range c.CountCalls {
 		name := countCall.Name
 		summary, ok := result[name]
