@@ -13,7 +13,6 @@ import (
 	"github.com/DataDog/datadog-trace-agent/fixtures"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/DataDog/datadog-trace-agent/statsd"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/stretchr/testify/assert"
 )
@@ -200,7 +199,7 @@ func assertStatsPayload(assert *assert.Assertions, headers map[string]string, bu
 	assert.Equal(buckets, statsPayload.Stats, "Stat buckets should match expectation")
 }
 
-func testStatsWriter() (*StatsWriter, chan []model.StatsBucket, *TestEndpoint, *statsd.TestStatsClient) {
+func testStatsWriter() (*StatsWriter, chan []model.StatsBucket, *testEndpoint, *fixtures.TestStatsClient) {
 	statsChannel := make(chan []model.StatsBucket)
 	conf := &config.AgentConfig{
 		HostName:          testHostName,
@@ -208,9 +207,9 @@ func testStatsWriter() (*StatsWriter, chan []model.StatsBucket, *TestEndpoint, *
 		StatsWriterConfig: writerconfig.DefaultStatsWriterConfig(),
 	}
 	statsWriter := NewStatsWriter(conf, statsChannel)
-	testEndpoint := &TestEndpoint{}
+	testEndpoint := &testEndpoint{}
 	statsWriter.BaseWriter.payloadSender.setEndpoint(testEndpoint)
-	testStatsClient := &statsd.TestStatsClient{}
+	testStatsClient := &fixtures.TestStatsClient{}
 	statsWriter.statsClient = testStatsClient
 
 	return statsWriter, statsChannel, testEndpoint, testStatsClient

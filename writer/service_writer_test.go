@@ -11,7 +11,6 @@ import (
 	"github.com/DataDog/datadog-trace-agent/fixtures"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/DataDog/datadog-trace-agent/statsd"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/stretchr/testify/assert"
 )
@@ -190,15 +189,15 @@ func assertMetadata(assert *assert.Assertions, expectedHeaders map[string]string
 	assert.Equal(expectedMetadata, servicesMetadata, "Service metadata should match expectation")
 }
 
-func testServiceWriter() (*ServiceWriter, chan model.ServicesMetadata, *TestEndpoint, *statsd.TestStatsClient) {
+func testServiceWriter() (*ServiceWriter, chan model.ServicesMetadata, *testEndpoint, *fixtures.TestStatsClient) {
 	serviceChannel := make(chan model.ServicesMetadata)
 	conf := &config.AgentConfig{
 		ServiceWriterConfig: writerconfig.DefaultServiceWriterConfig(),
 	}
 	serviceWriter := NewServiceWriter(conf, serviceChannel)
-	testEndpoint := &TestEndpoint{}
+	testEndpoint := &testEndpoint{}
 	serviceWriter.BaseWriter.payloadSender.setEndpoint(testEndpoint)
-	testStatsClient := &statsd.TestStatsClient{}
+	testStatsClient := &fixtures.TestStatsClient{}
 	serviceWriter.statsClient = testStatsClient
 
 	return serviceWriter, serviceChannel, testEndpoint, testStatsClient

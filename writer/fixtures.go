@@ -9,15 +9,15 @@ import (
 	"github.com/DataDog/datadog-trace-agent/fixtures"
 )
 
-// PayloadConstructedHandlerArgs encodes the arguments passed to a PayloadConstructedHandler call.
-type PayloadConstructedHandlerArgs struct {
+// payloadConstructedHandlerArgs encodes the arguments passed to a PayloadConstructedHandler call.
+type payloadConstructedHandlerArgs struct {
 	payload *Payload
 	stats   interface{}
 }
 
-// TestEndpoint represents a mocked endpoint that replies with a configurable error and records successful and failed
+// testEndpoint represents a mocked endpoint that replies with a configurable error and records successful and failed
 // payloads.
-type TestEndpoint struct {
+type testEndpoint struct {
 	sync.RWMutex
 	err             error
 	successPayloads []Payload
@@ -26,7 +26,7 @@ type TestEndpoint struct {
 
 // Write mocks the writing of a payload to a remote endpoint, recording it and replying with the configured error (or
 // success in its absence).
-func (e *TestEndpoint) Write(payload *Payload) error {
+func (e *testEndpoint) Write(payload *Payload) error {
 	e.Lock()
 	defer e.Unlock()
 	if e.err != nil {
@@ -37,35 +37,35 @@ func (e *TestEndpoint) Write(payload *Payload) error {
 	return e.err
 }
 
-func (e *TestEndpoint) Error() error {
+func (e *testEndpoint) Error() error {
 	e.RLock()
 	defer e.RUnlock()
 	return e.err
 }
 
 // ErrorPayloads returns all the error payloads registered with the test endpoint.
-func (e *TestEndpoint) ErrorPayloads() []Payload {
+func (e *testEndpoint) ErrorPayloads() []Payload {
 	e.RLock()
 	defer e.RUnlock()
 	return e.errorPayloads
 }
 
 // SuccessPayloads returns all the success payloads registered with the test endpoint.
-func (e *TestEndpoint) SuccessPayloads() []Payload {
+func (e *testEndpoint) SuccessPayloads() []Payload {
 	e.RLock()
 	defer e.RUnlock()
 	return e.successPayloads
 }
 
 // SetError sets the passed error on the endpoint.
-func (e *TestEndpoint) SetError(err error) {
+func (e *testEndpoint) SetError(err error) {
 	e.Lock()
 	defer e.Unlock()
 	e.err = err
 }
 
-func (e *TestEndpoint) String() string {
-	return "TestEndpoint"
+func (e *testEndpoint) String() string {
+	return "testEndpoint"
 }
 
 // RandomPayload creates a new payload instance using random data and up to 32 bytes.
@@ -78,28 +78,28 @@ func RandomSizedPayload(size int) *Payload {
 	return NewPayload(fixtures.RandomSizedBytes(size), fixtures.RandomStringMap())
 }
 
-// TestPayloadSender is a PayloadSender that is connected to a TestEndpoint, used for testing.
-type TestPayloadSender struct {
-	testEndpoint *TestEndpoint
+// testPayloadSender is a PayloadSender that is connected to a testEndpoint, used for testing.
+type testPayloadSender struct {
+	testEndpoint *testEndpoint
 	BasePayloadSender
 }
 
-// NewTestPayloadSender creates a new instance of a TestPayloadSender.
-func NewTestPayloadSender() *TestPayloadSender {
-	testEndpoint := &TestEndpoint{}
-	return &TestPayloadSender{
+// newTestPayloadSender creates a new instance of a testPayloadSender.
+func newTestPayloadSender() *testPayloadSender {
+	testEndpoint := &testEndpoint{}
+	return &testPayloadSender{
 		testEndpoint:      testEndpoint,
 		BasePayloadSender: *NewBasePayloadSender(testEndpoint),
 	}
 }
 
 // Start asynchronously starts this payload sender.
-func (c *TestPayloadSender) Start() {
+func (c *testPayloadSender) Start() {
 	go c.Run()
 }
 
 // Run executes the core loop of this sender.
-func (c *TestPayloadSender) Run() {
+func (c *testPayloadSender) Run() {
 	c.exitWG.Add(1)
 	defer c.exitWG.Done()
 
@@ -120,21 +120,21 @@ func (c *TestPayloadSender) Run() {
 }
 
 // Payloads allows access to all payloads recorded as being successfully sent by this sender.
-func (c *TestPayloadSender) Payloads() []Payload {
+func (c *testPayloadSender) Payloads() []Payload {
 	return c.testEndpoint.SuccessPayloads()
 }
 
-// Endpoint allows access to the underlying TestEndpoint.
-func (c *TestPayloadSender) Endpoint() *TestEndpoint {
+// Endpoint allows access to the underlying testEndpoint.
+func (c *testPayloadSender) Endpoint() *testEndpoint {
 	return c.testEndpoint
 }
 
-func (c *TestPayloadSender) setEndpoint(endpoint Endpoint) {
-	c.testEndpoint = endpoint.(*TestEndpoint)
+func (c *testPayloadSender) setEndpoint(endpoint Endpoint) {
+	c.testEndpoint = endpoint.(*testEndpoint)
 }
 
-// TestPayloadSenderMonitor monitors a PayloadSender and stores all events
-type TestPayloadSenderMonitor struct {
+// testPayloadSenderMonitor monitors a PayloadSender and stores all events
+type testPayloadSenderMonitor struct {
 	SuccessEvents []SenderSuccessEvent
 	FailureEvents []SenderFailureEvent
 	RetryEvents   []SenderRetryEvent
@@ -145,21 +145,21 @@ type TestPayloadSenderMonitor struct {
 	exitWG sync.WaitGroup
 }
 
-// NewTestPayloadSenderMonitor creates a new TestPayloadSenderMonitor monitoring the specified sender.
-func NewTestPayloadSenderMonitor(sender PayloadSender) *TestPayloadSenderMonitor {
-	return &TestPayloadSenderMonitor{
+// newTestPayloadSenderMonitor creates a new testPayloadSenderMonitor monitoring the specified sender.
+func newTestPayloadSenderMonitor(sender PayloadSender) *testPayloadSenderMonitor {
+	return &testPayloadSenderMonitor{
 		sender: sender,
 		exit:   make(chan struct{}),
 	}
 }
 
 // Start asynchronously starts this payload monitor.
-func (m *TestPayloadSenderMonitor) Start() {
+func (m *testPayloadSenderMonitor) Start() {
 	go m.Run()
 }
 
 // Run executes the core loop of this monitor.
-func (m *TestPayloadSenderMonitor) Run() {
+func (m *testPayloadSenderMonitor) Run() {
 	m.exitWG.Add(1)
 	defer m.exitWG.Done()
 
@@ -187,13 +187,13 @@ func (m *TestPayloadSenderMonitor) Run() {
 }
 
 // Stop stops this payload monitor and waits for it to stop.
-func (m *TestPayloadSenderMonitor) Stop() {
+func (m *testPayloadSenderMonitor) Stop() {
 	close(m.exit)
 	m.exitWG.Wait()
 }
 
 // SuccessPayloads returns a slice containing all successful payloads.
-func (m *TestPayloadSenderMonitor) SuccessPayloads() []Payload {
+func (m *testPayloadSenderMonitor) SuccessPayloads() []Payload {
 	result := make([]Payload, len(m.SuccessEvents))
 
 	for i, successEvent := range m.SuccessEvents {
@@ -204,7 +204,7 @@ func (m *TestPayloadSenderMonitor) SuccessPayloads() []Payload {
 }
 
 // FailurePayloads returns a slice containing all failed payloads.
-func (m *TestPayloadSenderMonitor) FailurePayloads() []Payload {
+func (m *testPayloadSenderMonitor) FailurePayloads() []Payload {
 	result := make([]Payload, len(m.FailureEvents))
 
 	for i, successEvent := range m.FailureEvents {
@@ -215,7 +215,7 @@ func (m *TestPayloadSenderMonitor) FailurePayloads() []Payload {
 }
 
 // RetryPayloads returns a slice containing all failed payloads.
-func (m *TestPayloadSenderMonitor) RetryPayloads() []Payload {
+func (m *testPayloadSenderMonitor) RetryPayloads() []Payload {
 	result := make([]Payload, len(m.RetryEvents))
 
 	for i, successEvent := range m.RetryEvents {
