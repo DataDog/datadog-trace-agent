@@ -22,13 +22,13 @@ func TestQueuablePayloadSender_WorkingEndpoint(t *testing.T) {
 	assert := assert.New(t)
 
 	// Given an endpoint that doesn't fail
-	workingEndpoint := &TestEndpoint{}
+	workingEndpoint := &testEndpoint{}
 
 	// And a queuable sender using that endpoint
 	queuableSender := NewQueuablePayloadSender(workingEndpoint)
 
 	// And a test monitor for that sender
-	monitor := NewTestPayloadSenderMonitor(queuableSender)
+	monitor := newTestPayloadSenderMonitor(queuableSender)
 
 	// When we start the sender
 	monitor.Start()
@@ -64,7 +64,7 @@ func TestQueuablePayloadSender_FlakyEndpoint(t *testing.T) {
 	assert := assert.New(t)
 
 	// Given an endpoint that initially works ok
-	flakyEndpoint := &TestEndpoint{}
+	flakyEndpoint := &testEndpoint{}
 
 	// And a test backoff timer that can be triggered on-demand
 	testBackoffTimer := fixtures.NewTestBackoffTimer()
@@ -77,7 +77,7 @@ func TestQueuablePayloadSender_FlakyEndpoint(t *testing.T) {
 	queuableSender.syncBarrier = syncBarrier
 
 	// And a test monitor for that sender
-	monitor := NewTestPayloadSenderMonitor(queuableSender)
+	monitor := newTestPayloadSenderMonitor(queuableSender)
 
 	monitor.Start()
 	queuableSender.Start()
@@ -162,7 +162,7 @@ func TestQueuablePayloadSender_MaxQueuedPayloads(t *testing.T) {
 	assert := assert.New(t)
 
 	// Given an endpoint that continuously throws out retriable errors
-	flakyEndpoint := &TestEndpoint{}
+	flakyEndpoint := &testEndpoint{}
 	flakyEndpoint.SetError(&RetriableError{err: fmt.Errorf("bleh"), endpoint: flakyEndpoint})
 
 	// And a test backoff timer that can be triggered on-demand
@@ -177,7 +177,7 @@ func TestQueuablePayloadSender_MaxQueuedPayloads(t *testing.T) {
 	queuableSender.syncBarrier = syncBarrier
 
 	// And a test monitor for that sender
-	monitor := NewTestPayloadSenderMonitor(queuableSender)
+	monitor := newTestPayloadSenderMonitor(queuableSender)
 
 	monitor.Start()
 	queuableSender.Start()
@@ -232,7 +232,7 @@ func TestQueuablePayloadSender_MaxQueuedBytes(t *testing.T) {
 	assert := assert.New(t)
 
 	// Given an endpoint that continuously throws out retriable errors
-	flakyEndpoint := &TestEndpoint{}
+	flakyEndpoint := &testEndpoint{}
 	flakyEndpoint.SetError(&RetriableError{err: fmt.Errorf("bleh"), endpoint: flakyEndpoint})
 
 	// And a test backoff timer that can be triggered on-demand
@@ -247,7 +247,7 @@ func TestQueuablePayloadSender_MaxQueuedBytes(t *testing.T) {
 	queuableSender.syncBarrier = syncBarrier
 
 	// And a test monitor for that sender
-	monitor := NewTestPayloadSenderMonitor(queuableSender)
+	monitor := newTestPayloadSenderMonitor(queuableSender)
 
 	monitor.Start()
 	queuableSender.Start()
@@ -301,7 +301,7 @@ func TestQueuablePayloadSender_DropBigPayloadsOnRetry(t *testing.T) {
 	assert := assert.New(t)
 
 	// Given an endpoint that continuously throws out retriable errors
-	flakyEndpoint := &TestEndpoint{}
+	flakyEndpoint := &testEndpoint{}
 	flakyEndpoint.SetError(&RetriableError{err: fmt.Errorf("bleh"), endpoint: flakyEndpoint})
 
 	// And a test backoff timer that can be triggered on-demand
@@ -316,7 +316,7 @@ func TestQueuablePayloadSender_DropBigPayloadsOnRetry(t *testing.T) {
 	queuableSender.syncBarrier = syncBarrier
 
 	// And a test monitor for that sender
-	monitor := NewTestPayloadSenderMonitor(queuableSender)
+	monitor := newTestPayloadSenderMonitor(queuableSender)
 
 	monitor.Start()
 	queuableSender.Start()
@@ -358,7 +358,7 @@ func TestQueuablePayloadSender_SendBigPayloadsIfNoRetry(t *testing.T) {
 	assert := assert.New(t)
 
 	// Given an endpoint that works
-	workingEndpoint := &TestEndpoint{}
+	workingEndpoint := &testEndpoint{}
 
 	// And a test backoff timer that can be triggered on-demand
 	testBackoffTimer := fixtures.NewTestBackoffTimer()
@@ -372,7 +372,7 @@ func TestQueuablePayloadSender_SendBigPayloadsIfNoRetry(t *testing.T) {
 	queuableSender.syncBarrier = syncBarrier
 
 	// And a test monitor for that sender
-	monitor := NewTestPayloadSenderMonitor(queuableSender)
+	monitor := newTestPayloadSenderMonitor(queuableSender)
 
 	monitor.Start()
 	queuableSender.Start()
@@ -403,7 +403,7 @@ func TestQueuablePayloadSender_MaxAge(t *testing.T) {
 	assert := assert.New(t)
 
 	// Given an endpoint that continuously throws out retriable errors
-	flakyEndpoint := &TestEndpoint{}
+	flakyEndpoint := &testEndpoint{}
 	flakyEndpoint.SetError(&RetriableError{err: fmt.Errorf("bleh"), endpoint: flakyEndpoint})
 
 	// And a test backoff timer that can be triggered on-demand
@@ -418,7 +418,7 @@ func TestQueuablePayloadSender_MaxAge(t *testing.T) {
 	queuableSender.syncBarrier = syncBarrier
 
 	// And a test monitor for that sender
-	monitor := NewTestPayloadSenderMonitor(queuableSender)
+	monitor := newTestPayloadSenderMonitor(queuableSender)
 
 	monitor.Start()
 	queuableSender.Start()

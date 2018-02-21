@@ -13,7 +13,6 @@ import (
 	"github.com/DataDog/datadog-trace-agent/fixtures"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/DataDog/datadog-trace-agent/statsd"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
@@ -338,7 +337,7 @@ func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expecte
 
 }
 
-func testTraceWriter() (*TraceWriter, chan *model.Trace, *TestEndpoint, *statsd.TestStatsClient) {
+func testTraceWriter() (*TraceWriter, chan *model.Trace, *testEndpoint, *fixtures.TestStatsClient) {
 	traceChannel := make(chan *model.Trace)
 	transactionChannel := make(chan *model.Span)
 	conf := &config.AgentConfig{
@@ -347,9 +346,9 @@ func testTraceWriter() (*TraceWriter, chan *model.Trace, *TestEndpoint, *statsd.
 		TraceWriterConfig: writerconfig.DefaultTraceWriterConfig(),
 	}
 	traceWriter := NewTraceWriter(conf, traceChannel, transactionChannel)
-	testEndpoint := &TestEndpoint{}
+	testEndpoint := &testEndpoint{}
 	traceWriter.BaseWriter.payloadSender.setEndpoint(testEndpoint)
-	testStatsClient := &statsd.TestStatsClient{}
+	testStatsClient := &fixtures.TestStatsClient{}
 	traceWriter.statsClient = testStatsClient
 
 	return traceWriter, traceChannel, testEndpoint, testStatsClient
