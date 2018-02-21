@@ -5,18 +5,20 @@ jobs:
           resource_class: large
 
           docker:
-               - image: circleci/golang:1.8
+               - image: circleci/golang:1.9.4
 
           steps:
                - checkout
 
                - run:
-                    name: Installing golint
+                    name: Install dependencies
                     command: |
-                         go get -u github.com/golang/lint/golint
+                         go get -u github.com/Masterminds/glide/...
+                         go get -u github.com/golang/lint/golint/...
+                         glide install
 
                - run:
                     name: Test
                     command: |
                          $GOPATH/bin/golint ./cmd/trace-agent ./filters ./fixtures ./info ./quantile ./quantizer ./sampler ./statsd ./watchdog ./writer
-                         go test $(go list ./... | grep -v /vendor/)
+                         go test ./...
