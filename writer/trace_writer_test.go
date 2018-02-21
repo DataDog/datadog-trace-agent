@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/fixtures"
 	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/gogo/protobuf/proto"
@@ -32,7 +32,7 @@ func TestTraceWriter_TraceHandling(t *testing.T) {
 	traceWriter.Start()
 
 	// Given a set of 6 test traces
-	testTraces := []model.Trace{
+	testTraces := []agent.Trace{
 		fixtures.RandomTrace(3, 1),
 		fixtures.RandomTrace(1, 3),
 		fixtures.RandomTrace(9, 3),
@@ -80,7 +80,7 @@ func TestTraceWriter_BigTraceHandling(t *testing.T) {
 	traceWriter.Start()
 
 	// Given a set of 6 test traces
-	testTraces := []model.Trace{
+	testTraces := []agent.Trace{
 		fixtures.RandomTrace(3, 1),
 		fixtures.RandomTrace(1, 3),
 		fixtures.RandomTrace(9, 3),
@@ -137,7 +137,7 @@ func TestTraceWriter_UpdateInfoHandling(t *testing.T) {
 
 	// When sending 1 payload with 3 traces
 	expectedNumPayloads++
-	payload1Traces := []model.Trace{
+	payload1Traces := []agent.Trace{
 		fixtures.RandomTrace(3, 1),
 		fixtures.RandomTrace(1, 3),
 		fixtures.RandomTrace(9, 3),
@@ -155,7 +155,7 @@ func TestTraceWriter_UpdateInfoHandling(t *testing.T) {
 
 	// And then sending a second payload with other 3 traces
 	expectedNumPayloads++
-	payload2Traces := []model.Trace{
+	payload2Traces := []agent.Trace{
 		fixtures.RandomTrace(3, 1),
 		fixtures.RandomTrace(1, 3),
 		fixtures.RandomTrace(9, 3),
@@ -174,7 +174,7 @@ func TestTraceWriter_UpdateInfoHandling(t *testing.T) {
 	// And then sending a third payload with other 3 traces with an errored out endpoint
 	testEndpoint.SetError(fmt.Errorf("non retriable error"))
 	expectedNumErrors++
-	payload3Traces := []model.Trace{
+	payload3Traces := []agent.Trace{
 		fixtures.RandomTrace(3, 1),
 		fixtures.RandomTrace(1, 3),
 		fixtures.RandomTrace(9, 3),
@@ -196,7 +196,7 @@ func TestTraceWriter_UpdateInfoHandling(t *testing.T) {
 		endpoint: testEndpoint,
 	})
 	expectedMinNumRetries++
-	payload4Traces := []model.Trace{
+	payload4Traces := []agent.Trace{
 		fixtures.RandomTrace(3, 1),
 		fixtures.RandomTrace(1, 3),
 		fixtures.RandomTrace(9, 3),
@@ -251,14 +251,14 @@ func TestTraceWriter_UpdateInfoHandling(t *testing.T) {
 	assert.Equal(expectedNumErrors, errorsSummary.Sum)
 }
 
-func calculateTracePayloadSize(traces []model.Trace) int64 {
-	apiTraces := make([]*model.APITrace, len(traces))
+func calculateTracePayloadSize(traces []agent.Trace) int64 {
+	apiTraces := make([]*agent.APITrace, len(traces))
 
 	for i, trace := range traces {
 		apiTraces[i] = trace.APITrace()
 	}
 
-	tracePayload := model.TracePayload{
+	tracePayload := agent.TracePayload{
 		HostName: testHostName,
 		Env:      testEnv,
 		Traces:   apiTraces,
@@ -284,13 +284,13 @@ func calculateTracePayloadSize(traces []model.Trace) int64 {
 }
 
 func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expectedHeaders map[string]string,
-	expectedTraces []model.Trace, payloads []Payload) {
+	expectedTraces []agent.Trace, payloads []Payload) {
 
-	seenAPITraces := []*model.APITrace(nil)
+	seenAPITraces := []*agent.APITrace(nil)
 	for _, payload := range payloads {
 		assert.Equal(expectedHeaders, payload.Headers, "Payload headers should match expectation")
 
-		var tracePayload model.TracePayload
+		var tracePayload agent.TracePayload
 		payloadBuffer := bytes.NewBuffer(payload.Bytes)
 		gz, err := gzip.NewReader(payloadBuffer)
 		assert.NoError(err, "Gzip reader should work correctly")
@@ -338,9 +338,9 @@ func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expecte
 
 }
 
-func testTraceWriter() (*TraceWriter, chan *model.Trace, *TestEndpoint, *statsd.TestStatsClient) {
-	traceChannel := make(chan *model.Trace)
-	transactionChannel := make(chan *model.Span)
+func testTraceWriter() (*TraceWriter, chan *agent.Trace, *TestEndpoint, *statsd.TestStatsClient) {
+	traceChannel := make(chan *agent.Trace)
+	transactionChannel := make(chan *agent.Span)
 	conf := &config.AgentConfig{
 		HostName:          testHostName,
 		DefaultEnv:        testEnv,

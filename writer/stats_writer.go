@@ -7,9 +7,9 @@ import (
 
 	log "github.com/cihub/seelog"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 )
@@ -19,14 +19,14 @@ type StatsWriter struct {
 	hostName string
 	env      string
 	conf     writerconfig.StatsWriterConfig
-	InStats  <-chan []model.StatsBucket
+	InStats  <-chan []agent.StatsBucket
 	stats    info.StatsWriterInfo
 
 	BaseWriter
 }
 
 // NewStatsWriter returns a new writer for services.
-func NewStatsWriter(conf *config.AgentConfig, InStats <-chan []model.StatsBucket) *StatsWriter {
+func NewStatsWriter(conf *config.AgentConfig, InStats <-chan []agent.StatsBucket) *StatsWriter {
 	writerConf := conf.StatsWriterConfig
 	log.Infof("Stats writer initializing with config: %+v", writerConf)
 
@@ -109,7 +109,7 @@ func (w *StatsWriter) Stop() {
 	w.BaseWriter.Stop()
 }
 
-func (w *StatsWriter) handleStats(stats []model.StatsBucket) {
+func (w *StatsWriter) handleStats(stats []agent.StatsBucket) {
 	numStats := len(stats)
 
 	// If no stats, we can't construct anything
@@ -119,13 +119,13 @@ func (w *StatsWriter) handleStats(stats []model.StatsBucket) {
 	log.Debugf("going to flush stats buckets, %d buckets", numStats)
 	atomic.AddInt64(&w.stats.StatsBuckets, int64(numStats))
 
-	statsPayload := &model.StatsPayload{
+	statsPayload := &agent.StatsPayload{
 		HostName: w.hostName,
 		Env:      w.env,
 		Stats:    stats,
 	}
 
-	data, err := model.EncodeStatsPayload(statsPayload)
+	data, err := agent.EncodeStatsPayload(statsPayload)
 	if err != nil {
 		log.Errorf("encoding issue: %v", err)
 		return

@@ -7,8 +7,8 @@ import (
 
 	log "github.com/cihub/seelog"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,11 +29,11 @@ func getTestPriorityEngine() *PriorityEngine {
 	return NewPriorityEngine(extraRate, maxTPS, &rateByService)
 }
 
-func getTestTraceWithService(t *testing.T, service string, s *PriorityEngine) (model.Trace, *model.Span) {
+func getTestTraceWithService(t *testing.T, service string, s *PriorityEngine) (agent.Trace, *agent.Span) {
 	tID := randomTraceID()
-	trace := model.Trace{
-		&model.Span{TraceID: tID, SpanID: 1, ParentID: 0, Start: 42, Duration: 1000000, Service: service, Type: "web", Meta: map[string]string{"env": defaultEnv}},
-		&model.Span{TraceID: tID, SpanID: 2, ParentID: 1, Start: 100, Duration: 200000, Service: service, Type: "sql"},
+	trace := agent.Trace{
+		&agent.Span{TraceID: tID, SpanID: 1, ParentID: 0, Start: 42, Duration: 1000000, Service: service, Type: "web", Meta: map[string]string{"env": defaultEnv}},
+		&agent.Span{TraceID: tID, SpanID: 2, ParentID: 1, Start: 100, Duration: 200000, Service: service, Type: "sql"},
 	}
 	r := rand.Float64()
 	priority := 0.0

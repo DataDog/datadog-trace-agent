@@ -9,8 +9,8 @@ import (
 
 	"gopkg.in/yaml.v2"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/backoff"
-	"github.com/DataDog/datadog-trace-agent/model"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	log "github.com/cihub/seelog"
 )
@@ -150,7 +150,7 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
 	}
 
 	if yc.TraceAgent.Env != "" {
-		agentConf.DefaultEnv = model.NormalizeTag(yc.TraceAgent.Env)
+		agentConf.DefaultEnv = agent.NormalizeTag(yc.TraceAgent.Env)
 	}
 
 	if yc.TraceAgent.ReceiverPort > 0 {

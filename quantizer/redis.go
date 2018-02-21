@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"strings"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 )
 
 // redisTruncationMark is used as suffix by tracing libraries to indicate that a
@@ -18,7 +18,7 @@ var redisCompoundCommandSet = map[string]bool{
 	"CLIENT": true, "CLUSTER": true, "COMMAND": true, "CONFIG": true, "DEBUG": true, "SCRIPT": true}
 
 // QuantizeRedis generates resource for Redis spans
-func QuantizeRedis(span *model.Span) {
+func QuantizeRedis(span *agent.Span) {
 	query := compactWhitespaces(span.Resource)
 
 	var resource bytes.Buffer

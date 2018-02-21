@@ -5,14 +5,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/stretchr/testify/assert"
 )
 
 var testBucketInterval = time.Duration(2 * time.Second).Nanoseconds()
 
 func NewTestConcentrator() *Concentrator {
-	statsChan := make(chan []model.StatsBucket)
+	statsChan := make(chan []agent.StatsBucket)
 	return NewConcentrator([]string{}, time.Second.Nanoseconds(), statsChan)
 }
 
@@ -23,11 +23,11 @@ func getTsInBucket(alignedNow int64, bsize int64, offset int64) int64 {
 
 // testSpan avoids typo and inconsistency in test spans (typical pitfall: duration, start time,
 // and end time are aligned, and end time is the one that needs to be aligned
-func testSpan(c *Concentrator, spanID uint64, duration, offset int64, service, resource string, err int32) *model.Span {
+func testSpan(c *Concentrator, spanID uint64, duration, offset int64, service, resource string, err int32) *agent.Span {
 	now := time.Now().UnixNano()
 	alignedNow := now - now%c.bsize
 
-	return &model.Span{
+	return &agent.Span{
 		SpanID:   spanID,
 		Duration: duration,
 		Start:    getTsInBucket(alignedNow, c.bsize, offset) - duration,
@@ -40,13 +40,13 @@ func testSpan(c *Concentrator, spanID uint64, duration, offset int64, service, r
 
 func TestConcentratorStatsCounts(t *testing.T) {
 	assert := assert.New(t)
-	statsChan := make(chan []model.StatsBucket)
+	statsChan := make(chan []agent.StatsBucket)
 	c := NewConcentrator([]string{}, testBucketInterval, statsChan)
 
 	now := time.Now().UnixNano()
 	alignedNow := now - now%c.bsize
 
-	trace := model.Trace{
+	trace := agent.Trace{
 		// first bucket
 		testSpan(c, 1, 24, 3, "A1", "resource1", 0),
 		testSpan(c, 2, 12, 3, "A1", "resource1", 2),
@@ -63,7 +63,7 @@ func TestConcentratorStatsCounts(t *testing.T) {
 		testSpan(c, 6, 24, 1, "A1", "resource2", 0),
 	}
 	trace.ComputeTopLevel()
-	wt := model.NewWeightedTrace(trace, trace.GetRoot())
+	wt := agent.NewWeightedTrace(trace, trace.GetRoot())
 
 	testTrace := processedTrace{
 		Env:           "none",
@@ -79,18 +79,18 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	}
 
 	// nothing guarantees the order of the buckets, they're from a map
-	var receivedBuckets []model.StatsBucket
+	var receivedBuckets []agent.StatsBucket
 	if stats[0].Start < stats[1].Start {
-		receivedBuckets = []model.StatsBucket{stats[0], stats[1]}
+		receivedBuckets = []agent.StatsBucket{stats[0], stats[1]}
 	} else {
-		receivedBuckets = []model.StatsBucket{stats[1], stats[0]}
+		receivedBuckets = []agent.StatsBucket{stats[1], stats[0]}
 	}
 
 	// inspect our 2 stats buckets
 	assert.Equal(alignedNow-3*testBucketInterval, receivedBuckets[0].Start)
 	assert.Equal(alignedNow-2*testBucketInterval, receivedBuckets[1].Start)
 
-	var receivedCounts map[string]model.Count
+	var receivedCounts map[string]agent.Count
 
 	// Start with the first/older bucket
 	receivedCounts = receivedBuckets[0].Counts

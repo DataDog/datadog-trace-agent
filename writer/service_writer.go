@@ -7,9 +7,9 @@ import (
 
 	log "github.com/cihub/seelog"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 )
@@ -17,23 +17,23 @@ import (
 // ServiceWriter ingests service metadata and flush them to the API.
 type ServiceWriter struct {
 	conf       writerconfig.ServiceWriterConfig
-	InServices <-chan model.ServicesMetadata
+	InServices <-chan agent.ServicesMetadata
 	stats      info.ServiceWriterInfo
 
-	serviceBuffer model.ServicesMetadata
+	serviceBuffer agent.ServicesMetadata
 
 	BaseWriter
 }
 
 // NewServiceWriter returns a new writer for services.
-func NewServiceWriter(conf *config.AgentConfig, InServices <-chan model.ServicesMetadata) *ServiceWriter {
+func NewServiceWriter(conf *config.AgentConfig, InServices <-chan agent.ServicesMetadata) *ServiceWriter {
 	writerConf := conf.ServiceWriterConfig
 	log.Infof("Service writer initializing with config: %+v", writerConf)
 
 	return &ServiceWriter{
 		conf:          writerConf,
 		InServices:    InServices,
-		serviceBuffer: model.ServicesMetadata{},
+		serviceBuffer: agent.ServicesMetadata{},
 		BaseWriter: *NewBaseWriter(conf, "/api/v0.2/services", func(endpoint Endpoint) PayloadSender {
 			senderConf := writerConf.SenderConfig
 			return NewCustomQueuablePayloadSender(endpoint, senderConf)
@@ -117,7 +117,7 @@ func (w *ServiceWriter) Stop() {
 	w.BaseWriter.Stop()
 }
 
-func (w *ServiceWriter) handleServiceMetadata(metadata model.ServicesMetadata) {
+func (w *ServiceWriter) handleServiceMetadata(metadata agent.ServicesMetadata) {
 	w.serviceBuffer.Merge(metadata)
 }
 
@@ -131,7 +131,7 @@ func (w *ServiceWriter) flush() {
 	log.Debugf("going to flush updated service metadata, %d services", numServices)
 	atomic.StoreInt64(&w.stats.Services, int64(numServices))
 
-	data, err := model.EncodeServicesPayload(w.serviceBuffer)
+	data, err := agent.EncodeServicesPayload(w.serviceBuffer)
 	if err != nil {
 		log.Errorf("error while encoding service payload: %v", err)
 		return
@@ -147,7 +147,7 @@ func (w *ServiceWriter) flush() {
 	payload := NewPayload(data, headers)
 	w.payloadSender.Send(payload)
 
-	w.serviceBuffer = make(model.ServicesMetadata)
+	w.serviceBuffer = make(agent.ServicesMetadata)
 }
 
 func (w *ServiceWriter) updateInfo() {

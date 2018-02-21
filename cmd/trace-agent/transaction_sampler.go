@@ -1,19 +1,19 @@
 package main
 
 import (
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 )
 
 // TransactionSampler extracts and samples analyzed spans
 type TransactionSampler struct {
-	analyzed              chan *model.Span
+	analyzed              chan *agent.Span
 	analyzedRateByService map[string]float64
 }
 
 // NewTransactionSampler creates a new empty transaction sampler
-func NewTransactionSampler(conf *config.AgentConfig, analyzed chan *model.Span) *TransactionSampler {
+func NewTransactionSampler(conf *config.AgentConfig, analyzed chan *agent.Span) *TransactionSampler {
 	return &TransactionSampler{
 		analyzed:              analyzed,
 		analyzedRateByService: conf.AnalyzedRateByService,
@@ -37,7 +37,7 @@ func (s *TransactionSampler) Add(t processedTrace) {
 
 // Analyzed tells if a span should be considered as analyzed
 // Only top-level spans are eligible to be analyzed
-func (s *TransactionSampler) Analyzed(span *model.WeightedSpan) bool {
+func (s *TransactionSampler) Analyzed(span *agent.WeightedSpan) bool {
 	if !span.TopLevel {
 		return false
 	}

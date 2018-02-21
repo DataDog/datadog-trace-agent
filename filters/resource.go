@@ -3,8 +3,8 @@ package filters
 import (
 	"regexp"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/model"
 
 	log "github.com/cihub/seelog"
 )
@@ -15,7 +15,7 @@ type resourceFilter struct {
 }
 
 // Keep returns true if Span.Resource doesn't match any of the filter's rules
-func (f *resourceFilter) Keep(t *model.Span) bool {
+func (f *resourceFilter) Keep(t *agent.Span) bool {
 	for _, entry := range f.blacklist {
 		if entry.MatchString(t.Resource) {
 			return false

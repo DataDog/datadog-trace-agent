@@ -7,7 +7,7 @@ import (
 
 	log "github.com/cihub/seelog"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
@@ -22,21 +22,21 @@ type Concentrator struct {
 	// bucket duration in nanoseconds
 	bsize int64
 
-	OutStats chan []model.StatsBucket
+	OutStats chan []agent.StatsBucket
 
 	exit   chan struct{}
 	exitWG *sync.WaitGroup
 
-	buckets map[int64]*model.StatsRawBucket // buckets used to aggregate stats per timestamp
+	buckets map[int64]*agent.StatsRawBucket // buckets used to aggregate stats per timestamp
 	mu      sync.Mutex
 }
 
 // NewConcentrator initializes a new concentrator ready to be started
-func NewConcentrator(aggregators []string, bsize int64, out chan []model.StatsBucket) *Concentrator {
+func NewConcentrator(aggregators []string, bsize int64, out chan []agent.StatsBucket) *Concentrator {
 	c := Concentrator{
 		aggregators: aggregators,
 		bsize:       bsize,
-		buckets:     make(map[int64]*model.StatsRawBucket),
+		buckets:     make(map[int64]*agent.StatsRawBucket),
 
 		OutStats: out,
 
@@ -93,7 +93,7 @@ func (c *Concentrator) Add(t processedTrace) {
 		btime := s.End() - s.End()%c.bsize
 		b, ok := c.buckets[btime]
 		if !ok {
-			b = model.NewStatsRawBucket(btime, c.bsize)
+			b = agent.NewStatsRawBucket(btime, c.bsize)
 			c.buckets[btime] = b
 		}
 
@@ -109,8 +109,8 @@ func (c *Concentrator) Add(t processedTrace) {
 }
 
 // Flush deletes and returns complete statistic buckets
-func (c *Concentrator) Flush() []model.StatsBucket {
-	var sb []model.StatsBucket
+func (c *Concentrator) Flush() []agent.StatsBucket {
+	var sb []agent.StatsBucket
 	now := time.Now().UnixNano()
 
 	c.mu.Lock()

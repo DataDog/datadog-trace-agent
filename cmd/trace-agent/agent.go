@@ -6,10 +6,10 @@ import (
 
 	log "github.com/cihub/seelog"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/filters"
 	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/quantizer"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
@@ -22,11 +22,11 @@ const (
 )
 
 type processedTrace struct {
-	Trace         model.Trace
-	WeightedTrace model.WeightedTrace
-	Root          *model.Span
+	Trace         agent.Trace
+	WeightedTrace agent.WeightedTrace
+	Root          *agent.Span
 	Env           string
-	Sublayers     []model.SublayerValue
+	Sublayers     []agent.SublayerValue
 }
 
 func (pt *processedTrace) weight() float64 {
@@ -50,7 +50,7 @@ type Agent struct {
 	ServiceExtractor   *TraceServiceExtractor
 	ServiceMapper      *ServiceMapper
 
-	sampledTraceChan chan *model.Trace
+	sampledTraceChan chan *agent.Trace
 
 	// config
 	conf    *config.AgentConfig
@@ -67,12 +67,12 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 	dynConf := config.NewDynamicConfig()
 
 	// inter-component channels
-	rawTraceChan := make(chan model.Trace, 5000) // about 1000 traces/sec for 5 sec, TODO: move to *model.Trace
-	sampledTraceChan := make(chan *model.Trace)
-	analyzedTransactionChan := make(chan *model.Span)
-	statsChan := make(chan []model.StatsBucket)
-	serviceChan := make(chan model.ServicesMetadata, 50)
-	filteredServiceChan := make(chan model.ServicesMetadata, 50)
+	rawTraceChan := make(chan agent.Trace, 5000) // about 1000 traces/sec for 5 sec, TODO: move to *agent.Trace
+	sampledTraceChan := make(chan *agent.Trace)
+	analyzedTransactionChan := make(chan *agent.Span)
+	statsChan := make(chan []agent.StatsBucket)
+	serviceChan := make(chan agent.ServicesMetadata, 50)
+	filteredServiceChan := make(chan agent.ServicesMetadata, 50)
 
 	// create components
 	r := NewHTTPReceiver(conf, dynConf, rawTraceChan, serviceChan)
@@ -157,7 +157,7 @@ func (a *Agent) Run() {
 
 // Process is the default work unit that receives a trace, transforms it and
 // passes it downstream.
-func (a *Agent) Process(t model.Trace) {
+func (a *Agent) Process(t agent.Trace) {
 	if len(t) == 0 {
 		// XXX Should never happen since we reject empty traces during
 		// normalization.
@@ -225,10 +225,10 @@ func (a *Agent) Process(t model.Trace) {
 	// Need to do this computation before entering the concentrator
 	// as they access the Metrics map, which is not thread safe.
 	t.ComputeTopLevel()
-	wt := model.NewWeightedTrace(t, root)
+	wt := agent.NewWeightedTrace(t, root)
 
-	sublayers := model.ComputeSublayers(t)
-	model.SetSublayersOnSpan(root, sublayers)
+	sublayers := agent.ComputeSublayers(t)
+	agent.SetSublayersOnSpan(root, sublayers)
 
 	for i := range t {
 		quantizer.Quantize(t[i])
