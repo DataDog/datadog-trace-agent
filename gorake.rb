@@ -65,7 +65,7 @@ def go_vet(path)
 end
 
 def go_test(path, opts = {})
-  cmd = 'go test'
+  cmd = 'go test -race'
   filter = ''
   if opts[:coverage_file]
     cmd += " -coverprofile=#{opts[:coverage_file]} -coverpkg=./..."
