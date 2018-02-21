@@ -111,7 +111,7 @@ func (c *Concentrator) Add(t processedTrace) {
 // Flush deletes and returns complete statistic buckets
 func (c *Concentrator) Flush() []model.StatsBucket {
 	var sb []model.StatsBucket
-	now := model.Now()
+	now := time.Now().UnixNano()
 
 	c.mu.Lock()
 	for ts, srb := range c.buckets {

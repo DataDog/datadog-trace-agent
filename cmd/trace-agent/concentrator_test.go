@@ -24,7 +24,7 @@ func getTsInBucket(alignedNow int64, bsize int64, offset int64) int64 {
 // testSpan avoids typo and inconsistency in test spans (typical pitfall: duration, start time,
 // and end time are aligned, and end time is the one that needs to be aligned
 func testSpan(c *Concentrator, spanID uint64, duration, offset int64, service, resource string, err int32) *model.Span {
-	now := model.Now()
+	now := time.Now().UnixNano()
 	alignedNow := now - now%c.bsize
 
 	return &model.Span{
@@ -43,7 +43,7 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	statsChan := make(chan []model.StatsBucket)
 	c := NewConcentrator([]string{}, testBucketInterval, statsChan)
 
-	now := model.Now()
+	now := time.Now().UnixNano()
 	alignedNow := now - now%c.bsize
 
 	trace := model.Trace{
