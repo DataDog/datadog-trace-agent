@@ -5,14 +5,8 @@ jobs:
           resource_class: large
 
           docker:
-               - image: circleci/golang:1.8
+               - image: circleci/golang:1.9.4
 
           steps:
                - checkout
-               - run:
-                    name: Install Ruby
-                    command: sudo apt-get install rake
-
-               - run:
-                    name: Test
-                    command: rake restore && rake ci
+               - run: make ci

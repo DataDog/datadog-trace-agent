@@ -1,3 +1,5 @@
+//go:generate go run make.go
+
 package info
 
 import (

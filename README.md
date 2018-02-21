@@ -47,24 +47,19 @@ The APM agent (aka Trace Agent) isn't part of the OSX Datadog Agent yet, it need
 ## Development
 
 Pre-requisites:
-- `go` 1.7+
-- `rake`
+- `go` 1.9+
 
 
 Build and run from source:
-- Import dependencies with `rake restore`. This task uses
-  [glide](https://github.com/Masterminds/glide) to import all dependencies
-  listed in `glide.yaml` in the `vendor` directory with the right version.
-- Run `rake build` to build the `trace-agent` binary from current source
-- Or run `rake install` to install `trace-agent` to your $GOPATH
-- You can then run it with `trace-agent --config PATH_TO_YOUR_DATADOG_CONFIG_FILE`
+- Run `make install` to install the `trace-agent` binary in $GOPATH/bin
+- You may then run it with `trace-agent --config PATH_TO_YOUR_DATADOG_CONFIG_FILE`
 
 
 ## Testing
 
-- Lint with `rake lint`
-- Run the full CI suite locally with `rake ci`
-- Alternatively test individual packages like so `go test ./agent`
+- We use [`golint`](https://github.com/golang/lint) to lint our source code.
+- You may also run the CI locally using the [CircleCI CLI](https://circleci.com/docs/2.0/local-jobs/): `circleci build`.
+- To run only the tests, simply run `go test ./...`
 
 
 ## Contributing
