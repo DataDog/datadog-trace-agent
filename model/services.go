@@ -25,9 +25,9 @@ func (s1 ServicesMetadata) Merge(s2 ServicesMetadata) {
 }
 
 // EncodeServicesPayload will return a slice of bytes representing the
-// services metadata, this uses the same versioned endpoint that AgentPayload
+// services metadata, this uses the same versioned endpoint that Payload
 // uses for serialization.
-// Hence watch for GlobalAgentPayloadVersion's value.
+// Hence watch for GlobalPayloadVersion's value.
 func EncodeServicesPayload(sm ServicesMetadata) ([]byte, error) {
 	return json.Marshal(sm)
 }
@@ -35,14 +35,14 @@ func EncodeServicesPayload(sm ServicesMetadata) ([]byte, error) {
 // ServicesPayloadAPIPath returns the path to append to the URL to get
 // the endpoint for submitting a services metadata payload.
 func ServicesPayloadAPIPath() string {
-	return fmt.Sprintf("/api/%s/services", GlobalAgentPayloadVersion)
+	return fmt.Sprintf("/api/%s/services", GlobalPayloadVersion)
 }
 
 // SetServicesPayloadHeaders takes a Header struct and adds the appropriate
 // header keys for the API to be able to decode the services metadata.
 func SetServicesPayloadHeaders(h http.Header) {
-	switch GlobalAgentPayloadVersion {
-	case AgentPayloadV01:
+	switch GlobalPayloadVersion {
+	case PayloadV01:
 		h.Set("Content-Type", "application/json")
 	default:
 	}
