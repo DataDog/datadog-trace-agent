@@ -6,9 +6,9 @@ TRACE_AGENT_VERSION := $(if $(TRACE_AGENT_VERSION),$(TRACE_AGENT_VERSION), 0.99.
 
 # break up the version
 SPLAT = $(subst ., ,$(TRACE_AGENT_VERSION))
-VERSION_MAJOR = $(word 1, $(SPLAT))
-VERSION_MINOR = $(word 2, $(SPLAT))
-VERSION_PATCH = $(word 3, $(SPLAT))
+VERSION_MAJOR = $(shell echo $(word 1, $(SPLAT)) | sed 's/[^0-9]*//g')
+VERSION_MINOR = $(shell echo $(word 2, $(SPLAT)) | sed 's/[^0-9]*//g')
+VERSION_PATCH = $(shell echo $(word 3, $(SPLAT)) | sed 's/[^0-9]*//g')
 
 # account for some defaults
 VERSION_MAJOR := $(if $(VERSION_MAJOR),$(VERSION_MAJOR), 0)
