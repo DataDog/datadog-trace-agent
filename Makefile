@@ -37,7 +37,7 @@ ci: deps
 	golint ./cmd/trace-agent ./filters ./fixtures ./info ./quantile ./quantizer ./sampler ./statsd ./watchdog ./writer
 	go test ./...
 
-windows: clean-windows
+windows:
 	# pre-packages resources needed for the windows release
 	windmc --target pe-x86-64 -r cmd/trace-agent/windows_resources cmd/trace-agent/windows_resources/trace-agent-msg.mc
 	windres --define MAJ_VER=$(VERSION_MAJOR) --define MIN_VER=$(VERSION_MINOR) --define PATCH_VER=$(VERSION_PATCH) -i cmd/trace-agent/windows_resources/trace-agent.rc --target=pe-x86-64 -O coff -o cmd/trace-agent/rsrc.syso
@@ -46,9 +46,6 @@ clean: clean-deps clean-install clean-windows
 
 clean-deps:
 	rm -rf vendor
-
-clean-windows:
-	rm -f ./cmd/trace-agent/windows_resources/*.bin ./cmd/trace-agent/windows_resources/trace-agent-msg.rc
 
 clean-install:
 	rm -f ./info/git_version.go
