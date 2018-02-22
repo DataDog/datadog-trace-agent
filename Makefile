@@ -15,7 +15,7 @@ VERSION_MAJOR := $(if $(VERSION_MAJOR),$(VERSION_MAJOR), 0)
 VERSION_MINOR := $(if $(VERSION_MINOR),$(VERSION_MINOR), 0)
 VERSION_PATCH := $(if $(VERSION_PATCH),$(VERSION_PATCH), 0)
 
-deps: clean-deps
+deps:
 	# downloads and installs dependencies
 	go get -d github.com/Masterminds/glide/...
 	# use a known version
@@ -25,7 +25,7 @@ deps: clean-deps
 	# get all dependencies
 	glide install
 
-install: deps clean-install
+install: deps
 	# prepares all dependencies by running the 'deps' task, generating
 	# versioning information and installing the binary.
 	go generate ./info
@@ -41,11 +41,3 @@ windows:
 	# pre-packages resources needed for the windows release
 	windmc --target pe-x86-64 -r cmd/trace-agent/windows_resources cmd/trace-agent/windows_resources/trace-agent-msg.mc
 	windres --define MAJ_VER=$(VERSION_MAJOR) --define MIN_VER=$(VERSION_MINOR) --define PATCH_VER=$(VERSION_PATCH) -i cmd/trace-agent/windows_resources/trace-agent.rc --target=pe-x86-64 -O coff -o cmd/trace-agent/rsrc.syso
-
-clean: clean-deps clean-install clean-windows
-
-clean-deps:
-	rm -rf vendor
-
-clean-install:
-	rm -f ./info/git_version.go
