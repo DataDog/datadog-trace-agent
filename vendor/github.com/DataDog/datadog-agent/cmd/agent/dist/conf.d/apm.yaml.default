@@ -1,0 +1,10 @@
+instances:
+- {} # default instance, if you need to customize its configuration, please comment out this instance
+     # and customize the configuration options on the instance below
+
+#   # path to trace agent binary, defaults to `embedded/bin/trace-agent` in agent installation dir
+# - bin_path: /opt/datadog-agent/embedded/bin/trace-agent
+
+#   # Path to classic agent configuration, defaults to `trace-agent.conf` in agent configuration dir
+#   # (i.e. same directory as the one the agent reads `datadog.yaml` from)
+#   conf_path: /etc/datadog-agent/trace-agent.conf
