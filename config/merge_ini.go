@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/backoff"
-	"github.com/DataDog/datadog-trace-agent/model"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	log "github.com/cihub/seelog"
 	"github.com/go-ini/ini"
@@ -91,7 +91,7 @@ func mergeIniConfig(c *AgentConfig, conf *File) error {
 
 	// [trace.config] section
 	if v, _ := conf.Get("trace.config", "env"); v != "" {
-		c.DefaultEnv = model.NormalizeTag(v)
+		c.DefaultEnv = agent.NormalizeTag(v)
 	}
 	// undocumented
 	// TODO: DEPRECATED? do we keep this one?

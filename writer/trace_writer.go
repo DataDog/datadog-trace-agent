@@ -9,9 +9,9 @@ import (
 
 	log "github.com/cihub/seelog"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/golang/protobuf/proto"
@@ -22,19 +22,19 @@ type TraceWriter struct {
 	hostName       string
 	env            string
 	conf           writerconfig.TraceWriterConfig
-	InTraces       <-chan *model.Trace
-	InTransactions <-chan *model.Span
+	InTraces       <-chan *agent.Trace
+	InTransactions <-chan *agent.Span
 	stats          info.TraceWriterInfo
 
-	traces        []*model.APITrace
-	transactions  []*model.Span
+	traces        []*agent.APITrace
+	transactions  []*agent.Span
 	spansInBuffer int
 
 	BaseWriter
 }
 
 // NewTraceWriter returns a new writer for traces.
-func NewTraceWriter(conf *config.AgentConfig, InTraces <-chan *model.Trace, InTransactions <-chan *model.Span) *TraceWriter {
+func NewTraceWriter(conf *config.AgentConfig, InTraces <-chan *agent.Trace, InTransactions <-chan *agent.Span) *TraceWriter {
 	writerConf := conf.TraceWriterConfig
 	log.Infof("Trace writer initializing with config: %+v", writerConf)
 
@@ -43,8 +43,8 @@ func NewTraceWriter(conf *config.AgentConfig, InTraces <-chan *model.Trace, InTr
 		hostName: conf.HostName,
 		env:      conf.DefaultEnv,
 
-		traces:       []*model.APITrace{},
-		transactions: []*model.Span{},
+		traces:       []*agent.APITrace{},
+		transactions: []*agent.Span{},
 
 		InTraces:       InTraces,
 		InTransactions: InTransactions,
@@ -139,7 +139,7 @@ func (w *TraceWriter) Stop() {
 	w.BaseWriter.Stop()
 }
 
-func (w *TraceWriter) handleTrace(trace *model.Trace) {
+func (w *TraceWriter) handleTrace(trace *agent.Trace) {
 	if len(*trace) == 0 {
 		log.Debugf("Ignoring 0-length trace")
 		return
@@ -149,7 +149,7 @@ func (w *TraceWriter) handleTrace(trace *model.Trace) {
 
 	spanOverflow := w.spansInBuffer + len(*trace) - w.conf.MaxSpansPerPayload
 
-	var splitTrace model.Trace
+	var splitTrace agent.Trace
 
 	// If we overflow max spans per payload split last trace
 	// (necessarily the one that went over the limit otherwise we'd have split earlier)
@@ -200,7 +200,7 @@ func (w *TraceWriter) flush() {
 	atomic.AddInt64(&w.stats.Transactions, int64(numTransactions))
 	atomic.AddInt64(&w.stats.Spans, int64(w.spansInBuffer))
 
-	tracePayload := model.TracePayload{
+	tracePayload := agent.TracePayload{
 		HostName:     w.hostName,
 		Env:          w.env,
 		Traces:       w.traces,

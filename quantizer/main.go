@@ -3,7 +3,7 @@ package quantizer
 import (
 	"regexp"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 )
 
 const (
@@ -18,7 +18,7 @@ const (
 var nonUniformSpacesRegexp = regexp.MustCompile("\\s+")
 
 // Quantize generates meaningful resource for a span, depending on its type
-func Quantize(span *model.Span) {
+func Quantize(span *agent.Span) {
 	switch span.Type {
 	case sqlType:
 		QuantizeSQL(span)

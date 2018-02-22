@@ -10,9 +10,9 @@ import (
 
 	log "github.com/cihub/seelog"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/fixtures"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/quantizer"
 	"github.com/stretchr/testify/assert"
 )
@@ -84,8 +84,8 @@ func TestFormatTrace(t *testing.T) {
 	resource := "SELECT name FROM people WHERE age = 42"
 	rep := strings.Repeat(" AND age = 42", 5000)
 	resource = resource + rep
-	testTrace := model.Trace{
-		&model.Span{
+	testTrace := agent.Trace{
+		&agent.Span{
 			Resource: resource,
 			Type:     "sql",
 		},
@@ -154,7 +154,7 @@ func BenchmarkWatchdog(b *testing.B) {
 }
 
 // Mimicks behaviour of agent Process function
-func formatTrace(t model.Trace) model.Trace {
+func formatTrace(t agent.Trace) agent.Trace {
 	for i := range t {
 		quantizer.Quantize(t[i])
 		t[i].Truncate()

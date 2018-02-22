@@ -5,9 +5,9 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	log "github.com/cihub/seelog"
 
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,11 +24,11 @@ func getTestScoreEngine() *ScoreEngine {
 	return NewScoreEngine(extraRate, maxTPS)
 }
 
-func getTestTrace() (model.Trace, *model.Span) {
+func getTestTrace() (agent.Trace, *agent.Span) {
 	tID := randomTraceID()
-	trace := model.Trace{
-		&model.Span{TraceID: tID, SpanID: 1, ParentID: 0, Start: 42, Duration: 1000000, Service: "mcnulty", Type: "web"},
-		&model.Span{TraceID: tID, SpanID: 2, ParentID: 1, Start: 100, Duration: 200000, Service: "mcnulty", Type: "sql"},
+	trace := agent.Trace{
+		&agent.Span{TraceID: tID, SpanID: 1, ParentID: 0, Start: 42, Duration: 1000000, Service: "mcnulty", Type: "web"},
+		&agent.Span{TraceID: tID, SpanID: 2, ParentID: 1, Start: 100, Duration: 200000, Service: "mcnulty", Type: "sql"},
 	}
 	return trace, trace[0]
 }
@@ -124,7 +124,7 @@ func TestApplySampleRate(t *testing.T) {
 	assert := assert.New(t)
 	tID := randomTraceID()
 
-	root := model.Span{TraceID: tID, SpanID: 1, ParentID: 0, Start: 123, Duration: 100000, Service: "mcnulty", Type: "web"}
+	root := agent.Span{TraceID: tID, SpanID: 1, ParentID: 0, Start: 123, Duration: 100000, Service: "mcnulty", Type: "web"}
 
 	applySampleRate(&root, 0.4)
 	assert.Equal(0.4, root.Metrics["_sample_rate"], "sample rate should be 40%%")
@@ -145,12 +145,12 @@ func BenchmarkSampler(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		trace := model.Trace{
-			&model.Span{TraceID: 1, SpanID: 1, ParentID: 0, Start: 42, Duration: 1000000000, Service: "mcnulty", Type: "web", Resource: string(rand.Intn(signatureCount))},
-			&model.Span{TraceID: 1, SpanID: 2, ParentID: 1, Start: 100, Duration: 200000000, Service: "mcnulty", Type: "sql"},
-			&model.Span{TraceID: 1, SpanID: 3, ParentID: 2, Start: 150, Duration: 199999000, Service: "master-db", Type: "sql"},
-			&model.Span{TraceID: 1, SpanID: 4, ParentID: 1, Start: 500000000, Duration: 500000, Service: "redis", Type: "redis"},
-			&model.Span{TraceID: 1, SpanID: 5, ParentID: 1, Start: 700000000, Duration: 700000, Service: "mcnulty", Type: ""},
+		trace := agent.Trace{
+			&agent.Span{TraceID: 1, SpanID: 1, ParentID: 0, Start: 42, Duration: 1000000000, Service: "mcnulty", Type: "web", Resource: string(rand.Intn(signatureCount))},
+			&agent.Span{TraceID: 1, SpanID: 2, ParentID: 1, Start: 100, Duration: 200000000, Service: "mcnulty", Type: "sql"},
+			&agent.Span{TraceID: 1, SpanID: 3, ParentID: 2, Start: 150, Duration: 199999000, Service: "master-db", Type: "sql"},
+			&agent.Span{TraceID: 1, SpanID: 4, ParentID: 1, Start: 500000000, Duration: 500000, Service: "redis", Type: "redis"},
+			&agent.Span{TraceID: 1, SpanID: 5, ParentID: 1, Start: 700000000, Duration: 700000, Service: "mcnulty", Type: ""},
 		}
 		s.Sample(trace, trace[0], defaultEnv)
 	}

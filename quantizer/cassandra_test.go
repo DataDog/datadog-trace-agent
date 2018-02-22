@@ -3,13 +3,12 @@ package quantizer
 import (
 	"testing"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/DataDog/datadog-trace-agent/model"
 )
 
-func CassSpan(query string) *model.Span {
-	return &model.Span{
+func CassSpan(query string) *agent.Span {
+	return &agent.Span{
 		Resource: query,
 		Type:     "cassandra",
 		Meta: map[string]string{

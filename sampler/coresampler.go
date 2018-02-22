@@ -17,7 +17,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
@@ -40,7 +40,7 @@ type Engine interface {
 	// Stop the sampler.
 	Stop()
 	// Sample a trace.
-	Sample(trace model.Trace, root *model.Span, env string) bool
+	Sample(trace agent.Trace, root *agent.Span, env string) bool
 	// GetState returns information about the sampler.
 	GetState() interface{}
 }
@@ -129,7 +129,7 @@ func (s *Sampler) RunAdjustScoring() {
 }
 
 // GetSampleRate returns the sample rate to apply to a trace.
-func (s *Sampler) GetSampleRate(trace model.Trace, root *model.Span, signature Signature) float64 {
+func (s *Sampler) GetSampleRate(trace agent.Trace, root *agent.Span, signature Signature) float64 {
 	sampleRate := s.GetSignatureSampleRate(signature) * s.extraRate
 
 	return sampleRate
@@ -150,8 +150,8 @@ func (s *Sampler) GetMaxTPSSampleRate() float64 {
 }
 
 // GetTraceAppliedSampleRate gets the sample rate the sample rate applied earlier in the pipeline.
-func GetTraceAppliedSampleRate(root *model.Span) float64 {
-	if rate, ok := root.Metrics[model.SpanSampleRateMetricKey]; ok {
+func GetTraceAppliedSampleRate(root *agent.Span) float64 {
+	if rate, ok := root.Metrics[agent.SpanSampleRateMetricKey]; ok {
 		return rate
 	}
 
@@ -159,9 +159,9 @@ func GetTraceAppliedSampleRate(root *model.Span) float64 {
 }
 
 // SetTraceAppliedSampleRate sets the currently applied sample rate in the trace data to allow chained up sampling.
-func SetTraceAppliedSampleRate(root *model.Span, sampleRate float64) {
+func SetTraceAppliedSampleRate(root *agent.Span, sampleRate float64) {
 	if root.Metrics == nil {
 		root.Metrics = make(map[string]float64)
 	}
-	root.Metrics[model.SpanSampleRateMetricKey] = sampleRate
+	root.Metrics[agent.SpanSampleRateMetricKey] = sampleRate
 }

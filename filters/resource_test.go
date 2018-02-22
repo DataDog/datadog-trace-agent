@@ -3,9 +3,9 @@ package filters
 import (
 	"testing"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/fixtures"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -72,7 +72,7 @@ func newTestFilter(blacklist ...string) Filter {
 	return newResourceFilter(c)
 }
 
-func newTestSpan(resource string) *model.Span {
+func newTestSpan(resource string) *agent.Span {
 	span := fixtures.RandomSpan()
 	span.Resource = resource
 	return span

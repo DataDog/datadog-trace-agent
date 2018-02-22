@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 	log "github.com/cihub/seelog"
 )
 
@@ -202,7 +202,7 @@ var tokenQuantizer = NewTokenConsumer(
 	})
 
 // QuantizeSQL generates resource and sql.query meta for SQL spans
-func QuantizeSQL(span *model.Span) {
+func QuantizeSQL(span *agent.Span) {
 	if span.Resource == "" {
 		return
 	}
