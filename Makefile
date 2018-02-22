@@ -15,19 +15,13 @@ VERSION_MAJOR := $(if $(VERSION_MAJOR),$(VERSION_MAJOR), 0)
 VERSION_MINOR := $(if $(VERSION_MINOR),$(VERSION_MINOR), 0)
 VERSION_PATCH := $(if $(VERSION_PATCH),$(VERSION_PATCH), 0)
 
-deps:
-	go get -d github.com/golang/dep/cmd/dep
-	cd $(GOPATH)/src/github.com/golang/dep && git reset --hard v0.3.2 && cd -
-	go install github.com/golang/dep/cmd/dep
-	dep ensure
-
-install: deps
+install:
 	# prepares all dependencies by running the 'deps' task, generating
 	# versioning information and installing the binary.
 	go generate ./info
 	go install ./cmd/trace-agent
 
-ci: deps
+ci:
 	# task used by CI
 	go get -u github.com/golang/lint/golint/...
 	golint ./cmd/trace-agent ./filters ./fixtures ./info ./quantile ./quantizer ./sampler ./statsd ./watchdog ./writer

@@ -1,0 +1,540 @@
+stages:
+  - source_test
+  - binary_build
+  - integration_test
+  - package_build
+  - image_build
+  - image_deploy
+  - deploy
+
+variables:
+  SRC_PATH: /src/github.com/DataDog/datadog-agent
+  OMNIBUS_BASE_DIR: $CI_PROJECT_DIR/.omnibus/
+  OMNIBUS_PACKAGE_DIR: $CI_PROJECT_DIR/.omnibus/pkg/
+  # make sure the types of RPM packages are kept separate
+  OMNIBUS_BASE_DIR_SUSE: $CI_PROJECT_DIR/.omnibus/suse/
+  OMNIBUS_PACKAGE_DIR_SUSE: $CI_PROJECT_DIR/.omnibus/suse/pkg/
+  STATIC_BINARIES_DIR: bin/static
+  DOGSTATSD_BINARIES_DIR: bin/dogstatsd
+  DEB_S3_BUCKET_DEPRECATED: apt-agent6.datad0g.com
+  DEB_S3_BUCKET: apt.datad0g.com
+  RPM_S3_BUCKET: yum.datad0g.com
+  DEB_RPM_BUCKET_BRANCH: nightly  # branch of the DEB_S3_BUCKET and RPM_S3_BUCKET repos to release to, 'nightly' or 'beta'
+  DD_REPO_BRANCH_NAME: $CI_COMMIT_REF_NAME
+  S3_CP_CMD: aws s3 cp --only-show-errors --region us-east-1 --sse AES256
+  S3_SCRATCH_URI: s3://dd-scratch-space-build-stable/$CI_PROJECT_NAME/$CI_PIPELINE_ID
+  S3_DSD6_URI: s3://dsd6-staging/linux
+
+before_script:
+  # We need to install go deps from within the GOPATH, which we set to / on builder images; that's because pointing
+  # GOPATH to the project folder would be too complex (we'd need to replicate the `src/github/project` scheme).
+  # So we copy the agent sources to / and bootstrap from there the vendor dependencies before running any job.
+  - rsync -azr --delete ./ $SRC_PATH
+  - cd $SRC_PATH
+  - inv -e deps
+
+
+#
+# source_test
+#
+
+
+# run tests for deb-x64
+run_tests_deb-x64:
+  stage: source_test
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/datadog-agent-builders/deb_x64:latest
+  tags: [ "runner:main", "size:large" ]
+  script:
+    - inv -e test --coverage
+
+# run tests for rpm-x64
+run_test_rpm-x64:
+  stage: source_test
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/datadog-agent-builders/rpm_x64:latest
+  tags: [ "runner:main", "size:large" ]
+  script:
+    - inv -e test --coverage
+
+
+#
+# binary_build
+#
+
+
+# build dogstatsd static for deb-x64
+build_dogstatsd_static-deb_x64:
+  stage: binary_build
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/datadog-agent-builders/deb_x64:latest
+  tags: [ "runner:main", "size:large" ]
+  script:
+    - inv -e dogstatsd.build --static
+    - $S3_CP_CMD $SRC_PATH/$STATIC_BINARIES_DIR/dogstatsd $S3_SCRATCH_URI/static/dogstatsd
+
+# build puppy agent for deb-x64, to make sure the build is not broken because of build flags
+build_puppy_agent-deb_x64:
+  stage: binary_build
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/datadog-agent-builders/deb_x64:latest
+  tags: [ "runner:main", "size:large" ]
+  script:
+    - inv -e agent.build --puppy
+
+# build dogstatsd for deb-x64
+build_dogstatsd-deb_x64:
+  stage: binary_build
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/datadog-agent-builders/deb_x64:latest
+  tags: [ "runner:main", "size:large" ]
+  script:
+    - inv -e dogstatsd.build
+    - $S3_CP_CMD $SRC_PATH/$DOGSTATSD_BINARIES_DIR/dogstatsd $S3_SCRATCH_URI/dogstatsd/dogstatsd
+
+#
+# integration_test
+#
+
+# run benchmarks on deb
+# run_benchmarks-deb_x64:
+#   stage: integration_test
+#   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/datadog-agent-builders/deb_x64:latest
+#   allow_failure: true  # FIXME: this was set to true to temporarily unblock the pipeline
+#   tags: [ "runner:main", "size:large" ]
+#   script:
+#     - inv -e bench.aggregator
+#     # FIXME: in our docker image, non ascii characters printed by the benchmark
+#     # make invoke traceback. For now, the workaround is to call the benchmarks
+#     # manually
+#     - inv -e bench.build-dogstatsd
+
+#     - set +x # make sure we don't output the creds to the build log
+#     - DD_AGENT_API_KEY=$(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.dd_agent_api_key --with-decryption --query "Parameter.Value" --out text)
+
+#     # dogstatsd validation - not really benchmarking: gitlab isn't the right place to do this.
+#     - ./bin/benchmarks/dogstatsd -pps=20000 -dur 30 -ser 5 -branch $DD_REPO_BRANCH_NAME -api-key $DD_AGENT_API_KEY
+#   artifacts:
+#     expire_in: 2 weeks
+#     paths:
+#       - benchmarks
+
+# check the size of the static dogstatsd binary
+run_dogstatsd_size_test:
+  stage: integration_test
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/datadog-agent-builders/deb_x64:latest
+  tags: [ "runner:main", "size:large" ]
+  before_script:
+    # Disable global before_script
+    - mkdir -p $STATIC_BINARIES_DIR
+    - $S3_CP_CMD $S3_SCRATCH_URI/static/dogstatsd $STATIC_BINARIES_DIR/dogstatsd
+  script:
+    - inv -e dogstatsd.size-test --skip-build
+
+#
+# package_build
+#
+
+
+# build Agent package for deb-x64
+agent_deb-x64:
+  stage: package_build
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/datadog-agent-builders/deb_x64:latest
+  tags: [ "runner:main", "size:large" ]
+  script:
+    # Artifacts and cache must live within project directory but we run omnibus
+    # from the GOPATH (see above). We then call `invoke` passing --base-dir,
+    # pointing to a gitlab-friendly location.
+    - inv -e agent.omnibus-build --base-dir $OMNIBUS_BASE_DIR
+    - dpkg -c $OMNIBUS_PACKAGE_DIR/datadog-agent*_amd64.deb
+    - $S3_CP_CMD $OMNIBUS_PACKAGE_DIR/datadog-agent*_amd64.deb $S3_SCRATCH_URI/datadog-agent_amd64.deb
+  cache:
+    # cache per branch
+    key: $CI_COMMIT_REF_NAME
+    paths:
+      - $OMNIBUS_BASE_DIR
+  artifacts:
+    expire_in: 2 weeks
+    paths:
+      - $OMNIBUS_PACKAGE_DIR
+
+# build Agent package for rpm-x64
+agent_rpm-x64:
+  stage: package_build
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/datadog-agent-builders/rpm_x64:latest
+  tags: [ "runner:main", "size:large" ]
+  script:
+    # Artifacts and cache must live within project directory but we run omnibus
+    # from the GOPATH (see above). We then call `invoke` passing --base-dir,
+    # pointing to a gitlab-friendly location.
+    - set +x
+    - RPM_GPG_KEY=$(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.rpm_signing_private_key --with-decryption --query "Parameter.Value" --out text)
+    - printf -- "$RPM_GPG_KEY" | gpg --import --batch
+    - export RPM_SIGNING_PASSPHRASE=$(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.rpm_signing_key_passphrase --with-decryption --query "Parameter.Value" --out text)
+    - set -x
+    - inv -e agent.omnibus-build --base-dir $OMNIBUS_BASE_DIR
+    - rpm -i $OMNIBUS_PACKAGE_DIR/*.rpm
+  cache:
+    # cache per branch
+    key: $CI_COMMIT_REF_NAME
+    paths:
+      - $OMNIBUS_BASE_DIR
+  artifacts:
+    expire_in: 2 weeks
+    paths:
+      - $OMNIBUS_PACKAGE_DIR
+
+# build Agent package for rpm-x64
+agent_suse-x64:
+  stage: package_build
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/datadog-agent-builders/suse_x64:latest
+  tags: [ "runner:main", "size:large" ]
+  script:
+    # Artifacts and cache must live within project directory but we run omnibus
+    # from the GOPATH (see above). We then call `invoke` passing --base-dir,
+    # pointing to a gitlab-friendly location.
+    - set +x
+    - RPM_GPG_KEY=$(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.rpm_signing_private_key --with-decryption --query "Parameter.Value" --out text)
+    - printf -- "$RPM_GPG_KEY" | gpg --import --batch
+    - export RPM_SIGNING_PASSPHRASE=$(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.rpm_signing_key_passphrase --with-decryption --query "Parameter.Value" --out text)
+    - set -x
+    - inv -e agent.omnibus-build --base-dir $OMNIBUS_BASE_DIR_SUSE
+    # FIXME: skip the installation step until we fix the preinst/postinst scripts in the rpm package
+    # to also work with SUSE11
+    # - rpm -i $OMNIBUS_PACKAGE_DIR_SUSE/*.rpm
+  cache:
+    # cache per branch
+    key: $CI_COMMIT_REF_NAME
+    paths:
+      - $OMNIBUS_BASE_DIR_SUSE
+  artifacts:
+    expire_in: 2 weeks
+    paths:
+      - $OMNIBUS_PACKAGE_DIR_SUSE
+
+# build Agent package for Windows
+build_windows_msi_x64:
+  before_script:
+    - if exist .omnibus rd /s/q .omnibus
+    - if exist %GOPATH%\src\github.com\DataDog\datadog-agent rd /s/q %GOPATH%\src\github.com\DataDog\datadog-agent
+    - mkdir %GOPATH%\src\github.com\DataDog\datadog-agent
+    - xcopy /q/h/e/s * %GOPATH%\src\github.com\DataDog\datadog-agent
+    - cd %GOPATH%\src\github.com\DataDog\datadog-agent
+    - inv -e deps
+  stage: package_build
+  tags: ["runner:windows"]
+  script:
+    - cd %GOPATH%\src\github.com\DataDog\datadog-agent
+    - inv agent.omnibus-build
+  artifacts:
+    expire_in: 2 weeks
+    paths:
+    - .omnibus/pkg
+
+# build Dogstastd package for deb-x64
+dogstatsd_deb-x64:
+  stage: package_build
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/datadog-agent-builders/deb_x64:latest
+  tags: [ "runner:main", "size:large" ]
+  script:
+    # Artifacts and cache must live within project directory but we run omnibus
+    # from the GOPATH (see above). We then call `invoke` passing --base-dir,
+    # pointing to a gitlab-friendly location.
+    - inv -e dogstatsd.omnibus-build --base-dir $OMNIBUS_BASE_DIR
+    - dpkg -c $OMNIBUS_PACKAGE_DIR/datadog-dogstatsd*_amd64.deb
+    - $S3_CP_CMD $OMNIBUS_PACKAGE_DIR/datadog-dogstatsd*_amd64.deb $S3_SCRATCH_URI/datadog-dogstatsd_amd64.deb
+  cache:
+    # cache per branch
+    key: $CI_COMMIT_REF_NAME
+    paths:
+      - $OMNIBUS_BASE_DIR
+  artifacts:
+    expire_in: 2 weeks
+    paths:
+      - $OMNIBUS_PACKAGE_DIR
+
+# build Dogstastd package for rpm-x64
+dogstatsd_rpm-x64:
+  stage: package_build
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/datadog-agent-builders/rpm_x64:latest
+  tags: [ "runner:main", "size:large" ]
+  script:
+    # Artifacts and cache must live within project directory but we run omnibus
+    # from the GOPATH (see above). We then call `invoke` passing --base-dir,
+    # pointing to a gitlab-friendly location.
+    - set +x
+    - RPM_GPG_KEY=$(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.rpm_signing_private_key --with-decryption --query "Parameter.Value" --out text)
+    - printf -- "$RPM_GPG_KEY" | gpg --import --batch
+    - export RPM_SIGNING_PASSPHRASE=$(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.rpm_signing_key_passphrase --with-decryption --query "Parameter.Value" --out text)
+    - set -x
+    - inv -e dogstatsd.omnibus-build --base-dir $OMNIBUS_BASE_DIR
+    - rpm -i $OMNIBUS_PACKAGE_DIR/*.rpm
+  cache:
+    # cache per branch
+    key: $CI_COMMIT_REF_NAME
+    paths:
+      - $OMNIBUS_BASE_DIR
+  artifacts:
+    expire_in: 2 weeks
+    paths:
+      - $OMNIBUS_PACKAGE_DIR
+
+
+# build Dogstastd package for rpm-x64
+dogstatsd_suse-x64:
+  stage: package_build
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/datadog-agent-builders/suse_x64:latest
+  tags: [ "runner:main", "size:large" ]
+  script:
+    # Artifacts and cache must live within project directory but we run omnibus
+    # from the GOPATH (see above). We then call `invoke` passing --base-dir,
+    # pointing to a gitlab-friendly location.
+    - set +x
+    - RPM_GPG_KEY=$(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.rpm_signing_private_key --with-decryption --query "Parameter.Value" --out text)
+    - printf -- "$RPM_GPG_KEY" | gpg --import --batch
+    - export RPM_SIGNING_PASSPHRASE=$(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.rpm_signing_key_passphrase --with-decryption --query "Parameter.Value" --out text)
+    - set -x
+    - inv -e dogstatsd.omnibus-build --base-dir $OMNIBUS_BASE_DIR_SUSE
+    - rpm -i $OMNIBUS_PACKAGE_DIR_SUSE/*.rpm
+  cache:
+    # cache per branch
+    key: $CI_COMMIT_REF_NAME
+    paths:
+      - $OMNIBUS_BASE_DIR_SUSE
+  artifacts:
+    expire_in: 2 weeks
+    paths:
+      - $OMNIBUS_PACKAGE_DIR_SUSE
+
+#
+# image_build
+#
+
+.dind_job_template: &dind_job_definition
+  stage: image_build
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/devtools/dind/build:latest
+  tags: [ "runner:dind", "size:large" ]
+  script: [ "# noop" ]
+
+# build the agent6 image
+build_agent6:
+  <<: *dind_job_definition
+  variables:
+    DD_DIND_BUILD_CONTEXT: Dockerfiles/agent
+    DD_DIND_IMAGE: &agent_ecr 486234852809.dkr.ecr.us-east-1.amazonaws.com/datadog-agent/agent:$CI_PIPELINE_ID
+    DD_DIND_ARTEFACTS: "true"
+
+# build the agent6 jmx image
+build_agent6_jmx:
+  <<: *dind_job_definition
+  variables:
+    DD_DIND_BUILD_CONTEXT: Dockerfiles/agent
+    DD_DIND_IMAGE: &agent_jmx_ecr 486234852809.dkr.ecr.us-east-1.amazonaws.com/datadog-agent/agent:${CI_PIPELINE_ID}-jmx
+    DD_DIND_BUILD_ARG: "WITH_JMX=true"
+    DD_DIND_ARTEFACTS: "true"
+
+# build the dogstatsd image
+build_dogstatsd:
+  <<: *dind_job_definition
+  variables:
+    DD_DIND_BUILD_CONTEXT: Dockerfiles/dogstatsd/alpine
+    DD_DIND_IMAGE: &dogstatsd_ecr 486234852809.dkr.ecr.us-east-1.amazonaws.com/datadog-agent/dogstatsd:$CI_PIPELINE_ID
+    DD_DIND_ARTEFACTS: "true"
+
+#
+# image_deploy
+#
+
+.dind_tag_job_template: &dind_tag_job_definition
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/devtools/dind/tag:latest
+  tags: [ "runner:dind", "size:large" ]
+  stage: image_deploy
+  script: [ "# noop" ]
+
+agent6_docker_hub:
+  <<: *dind_tag_job_definition
+  when: manual
+  only:
+    - master
+    - tags # FIXME see https://gitlab.com/gitlab-org/gitlab-ce/issues/37397
+  variables:
+    DD_DIND_TAG_SOURCE: *agent_ecr
+    DD_DIND_DEST_REGISTRY_TYPE: DOCKER_HUB
+    DD_DIND_TAG_DEST: datadog/agent:$CI_COMMIT_TAG
+
+agent6_jmx_docker_hub:
+  <<: *dind_tag_job_definition
+  when: manual
+  only:
+    - master
+    - tags # FIXME see https://gitlab.com/gitlab-org/gitlab-ce/issues/37397
+  variables:
+    DD_DIND_TAG_SOURCE: *agent_jmx_ecr
+    DD_DIND_DEST_REGISTRY_TYPE: DOCKER_HUB
+    DD_DIND_TAG_DEST: datadog/agent:${CI_COMMIT_TAG}-jmx
+
+agent6_dev_docker_hub:
+  <<: *dind_tag_job_definition
+  when: manual
+  except:
+    - master
+  variables:
+    DD_DIND_TAG_SOURCE: *agent_ecr
+    DD_DIND_DEST_REGISTRY_TYPE: DOCKER_HUB
+    DD_DIND_TAG_DEST: datadog/agent-dev:$CI_COMMIT_REF_SLUG
+
+agent6_jmx_dev_docker_hub:
+  <<: *dind_tag_job_definition
+  when: manual
+  except:
+    - master
+  variables:
+    DD_DIND_TAG_SOURCE: *agent_jmx_ecr
+    DD_DIND_DEST_REGISTRY_TYPE: DOCKER_HUB
+    DD_DIND_TAG_DEST: datadog/agent-dev:${CI_COMMIT_REF_SLUG}-jmx
+
+agent6_dev_docker_hub_master:
+  <<: *dind_tag_job_definition
+  only:
+    - master
+  variables:
+    DD_DIND_TAG_SOURCE: *agent_ecr
+    DD_DIND_DEST_REGISTRY_TYPE: DOCKER_HUB
+    DD_DIND_TAG_DEST: datadog/agent-dev:$CI_COMMIT_REF_SLUG
+
+agent6_jmx_dev_docker_hub_master:
+  <<: *dind_tag_job_definition
+  only:
+    - master
+  variables:
+    DD_DIND_TAG_SOURCE: *agent_jmx_ecr
+    DD_DIND_DEST_REGISTRY_TYPE: DOCKER_HUB
+    DD_DIND_TAG_DEST: datadog/agent-dev:${CI_COMMIT_REF_SLUG}-jmx
+
+dogstatsd_docker_hub:
+  <<: *dind_tag_job_definition
+  when: manual
+  only:
+    - master
+    - tags # FIXME see https://gitlab.com/gitlab-org/gitlab-ce/issues/37397
+  variables:
+    DD_DIND_TAG_SOURCE: *dogstatsd_ecr
+    DD_DIND_DEST_REGISTRY_TYPE: DOCKER_HUB
+    DD_DIND_TAG_DEST: datadog/dogstatsd:$CI_COMMIT_TAG
+
+dogstatsd_dev_docker_hub:
+  <<: *dind_tag_job_definition
+  when: manual
+  except:
+    - master
+  variables:
+    DD_DIND_TAG_SOURCE: *dogstatsd_ecr
+    DD_DIND_DEST_REGISTRY_TYPE: DOCKER_HUB
+    DD_DIND_TAG_DEST: datadog/dogstatsd-dev:$CI_COMMIT_REF_SLUG
+
+dogstatsd_dev_docker_hub_master:
+  <<: *dind_tag_job_definition
+  only:
+    - master
+  variables:
+    DD_DIND_TAG_SOURCE: *dogstatsd_ecr
+    DD_DIND_DEST_REGISTRY_TYPE: DOCKER_HUB
+    DD_DIND_TAG_DEST: datadog/dogstatsd-dev:$CI_COMMIT_REF_SLUG
+
+#
+# deploy
+#
+
+
+# deploy debian packages to apt staging repo
+deploy_deb:
+  stage: deploy
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/datadog-agent-builders/deploy:latest
+  before_script:
+    - ls $OMNIBUS_PACKAGE_DIR
+  only:
+    - master
+    - tags
+  tags: [ "runner:main", "size:large" ]
+  script:
+    - source /usr/local/rvm/scripts/rvm
+    - rvm use 2.4
+
+    - set +x # make sure we don't output the creds to the build log
+    - APT_SIGNING_KEY_ID=$(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.apt_signing_key_id --with-decryption --query "Parameter.Value" --out text)
+    - APT_SIGNING_PRIVATE_KEY_PART1=$(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.apt_signing_private_key_part1 --with-decryption --query "Parameter.Value" --out text)
+    - APT_SIGNING_PRIVATE_KEY_PART2=$(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.apt_signing_private_key_part2 --with-decryption --query "Parameter.Value" --out text)
+    - APT_SIGNING_KEY_PASSPHRASE=$(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.apt_signing_key_passphrase --with-decryption --query "Parameter.Value" --out text)
+
+    - echo "$APT_SIGNING_KEY_ID"
+    - printf -- "$APT_SIGNING_PRIVATE_KEY_PART1\n$APT_SIGNING_PRIVATE_KEY_PART2\n" | gpg --import --batch
+
+    - APT_SIGNING_KEY_DEPRECATED_ID=$(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.apt_signing_key_deprecated_id --with-decryption --query "Parameter.Value" --out text)
+    - APT_SIGNING_PRIVATE_KEY_DEPRECATED=$(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.apt_signing_key_deprecated --with-decryption --query "Parameter.Value" --out text)
+    - APT_SIGNING_KEY_DEPRECATED_PASSPHRASE=$(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.apt_signing_key_deprecated_passphrase --with-decryption --query "Parameter.Value" --out text)
+
+    - echo "$APT_SIGNING_KEY_ID"
+    - printf -- "$APT_SIGNING_PRIVATE_KEY_PART1\n$APT_SIGNING_PRIVATE_KEY_PART2\n" | gpg --import --batch
+    - echo "$APT_SIGNING_KEY_DEPRECATED_ID"
+    - printf -- "$APT_SIGNING_PRIVATE_KEY_DEPRECATED" | gpg --import --batch
+
+    # FIXME: remove this once we move to the new apt repo on our staging and production environments
+    - echo "$APT_SIGNING_KEY_PASSPHRASE" | deb-s3 upload -c unstable -b $DEB_S3_BUCKET_DEPRECATED -a amd64 --sign=$APT_SIGNING_KEY_ID --gpg_options="--passphrase-fd 0 --pinentry-mode loopback --batch --digest-algo SHA512" --preserve_versions --visibility public $OMNIBUS_PACKAGE_DIR/*amd64.deb
+    - echo "$APT_SIGNING_KEY_PASSPHRASE" | deb-s3 upload -c unstable -b $DEB_S3_BUCKET_DEPRECATED -a x86_64 --sign=$APT_SIGNING_KEY_ID --gpg_options="--passphrase-fd 0 --pinentry-mode loopback --batch --digest-algo SHA512" --preserve_versions --visibility public $OMNIBUS_PACKAGE_DIR/*amd64.deb
+
+
+    # Check if it is in the pool, if it is, do not release the new one
+    # FIXME: move this to a script in the build image
+    - PACKAGE_VERSION=`ls $OMNIBUS_PACKAGE_DIR/ | grep _amd64.deb | sed s/datadog-agent_// | sed s/_amd64.deb//`
+    - if curl --output /dev/null --silent --head --fail -v "https://s3.amazonaws.com/apt.datad0g.com/pool/d/da/datadog-agent_${PACKAGE_VERSION}_amd64.deb"; then echo "datadog-agent_${PACKAGE_VERSION}_amd64.deb already exists in the APT pool, releasing this one instead of the latest build."; rm -f $OMNIBUS_PACKAGE_DIR/datadog-agent_${PACKAGE_VERSION}_amd64.deb; curl -v -o $OMNIBUS_PACKAGE_DIR "https://s3.amazonaws.com/apt.datad0g.com/pool/d/da/datadog-agent_${PACKAGE_VERSION}_${1}.deb"; fi;
+
+    - echo "$APT_SIGNING_KEY_DEPRECATED_PASSPHRASE" | deb-s3 upload -c $DEB_RPM_BUCKET_BRANCH -b $DEB_S3_BUCKET -a amd64 --sign=$APT_SIGNING_KEY_DEPRECATED_ID --gpg_options="--passphrase-fd 0 --pinentry-mode loopback --batch --digest-algo SHA512" --preserve_versions --visibility public $OMNIBUS_PACKAGE_DIR/*amd64.deb
+    - echo "$APT_SIGNING_KEY_DEPRECATED_PASSPHRASE" | deb-s3 upload -c $DEB_RPM_BUCKET_BRANCH -b $DEB_S3_BUCKET -a x86_64 --sign=$APT_SIGNING_KEY_DEPRECATED_ID --gpg_options="--passphrase-fd 0 --pinentry-mode loopback --batch --digest-algo SHA512" --preserve_versions --visibility public $OMNIBUS_PACKAGE_DIR/*amd64.deb
+
+# deploy rpm packages to yum staging repo
+deploy_rpm:
+  stage: deploy
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/datadog-agent-builders/deploy:latest
+  before_script:
+    - ls $OMNIBUS_PACKAGE_DIR
+  only:
+    - master
+    - tags
+  tags: [ "runner:main", "size:large" ]
+  script:
+    - source /usr/local/rvm/scripts/rvm
+    - rvm use 2.4
+    - mkdir -p ./rpmrepo/x86_64/
+    - aws s3 sync s3://$RPM_S3_BUCKET/$DEB_RPM_BUCKET_BRANCH/ ./rpmrepo/
+    - cp $OMNIBUS_PACKAGE_DIR/*x86_64.rpm ./rpmrepo/x86_64/
+    - createrepo --update -v --checksum sha ./rpmrepo/x86_64
+    - aws s3 sync ./rpmrepo/ s3://$RPM_S3_BUCKET/$DEB_RPM_BUCKET_BRANCH/ --grants read=uri=http://acs.amazonaws.com/groups/global/AllUsers full=id=3a6e02b08553fd157ae3fb918945dd1eaae5a1aa818940381ef07a430cf25732
+
+# deploy rpm packages to yum staging repo
+deploy_suse_rpm:
+  stage: deploy
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/datadog-agent-builders/deploy:latest
+  before_script:
+    - ls $OMNIBUS_PACKAGE_DIR_SUSE
+  only:
+    - master
+    - tags
+  tags: [ "runner:main", "size:large" ]
+  script:
+    - source /usr/local/rvm/scripts/rvm
+    - rvm use 2.4
+    - mkdir -p ./rpmrepo/suse/x86_64/
+    - aws s3 sync s3://$RPM_S3_BUCKET/suse/$DEB_RPM_BUCKET_BRANCH/ ./rpmrepo/
+    - cp $OMNIBUS_PACKAGE_DIR_SUSE/*x86_64.rpm ./rpmrepo/x86_64/
+    - createrepo --update -v --checksum sha ./rpmrepo/x86_64
+    - aws s3 sync ./rpmrepo/ s3://$RPM_S3_BUCKET/suse/$DEB_RPM_BUCKET_BRANCH/ --grants read=uri=http://acs.amazonaws.com/groups/global/AllUsers full=id=3a6e02b08553fd157ae3fb918945dd1eaae5a1aa818940381ef07a430cf25732
+
+# deploy dsd binary to staging bucket
+deploy_dsd:
+  stage: deploy
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/datadog-agent-builders/deploy:latest
+  before_script:
+    - ls $OMNIBUS_PACKAGE_DIR
+  only:
+    - master
+    - tags
+  tags: [ "runner:main", "size:large" ]
+  script:
+    - $S3_CP_CMD $S3_SCRATCH_URI/dogstatsd/dogstatsd ./dogstatsd
+    - export VERSION=$(inv version)
+    - aws s3 cp --region us-east-1 ./dogstatsd $S3_DSD6_URI/dogstatsd-$VERSION --grants read=uri=http://acs.amazonaws.com/groups/global/AllUsers full=id=3a6e02b08553fd157ae3fb918945dd1eaae5a1aa818940381ef07a430cf25732

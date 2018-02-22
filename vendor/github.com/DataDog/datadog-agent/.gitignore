@@ -1,0 +1,26 @@
+# dogstatsd image temporary file
+Dockerfiles/dogstatsd/alpine/dogstatsd
+
+# folders
+vendor/
+bin/
+/dev/
+
+**/*.tmp
+**/debug.test
+# files
+.DS_Store
+.vscode
+*.cov
+*.pyc
+*.swp
+*.exe
+*.syso
+*.log
+
+#file generated at build time by message compiler
+agentmsg.h
+
+# go-generated files
+datadog.yaml
+dogstatsd.yaml
