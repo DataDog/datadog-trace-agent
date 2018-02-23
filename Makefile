@@ -16,10 +16,14 @@ VERSION_MINOR := $(if $(VERSION_MINOR),$(VERSION_MINOR), 0)
 VERSION_PATCH := $(if $(VERSION_PATCH),$(VERSION_PATCH), 0)
 
 deps:
-	go get -d github.com/golang/dep/cmd/dep
-	cd $(GOPATH)/src/github.com/golang/dep && git reset --hard v0.3.2 && cd -
-	go install github.com/golang/dep/cmd/dep
-	dep ensure
+	# downloads and installs dependencies
+	go get -d github.com/Masterminds/glide/...
+	# use a known version
+	cd $(GOPATH)/src/github.com/Masterminds/glide && git reset --hard v0.12.3 && cd -
+	# install it
+	go install github.com/Masterminds/glide/...
+	# get all dependencies
+	glide install
 
 install: deps
 	# prepares all dependencies by running the 'deps' task, generating
