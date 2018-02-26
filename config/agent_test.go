@@ -173,9 +173,11 @@ func TestConfigNewIfExists(t *testing.T) {
 }
 
 func TestGetHostname(t *testing.T) {
-	h, err := getHostname()
+	h, err := getHostname("")
 	assert.Nil(t, err)
-	assert.NotEqual(t, "", h)
+
+	host, _ := os.Hostname()
+	assert.Equal(t, host, h)
 }
 
 func TestUndocumentedIni(t *testing.T) {
