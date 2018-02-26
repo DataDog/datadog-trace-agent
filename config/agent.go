@@ -72,6 +72,9 @@ type AgentConfig struct {
 
 	// transaction analytics
 	AnalyzedRateByService map[string]float64
+
+	// infrastructure agent binary
+	DDAgentBin string // DDAgentBin will be "" for Agent5 scenarios
 }
 
 // NewDefaultAgentConfig returns a configuration with the default values
@@ -117,16 +120,27 @@ func NewDefaultAgentConfig() *AgentConfig {
 
 // getHostname shells out to obtain the hostname used by the infra agent
 // falling back to os.Hostname() if it is unavailable
-func getHostname() (string, error) {
-	ddAgentPy := "/opt/datadog-agent/embedded/bin/python"
-	getHostnameCmd := "from utils.hostname import get_hostname; print get_hostname()"
+func getHostname(ddAgentBin string) (string, error) {
+	var cmd *exec.Cmd
 
-	cmd := exec.Command(ddAgentPy, "-c", getHostnameCmd)
-	cmd.Env = []string{"PYTHONPATH=/opt/datadog-agent/agent"}
+	// In Agent 6 we will have an Agent binary defined.
+	if ddAgentBin != "" {
+		cmd = exec.Command(ddAgentBin, "hostname")
+		cmd.Env = []string{}
+	} else {
+		getHostnameCmd := "from utils.hostname import get_hostname; print get_hostname()"
+		cmd = exec.Command(defaultDDAgentPy, "-c", getHostnameCmd)
+		cmd.Env = []string{defaultDDAgentPyEnv}
+	}
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	// Copying all environment variables to child process
+	// Windows: Required, so the child process can load DLLs, etc.
+	// Linux:   Optional, but will make use of DD_HOSTNAME and DOCKER_DD_AGENT if they exist
+	osEnv := os.Environ()
+	cmd.Env = append(osEnv, cmd.Env...)
 
 	err := cmd.Run()
 	if err != nil {
@@ -140,6 +154,7 @@ func getHostname() (string, error) {
 	}
 
 	return hostname, nil
+
 }
 
 // NewAgentConfig creates the AgentConfig from the standard config
@@ -179,9 +194,8 @@ func NewAgentConfig(conf *File, legacyConf *File, agentYaml *YamlAgentConfig) (*
 	}
 
 	// If hostname isn't provided in the configuration, try to guess it.
-	// TODO: rely on Agent 6 code instead.
 	if c.HostName == "" {
-		hostname, err := getHostname()
+		hostname, err := getHostname(c.DDAgentBin)
 		if err != nil {
 			return c, errors.New("failed to automatically set the hostname, you must specify it via configuration for or the DD_HOSTNAME env var")
 		}
