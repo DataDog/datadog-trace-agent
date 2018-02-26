@@ -135,35 +135,33 @@ type spanAndAncestors struct {
 	Ancestors []*Span
 }
 
-// element and queue implement a very basic FIFO used to do a BFS on a trace
+// element and queue implement a very basic LIFO used to do an iterative DFS on a trace
 type element struct {
 	SpanAndAncestors *spanAndAncestors
 	Next             *element
 }
 
-type queue struct {
-	first *element
-	last  *element
+type stack struct {
+	head *element
 }
 
-func (q *queue) Push(s *spanAndAncestors) {
-	e := &element{s, nil}
-	if q.first == nil {
-		q.first = e
-		q.last = e
+func (s *stack) Push(value *spanAndAncestors) {
+	e := &element{value, nil}
+	if s.head == nil {
+		s.head = e
 		return
 	}
-	q.last.Next = e
-	q.last = e
+	e.Next = s.head
+	s.head = e
 }
 
-func (q *queue) Pop() *spanAndAncestors {
-	if q.first == nil {
+func (s *stack) Pop() *spanAndAncestors {
+	if s.head == nil {
 		return nil
 	}
-	r := q.first.SpanAndAncestors
-	q.first = q.first.Next
-	return r
+	value := s.head.SpanAndAncestors
+	s.head = s.head.Next
+	return value
 }
 
 // ExtractTopLevelSubtraces extracts all subtraces rooted in a toplevel span
@@ -177,7 +175,7 @@ func (t Trace) ExtractTopLevelSubtraces(root *Span) []Subtrace {
 
 	visited := make(map[*Span]bool, len(t))
 	subtracesMap := make(map[*Span][]*Span)
-	next := queue{}
+	next := stack{}
 	next.Push(&spanAndAncestors{root, []*Span{}})
 
 	// We do a DFS on the trace to record the toplevel ancesters of each span
