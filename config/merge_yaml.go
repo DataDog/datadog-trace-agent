@@ -54,6 +54,8 @@ type traceAgent struct {
 	StatsWriter   statsWriter   `yaml:"stats_writer"`
 
 	AnalyzedRateByService map[string]float64 `yaml:"analyzed_rate_by_service"`
+
+	DDAgentBin string `yaml:"dd_agent_bin"`
 }
 
 type traceWriter struct {
@@ -190,6 +192,12 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
 
 	// undocumented
 	agentConf.AnalyzedRateByService = yc.TraceAgent.AnalyzedRateByService
+
+	// undocumented
+	agentConf.DDAgentBin = defaultDDAgentBin
+	if yc.TraceAgent.DDAgentBin != "" {
+		agentConf.DDAgentBin = yc.TraceAgent.DDAgentBin
+	}
 
 	return nil
 }
