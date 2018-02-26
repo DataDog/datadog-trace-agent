@@ -48,8 +48,7 @@
     "proto",
     "protoc-gen-gogo/descriptor"
   ]
-  revision = "342cbe0a04158f6dcb03ca0079991a51a4248c02"
-  version = "v0.5"
+  revision = "d76fbc1373015ced59b43ac267f28d546b955683"
 
 [[projects]]
   name = "github.com/golang/protobuf"
@@ -113,14 +112,13 @@
   revision = "8f0908ab3b2457e2e15403d3697c9ef5cb4b57a9"
 
 [[projects]]
-  branch = "v2"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
-  revision = "d670f9405373e636a5a2765eea47fac0c9bc91a4"
+  revision = "cd8b52f8269e0feb286dfeef29f8fe4d5b397e0b"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "77c57f58ee339b502c5e6c59a3f7214813c33ceb39af3278565f7fa2fcc4c8c4"
+  inputs-digest = "b4f352701c4f11cd79ab63920998103e531310cbdbee6e5e86852efb9e78bad6"
   solver-name = "gps-cdcl"
   solver-version = 1
