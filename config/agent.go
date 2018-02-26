@@ -1,7 +1,6 @@
 package config
 
 import (
-	"bytes"
 	"errors"
 	"net/url"
 	"os"
@@ -11,6 +10,9 @@ import (
 
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 )
+
+// Enables hostname logic testing
+var getHostnameCaller = getHostnameCmd
 
 // AgentConfig handles the interpretation of the configuration (with default
 // behaviors) in one place. It is also a simple structure to share across all
@@ -118,9 +120,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 	}
 }
 
-// getHostname shells out to obtain the hostname used by the infra agent
-// falling back to os.Hostname() if it is unavailable
-func getHostname(ddAgentBin string) (string, error) {
+func getHostnameCmd(ddAgentBin string) *exec.Cmd {
 	var cmd *exec.Cmd
 
 	// In Agent 6 we will have an Agent binary defined.
@@ -128,26 +128,32 @@ func getHostname(ddAgentBin string) (string, error) {
 		cmd = exec.Command(ddAgentBin, "hostname")
 		cmd.Env = []string{}
 	} else {
-		getHostnameCmd := "from utils.hostname import get_hostname; print get_hostname()"
-		cmd = exec.Command(defaultDDAgentPy, "-c", getHostnameCmd)
+		hostnameCmd := "from utils.hostname import get_hostname; print get_hostname()"
+		cmd = exec.Command(defaultDDAgentPy, "-c", hostnameCmd)
 		cmd.Env = []string{defaultDDAgentPyEnv}
 	}
 
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
 	// Copying all environment variables to child process
 	// Windows: Required, so the child process can load DLLs, etc.
 	// Linux:   Optional, but will make use of DD_HOSTNAME and DOCKER_DD_AGENT if they exist
 	osEnv := os.Environ()
 	cmd.Env = append(osEnv, cmd.Env...)
 
-	err := cmd.Run()
+	return cmd
+}
+
+// getHostname shells out to obtain the hostname used by the infra agent
+// falling back to os.Hostname() if it is unavailable
+func getHostname(ddAgentBin string) (string, error) {
+
+	cmd := getHostnameCaller(ddAgentBin)
+
+	stdout, err := cmd.Output()
 	if err != nil {
 		return os.Hostname()
 	}
 
-	hostname := strings.TrimSpace(stdout.String())
+	hostname := strings.TrimSpace(string(stdout[:]))
 
 	if hostname == "" {
 		return os.Hostname()

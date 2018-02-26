@@ -1,7 +1,9 @@
 package config
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -172,12 +174,53 @@ func TestConfigNewIfExists(t *testing.T) {
 	os.Remove(filename)
 }
 
+func mockGetHostnameCmd(agent6Bin string) *exec.Cmd {
+	cs := []string{"-test.run=TestHelperProcess", "--", "gethostname"}
+	cmd := exec.Command(os.Args[0], cs...)
+	cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1"}
+	if agent6Bin != "" {
+		cmd.Env = append(cmd.Env, "AGENT=6")
+	} else {
+		cmd.Env = append(cmd.Env, "AGENT=5")
+	}
+	return cmd
+}
+
 func TestGetHostname(t *testing.T) {
 	h, err := getHostname("")
 	assert.Nil(t, err)
 
 	host, _ := os.Hostname()
 	assert.Equal(t, host, h)
+}
+
+func TestGetHostnameAgent5(t *testing.T) {
+	getHostnameCaller = mockGetHostnameCmd
+	defer func() { getHostnameCaller = getHostnameCmd }()
+
+	h, err := getHostname("")
+	assert.Nil(t, err)
+
+	assert.Equal(t, "foo5", h)
+}
+
+func TestGetHostnameAgent6(t *testing.T) {
+	getHostnameCaller = mockGetHostnameCmd
+	defer func() { getHostnameCaller = getHostnameCmd }()
+
+	h, err := getHostname("/some/binary/somewhere")
+	assert.Nil(t, err)
+
+	assert.Equal(t, "foo6", h)
+}
+
+func TestHelperProcess(t *testing.T) {
+	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
+		return
+	}
+
+	fmt.Fprintf(os.Stdout, "foo%v", os.Getenv("AGENT"))
+	os.Exit(0)
 }
 
 func TestUndocumentedIni(t *testing.T) {
