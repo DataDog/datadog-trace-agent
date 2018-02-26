@@ -56,7 +56,7 @@ func (v SublayerValue) GoString() string {
 //         direct child span at that time interval. This is done by
 //         iterating over the spans, iterating over each time
 //         intervals, and checking if the span has a child running
-//         during that time interval. If now, it is considered active:
+//         during that time interval. If not, it is considered active:
 //
 //         {
 //             0: [ 1 ],

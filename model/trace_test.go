@@ -53,3 +53,93 @@ func TestTraceChildrenMap(t *testing.T) {
 	assert.Equal([]*Span{}, childrenMap[5])
 	assert.Equal([]*Span{}, childrenMap[6])
 }
+
+func TestExtractTopLevelSubtracesWithSimpleTrace(t *testing.T) {
+	assert := assert.New(t)
+
+	trace := Trace{
+		&Span{SpanID: 1, ParentID: 0, Service: "s1"},
+		&Span{SpanID: 2, ParentID: 1, Service: "s2"},
+		&Span{SpanID: 3, ParentID: 2, Service: "s2"},
+		&Span{SpanID: 4, ParentID: 3, Service: "s2"},
+		&Span{SpanID: 5, ParentID: 1, Service: "s1"},
+	}
+
+	expected := []Subtrace{
+		Subtrace{trace[0], trace},
+		Subtrace{trace[1], []*Span{trace[1], trace[2], trace[3]}},
+	}
+
+	trace.ComputeTopLevel()
+	subtraces := trace.ExtractTopLevelSubtraces(trace[0])
+
+	assert.Equal(len(expected), len(subtraces))
+
+	subtracesMap := make(map[*Span]Subtrace)
+	for _, s := range subtraces {
+		subtracesMap[s.Root] = s
+	}
+
+	for _, s := range expected {
+		assert.ElementsMatch(s.Trace, subtracesMap[s.Root].Trace)
+	}
+}
+
+func TestExtractTopLevelSubtracesShouldIgnoreLeafTopLevel(t *testing.T) {
+	assert := assert.New(t)
+
+	trace := Trace{
+		&Span{SpanID: 1, ParentID: 0, Service: "s1"},
+		&Span{SpanID: 2, ParentID: 1, Service: "s2"},
+		&Span{SpanID: 3, ParentID: 2, Service: "s2"},
+		&Span{SpanID: 4, ParentID: 1, Service: "s3"},
+	}
+
+	expected := []Subtrace{
+		Subtrace{trace[0], trace},
+		Subtrace{trace[1], []*Span{trace[1], trace[2]}},
+	}
+
+	trace.ComputeTopLevel()
+	subtraces := trace.ExtractTopLevelSubtraces(trace[0])
+
+	assert.Equal(len(expected), len(subtraces))
+
+	subtracesMap := make(map[*Span]Subtrace)
+	for _, s := range subtraces {
+		subtracesMap[s.Root] = s
+	}
+
+	for _, s := range expected {
+		assert.ElementsMatch(s.Trace, subtracesMap[s.Root].Trace)
+	}
+}
+
+func TestExtractTopLevelSubtracesWorksInSpiteOfCycles(t *testing.T) {
+	assert := assert.New(t)
+
+	trace := Trace{
+		&Span{SpanID: 1, ParentID: 3, Service: "s1"},
+		&Span{SpanID: 2, ParentID: 1, Service: "s2"},
+		&Span{SpanID: 3, ParentID: 2, Service: "s2"},
+	}
+
+	expected := []Subtrace{
+		Subtrace{trace[0], trace},
+		Subtrace{trace[1], []*Span{trace[1], trace[2]}},
+	}
+
+	trace.ComputeTopLevel()
+	subtraces := trace.ExtractTopLevelSubtraces(trace[0])
+
+	assert.Equal(len(expected), len(subtraces))
+
+	subtracesMap := make(map[*Span]Subtrace)
+	for _, s := range subtraces {
+		subtracesMap[s.Root] = s
+	}
+
+	for _, s := range expected {
+		assert.ElementsMatch(s.Trace, subtracesMap[s.Root].Trace)
+	}
+}

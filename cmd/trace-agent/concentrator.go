@@ -97,9 +97,9 @@ func (c *Concentrator) Add(t processedTrace) {
 			c.buckets[btime] = b
 		}
 
-		if t.Root != nil && s.SpanID == t.Root.SpanID && t.Sublayers != nil {
-			// handle sublayers
-			b.HandleSpan(s, t.Env, c.aggregators, &t.Sublayers)
+		sublayers, ok := t.Sublayers[s.Span]
+		if ok {
+			b.HandleSpan(s, t.Env, c.aggregators, &sublayers)
 		} else {
 			b.HandleSpan(s, t.Env, c.aggregators, nil)
 		}
