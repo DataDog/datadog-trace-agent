@@ -36,6 +36,7 @@ func testSpan(c *Concentrator, spanID uint64, parentID uint64, duration, offset 
 		Name:     "query",
 		Resource: resource,
 		Error:    err,
+		Type:     "db",
 	}
 }
 
@@ -201,6 +202,8 @@ func TestConcentratorSublayersStatsCounts(t *testing.T) {
 		"query|_sublayers.duration.by_service|env:none,resource:resource1,service:A1,sublayer_service:A3": 370,
 		"query|_sublayers.duration.by_service|env:none,resource:resource2,service:A2,sublayer_service:A2": 1000,
 		"query|_sublayers.duration.by_service|env:none,resource:resource2,service:A2,sublayer_service:A3": 370,
+		"query|_sublayers.duration.by_type|env:none,resource:resource1,service:A1,sublayer_type:db":       4370,
+		"query|_sublayers.duration.by_type|env:none,resource:resource2,service:A2,sublayer_type:db":       1370,
 		"query|_sublayers.span_count|env:none,resource:resource1,service:A1,:":                            6,
 		"query|_sublayers.span_count|env:none,resource:resource2,service:A2,:":                            4,
 		"query|duration|env:none,resource:resource1,service:A1":                                           2000,
