@@ -192,8 +192,8 @@ func (t Trace) ExtractTopLevelSubtraces(root *Span) []Subtrace {
 		for _, child := range childrenMap[current.Span.SpanID] {
 			// Continue if this span has already been explored (meaning the
 			// trace is not a Tree)
-			// TODO we might want to log something here
 			if visited[child] {
+				log.Warnf("Found a cycle while processing traceID:%v, trace should be a tree", t[0].TraceID)
 				continue
 			}
 			next.Push(&spanAndAncestors{child, current.Ancestors})
