@@ -123,13 +123,13 @@ func (t Trace) APITrace() *APITrace {
 	}
 }
 
-// Subtrace represents the combination of a root and the trace consisting of all its descendant spans
+// Subtrace represents the combination of a root span and the trace consisting of all its descendant spans
 type Subtrace struct {
 	Root  *Span
 	Trace Trace
 }
 
-// spaAndAncestors is an internal type used by ExtractTopLevelSubtraces
+// spanAndAncestors is used by ExtractTopLevelSubtraces to store the pair of a span and its ancestors
 type spanAndAncestors struct {
 	Span      *Span
 	Ancestors []*Span
@@ -164,8 +164,8 @@ func (s *stack) Pop() *spanAndAncestors {
 	return value
 }
 
-// ExtractTopLevelSubtraces extracts all subtraces rooted in a toplevel span
-// ComputeTopLevel should be called before
+// ExtractTopLevelSubtraces extracts all subtraces rooted in a toplevel span,
+// ComputeTopLevel should be called before.
 func (t Trace) ExtractTopLevelSubtraces(root *Span) []Subtrace {
 	if root == nil {
 		return []Subtrace{}
@@ -175,7 +175,7 @@ func (t Trace) ExtractTopLevelSubtraces(root *Span) []Subtrace {
 
 	visited := make(map[*Span]bool, len(t))
 	subtracesMap := make(map[*Span][]*Span)
-	next := stack{}
+	var next stack
 	next.Push(&spanAndAncestors{root, []*Span{}})
 
 	// We do a DFS on the trace to record the toplevel ancesters of each span
