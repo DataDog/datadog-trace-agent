@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"time"
 )
 
 // runs runs the given command and returns the output. If it fails,
@@ -35,7 +36,7 @@ func main() {
 		version = "0.99.0"
 	}
 
-	output := fmt.Sprintf(template, version, commit, branch)
+	output := fmt.Sprintf(template, version, commit, branch, time.Now().String())
 	err := ioutil.WriteFile("git_version.go", []byte(output), 0664)
 	if err != nil {
 		log.Fatal(err)
@@ -49,7 +50,6 @@ package info
 
 import (
 	"runtime"
-	"time"
 	"strings"
 )
 
@@ -57,7 +57,7 @@ func init() {
 	Version = %[1]q
 	GitCommit = %[2]q
 	GitBranch = %[3]q
-	BuildDate = time.Now().String()
+	BuildDate = %[4]q
 	GoVersion = strings.TrimPrefix(runtime.Version(), "go")
 }
 `
