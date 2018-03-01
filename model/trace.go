@@ -122,3 +122,87 @@ func (t Trace) APITrace() *APITrace {
 		EndTime:   end,
 	}
 }
+
+// Subtrace represents the combination of a root span and the trace consisting of all its descendant spans
+type Subtrace struct {
+	Root  *Span
+	Trace Trace
+}
+
+// spanAndAncestors is used by ExtractTopLevelSubtraces to store the pair of a span and its ancestors
+type spanAndAncestors struct {
+	Span      *Span
+	Ancestors []*Span
+}
+
+// element and queue implement a very basic LIFO used to do an iterative DFS on a trace
+type element struct {
+	SpanAndAncestors *spanAndAncestors
+	Next             *element
+}
+
+type stack struct {
+	head *element
+}
+
+func (s *stack) Push(value *spanAndAncestors) {
+	e := &element{value, nil}
+	if s.head == nil {
+		s.head = e
+		return
+	}
+	e.Next = s.head
+	s.head = e
+}
+
+func (s *stack) Pop() *spanAndAncestors {
+	if s.head == nil {
+		return nil
+	}
+	value := s.head.SpanAndAncestors
+	s.head = s.head.Next
+	return value
+}
+
+// ExtractTopLevelSubtraces extracts all subtraces rooted in a toplevel span,
+// ComputeTopLevel should be called before.
+func (t Trace) ExtractTopLevelSubtraces(root *Span) []Subtrace {
+	if root == nil {
+		return []Subtrace{}
+	}
+	childrenMap := t.ChildrenMap()
+	subtraces := []Subtrace{}
+
+	visited := make(map[*Span]bool, len(t))
+	subtracesMap := make(map[*Span][]*Span)
+	var next stack
+	next.Push(&spanAndAncestors{root, []*Span{}})
+
+	// We do a DFS on the trace to record the toplevel ancesters of each span
+	for current := next.Pop(); current != nil; current = next.Pop() {
+		// We do not extract subtraces for toplevel spans that have no children
+		// since these are not interresting
+		if current.Span.TopLevel() && len(childrenMap[current.Span.SpanID]) > 0 {
+			current.Ancestors = append(current.Ancestors, current.Span)
+		}
+		visited[current.Span] = true
+		for _, ancestor := range current.Ancestors {
+			subtracesMap[ancestor] = append(subtracesMap[ancestor], current.Span)
+		}
+		for _, child := range childrenMap[current.Span.SpanID] {
+			// Continue if this span has already been explored (meaning the
+			// trace is not a Tree)
+			if visited[child] {
+				log.Warnf("Found a cycle while processing traceID:%v, trace should be a tree", t[0].TraceID)
+				continue
+			}
+			next.Push(&spanAndAncestors{child, current.Ancestors})
+		}
+	}
+
+	for topLevel, subtrace := range subtracesMap {
+		subtraces = append(subtraces, Subtrace{topLevel, subtrace})
+	}
+
+	return subtraces
+}

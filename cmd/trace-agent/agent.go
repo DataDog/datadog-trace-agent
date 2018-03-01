@@ -26,7 +26,7 @@ type processedTrace struct {
 	WeightedTrace model.WeightedTrace
 	Root          *model.Span
 	Env           string
-	Sublayers     []model.SublayerValue
+	Sublayers     map[*model.Span][]model.SublayerValue
 }
 
 func (pt *processedTrace) weight() float64 {
@@ -227,8 +227,13 @@ func (a *Agent) Process(t model.Trace) {
 	t.ComputeTopLevel()
 	wt := model.NewWeightedTrace(t, root)
 
-	sublayers := model.ComputeSublayers(t)
-	model.SetSublayersOnSpan(root, sublayers)
+	subtraces := t.ExtractTopLevelSubtraces(root)
+	sublayers := make(map[*model.Span][]model.SublayerValue)
+	for _, subtrace := range subtraces {
+		subtraceSublayers := model.ComputeSublayers(subtrace.Trace)
+		sublayers[subtrace.Root] = subtraceSublayers
+		model.SetSublayersOnSpan(subtrace.Root, subtraceSublayers)
+	}
 
 	for i := range t {
 		quantizer.Quantize(t[i])
