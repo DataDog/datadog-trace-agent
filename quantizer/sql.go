@@ -60,10 +60,7 @@ func (f *ReplaceFilter) Filter(token, lastToken int, buffer []byte) (int, []byte
 	switch lastToken {
 	case Savepoint:
 		return Filtered, []byte("?")
-	case Limit:
-		return token, buffer
 	}
-
 	switch token {
 	case String, Number, Null, Variable, PreparedStatement, BooleanLiteral, EscapeSequence:
 		return Filtered, []byte("?")

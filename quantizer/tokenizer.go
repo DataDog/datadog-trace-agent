@@ -35,9 +35,15 @@ const (
 	LE                = 57361
 	GE                = 57362
 	NE                = 57363
-	Filtered          = 57364
 	As                = 57365
-	FilteredComma     = 57366
+
+	// Filtered specifies that the given token has been discarded by one of the
+	// token filters.
+	Filtered = 57364
+
+	// FilteredComma specifies that the token is a comma and was discarded by one
+	// of the filters.
+	FilteredComma = 57366
 )
 
 // Tokenizer is the struct used to generate SQL
