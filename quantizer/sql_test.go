@@ -154,11 +154,24 @@ func TestSQLQuantizer(t *testing.T) {
 		},
 		{
 			"SELECT articles.* FROM articles WHERE articles.id = 1 LIMIT 1",
-			"SELECT articles.* FROM articles WHERE articles.id = ? LIMIT 1",
+			"SELECT articles.* FROM articles WHERE articles.id = ? LIMIT ?",
+		},
+
+		{
+			"SELECT articles.* FROM articles WHERE articles.id = 1 LIMIT 1, 20",
+			"SELECT articles.* FROM articles WHERE articles.id = ? LIMIT ?",
+		},
+		{
+			"SELECT articles.* FROM articles WHERE articles.id = 1 LIMIT 1, 20;",
+			"SELECT articles.* FROM articles WHERE articles.id = ? LIMIT ?",
+		},
+		{
+			"SELECT articles.* FROM articles WHERE articles.id = 1 LIMIT 15,20;",
+			"SELECT articles.* FROM articles WHERE articles.id = ? LIMIT ?",
 		},
 		{
 			"SELECT articles.* FROM articles WHERE articles.id = 1 LIMIT 1;",
-			"SELECT articles.* FROM articles WHERE articles.id = ? LIMIT 1",
+			"SELECT articles.* FROM articles WHERE articles.id = ? LIMIT ?",
 		},
 		{
 			"SELECT articles.* FROM articles WHERE (articles.created_at BETWEEN '2016-10-31 23:00:00.000000' AND '2016-11-01 23:00:00.000000')",
@@ -194,7 +207,7 @@ func TestSQLQuantizer(t *testing.T) {
 		},
 		{
 			"SELECT * FROM articles WHERE id > 10 ORDER BY id asc LIMIT 20",
-			"SELECT * FROM articles WHERE id > ? ORDER BY id asc LIMIT 20",
+			"SELECT * FROM articles WHERE id > ? ORDER BY id asc LIMIT ?",
 		},
 		{
 			"SELECT clients.* FROM clients INNER JOIN posts ON posts.author_id = author.id AND posts.published = 't'",
@@ -206,7 +219,11 @@ func TestSQLQuantizer(t *testing.T) {
 		},
 		{
 			"SELECT * FROM clients WHERE (clients.first_name = 'Andy') LIMIT 1 BEGIN INSERT INTO clients (created_at, first_name, locked, orders_count, updated_at) VALUES ('2011-08-30 05:22:57', 'Andy', 1, NULL, '2011-08-30 05:22:57') COMMIT",
-			"SELECT * FROM clients WHERE ( clients.first_name = ? ) LIMIT 1 BEGIN INSERT INTO clients ( created_at, first_name, locked, orders_count, updated_at ) VALUES ( ? ) COMMIT",
+			"SELECT * FROM clients WHERE ( clients.first_name = ? ) LIMIT ? BEGIN INSERT INTO clients ( created_at, first_name, locked, orders_count, updated_at ) VALUES ( ? ) COMMIT",
+		},
+		{
+			"SELECT * FROM clients WHERE (clients.first_name = 'Andy') LIMIT 15, 25 BEGIN INSERT INTO clients (created_at, first_name, locked, orders_count, updated_at) VALUES ('2011-08-30 05:22:57', 'Andy', 1, NULL, '2011-08-30 05:22:57') COMMIT",
+			"SELECT * FROM clients WHERE ( clients.first_name = ? ) LIMIT ? BEGIN INSERT INTO clients ( created_at, first_name, locked, orders_count, updated_at ) VALUES ( ? ) COMMIT",
 		},
 		{
 			"SAVEPOINT \"s139956586256192_x1\"",
@@ -222,7 +239,7 @@ func TestSQLQuantizer(t *testing.T) {
 		},
 		{
 			`SELECT "webcore_page"."id" FROM "webcore_page" WHERE "webcore_page"."slug" = %s ORDER BY "webcore_page"."path" ASC LIMIT 1`,
-			"SELECT webcore_page . id FROM webcore_page WHERE webcore_page . slug = ? ORDER BY webcore_page . path ASC LIMIT 1",
+			"SELECT webcore_page . id FROM webcore_page WHERE webcore_page . slug = ? ORDER BY webcore_page . path ASC LIMIT ?",
 		},
 		{
 			"SELECT server_table.host AS host_id FROM table#.host_tags as server_table WHERE server_table.host_id = 50",
