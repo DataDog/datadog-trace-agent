@@ -1,11 +1,11 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"sort"
 	"strings"
@@ -62,10 +62,9 @@ type HTTPReceiver struct {
 	stats      *info.ReceiverStats
 	preSampler *sampler.PreSampler
 
-	exit chan struct{}
-
 	maxRequestBodyLength int64
 	debug                bool
+	server               *http.Server
 }
 
 // NewHTTPReceiver returns a pointer to a new HTTPReceiver
@@ -78,7 +77,6 @@ func NewHTTPReceiver(
 		dynConf:    dynConf,
 		stats:      info.NewReceiverStats(),
 		preSampler: sampler.NewPreSampler(conf.PreSampleRate),
-		exit:       make(chan struct{}),
 
 		traces:   traces,
 		services: services,
@@ -123,39 +121,31 @@ func (r *HTTPReceiver) Run() {
 
 // Listen creates a new HTTP server listening on the provided address.
 func (r *HTTPReceiver) Listen(addr, logExtra string) error {
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("cannot listen on %s: %v", addr, err)
-	}
-
-	stoppableListener, err := NewStoppableListener(listener, r.exit,
-		r.conf.ConnectionLimit)
-	if err != nil {
-		return fmt.Errorf("cannot create stoppable listener: %v", err)
-	}
-
 	timeout := 5 * time.Second
 	if r.conf.ReceiverTimeout > 0 {
 		timeout = time.Duration(r.conf.ReceiverTimeout) * time.Second
 	}
-
-	server := http.Server{
+	r.server = &http.Server{
 		ReadTimeout:  time.Second * time.Duration(timeout),
 		WriteTimeout: time.Second * time.Duration(timeout),
 	}
-
+	ln, err := newRateLimitedListener(addr, r.conf.ConnectionLimit)
+	if err != nil {
+		return fmt.Errorf("cannot create stoppable listener: %v", err)
+	}
 	log.Infof("listening for traces at http://%s%s", addr, logExtra)
-
 	go func() {
 		defer watchdog.LogOnPanic()
-		stoppableListener.Refresh(r.conf.ConnectionLimit)
+		r.server.Serve(ln)
 	}()
-	go func() {
-		defer watchdog.LogOnPanic()
-		server.Serve(stoppableListener)
-	}()
-
 	return nil
+}
+
+func (r *HTTPReceiver) Stop() error {
+	// allow 20 seconds for shut down
+	expiry := time.Now().Add(20 * time.Second)
+	ctx, _ := context.WithDeadline(context.Background(), expiry)
+	return r.server.Shutdown(ctx)
 }
 
 func (r *HTTPReceiver) httpHandle(fn http.HandlerFunc) http.HandlerFunc {
