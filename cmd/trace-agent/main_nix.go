@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	_ "net/http/pprof"
 
@@ -28,13 +29,13 @@ func init() {
 
 // main is the main application entry point
 func main() {
-	exit := make(chan struct{})
+	ctx, cancelFunc := context.WithCancel(context.Background())
 
 	// Handle stops properly
 	go func() {
 		defer watchdog.LogOnPanic()
-		handleSignal(exit)
+		handleSignal(cancelFunc)
 	}()
 
-	runAgent(exit)
+	runAgent(ctx)
 }

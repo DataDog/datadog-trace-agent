@@ -23,6 +23,7 @@ install:
 
 ci:
 	# task used by CI
+	GOOS=windows go build ./cmd/trace-agent # ensure windows builds
 	go get -u github.com/golang/lint/golint/...
 	golint ./cmd/trace-agent ./filters ./fixtures ./info ./quantile ./quantizer ./sampler ./statsd ./watchdog ./writer
 	go test ./...

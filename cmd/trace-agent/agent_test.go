@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"runtime"
@@ -31,17 +32,14 @@ func TestWatchdog(t *testing.T) {
 	defaultMux := http.DefaultServeMux
 	http.DefaultServeMux = http.NewServeMux()
 
-	exit := make(chan struct{})
-	agent := NewAgent(conf, exit)
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	agent := NewAgent(ctx, conf)
 
 	defer func() {
-		close(agent.exit)
+		cancelFunc()
 		// We need to manually close the receiver as the Run() func
 		// should have been broken and interrupted by the watchdog panic
-		close(agent.Receiver.exit)
-		// we need to wait more than on second (time for StoppableListener.Accept
-		// to acknowledge the connection has been closed)
-		time.Sleep(2 * time.Second)
+		agent.Receiver.Stop()
 		http.DefaultServeMux = defaultMux
 	}()
 
@@ -129,8 +127,9 @@ func BenchmarkAgentTraceProcessingWithWorstCaseFiltering(b *testing.B) {
 }
 
 func runTraceProcessingBenchmark(b *testing.B, c *config.AgentConfig) {
-	exit := make(chan struct{})
-	agent := NewAgent(c, exit)
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+	agent := NewAgent(ctx, c)
 	log.UseLogger(log.Disabled)
 
 	b.ResetTimer()
@@ -143,8 +142,9 @@ func runTraceProcessingBenchmark(b *testing.B, c *config.AgentConfig) {
 func BenchmarkWatchdog(b *testing.B) {
 	conf := config.NewDefaultAgentConfig()
 	conf.APIKey = "apikey_2"
-	exit := make(chan struct{})
-	agent := NewAgent(conf, exit)
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+	agent := NewAgent(ctx, conf)
 
 	b.ResetTimer()
 	b.ReportAllocs()

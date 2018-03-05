@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -58,11 +59,10 @@ type HTTPReceiver struct {
 	services chan model.ServicesMetadata
 	conf     *config.AgentConfig
 	dynConf  *config.DynamicConfig
+	server   *http.Server
 
 	stats      *info.ReceiverStats
 	preSampler *sampler.PreSampler
-
-	exit chan struct{}
 
 	maxRequestBodyLength int64
 	debug                bool
@@ -78,7 +78,6 @@ func NewHTTPReceiver(
 		dynConf:    dynConf,
 		stats:      info.NewReceiverStats(),
 		preSampler: sampler.NewPreSampler(conf.PreSampleRate),
-		exit:       make(chan struct{}),
 
 		traces:   traces,
 		services: services,
@@ -128,34 +127,36 @@ func (r *HTTPReceiver) Listen(addr, logExtra string) error {
 		return fmt.Errorf("cannot listen on %s: %v", addr, err)
 	}
 
-	stoppableListener, err := NewStoppableListener(listener, r.exit,
-		r.conf.ConnectionLimit)
+	ln, err := NewRateLimitedListener(listener, r.conf.ConnectionLimit)
 	if err != nil {
-		return fmt.Errorf("cannot create stoppable listener: %v", err)
+		return fmt.Errorf("cannot create listener: %v", err)
 	}
-
 	timeout := 5 * time.Second
 	if r.conf.ReceiverTimeout > 0 {
 		timeout = time.Duration(r.conf.ReceiverTimeout) * time.Second
 	}
-
-	server := http.Server{
-		ReadTimeout:  time.Second * time.Duration(timeout),
-		WriteTimeout: time.Second * time.Duration(timeout),
+	r.server = &http.Server{
+		ReadTimeout:  timeout,
+		WriteTimeout: timeout,
 	}
-
 	log.Infof("listening for traces at http://%s%s", addr, logExtra)
 
 	go func() {
 		defer watchdog.LogOnPanic()
-		stoppableListener.Refresh(r.conf.ConnectionLimit)
+		ln.Refresh(r.conf.ConnectionLimit)
 	}()
 	go func() {
 		defer watchdog.LogOnPanic()
-		server.Serve(stoppableListener)
+		r.server.Serve(ln)
 	}()
 
 	return nil
+}
+
+func (r *HTTPReceiver) Stop() error {
+	expiry := time.Now().Add(20 * time.Second) // give it 20 seconds
+	ctx, _ := context.WithDeadline(context.Background(), expiry)
+	return r.server.Shutdown(ctx)
 }
 
 func (r *HTTPReceiver) httpHandle(fn http.HandlerFunc) http.HandlerFunc {
