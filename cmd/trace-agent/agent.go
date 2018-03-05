@@ -142,7 +142,9 @@ func (a *Agent) Run() {
 			a.watchdog()
 		case <-a.exit:
 			log.Info("exiting")
-			close(a.Receiver.exit)
+			if err := a.Receiver.Stop(); err != nil {
+				log.Error(err)
+			}
 			a.Concentrator.Stop()
 			a.TraceWriter.Stop()
 			a.StatsWriter.Stop()

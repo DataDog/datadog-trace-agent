@@ -38,7 +38,7 @@ func TestWatchdog(t *testing.T) {
 		close(agent.exit)
 		// We need to manually close the receiver as the Run() func
 		// should have been broken and interrupted by the watchdog panic
-		close(agent.Receiver.exit)
+		agent.Receiver.Stop()
 		// we need to wait more than on second (time for StoppableListener.Accept
 		// to acknowledge the connection has been closed)
 		time.Sleep(2 * time.Second)

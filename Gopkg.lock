@@ -36,19 +36,12 @@
 
 [[projects]]
   name = "github.com/go-ole/go-ole"
-  packages = [
-    ".",
-    "oleutil"
-  ]
+  packages = [".","oleutil"]
   revision = "de8695c8edbf8236f30d6e1376e20b198a028d42"
 
 [[projects]]
   name = "github.com/gogo/protobuf"
-  packages = [
-    "gogoproto",
-    "proto",
-    "protoc-gen-gogo/descriptor"
-  ]
+  packages = ["gogoproto","proto","protoc-gen-gogo/descriptor"]
   revision = "d76fbc1373015ced59b43ac267f28d546b955683"
 
 [[projects]]
@@ -70,14 +63,7 @@
 
 [[projects]]
   name = "github.com/shirou/gopsutil"
-  packages = [
-    "cpu",
-    "host",
-    "internal/common",
-    "mem",
-    "net",
-    "process"
-  ]
+  packages = ["cpu","host","internal/common","mem","net","process"]
   revision = "70a1b78fe69202d93d6718fc9e3a4d6f81edfd58"
   version = "v2.17.01"
 
@@ -89,10 +75,7 @@
 
 [[projects]]
   name = "github.com/stretchr/testify"
-  packages = [
-    "assert",
-    "require"
-  ]
+  packages = ["assert","require"]
   revision = "12b6f73e6084dad08a7c6e575284b177ecafbc71"
   version = "v1.2.1"
 
@@ -102,16 +85,21 @@
   revision = "362bfb3384d53ae4d5dd745983a4d70b6d23628c"
 
 [[projects]]
+  branch = "master"
+  name = "golang.org/x/net"
+  packages = ["context"]
+  revision = "22ae77b79946ea320088417e4d50825671d82d57"
+
+[[projects]]
   name = "golang.org/x/sys"
-  packages = [
-    "windows",
-    "windows/registry",
-    "windows/svc",
-    "windows/svc/debug",
-    "windows/svc/eventlog",
-    "windows/svc/mgr"
-  ]
+  packages = ["windows","windows/registry","windows/svc","windows/svc/debug","windows/svc/eventlog","windows/svc/mgr"]
   revision = "8f0908ab3b2457e2e15403d3697c9ef5cb4b57a9"
+
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/time"
+  packages = ["rate"]
+  revision = "6dc17368e09b0e8634d71cac8168d853e869a0c7"
 
 [[projects]]
   name = "gopkg.in/yaml.v2"
@@ -121,6 +109,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "b5835767ec41c879ca5cf6a446e52ccc4ea1bb23f3ae4101356e86a4c092f137"
+  inputs-digest = "01924d89cd834710d6ef960d69ed265fada80b4d10a2153c83e2e00cff784cea"
   solver-name = "gps-cdcl"
   solver-version = 1
