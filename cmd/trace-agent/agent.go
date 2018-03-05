@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"sync/atomic"
 	"time"
 
@@ -57,13 +58,14 @@ type Agent struct {
 	dynConf *config.DynamicConfig
 
 	// Used to synchronize on a clean exit
-	exit chan struct{}
+	ctx context.Context
 
 	die func(format string, args ...interface{})
 }
 
-// NewAgent returns a new Agent object, ready to be started
-func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
+// NewAgent returns a new Agent object, ready to be started. It takes a context
+// which may be cancelled in order to gracefully stop the agent.
+func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	dynConf := config.NewDynamicConfig()
 
 	// inter-component channels
@@ -107,7 +109,7 @@ func NewAgent(conf *config.AgentConfig, exit chan struct{}) *Agent {
 		sampledTraceChan:   sampledTraceChan,
 		conf:               conf,
 		dynConf:            dynConf,
-		exit:               exit,
+		ctx:                ctx,
 		die:                die,
 	}
 }
@@ -140,9 +142,11 @@ func (a *Agent) Run() {
 			a.Process(t)
 		case <-watchdogTicker.C:
 			a.watchdog()
-		case <-a.exit:
+		case <-a.ctx.Done():
 			log.Info("exiting")
-			close(a.Receiver.exit)
+			if err := a.Receiver.Stop(); err != nil {
+				log.Error(err)
+			}
 			a.Concentrator.Stop()
 			a.TraceWriter.Stop()
 			a.StatsWriter.Stop()

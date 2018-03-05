@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -60,7 +61,7 @@ func (m *myservice) Execute(args []string, r <-chan svc.ChangeRequest, changes c
 	changes <- svc.Status{State: svc.StartPending}
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 
-	exit := make(chan struct{})
+	ctx, cancelFunc := context.WithCancel(context.Background())
 
 	go func() {
 		for {
@@ -75,7 +76,7 @@ func (m *myservice) Execute(args []string, r <-chan svc.ChangeRequest, changes c
 				case svc.Stop, svc.Shutdown:
 					elog.Info(0x40000006, ServiceName)
 					changes <- svc.Status{State: svc.StopPending}
-					close(exit)
+					cancelFunc()
 					return
 				default:
 					elog.Warning(0xc000000A, string(c.Cmd))
@@ -84,7 +85,7 @@ func (m *myservice) Execute(args []string, r <-chan svc.ChangeRequest, changes c
 		}
 	}()
 	elog.Info(0x40000003, ServiceName)
-	runAgent(exit)
+	runAgent(ctx)
 
 	changes <- svc.Status{State: svc.Stopped}
 	return
@@ -173,15 +174,15 @@ func main() {
 
 	// if we are an interactive session, then just invoke the agent on the command line.
 
-	exit := make(chan struct{})
+	ctx, cancelFunc := context.WithCancel(context.Background())
 	// Handle stops properly
 	go func() {
 		defer watchdog.LogOnPanic()
-		handleSignal(exit)
+		handleSignal(cancelFunc)
 	}()
 
 	// Invoke the Agent
-	runAgent(exit)
+	runAgent(ctx)
 }
 
 func startService() error {

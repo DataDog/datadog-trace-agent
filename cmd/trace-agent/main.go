@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"os"
@@ -24,14 +25,14 @@ import (
 )
 
 // handleSignal closes a channel to exit cleanly from routines
-func handleSignal(exit chan struct{}) {
+func handleSignal(onSignal func()) {
 	sigChan := make(chan os.Signal, 10)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	for signo := range sigChan {
 		switch signo {
 		case syscall.SIGINT, syscall.SIGTERM:
 			log.Infof("received signal %d (%v)", signo, signo)
-			close(exit)
+			onSignal()
 			return
 		default:
 			log.Warnf("unhandled signal %d (%v)", signo, signo)
@@ -71,7 +72,7 @@ to your datadog.conf file.
 Exiting.`
 
 // runAgent is the entrypoint of our code
-func runAgent(exit chan struct{}) {
+func runAgent(ctx context.Context) {
 	// configure a default logger before anything so we can observe initialization
 	if opts.info || opts.version {
 		log.UseLogger(log.Disabled)
@@ -205,7 +206,7 @@ func runAgent(exit chan struct{}) {
 	// Seed rand
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	agent := NewAgent(agentConf, exit)
+	agent := NewAgent(ctx, agentConf)
 
 	log.Infof("trace-agent running on host %s", agentConf.HostName)
 	agent.Run()

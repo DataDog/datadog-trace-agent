@@ -63,10 +63,7 @@ func TestReceiverRequestBodyLength(t *testing.T) {
 	go receiver.Run()
 
 	defer func() {
-		close(receiver.exit)
-		// we need to wait more than on second (time for StoppableListener.Accept
-		// to acknowledge the connection has been closed)
-		time.Sleep(2 * time.Second)
+		receiver.Stop()
 		http.DefaultServeMux = defaultMux
 	}()
 
