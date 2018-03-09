@@ -18,10 +18,11 @@ import (
 // YamlAgentConfig is a structure used for marshaling the datadog.yaml configuration
 // available in Agent versions >= 6
 type YamlAgentConfig struct {
-	APIKey   string `yaml:"api_key"`
-	HostName string `yaml:"hostname"`
-	LogLevel string `yaml:"log_level"`
-	Proxy    proxy  `yaml:"proxy"`
+	APIKey            string `yaml:"api_key"`
+	HostName          string `yaml:"hostname"`
+	LogLevel          string `yaml:"log_level"`
+	Proxy             proxy  `yaml:"proxy"`
+	SkipSSLValidation *bool  `yaml:"skip_ssl_validation"`
 
 	StatsdPort int `yaml:"dogstatsd_port"`
 
@@ -141,6 +142,10 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
 				log.Errorf("Failed to parse proxy URL from proxy.https configuration: %s", err)
 			}
 		}
+	}
+
+	if yc.SkipSSLValidation != nil {
+		agentConf.SkipSSLValidation = *yc.SkipSSLValidation
 	}
 
 	if yc.TraceAgent.Enabled != nil {
