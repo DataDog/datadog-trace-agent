@@ -67,6 +67,13 @@ func mergeIniConfig(c *AgentConfig, conf *File) error {
 		} else if pURL != nil {
 			c.ProxyURL = pURL
 		}
+
+		switch m.Key("skip_ssl_validation").MustString("") {
+		case "yes", "true", "1":
+			c.SkipSSLValidation = true
+		case "no", "false", "0":
+			c.SkipSSLValidation = false
+		}
 	}
 
 	// [trace.api] section

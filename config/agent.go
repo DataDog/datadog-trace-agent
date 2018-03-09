@@ -65,7 +65,8 @@ type AgentConfig struct {
 	WatchdogInterval time.Duration // WatchdogInterval is the delay between 2 watchdog checks
 
 	// http/s proxying
-	ProxyURL *url.URL
+	ProxyURL          *url.URL
+	SkipSSLValidation bool
 
 	// filtering
 	Ignore map[string][]string

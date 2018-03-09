@@ -1,6 +1,7 @@
 package writer
 
 import (
+	"crypto/tls"
 	"net/http"
 	"time"
 
@@ -12,20 +13,13 @@ import (
 const timeout = 10 * time.Second
 
 // NewClient returns a http.Client configured with the Agent options.
-func NewClient(conf *config.AgentConfig) (client *http.Client) {
+func NewClient(conf *config.AgentConfig) *http.Client {
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: conf.SkipSSLValidation},
+	}
 	if conf.ProxyURL != nil {
 		log.Infof("configuring proxy through host %s", conf.ProxyURL.Hostname())
-		client = &http.Client{
-			Timeout: timeout,
-			Transport: &http.Transport{
-				Proxy: http.ProxyURL(conf.ProxyURL),
-			},
-		}
-	} else {
-		client = &http.Client{
-			Timeout: timeout,
-		}
+		transport.Proxy = http.ProxyURL(conf.ProxyURL)
 	}
-
-	return
+	return &http.Client{Timeout: timeout, Transport: transport}
 }
