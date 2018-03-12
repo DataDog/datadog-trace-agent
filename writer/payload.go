@@ -257,6 +257,9 @@ func (s *QueuablePayloadSender) enqueue(payload *Payload) error {
 		s.queuing = true
 	}
 
+	// Start by discarding payloads that are too old, freeing up memory
+	s.discardOldPayloads()
+
 	for s.conf.MaxQueuedPayloads > 0 && s.queuedPayloads.Len() >= s.conf.MaxQueuedPayloads {
 		log.Debugf("Dropping existing payload because max queued payloads reached: %d", s.conf.MaxQueuedPayloads)
 		if _, err := s.dropOldestPayload("max queued payloads reached"); err != nil {
@@ -287,12 +290,12 @@ func (s *QueuablePayloadSender) enqueue(payload *Payload) error {
 }
 
 func (s *QueuablePayloadSender) flushQueue() error {
-	if s.NumQueuedPayloads() == 0 {
-		return nil
-	}
-
 	log.Debugf("Attempting to flush queue with %d payloads", s.NumQueuedPayloads())
 
+	// Start by discarding payloads that are too old
+	s.discardOldPayloads()
+
+	// For the remaining ones, try to send them one by one
 	var next *list.Element
 	for e := s.queuedPayloads.Front(); e != nil; e = next {
 		payload := e.Value.(*Payload)
@@ -306,7 +309,6 @@ func (s *QueuablePayloadSender) flushQueue() error {
 				retryNum, delay := s.backoffTimer.ScheduleRetry(err)
 				log.Debugf("Got retriable error. Retrying flush later: retry=%d, delay=%s, err=%v",
 					retryNum, delay, err)
-				s.discardOldPayloads()
 				s.notifyRetry(payload, err, delay, retryNum)
 				// Don't try to send following. We'll flush all later.
 				return err

@@ -210,6 +210,7 @@ func (w *TraceWriter) flush() {
 	serialized, err := proto.Marshal(&tracePayload)
 	if err != nil {
 		log.Errorf("failed to serialize trace payload, data got dropped, err: %s", err)
+		w.resetBuffer()
 		return
 	}
 
@@ -244,7 +245,10 @@ func (w *TraceWriter) flush() {
 
 	log.Debugf("flushing traces=%v transactions=%v", len(w.traces), len(w.transactions))
 	w.payloadSender.Send(payload)
+	w.resetBuffer()
+}
 
+func (w *TraceWriter) resetBuffer() {
 	// Reset traces
 	w.traces = w.traces[:0]
 	w.transactions = w.transactions[:0]

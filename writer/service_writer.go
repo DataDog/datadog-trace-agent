@@ -134,6 +134,7 @@ func (w *ServiceWriter) flush() {
 	data, err := model.EncodeServicesPayload(w.serviceBuffer)
 	if err != nil {
 		log.Errorf("error while encoding service payload: %v", err)
+		w.serviceBuffer = make(model.ServicesMetadata)
 		return
 	}
 

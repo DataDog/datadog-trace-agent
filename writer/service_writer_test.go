@@ -43,12 +43,16 @@ func TestServiceWriter_ServiceHandling(t *testing.T) {
 	// When sending it
 	serviceChannel <- metadata1
 
+	// And then immediately sending another set of service metadata
+	metadata2 := fixtures.RandomServices(10, 10)
+	serviceChannel <- metadata2
+
 	// And then waiting for more than flush period
 	time.Sleep(2 * serviceWriter.conf.FlushPeriod)
 
-	// And then sending another set of service metadata
-	metadata2 := fixtures.RandomServices(10, 10)
-	serviceChannel <- metadata2
+	// And then sending a third set of service metadata
+	metadata3 := fixtures.RandomServices(10, 10)
+	serviceChannel <- metadata3
 
 	// And stopping service writer before flush ticker ticks (should still flush on exit though)
 	close(serviceChannel)
@@ -64,8 +68,8 @@ func TestServiceWriter_ServiceHandling(t *testing.T) {
 	successPayloads := testEndpoint.SuccessPayloads()
 
 	assert.Len(successPayloads, 2, "There should be 2 payloads")
-	assertMetadata(assert, expectedHeaders, metadata1, successPayloads[0])
-	assertMetadata(assert, expectedHeaders, mergedMetadata, successPayloads[1])
+	assertMetadata(assert, expectedHeaders, mergedMetadata, successPayloads[0])
+	assertMetadata(assert, expectedHeaders, metadata3, successPayloads[1])
 }
 
 func TestServiceWriter_UpdateInfoHandling(t *testing.T) {

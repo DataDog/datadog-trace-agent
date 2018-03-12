@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/backoff"
 	"github.com/DataDog/datadog-trace-agent/fixtures"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/stretchr/testify/assert"
@@ -450,6 +451,75 @@ func TestQueuablePayloadSender_MaxAge(t *testing.T) {
 
 	// Ensure tick was processed
 	syncBarrier <- nil
+
+	// Then we should have no queued payloads
+	assert.Equal(0, queuableSender.NumQueuedPayloads(), "We should have no queued payloads")
+
+	// When we stop the sender
+	queuableSender.Stop()
+	monitor.Stop()
+
+	// Then endpoint should have received only payload3. Because payload1 and payload2 were too old after the failed
+	// retry (first TriggerTick).
+	assert.Equal([]Payload{*payload3}, flakyEndpoint.SuccessPayloads(), "Endpoint should have received only payload 3")
+
+	// And monitor should have received failed events for payload1 and payload2 with correct reason
+	assert.Equal([]Payload{*payload1, *payload2}, monitor.FailurePayloads(),
+		"Monitor should agree with endpoint on failed payloads")
+	assert.Contains(monitor.FailureEvents[0].Error.Error(), "older than max age",
+		"Monitor failure event should mention correct reason for error")
+}
+
+func TestQueuablePayloadSender_RetryOfTooOldQueue(t *testing.T) {
+	assert := assert.New(t)
+
+	// Given an endpoint that continuously throws out retriable errors
+	flakyEndpoint := &testEndpoint{}
+	flakyEndpoint.SetError(&RetriableError{err: fmt.Errorf("bleh"), endpoint: flakyEndpoint})
+
+	// And a backoff timer that triggers every 100ms
+	testBackoffTimer := backoff.NewCustomTimer(func(numRetries int, err error) time.Duration {
+		return 100 * time.Millisecond
+	})
+
+	// And a queuable sender using said endpoint and timer and with a meager max age of 200ms
+	conf := writerconfig.DefaultQueuablePayloadSenderConf()
+	conf.MaxAge = 200 * time.Millisecond
+	queuableSender := NewCustomQueuablePayloadSender(flakyEndpoint, conf)
+	queuableSender.backoffTimer = testBackoffTimer
+	syncBarrier := make(chan interface{})
+	queuableSender.syncBarrier = syncBarrier
+
+	// And a test monitor for that sender
+	monitor := newTestPayloadSenderMonitor(queuableSender)
+
+	monitor.Start()
+	queuableSender.Start()
+
+	// When sending two payloads one after the other
+	payload1 := RandomPayload()
+	queuableSender.Send(payload1)
+	payload2 := RandomPayload()
+	queuableSender.Send(payload2)
+
+	// And then sleeping for 500ms
+	time.Sleep(600 * time.Millisecond)
+
+	// Then, eventually, during one of the retries those 2 payloads should end up being discarded and our queue
+	// will end up with a size of 0 and a flush call will be made for a queue of size 0
+
+	// Then send a third payload
+	payload3 := RandomPayload()
+	queuableSender.Send(payload3)
+
+	// Wait for payload to be queued
+	syncBarrier <- nil
+
+	// Then, when the endpoint finally works
+	flakyEndpoint.SetError(nil)
+
+	// Wait for a retry
+	time.Sleep(200 * time.Millisecond)
 
 	// Then we should have no queued payloads
 	assert.Equal(0, queuableSender.NumQueuedPayloads(), "We should have no queued payloads")
