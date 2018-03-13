@@ -14,5 +14,6 @@ type Filter interface {
 func Setup(c *config.AgentConfig) []Filter {
 	return []Filter{
 		newResourceFilter(c),
+		newTagReplacer(c),
 	}
 }

@@ -1,10 +1,12 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/url"
 	"os"
+	"regexp"
 	"time"
 
 	"gopkg.in/yaml.v2"
@@ -36,14 +38,15 @@ type proxy struct {
 }
 
 type traceAgent struct {
-	Enabled            *bool    `yaml:"enabled"`
-	Endpoint           string   `yaml:"apm_dd_url"`
-	Env                string   `yaml:"env"`
-	ExtraSampleRate    float64  `yaml:"extra_sample_rate"`
-	MaxTracesPerSecond float64  `yaml:"max_traces_per_second"`
-	IgnoreResources    []string `yaml:"ignore_resources"`
-	ReceiverPort       int      `yaml:"receiver_port"`
-	APMNonLocalTraffic *bool    `yaml:"apm_non_local_traffic"`
+	Enabled            *bool          `yaml:"enabled"`
+	Endpoint           string         `yaml:"apm_dd_url"`
+	Env                string         `yaml:"env"`
+	ExtraSampleRate    float64        `yaml:"extra_sample_rate"`
+	MaxTracesPerSecond float64        `yaml:"max_traces_per_second"`
+	IgnoreResources    []string       `yaml:"ignore_resources"`
+	ReplaceTags        []*ReplaceRule `yaml:"replace_tags"`
+	ReceiverPort       int            `yaml:"receiver_port"`
+	APMNonLocalTraffic *bool          `yaml:"apm_non_local_traffic"`
 
 	WatchdogMaxMemory float64 `yaml:"max_memory"`
 	WatchdogMaxCPUPct float64 `yaml:"max_cpu_percent"`
@@ -56,6 +59,13 @@ type traceAgent struct {
 	AnalyzedRateByService map[string]float64 `yaml:"analyzed_rate_by_service"`
 
 	DDAgentBin string `yaml:"dd_agent_bin"`
+}
+
+type ReplaceRule struct {
+	Name    string         `yaml:"name"`
+	Pattern string         `yaml:"pattern"`
+	Re      *regexp.Regexp `yaml:"-"`
+	Repl    string         `yaml:"repl"`
 }
 
 type traceWriter struct {
@@ -175,6 +185,14 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
 		agentConf.Ignore["resource"] = yc.TraceAgent.IgnoreResources
 	}
 
+	if rt := yc.TraceAgent.ReplaceTags; rt != nil {
+		err := compileReplaceRules(rt)
+		if err != nil {
+			return fmt.Errorf("replace_tags: %s", err)
+		}
+		agentConf.ReplaceTags = rt
+	}
+
 	if yc.TraceAgent.APMNonLocalTraffic != nil && *yc.TraceAgent.APMNonLocalTraffic {
 		agentConf.ReceiverHost = "0.0.0.0"
 	}
@@ -286,6 +304,25 @@ func readExponentialBackoffConfigYaml(yc queueablePayloadSender) backoff.Exponen
 	}
 
 	return c
+}
+
+// compileReplaceRules compiles the regular expressions found in the replace rules.
+// If it fails it returns the first error.
+func compileReplaceRules(rules []*ReplaceRule) error {
+	for _, r := range rules {
+		if r.Name == "" {
+			return errors.New(`all rules must have a "name" property (use "*" to target all)`)
+		}
+		if r.Pattern == "" {
+			return errors.New(`all rules must have a "pattern"`)
+		}
+		re, err := regexp.Compile(r.Pattern)
+		if err != nil {
+			return fmt.Errorf("key %q: %s", r.Name, err)
+		}
+		r.Re = re
+	}
+	return nil
 }
 
 // getDuration returns the duration of the provided value in seconds
