@@ -90,6 +90,10 @@ func (c *Concentrator) Add(t processedTrace) {
 	c.mu.Lock()
 
 	for _, s := range t.WeightedTrace {
+		// We do not compute stats for non top level spans since this is not surfaced in the UI
+		if !s.TopLevel {
+			continue
+		}
 		btime := s.End() - s.End()%c.bsize
 		b, ok := c.buckets[btime]
 		if !ok {
