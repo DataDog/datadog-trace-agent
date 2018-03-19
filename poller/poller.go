@@ -4,7 +4,6 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"strconv"
@@ -130,20 +129,20 @@ func (p *Poller) Updates() chan *config.ServerConfig {
 }
 
 func (p *Poller) persist(conf *config.ServerConfig) error {
+	if p.persistPath == "" {
+		//persistence disabled
+		log.Info("persist path unspecified: config not saved")
+		return nil
+	}
+
 	var f *os.File
 	var err error
 
-	// TODO[aaditya] need something OS-aware here
-	if p.persistPath == "" {
-		f, err = ioutil.TempFile("", "trace_agent_config")
-	} else {
-		f, err = os.Create(p.persistPath)
-	}
-	defer f.Close()
-
+	f, err = os.Create(p.persistPath)
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 
 	encoder := gob.NewEncoder(f)
 	encoder.Encode(conf)
