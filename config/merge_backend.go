@@ -8,7 +8,7 @@ import (
 type analyzedServices map[string]float64
 
 type ServerConfig struct {
-	ModifyIndex int64
+	ModifyIndex int64 `json:modify_index,omitempty`
 
 	AnalyzedServices analyzedServices `json:analyzed_services,omitempty`
 }

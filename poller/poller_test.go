@@ -1,18 +1,21 @@
-package config
+package poller
 
 import (
 	"encoding/json"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
+
+	"github.com/DataDog/datadog-trace-agent/config"
+	"github.com/stretchr/testify/assert"
 )
 
 func newTestConfigServer() *httptest.Server {
 	server := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			payload := ServerConfig{
+			payload := config.ServerConfig{
+				ModifyIndex: 1000,
 				AnalyzedServices: map[string]float64{
 					"web": 1.0,
 				},
@@ -36,8 +39,26 @@ func TestPoller(t *testing.T) {
 	assert.NotNil(url)
 	assert.Nil(err)
 
-	p := NewDefaultConfigPoller("apikey_2", "")
-	p.endpoint = url.String()
+	p := &Poller{
+		defaultInterval, "", http.DefaultClient,
+		url.String(), make(chan *config.ServerConfig), "apikey_2", 0,
+	}
 
+	go func() {
+		for {
+			select {
+			case conf := <-p.updates:
+				assert.Equal(conf.ModifyIndex, int64(1000))
+				assert.Equal(len(conf.AnalyzedServices), 1)
+				assert.Equal(conf.AnalyzedServices["web"], 1.0)
+
+				done <- struct{}{}
+			default:
+			}
+		}
+	}()
+
+	err = p.update()
+	assert.Nil(err)
 	<-done
 }

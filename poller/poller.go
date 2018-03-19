@@ -1,14 +1,17 @@
-package config
+package poller
 
 import (
 	"encoding/gob"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/config"
+	"github.com/DataDog/datadog-trace-agent/statsd"
 	log "github.com/cihub/seelog"
 )
 
@@ -17,7 +20,7 @@ type Poller struct {
 	persistPath string
 	client      *http.Client
 	endpoint    string
-	updates     chan *ServerConfig
+	updates     chan *config.ServerConfig
 	apiKey      string
 
 	index int64
@@ -30,10 +33,16 @@ var (
 	defaultEndpoint = "localhost:8090/config"
 )
 
+type pollingError struct {
+	error
+
+	tags []string
+}
+
 func NewDefaultConfigPoller(apiKey, persistPath string) *Poller {
 	p := &Poller{
 		defaultInterval, persistPath, http.DefaultClient,
-		defaultEndpoint, make(chan *ServerConfig), apiKey, 0,
+		defaultEndpoint, make(chan *config.ServerConfig), apiKey, 0,
 	}
 
 	go p.Run()
@@ -42,21 +51,27 @@ func NewDefaultConfigPoller(apiKey, persistPath string) *Poller {
 
 func (p *Poller) Run() {
 	// retrieve cached config on first boot
-	conf, err := NewServerConfigFromFile(p.persistPath)
+	conf, err := config.NewServerConfigFromFile(p.persistPath)
 	if err != nil {
 		log.Errorf("failed to read cached config at %v: %v. forcing reload...", p.persistPath, err)
-		p.update()
+		err = p.update()
+		if err != nil {
+			reportPollingError(&pollingError{err, []string{}})
+		}
 	} else {
 		p.updates <- conf
 		p.index = conf.ModifyIndex
 	}
 
 	for range time.Tick(p.interval) {
-		p.update()
+		err = p.update()
+		if err != nil {
+			reportPollingError(&pollingError{err, []string{}})
+		}
 	}
 }
 
-func (p *Poller) update() {
+func (p *Poller) update() (err error) {
 	req, err := http.NewRequest("GET", p.endpoint, nil)
 	if err != nil {
 		log.Errorf("failed to retrieve config from Datadog API: %v.", err)
@@ -70,49 +85,51 @@ func (p *Poller) update() {
 	defer response.Body.Close()
 
 	if err != nil {
-		// TODO[aaditya]
 		tags := []string{"error:http_error", "status_code:" + strconv.Itoa(response.StatusCode)}
-		reportPollingError(response, tags)
-		return
+		return pollingError{err, tags}
 	}
 
 	tags := []string{"status_code:" + strconv.Itoa(response.StatusCode)}
-	switch v := response.StatusCode; v {
+	switch response.StatusCode {
 	case http.StatusOK:
-		reportPollingSuccess(response, tags)
+		reportPollingSuccess(tags)
 	case http.StatusNotModified:
-		reportPollingSuccess(response, tags)
+		reportPollingSuccess(tags)
 
 		// not modified, exit early
 		return
 	default:
-		if v >= 500 {
-			tags := []string{"error:http_error", "status_code:" + strconv.Itoa(v)}
-			reportPollingError(response, tags)
+		if response.StatusCode >= 500 {
+			tags := append(tags, "error:http_error")
+			return pollingError{errors.New("config server error"), tags}
 		}
-
 	}
 
-	var s ServerConfig
-	err = json.NewDecoder(response.Body).Decode(s)
+	var s config.ServerConfig
+	err = json.NewDecoder(response.Body).Decode(&s)
 	if err != nil {
 		tags := []string{"error:decoding_error"}
-		reportPollingError(response, tags)
+		return pollingError{err, tags}
 	}
 
 	if s.ModifyIndex > p.index {
 		p.updates <- &s
-		p.persist(&s)
+		err = p.persist(&s)
+		if err != nil {
+			log.Errorf("failed to persist config from server: %v", err)
+			reportPersistFailed(err, []string{})
+		}
 	}
 
 	p.index = s.ModifyIndex
+	return nil
 }
 
-func (p *Poller) Updates() chan *ServerConfig {
+func (p *Poller) Updates() chan *config.ServerConfig {
 	return p.updates
 }
 
-func (p *Poller) persist(conf *ServerConfig) error {
+func (p *Poller) persist(conf *config.ServerConfig) error {
 	var f *os.File
 	var err error
 
@@ -125,7 +142,6 @@ func (p *Poller) persist(conf *ServerConfig) error {
 	defer f.Close()
 
 	if err != nil {
-		reportPersistFailed(err)
 		return err
 	}
 
@@ -135,17 +151,18 @@ func (p *Poller) persist(conf *ServerConfig) error {
 	return nil
 }
 
-func reportPollingError(r *http.Response, tags []string) {
-	//TODO[aaditya]
+func reportPollingError(err *pollingError) {
+	log.Errorf("failed to retrieve config from server: %v", err)
+	statsd.Client.Count("datadog.trace_agent.poller.poll.failed", 1, err.tags, 1.0)
+}
+
+func reportPollingSuccess(tags []string) {
+	statsd.Client.Count("datadog.trace_agent.poller.poll.succeeded", 1, tags, 1.0)
 	return
 }
 
-func reportPollingSuccess(r *http.Response, tags []string) {
-	//TODO[aaditya]
-	return
-}
-
-func reportPersistFailed(err error) {
-	//TODO[aaditya]
+func reportPersistFailed(err error, tags []string) {
+	log.Errorf("failed to persist config from server: %v", err)
+	statsd.Client.Count("datadog.trace_agent.poller.persist.failed", 1, tags, 1.0)
 	return
 }

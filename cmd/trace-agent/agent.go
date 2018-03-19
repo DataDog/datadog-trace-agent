@@ -11,6 +11,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/filters"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/poller"
 	"github.com/DataDog/datadog-trace-agent/quantizer"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
@@ -78,7 +79,7 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 
 	// poll for new config
 	//TODO[aaditya] get an OS-aware path for the state fle
-	poller := config.NewDefaultConfigPoller(conf.APIKey, "")
+	poller := poller.NewDefaultConfigPoller(conf.APIKey, "")
 
 	// create components
 	r := NewHTTPReceiver(conf, dynConf, rawTraceChan, serviceChan)
