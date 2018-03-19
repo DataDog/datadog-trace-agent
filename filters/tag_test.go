@@ -55,15 +55,20 @@ func TestTagReplacer(t *testing.T) {
 	} {
 		rules := parseRulesFromString(tt.rules)
 		tr := &tagReplacer{replace: rules}
-		span := replaceFilterTestSpan(tt.got)
-		ok := tr.Keep(span)
+		root := replaceFilterTestSpan(tt.got)
+		childSpan := replaceFilterTestSpan(tt.got)
+		trace := model.Trace{root, childSpan}
+		ok := tr.Keep(root, &trace)
 		assert.True(ok)
 		for k, v := range tt.want {
 			switch k {
 			case "resource.name":
-				assert.Equal(v, span.Resource)
+				// test that the filter applies to all spans, not only the root
+				assert.Equal(v, root.Resource)
+				assert.Equal(v, childSpan.Resource)
 			default:
-				assert.Equal(v, span.Meta[k])
+				assert.Equal(v, root.Meta[k])
+				assert.Equal(v, childSpan.Meta[k])
 			}
 		}
 	}
