@@ -15,7 +15,8 @@ type resourceFilter struct {
 }
 
 // Keep returns true if Span.Resource doesn't match any of the filter's rules
-func (f *resourceFilter) Keep(root *model.Span, trace *model.Trace) bool {
+func (f *resourceFilter) Keep(trace *model.Trace) bool {
+	root := trace.GetRoot()
 	for _, entry := range f.blacklist {
 		if entry.MatchString(root.Resource) {
 			return false

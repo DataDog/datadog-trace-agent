@@ -7,7 +7,7 @@ import (
 
 // Filter is the interface implemented by all span-filters
 type Filter interface {
-	Keep(*model.Span, *model.Trace) bool
+	Keep(*model.Trace) bool
 }
 
 // Setup returns a slice of all registered filters

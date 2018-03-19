@@ -19,7 +19,7 @@ func newTagReplacer(c *config.AgentConfig) *tagReplacer {
 }
 
 // Keep implements Filter.
-func (f tagReplacer) Keep(root *model.Span, trace *model.Trace) bool {
+func (f tagReplacer) Keep(trace *model.Trace) bool {
 	for _, rule := range f.replace {
 		key, str, re := rule.Name, rule.Repl, rule.Re
 		for _, s := range *trace {

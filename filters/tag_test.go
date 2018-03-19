@@ -58,7 +58,7 @@ func TestTagReplacer(t *testing.T) {
 		root := replaceFilterTestSpan(tt.got)
 		childSpan := replaceFilterTestSpan(tt.got)
 		trace := model.Trace{root, childSpan}
-		ok := tr.Keep(root, &trace)
+		ok := tr.Keep(&trace)
 		assert.True(ok)
 		for k, v := range tt.want {
 			switch k {
