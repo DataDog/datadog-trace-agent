@@ -63,7 +63,7 @@ func TestTransactionSamplerConfig(t *testing.T) {
 
 	// analyze only spans with service "web"
 	conf <- &config.ServerConfig{
-		AnalyzedServices: map[string]float64{
+		AnalyzedRateByService: map[string]float64{
 			"web": 1.0,
 		},
 	}
@@ -88,7 +88,7 @@ func TestTransactionSamplerConfig(t *testing.T) {
 
 	// flip the config to analyze the "db" service
 	conf <- &config.ServerConfig{
-		AnalyzedServices: map[string]float64{
+		AnalyzedRateByService: map[string]float64{
 			"db": 1.0,
 		},
 	}

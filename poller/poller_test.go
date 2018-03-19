@@ -16,7 +16,7 @@ func newTestConfigServer() *httptest.Server {
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			payload := config.ServerConfig{
 				ModifyIndex: 1000,
-				AnalyzedServices: map[string]float64{
+				AnalyzedRateByService: map[string]float64{
 					"web": 1.0,
 				},
 			}
@@ -49,8 +49,8 @@ func TestPoller(t *testing.T) {
 			select {
 			case conf := <-p.updates:
 				assert.Equal(conf.ModifyIndex, int64(1000))
-				assert.Equal(len(conf.AnalyzedServices), 1)
-				assert.Equal(conf.AnalyzedServices["web"], 1.0)
+				assert.Equal(len(conf.AnalyzedRateByService), 1)
+				assert.Equal(conf.AnalyzedRateByService["web"], 1.0)
 
 				done <- struct{}{}
 			default:

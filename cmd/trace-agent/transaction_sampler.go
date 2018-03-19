@@ -73,7 +73,12 @@ func (s *TransactionSampler) listen(in chan *config.ServerConfig) {
 				s.mu.Lock()
 				defer s.mu.Unlock()
 
-				s.analyzedRateByService = conf.AnalyzedServices
+				// during rollout, don't allow an empty server response to cancel
+				// analysis
+				if len(conf.AnalyzedRateByService) > 0 {
+					s.analyzedRateByService = conf.AnalyzedRateByService
+				}
+
 			}()
 		default:
 		}
