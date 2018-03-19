@@ -211,7 +211,7 @@ func (a *Agent) Process(t model.Trace) {
 	}
 
 	for _, f := range a.Filters {
-		if f.Keep(root) {
+		if f.Keep(root, &t) {
 			continue
 		}
 
