@@ -76,6 +76,10 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	serviceChan := make(chan model.ServicesMetadata, 50)
 	filteredServiceChan := make(chan model.ServicesMetadata, 50)
 
+	// poll for new config
+	//TODO[aaditya] get an OS-aware path for the state fle
+	poller := config.NewDefaultConfigPoller(conf.APIKey, "")
+
 	// create components
 	r := NewHTTPReceiver(conf, dynConf, rawTraceChan, serviceChan)
 	c := NewConcentrator(
@@ -87,9 +91,11 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 
 	ss := NewScoreSampler(conf)
 	ps := NewPrioritySampler(conf, dynConf)
-	ts := NewTransactionSampler(conf, analyzedTransactionChan)
+	ts := NewTransactionSampler(conf, analyzedTransactionChan, poller.Updates())
+
 	se := NewTraceServiceExtractor(serviceChan)
 	sm := NewServiceMapper(serviceChan, filteredServiceChan)
+
 	tw := writer.NewTraceWriter(conf, sampledTraceChan, analyzedTransactionChan)
 	sw := writer.NewStatsWriter(conf, statsChan)
 	svcW := writer.NewServiceWriter(conf, filteredServiceChan)

@@ -13,11 +13,14 @@ type TransactionSampler struct {
 }
 
 // NewTransactionSampler creates a new empty transaction sampler
-func NewTransactionSampler(conf *config.AgentConfig, analyzed chan *model.Span) *TransactionSampler {
-	return &TransactionSampler{
+func NewTransactionSampler(conf *config.AgentConfig, analyzed chan *model.Span, config chan *config.ServerConfig) *TransactionSampler {
+	t := &TransactionSampler{
 		analyzed:              analyzed,
 		analyzedRateByService: conf.AnalyzedRateByService,
 	}
+
+	go t.Listen(config)
+	return t
 }
 
 // Enabled tells if the transaction analysis is enabled
@@ -48,4 +51,18 @@ func (s *TransactionSampler) Analyzed(span *model.WeightedSpan) bool {
 		}
 	}
 	return false
+}
+
+func (s *TransactionSampler) Listen(in chan *config.ServerConfig) error {
+	// TODO[aaditya] when to actually return an error
+	for {
+		select {
+		case conf := <-in:
+			//TODO[aaditya]: lock here?
+			s.analyzedRateByService = conf.AnalyzedServices
+		default:
+		}
+	}
+
+	return nil
 }
