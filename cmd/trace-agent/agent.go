@@ -80,8 +80,7 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	var p *poller.Poller
 	if conf.EnableConfigPolling {
 		// poll for new config
-		//TODO[aaditya] get an OS-aware path for the state fle
-		p = poller.NewDefaultConfigPoller(conf.APIKey, "")
+		p = poller.NewDefaultConfigPoller(conf.APIKey, conf.ConfigPersistPath)
 	}
 
 	// create components

@@ -84,6 +84,7 @@ type AgentConfig struct {
 
 	// polling config from the DD backend
 	EnableConfigPolling bool
+	ConfigPersistPath   string
 }
 
 // NewDefaultAgentConfig returns a configuration with the default values
@@ -125,6 +126,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 		Ignore:                make(map[string][]string),
 		AnalyzedRateByService: make(map[string]float64),
 		EnableConfigPolling:   true,
+		ConfigPersistPath:     DefaultConfigPersistPath,
 	}
 }
 
