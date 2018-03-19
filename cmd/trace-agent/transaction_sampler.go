@@ -1,6 +1,8 @@
 package main
 
 import (
+	"sync"
+
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/sampler"
@@ -8,8 +10,10 @@ import (
 
 // TransactionSampler extracts and samples analyzed spans
 type TransactionSampler struct {
-	analyzed              chan *model.Span
+	analyzed chan *model.Span
+
 	analyzedRateByService map[string]float64
+	mu                    sync.RWMutex
 }
 
 // NewTransactionSampler creates a new empty transaction sampler
@@ -38,6 +42,13 @@ func (s *TransactionSampler) Add(t processedTrace) {
 	}
 }
 
+func (s *TransactionSampler) ratesByService() map[string]float64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.analyzedRateByService
+}
+
 // Analyzed tells if a span should be considered as analyzed
 // Only top-level spans are eligible to be analyzed
 func (s *TransactionSampler) Analyzed(span *model.WeightedSpan) bool {
@@ -45,7 +56,8 @@ func (s *TransactionSampler) Analyzed(span *model.WeightedSpan) bool {
 		return false
 	}
 
-	if analyzeRate, ok := s.analyzedRateByService[span.Service]; ok {
+	ratesByService := s.ratesByService()
+	if analyzeRate, ok := ratesByService[span.Service]; ok {
 		if sampler.SampleByRate(span.TraceID, analyzeRate) {
 			return true
 		}
@@ -58,8 +70,12 @@ func (s *TransactionSampler) Listen(in chan *config.ServerConfig) error {
 	for {
 		select {
 		case conf := <-in:
-			//TODO[aaditya]: lock here?
-			s.analyzedRateByService = conf.AnalyzedServices
+			func() {
+				s.mu.Lock()
+				defer s.mu.Unlock()
+
+				s.analyzedRateByService = conf.AnalyzedServices
+			}()
 		default:
 		}
 	}

@@ -81,12 +81,12 @@ func (p *Poller) update() (err error) {
 	req.Header.Set("DD-Config-Modify-Index", strconv.FormatInt(p.index, 10))
 
 	response, err := p.client.Do(req)
-	defer response.Body.Close()
-
 	if err != nil {
-		tags := []string{"error:http_error", "status_code:" + strconv.Itoa(response.StatusCode)}
+		tags := []string{"error:http_error"}
 		return pollingError{err, tags}
 	}
+
+	defer response.Body.Close()
 
 	tags := []string{"status_code:" + strconv.Itoa(response.StatusCode)}
 	switch response.StatusCode {
