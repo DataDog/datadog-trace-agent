@@ -5,6 +5,7 @@ import (
 
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/poller"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 )
 
@@ -17,13 +18,16 @@ type TransactionSampler struct {
 }
 
 // NewTransactionSampler creates a new empty transaction sampler
-func NewTransactionSampler(conf *config.AgentConfig, analyzed chan *model.Span, config chan *config.ServerConfig) *TransactionSampler {
+func NewTransactionSampler(conf *config.AgentConfig, analyzed chan *model.Span, poller *poller.Poller) *TransactionSampler {
 	t := &TransactionSampler{
 		analyzed:              analyzed,
 		analyzedRateByService: conf.AnalyzedRateByService,
 	}
 
-	go t.listen(config)
+	if poller != nil {
+		go t.listen(poller.Updates())
+	}
+
 	return t
 }
 
@@ -73,12 +77,7 @@ func (s *TransactionSampler) listen(in chan *config.ServerConfig) {
 				s.mu.Lock()
 				defer s.mu.Unlock()
 
-				// during rollout, don't allow an empty server response to cancel
-				// analysis
-				if len(conf.AnalyzedRateByService) > 0 {
-					s.analyzedRateByService = conf.AnalyzedRateByService
-				}
-
+				s.analyzedRateByService = conf.AnalyzedRateByService
 			}()
 		default:
 		}

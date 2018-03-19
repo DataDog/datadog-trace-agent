@@ -81,6 +81,9 @@ type AgentConfig struct {
 
 	// infrastructure agent binary
 	DDAgentBin string // DDAgentBin will be "" for Agent5 scenarios
+
+	// polling config from the DD backend
+	EnableConfigPolling bool
 }
 
 // NewDefaultAgentConfig returns a configuration with the default values
@@ -121,6 +124,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 
 		Ignore:                make(map[string][]string),
 		AnalyzedRateByService: make(map[string]float64),
+		EnableConfigPolling:   true,
 	}
 }
 
