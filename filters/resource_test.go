@@ -32,7 +32,7 @@ func TestFilter(t *testing.T) {
 		trace := model.Trace{span}
 		filter := newTestFilter(test.filter)
 
-		assert.Equal(t, test.expectation, filter.Keep(span, &trace))
+		assert.Equal(t, test.expectation, filter.Keep(&trace))
 	}
 }
 
@@ -43,7 +43,7 @@ func TestRegexCompilationFailure(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		span := fixtures.RandomSpan()
 		trace := model.Trace{span}
-		assert.True(t, filter.Keep(span, &trace))
+		assert.True(t, filter.Keep(&trace))
 	}
 }
 
@@ -52,10 +52,10 @@ func TestRegexEscaping(t *testing.T) {
 	trace := model.Trace{span}
 
 	filter := newTestFilter("[123")
-	assert.True(t, filter.Keep(span, &trace))
+	assert.True(t, filter.Keep(&trace))
 
 	filter = newTestFilter("\\[123")
-	assert.False(t, filter.Keep(span, &trace))
+	assert.False(t, filter.Keep(&trace))
 }
 
 func TestMultipleEntries(t *testing.T) {
@@ -63,11 +63,11 @@ func TestMultipleEntries(t *testing.T) {
 
 	span := newTestSpan("ABCCCC")
 	trace := model.Trace{span}
-	assert.False(t, filter.Keep(span, &trace))
+	assert.False(t, filter.Keep(&trace))
 
 	span = newTestSpan("WWW")
 	trace = model.Trace{span}
-	assert.False(t, filter.Keep(span, &trace))
+	assert.False(t, filter.Keep(&trace))
 }
 
 func newTestFilter(blacklist ...string) Filter {
