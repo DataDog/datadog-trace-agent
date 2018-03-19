@@ -14,6 +14,7 @@ import (
 	log "github.com/cihub/seelog"
 )
 
+// Poller polls Datadog for configuration updates
 type Poller struct {
 	interval    time.Duration
 	persistPath string
@@ -38,17 +39,18 @@ type pollingError struct {
 	tags []string
 }
 
+// NewDefaultConfigPoller initializes a new Poller with sane defaults
 func NewDefaultConfigPoller(apiKey, persistPath string) *Poller {
 	p := &Poller{
 		defaultInterval, persistPath, http.DefaultClient,
 		defaultEndpoint, make(chan *config.ServerConfig), apiKey, 0,
 	}
 
-	go p.Run()
+	go p.run()
 	return p
 }
 
-func (p *Poller) Run() {
+func (p *Poller) run() {
 	// retrieve cached config on first boot
 	conf, err := config.NewServerConfigFromFile(p.persistPath)
 	if err != nil {
@@ -124,6 +126,7 @@ func (p *Poller) update() (err error) {
 	return nil
 }
 
+// Updates returns the channel to subscribe to for configuration updates
 func (p *Poller) Updates() chan *config.ServerConfig {
 	return p.updates
 }

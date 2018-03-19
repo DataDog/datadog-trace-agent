@@ -23,7 +23,7 @@ func NewTransactionSampler(conf *config.AgentConfig, analyzed chan *model.Span, 
 		analyzedRateByService: conf.AnalyzedRateByService,
 	}
 
-	go t.Listen(config)
+	go t.listen(config)
 	return t
 }
 
@@ -65,8 +65,7 @@ func (s *TransactionSampler) Analyzed(span *model.WeightedSpan) bool {
 	return false
 }
 
-func (s *TransactionSampler) Listen(in chan *config.ServerConfig) error {
-	// TODO[aaditya] when to actually return an error
+func (s *TransactionSampler) listen(in chan *config.ServerConfig) {
 	for {
 		select {
 		case conf := <-in:
@@ -79,6 +78,4 @@ func (s *TransactionSampler) Listen(in chan *config.ServerConfig) error {
 		default:
 		}
 	}
-
-	return nil
 }

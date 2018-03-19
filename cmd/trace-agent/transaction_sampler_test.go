@@ -36,7 +36,7 @@ func TestTransactionSamplerConfig(t *testing.T) {
 	ts := newTestTransactionSampler()
 
 	conf := make(chan *config.ServerConfig)
-	go ts.Listen(conf)
+	go ts.listen(conf)
 
 	done := make(chan struct{})
 
