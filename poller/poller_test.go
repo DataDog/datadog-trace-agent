@@ -45,16 +45,12 @@ func TestPoller(t *testing.T) {
 	}
 
 	go func() {
-		for {
-			select {
-			case conf := <-p.updates:
-				assert.Equal(conf.ModifyIndex, int64(1000))
-				assert.Equal(len(conf.AnalyzedRateByService), 1)
-				assert.Equal(conf.AnalyzedRateByService["web"], 1.0)
+		for conf := range p.updates {
+			assert.Equal(conf.ModifyIndex, int64(1000))
+			assert.Equal(len(conf.AnalyzedRateByService), 1)
+			assert.Equal(conf.AnalyzedRateByService["web"], 1.0)
 
-				done <- struct{}{}
-			default:
-			}
+			close(done)
 		}
 	}()
 

@@ -13,11 +13,13 @@ import (
 type TransactionSampler struct {
 	analyzed chan *model.Span
 
-	analyzedRateByService map[string]float64
 	mu                    sync.RWMutex
+	analyzedRateByService map[string]float64
 }
 
 // NewTransactionSampler creates a new empty transaction sampler
+// It must be initalized with startup config, a channel for outbound analyzed spans, and
+// a poller.Poller for updating in-memory configuration
 func NewTransactionSampler(conf *config.AgentConfig, analyzed chan *model.Span, poller *poller.Poller) *TransactionSampler {
 	t := &TransactionSampler{
 		analyzed:              analyzed,
@@ -69,16 +71,15 @@ func (s *TransactionSampler) Analyzed(span *model.WeightedSpan) bool {
 	return false
 }
 
-func (s *TransactionSampler) listen(in chan *config.ServerConfig) {
+// listen listens for new ServerConfig reported by the poller
+func (s *TransactionSampler) listen(in <-chan *config.ServerConfig) {
 	for {
 		select {
 		case conf := <-in:
-			func() {
-				s.mu.Lock()
-				defer s.mu.Unlock()
+			s.mu.Lock()
 
-				s.analyzedRateByService = conf.AnalyzedRateByService
-			}()
+			s.analyzedRateByService = conf.AnalyzedRateByService
+			s.mu.Unlock()
 		default:
 		}
 	}

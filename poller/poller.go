@@ -127,7 +127,7 @@ func (p *Poller) update() (err error) {
 }
 
 // Updates returns the channel to subscribe to for configuration updates
-func (p *Poller) Updates() chan *config.ServerConfig {
+func (p *Poller) Updates() <-chan *config.ServerConfig {
 	return p.updates
 }
 

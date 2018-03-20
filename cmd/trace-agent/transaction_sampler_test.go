@@ -46,23 +46,20 @@ func TestTransactionSamplerConfig(t *testing.T) {
 		analyzedCount := 0
 		expected := []string{"web", "web", "db"}
 
-		for {
-			select {
-			case span := <-ts.analyzed:
-				// spans should be analyzed only if the config says so
-				assert.Equal(span.Service, expected[analyzedCount])
-				analyzedCount++
+		for span := range ts.analyzed {
+			// spans should be analyzed only if the config says so
+			assert.Equal(expected[analyzedCount], span.Service)
+			analyzedCount++
 
-				if analyzedCount == countUntil {
-					done <- struct{}{}
-				}
-			default:
+			if analyzedCount == countUntil {
+				close(done)
 			}
 		}
 	}()
 
 	// analyze only spans with service "web"
 	conf <- &config.ServerConfig{
+		ModifyIndex: 1,
 		AnalyzedRateByService: map[string]float64{
 			"web": 1.0,
 		},
@@ -88,6 +85,7 @@ func TestTransactionSamplerConfig(t *testing.T) {
 
 	// flip the config to analyze the "db" service
 	conf <- &config.ServerConfig{
+		ModifyIndex: 2,
 		AnalyzedRateByService: map[string]float64{
 			"db": 1.0,
 		},
