@@ -3,6 +3,8 @@ package quantizer
 import (
 	"bytes"
 	"errors"
+	"sort"
+	"strings"
 
 	"github.com/DataDog/datadog-trace-agent/model"
 	log "github.com/cihub/seelog"
@@ -33,7 +35,7 @@ func (f *DiscardFilter) Filter(token, lastToken int, buffer []byte) (int, []byte
 	switch lastToken {
 	case As:
 		// prevent the next comma from being part of a GroupingFilter
-		return FilteredComma, nil
+		return FilteredAlias, nil
 	}
 
 	// filters based on the current token; if the next token should be ignored,
@@ -102,6 +104,9 @@ func (f *GroupingFilter) Filter(token, lastToken int, buffer []byte) (int, []byt
 		}
 	case f.groupFilter > 0 && (token == ',' || token == '?'):
 		// if we are in a group drop all commas
+		if token == ',' {
+			return FilteredComma, nil
+		}
 		return Filtered, nil
 	case f.groupMulti > 1:
 		// drop all tokens since we're in a counting group
@@ -120,6 +125,95 @@ func (f *GroupingFilter) Filter(token, lastToken int, buffer []byte) (int, []byt
 func (f *GroupingFilter) Reset() {
 	f.groupFilter = 0
 	f.groupMulti = 0
+}
+
+func newSortFilter() TokenFilter {
+	return &sortFilter{list: make([]string, 0, 1)}
+}
+
+// sortFilter buffers parameters of SELECT and (UPDATE) SET instructions
+// internally and returns them in an alphabetically ordered fashion.
+type sortFilter struct {
+	// internal buffer of arguments that need to be sorted.
+	list []string
+
+	// set signifies if we are gathering a list of arguments to SET.
+	// Otherwise they are the arguments of a SELECT.
+	set bool
+}
+
+func (f *sortFilter) Filter(token, lastToken int, buffer []byte) (int, []byte) {
+	if lastToken == Select || lastToken == Set {
+		// starting a list of arguments
+		f.set = lastToken == Set
+		if len(buffer) > 0 {
+			f.list = append(f.list, string(buffer))
+		}
+		return token, nil // skip
+	}
+	if len(f.list) == 0 {
+		// we have nothing, abort
+		return token, buffer
+	}
+	// continue with existing list
+	if !f.set {
+		// we are gathering for SELECT
+		if token == As || token == FilteredAlias {
+			// an alias (AS) is following or an alias has been discarded
+			// by the previous filter, continue.
+			return token, nil
+		}
+	}
+	if token == ',' || token == FilteredComma {
+		// more to come
+		return token, nil
+	}
+	if lastToken == ',' || lastToken == FilteredComma {
+		// continuing list
+		if len(buffer) > 0 {
+			f.list = append(f.list, string(buffer))
+		}
+		return token, nil
+	}
+	if f.set {
+		// we are gathering for SET
+		switch token {
+		case Limit, UpdateFinishedKeyword, ';', EOFChar:
+			// Indicates that the arguments to SET have ended, based on:
+			// Cassandra: https://docs.datastax.com/en/cql/3.3/cql/cql_reference/cqlUpdate.html
+			// MySQL: https://dev.mysql.com/doc/refman/5.7/en/update.html
+			// Postgres: https://www.postgresql.org/docs/9.1/static/sql-update.html
+		default:
+			if len(buffer) > 0 {
+				f.list[len(f.list)-1] += " " + string(buffer)
+			}
+			return token, nil
+		}
+	}
+	// we have a list
+	defer f.Reset()
+	if len(f.list) > 0 {
+		sort.Strings(f.list)
+	}
+	glue := ", "
+	if f.set {
+		glue = " "
+	}
+	args := []byte(strings.Join(f.list, glue))
+	size := len(args)
+	if len(buffer) > 0 {
+		size += 1 + len(buffer)
+	}
+	buf := make([]byte, size)
+	n := copy(buf[0:], args)
+	n += copy(buf[n:], " ")
+	n += copy(buf[n:], buffer)
+	return token, buf[:n]
+}
+
+func (f *sortFilter) Reset() {
+	f.list = make([]string, 0, 1)
+	f.set = false
 }
 
 // TokenConsumer is a Tokenizer consumer. It calls the Tokenizer Scan() function until tokens
@@ -166,6 +260,17 @@ func (t *TokenConsumer) Process(in string) (string, error) {
 
 		t.lastToken = token
 	}
+	// signal filters that EOF is reached, some may have buffers to
+	// flush
+	for _, f := range t.filters {
+		_, buff = f.Filter(EOFChar, t.lastToken, buff)
+	}
+	if len(buff) > 0 {
+		if out.Len() != 0 && token != ',' {
+			out.WriteRune(' ')
+		}
+		out.Write(buff)
+	}
 
 	// reset internals to reuse allocated memory
 	t.Reset()
@@ -192,10 +297,12 @@ func NewTokenConsumer(filters []TokenFilter) *TokenConsumer {
 // the given filters; this quantizer is used only
 // for SQL and CQL strings
 var tokenQuantizer = NewTokenConsumer(
+	// filter order is essential
 	[]TokenFilter{
 		&DiscardFilter{},
 		&ReplaceFilter{},
 		&GroupingFilter{},
+		newSortFilter(),
 	})
 
 // QuantizeSQL generates resource and sql.query meta for SQL spans
