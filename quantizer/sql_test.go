@@ -104,7 +104,7 @@ func TestSQLQuantizer(t *testing.T) {
 	cases := []sqlTestCase{
 		{
 			"select * from users where id = 42",
-			"select * from users where id = ?",
+			"SELECT * FROM users WHERE id = ?",
 		},
 		{
 			"SELECT host, status FROM ec2_status WHERE org_id = 42",
@@ -116,7 +116,7 @@ func TestSQLQuantizer(t *testing.T) {
 		},
 		{
 			"-- get user \n--\n select * \n   from users \n    where\n       id = 214325346",
-			"select * from users where id = ?",
+			"SELECT * FROM users WHERE id = ?",
 		},
 		{
 			"SELECT * FROM `host` WHERE `id` IN (42, 43) /*comment with parameters,host:localhost,url:controller#home,id:FF005:00CAA*/",
@@ -138,19 +138,24 @@ func TestSQLQuantizer(t *testing.T) {
 			"SELECT * FROM host WHERE id IN ( ? )",
 		},
 		{
-			"UPDATE user_dash_pref SET json_prefs = %(json_prefs)s, modified = '2015-08-27 22:10:32.492912' WHERE user_id = %(user_id)s AND url = %(url)s",
-			"UPDATE user_dash_pref SET json_prefs = ? modified = ? WHERE user_id = ? AND url = ?"},
+			"UPDATE user_dash_pref SET modified = '2015-08-27 22:10:32.492912', json_prefs = %(json_prefs)s WHERE user_id = %(user_id)s AND url = %(url)s",
+			"UPDATE user_dash_pref SET json_prefs = ? modified = ? WHERE user_id = ? AND url = ?",
+		},
+		{
+			"UPDATE user_dash_pref SET modified = '2015-08-27 22:10:32.492912', x = x + 1, json_prefs = %(json_prefs)s WHERE user_id = %(user_id)s AND url = %(url)s",
+			"UPDATE user_dash_pref SET json_prefs = ? modified = ? x = x + ? WHERE user_id = ? AND url = ?",
+		},
 		{
 			"SELECT DISTINCT host.id AS host_id FROM host JOIN host_alias ON host_alias.host_id = host.id WHERE host.org_id = %(org_id_1)s AND host.name NOT IN (%(name_1)s) AND host.name IN (%(name_2)s, %(name_3)s, %(name_4)s, %(name_5)s)",
 			"SELECT DISTINCT host.id FROM host JOIN host_alias ON host_alias.host_id = host.id WHERE host.org_id = ? AND host.name NOT IN ( ? ) AND host.name IN ( ? )",
 		},
 		{
 			"SELECT org_id, metric_key FROM metrics_metadata WHERE org_id = %(org_id)s AND metric_key = ANY(array[75])",
-			"SELECT org_id, metric_key FROM metrics_metadata WHERE org_id = ? AND metric_key = ANY ( array [ ? ] )",
+			"SELECT metric_key, org_id FROM metrics_metadata WHERE org_id = ? AND metric_key = ANY ( array [ ? ] )",
 		},
 		{
 			"SELECT org_id, metric_key   FROM metrics_metadata   WHERE org_id = %(org_id)s AND metric_key = ANY(array[21, 25, 32])",
-			"SELECT org_id, metric_key FROM metrics_metadata WHERE org_id = ? AND metric_key = ANY ( array [ ? ] )",
+			"SELECT metric_key, org_id FROM metrics_metadata WHERE org_id = ? AND metric_key = ANY ( array [ ? ] )",
 		},
 		{
 			"SELECT articles.* FROM articles WHERE articles.id = 1 LIMIT 1",
@@ -207,7 +212,7 @@ func TestSQLQuantizer(t *testing.T) {
 		},
 		{
 			"SELECT * FROM articles WHERE id > 10 ORDER BY id asc LIMIT 20",
-			"SELECT * FROM articles WHERE id > ? ORDER BY id asc LIMIT ?",
+			"SELECT * FROM articles WHERE id > ? ORDER BY id ASC LIMIT ?",
 		},
 		{
 			"SELECT clients.* FROM clients INNER JOIN posts ON posts.author_id = author.id AND posts.published = 't'",
@@ -259,7 +264,7 @@ func TestSQLQuantizer(t *testing.T) {
 		},
 		{
 			"CREATE FUNCTION add(integer, integer) RETURNS integer\n AS 'select $1 + $2;'\n LANGUAGE SQL\n IMMUTABLE\n RETURNS NULL ON NULL INPUT;",
-			"CREATE FUNCTION add ( integer, integer ) RETURNS integer LANGUAGE SQL IMMUTABLE RETURNS ? ON ? INPUT",
+			"CREATE FUNCTION ADD ( INTEGER, INTEGER ) RETURNS INTEGER LANGUAGE SQL IMMUTABLE RETURNS ? ON ? INPUT",
 		},
 		{
 			"SELECT * FROM public.table ( array [ ROW ( array [ 'magic', 'foo',",
@@ -279,11 +284,11 @@ func TestSQLQuantizer(t *testing.T) {
 		},
 		{
 			"select * from users where id = 214325346     # This comment continues to the end of line",
-			"select * from users where id = ?",
+			"SELECT * FROM users WHERE id = ?",
 		},
 		{
 			"select * from users where id = 214325346     -- This comment continues to the end of line",
-			"select * from users where id = ?",
+			"SELECT * FROM users WHERE id = ?",
 		},
 		{
 			"SELECT * FROM /* this is an in-line comment */ users;",

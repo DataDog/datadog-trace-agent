@@ -3,6 +3,8 @@ package quantizer
 import (
 	"bytes"
 	"errors"
+	"sort"
+	"strings"
 
 	"github.com/DataDog/datadog-trace-agent/model"
 	log "github.com/cihub/seelog"
@@ -102,7 +104,7 @@ func (f *GroupingFilter) Filter(token, lastToken int, buffer []byte) (int, []byt
 		}
 	case f.groupFilter > 0 && (token == ',' || token == '?'):
 		// if we are in a group drop all commas
-		return Filtered, nil
+		return FilteredComma, nil
 	case f.groupMulti > 1:
 		// drop all tokens since we're in a counting group
 		// and they're duplicated
@@ -120,6 +122,74 @@ func (f *GroupingFilter) Filter(token, lastToken int, buffer []byte) (int, []byt
 func (f *GroupingFilter) Reset() {
 	f.groupFilter = 0
 	f.groupMulti = 0
+}
+
+func newSortFilter() TokenFilter {
+	return &sortFilter{list: []string{}}
+}
+
+// sortFilter buffers parameters of SELECT and (UPDATE) SET instructions
+// internally and returns them in an alphabetically ordered fashion.
+type sortFilter struct {
+	// internal buffer of arguments that need to be sorted.
+	list []string
+
+	// set signifies if we are gathering a list of arguments to SET.
+	// Otherwise they are the arguments of a SELECT.
+	set bool
+}
+
+func (f *sortFilter) Filter(token, lastToken int, buffer []byte) (int, []byte) {
+	// TODO(gbbr): SELECT's with AS
+	if lastToken == Select || lastToken == Set {
+		// new list
+		f.set = lastToken == Set
+		if len(buffer) > 0 {
+			f.list = append(f.list, string(buffer))
+		}
+		return token, nil // skip
+	}
+	n := len(f.list)
+	if n == 0 {
+		// we have nothing
+		return token, buffer
+	}
+	if token == ',' || token == FilteredComma {
+		// more to come
+		return token, nil
+	}
+	if lastToken == ',' || lastToken == FilteredComma {
+		// continuing list
+		if len(buffer) > 0 {
+			f.list = append(f.list, string(buffer))
+		}
+		return token, nil
+	}
+	if f.set && token != ReservedKeyword {
+		if len(buffer) > 0 {
+			f.list[n-1] += " " + string(buffer)
+		}
+		if token != EOFChar {
+			return token, nil
+		}
+	}
+	// we have a list
+	sort.Strings(f.list)
+	glue := ", "
+	if f.set {
+		glue = " "
+	}
+	s := strings.Join(f.list, glue)
+	if len(buffer) > 0 {
+		s += " "
+	}
+	defer f.Reset()
+	return token, append([]byte(s), buffer...)
+}
+
+func (f *sortFilter) Reset() {
+	f.list = []string{}
+	f.set = false
 }
 
 // TokenConsumer is a Tokenizer consumer. It calls the Tokenizer Scan() function until tokens
@@ -166,6 +236,17 @@ func (t *TokenConsumer) Process(in string) (string, error) {
 
 		t.lastToken = token
 	}
+	// signal filters that EOF is reached, some may have buffers to
+	// flush
+	for _, f := range t.filters {
+		_, buff = f.Filter(EOFChar, t.lastToken, buff)
+	}
+	if len(buff) > 0 {
+		if out.Len() != 0 && token != ',' {
+			out.WriteRune(' ')
+		}
+		out.Write(buff)
+	}
 
 	// reset internals to reuse allocated memory
 	t.Reset()
@@ -192,10 +273,12 @@ func NewTokenConsumer(filters []TokenFilter) *TokenConsumer {
 // the given filters; this quantizer is used only
 // for SQL and CQL strings
 var tokenQuantizer = NewTokenConsumer(
+	// filter order is essential
 	[]TokenFilter{
 		&DiscardFilter{},
 		&ReplaceFilter{},
 		&GroupingFilter{},
+		newSortFilter(),
 	})
 
 // QuantizeSQL generates resource and sql.query meta for SQL spans
