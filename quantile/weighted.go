@@ -42,6 +42,7 @@ func WeighSummary(s *SliceSummary, weight float64) *SliceSummary {
 	// is expensive to run
 	i := 0
 	randFloat := func() float64 {
+		i++
 		return randomFloats[i%len(randomFloats)]
 	}
 
