@@ -5,19 +5,27 @@ import (
 	"math/rand"
 )
 
+var randomFloats []float64
+
+func init() {
+	// generate a list of guaranteed random numbers for the probabilistic round
+	randomFloats = make([]float64, 100)
+	r := rand.New(rand.NewSource(7337))
+	for i := 0; i < 100; i++ {
+		randomFloats[i] = r.Float64()
+	}
+}
+
 // WeightedSliceSummary associates a weight to a slice summary.
 type WeightedSliceSummary struct {
 	Weight float64
 	*SliceSummary
 }
 
-func probabilisticRound(g int, weight float64) int {
-	// deterministic seed
-	rand.Seed(7337)
-
+func probabilisticRound(g int, weight float64, randFloat func() float64) int {
 	raw := weight * float64(g)
 	decimal := raw - math.Floor(raw)
-	limit := rand.Float64()
+	limit := randFloat()
 
 	iraw := int(raw)
 	if limit > decimal {
@@ -30,12 +38,20 @@ func probabilisticRound(g int, weight float64) int {
 // WeighSummary applies a weight factor to a slice summary and return it as a
 // new slice.
 func WeighSummary(s *SliceSummary, weight float64) *SliceSummary {
+	// Deterministic random number generation based on a list because rand.Seed
+	// is expensive to run
+	i := 0
+	randFloat := func() float64 {
+		i++
+		return randomFloats[i%len(randomFloats)]
+	}
+
 	sw := NewSliceSummary()
 	sw.Entries = make([]Entry, 0, len(s.Entries))
 
 	gsum := 0
 	for _, e := range s.Entries {
-		newg := probabilisticRound(e.G, weight)
+		newg := probabilisticRound(e.G, weight, randFloat)
 		// if an entry is down to 0 delete it
 		if newg != 0 {
 			sw.Entries = append(sw.Entries,
