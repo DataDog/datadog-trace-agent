@@ -10,9 +10,9 @@ var randomFloats []float64
 func init() {
 	// generate a list of guaranteed random numbers for the probabilistic round
 	randomFloats = make([]float64, 100)
-	rand.Seed(7337)
+	r := rand.New(rand.NewSource(7337))
 	for i := 0; i < 100; i++ {
-		randomFloats[i] = rand.Float64()
+		randomFloats[i] = r.Float64()
 	}
 }
 
