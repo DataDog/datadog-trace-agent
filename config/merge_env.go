@@ -26,6 +26,10 @@ func mergeEnv(c *AgentConfig) {
 		c.HostName = v
 	}
 
+	if v := os.Getenv("DD_APM_DD_URL"); v != "" {
+		c.APIEndpoint = v
+	}
+
 	if v := os.Getenv("DD_API_KEY"); v != "" {
 		vals := strings.Split(v, ",")
 		for i := range vals {
