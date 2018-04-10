@@ -312,7 +312,7 @@ func TestSQLQuantizer(t *testing.T) {
 
 	for _, c := range cases {
 		s := SQLSpan(c.query)
-		Quantize(s)
+		Quantize2(s)
 		assert.Equal(c.expected, s.Resource)
 	}
 }
@@ -392,5 +392,38 @@ func BenchmarkTokenizer(b *testing.B) {
 				_, _ = consumer.Process(bm.query)
 			}
 		})
+	}
+}
+
+func BenchmarkQuantizeSQL(b *testing.B) {
+	queries := [...]string{
+		"SELECT host, status FROM ec2_status WHERE org_id=42",
+		"SELECT * FROM `host` WHERE `id` IN (42, 43) /*comment with parameters,host:localhost,url:controller#home,id:FF005:00CAA*/",
+		"UPDATE user_dash_pref SET json_prefs = %(json_prefs)s, modified = '2015-08-27 22:10:32.492912' WHERE user_id = %(user_id)s AND url = %(url)s",
+		"SELECT DISTINCT host.id AS host_id FROM host JOIN host_alias ON host_alias.host_id = host.id WHERE host.org_id = %(org_id_1)s AND host.name NOT IN (%(name_1)s) AND host.name IN (%(name_2)s, %(name_3)s, %(name_4)s, %(name_5)s)",
+		"SELECT articles.* FROM articles WHERE articles.id = 1 LIMIT 1, 20",
+		"SELECT articles.* FROM articles WHERE (title = 'guides.rubyonrails.org')",
+		"SELECT clients.* FROM clients INNER JOIN posts ON posts.author_id = author.id AND posts.published = 't'",
+		"SELECT * FROM clients WHERE (clients.first_name = 'Andy') LIMIT 1 BEGIN INSERT INTO clients (created_at, first_name, locked, orders_count, updated_at) VALUES ('2011-08-30 05:22:57', 'Andy', 1, NULL, '2011-08-30 05:22:57') COMMIT",
+		"INSERT INTO user (id, username) VALUES ('Fred','Smith'), ('John','Smith'), ('Michael','Smith'), ('Robert','Smith');",
+		"CREATE KEYSPACE Excelsior WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 3};",
+		"SELECT server_table.host AS host_id FROM table#.host_tags as server_table WHERE server_table.host_id = 50",
+		"SELECT name, pretty_print(address) FROM people;",
+		"CREATE FUNCTION add(integer, integer) RETURNS integer\n AS 'select $1 + $2;'\n LANGUAGE SQL\n IMMUTABLE\n RETURNS NULL ON NULL INPUT;",
+		"SELECT pg_try_advisory_lock (123) AS t46eef3f025cc27feb31ca5a2d668a09a",
+		"INSERT INTO user (id, email, name) VALUES (null, ?, ?)",
+		"select * from users where id = 214325346     -- This comment continues to the end of line",
+		"SELECT /*! STRAIGHT_JOIN */ col1 FROM table1",
+		"SET @g = 'POLYGON((0 0,10 0,10 10,0 10,0 0),(5 5,7 5,7 7,5 7, 5 5))';",
+	}
+	n := len(queries)
+	span := new(model.Span)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		span.Resource = queries[i%(n-1)]
+		Quantize2(span)
 	}
 }
