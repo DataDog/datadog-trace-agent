@@ -44,6 +44,7 @@ type traceAgent struct {
 	ExtraSampleRate    float64        `yaml:"extra_sample_rate"`
 	MaxTracesPerSecond float64        `yaml:"max_traces_per_second"`
 	IgnoreResources    []string       `yaml:"ignore_resources"`
+	LogFilePath        string         `yaml:"log_file"`
 	ReplaceTags        []*ReplaceRule `yaml:"replace_tags"`
 	ReceiverPort       int            `yaml:"receiver_port"`
 	APMNonLocalTraffic *bool          `yaml:"apm_non_local_traffic"`
@@ -129,6 +130,9 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
 	if yc.HostName != "" {
 		agentConf.HostName = yc.HostName
 	}
+	if yc.LogLevel != "" {
+		agentConf.LogLevel = yc.LogLevel
+	}
 	if yc.StatsdPort > 0 {
 		agentConf.StatsdPort = yc.StatsdPort
 	}
@@ -164,6 +168,10 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
 
 	if yc.TraceAgent.Endpoint != "" {
 		agentConf.APIEndpoint = yc.TraceAgent.Endpoint
+	}
+
+	if yc.TraceAgent.LogFilePath != "" {
+		agentConf.LogFilePath = yc.TraceAgent.LogFilePath
 	}
 
 	if yc.TraceAgent.Env != "" {
