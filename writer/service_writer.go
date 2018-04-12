@@ -16,9 +16,9 @@ import (
 
 // ServiceWriter ingests service metadata and flush them to the API.
 type ServiceWriter struct {
+	stats      info.ServiceWriterInfo
 	conf       writerconfig.ServiceWriterConfig
 	InServices <-chan model.ServicesMetadata
-	stats      info.ServiceWriterInfo
 
 	serviceBuffer model.ServicesMetadata
 
