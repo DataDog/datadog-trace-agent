@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
+	writerconfig "stackstate-trace-agent/writer/config"
 )
 
 // AgentConfig handles the interpretation of the configuration (with default
@@ -88,7 +88,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 	return &AgentConfig{
 		Enabled:     true,
 		DefaultEnv:  "none",
-		APIEndpoint: "https://trace.agent.datadoghq.com",
+		APIEndpoint: "https://trace.agent.stackstatehq.com",
 		APIKey:      "",
 		APIEnabled:  true,
 

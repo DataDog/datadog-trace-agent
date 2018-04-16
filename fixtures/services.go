@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"stackstate-trace-agent/model"
 )
 
 // RandomServices generates random services metadata

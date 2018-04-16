@@ -15,9 +15,9 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/sampler"
-	"github.com/DataDog/datadog-trace-agent/watchdog"
+	"stackstate-trace-agent/config"
+	"stackstate-trace-agent/sampler"
+	"stackstate-trace-agent/watchdog"
 )
 
 var (

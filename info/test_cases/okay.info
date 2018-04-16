@@ -8,7 +8,7 @@ Trace Agent (v 0.99.0)
 
   Hostname: localhost.localdomain
   Receiver: localhost:8126
-  API Endpoint: https://trace.agent.datadoghq.com
+  API Endpoint: https://trace.agent.stackstatehq.com
 
   --- Receiver stats (1 min) ---
 

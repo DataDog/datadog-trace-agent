@@ -7,13 +7,13 @@ import (
 	"flag"
 	_ "net/http/pprof"
 
-	"github.com/DataDog/datadog-trace-agent/watchdog"
+	"stackstate-trace-agent/watchdog"
 )
 
 func init() {
 	// command-line arguments
 	// TODO: load from the .yaml automatically if there
-	flag.StringVar(&opts.configFile, "config", "/etc/dd-agent/datadog.conf", "Datadog Agent config file location")
+	flag.StringVar(&opts.configFile, "config", "/etc/dd-agent/stackstate.conf", "StackState Agent config file location")
 	flag.StringVar(&opts.legacyConfigFile, "ddconfig", "/etc/dd-agent/trace-agent.ini", "Deprecated extra configuration option.")
 	flag.StringVar(&opts.pidfilePath, "pid", "", "Path to set pidfile for process")
 	flag.BoolVar(&opts.version, "version", false, "Show version information and exit")

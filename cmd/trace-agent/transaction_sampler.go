@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/DataDog/datadog-trace-agent/sampler"
+	"stackstate-trace-agent/config"
+	"stackstate-trace-agent/model"
+	"stackstate-trace-agent/sampler"
 )
 
 // TransactionSampler extracts and samples analyzed spans

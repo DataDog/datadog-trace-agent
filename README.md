@@ -1,14 +1,14 @@
-# Datadog APM agent
+# StackState APM agent
 
-[![CircleCI](https://circleci.com/gh/DataDog/datadog-trace-agent.svg?style=svg)](https://circleci.com/gh/DataDog/datadog-trace-agent)
+[![CircleCI](https://circleci.com/gh/StackVista/stackstate-trace-agent.svg?style=svg)](https://circleci.com/gh/StackVista/stackstate-trace-agent)
 
-An agent that collects traces from various sources, normalizes and pre-processes them before sending the info to the Datadog backend.
+An agent that collects traces from various sources, normalizes and pre-processes them before sending the info to the StackState backend.
 
 
 ## Run on Linux
 
-The Trace Agent is packaged with the standard Datadog Agent.
-Just [run the Datadog Agent](http://docs.datadoghq.com/guides/basic_agent_usage/).
+The Trace Agent is packaged with the standard StackState Agent.
+Just [run the StackState Agent](http://docs.stackstatehq.com/guides/basic_agent_usage/).
 
 Note: the Trace Agent is not yet included in the installation from source of
 the Trace Agent. Follow the instructions in [Development](#development) to do
@@ -17,18 +17,18 @@ it manually.
 
 ## Run on OSX
 
-The APM agent (aka Trace Agent) isn't part of the OSX Datadog Agent yet, it needs to be run manually on the side.
+The APM agent (aka Trace Agent) isn't part of the OSX StackState Agent yet, it needs to be run manually on the side.
 
-- Have the [OSX Datadog Agent](https://app.datadoghq.com/account/settings#agent/mac).
-- Download the [latest OSX Trace Agent release](https://github.com/DataDog/datadog-trace-agent/releases/latest).
-- Run the Trace Agent using the Datadog Agent configuration.
+- Have the [OSX StackState Agent](https://app.stackstatehq.com/account/settings#agent/mac).
+- Download the [latest OSX Trace Agent release](https://github.com/StackVista/stackstate-trace-agent/releases/latest).
+- Run the Trace Agent using the StackState Agent configuration.
 
-    `./trace-agent-osx-X.Y.Z -config /opt/datadog-agent/etc/datadog.conf`
+    `./trace-agent-osx-X.Y.Z -config /opt/stackstate-agent/etc/stackstate.conf`
 
 - The Trace Agent should now be running in foreground, with an initial output similar to:
 
 ```
-2017-04-24 13:46:35 INFO (main.go:166) - using configuration from /opt/datadog-agent/etc/datadog.conf
+2017-04-24 13:46:35 INFO (main.go:166) - using configuration from /opt/stackstate-agent/etc/stackstate.conf
 2017-04-24 13:46:36 INFO (agent.go:200) - Failed to parse hostname from dd-agent config
 2017-04-24 13:46:36 DEBUG (agent.go:288) - No aggregator configuration, using defaults
 2017-04-24 13:46:36 INFO (main.go:220) - trace-agent running on host My-MacBook-Pro.local
@@ -37,7 +37,7 @@ The APM agent (aka Trace Agent) isn't part of the OSX Datadog Agent yet, it need
 
 ## Run on Windows
 
-On Windows, the trace agent is shipped together with the Datadog Agent only
+On Windows, the trace agent is shipped together with the StackState Agent only
 since version 5.19.0, so users must update to 5.19.0 or above. However the
 Windows trace agent is in beta and some manual steps are required.
 
@@ -47,14 +47,14 @@ Update your config file to include:
 [Main]
 apm_enabled: yes
 [trace.config]
-log_file = C:\ProgramData\Datadog\logs\trace-agent.log
+log_file = C:\ProgramData\StackState\logs\trace-agent.log
 ```
 
-Restart the datadogagent service:
+Restart the stackstateagent service:
 
 ```
-net stop datadogagent
-net start datadogagent
+net stop stackstateagent
+net start stackstateagent
 ```
 
 For this beta the trace agent status and logs are not displayed in the Agent
@@ -64,7 +64,7 @@ To see the trace agent status either use the Service tab of the Task Manager or
 run:
 
 ```
-sc.exe query datadog-trace-agent
+sc.exe query stackstate-trace-agent
 ```
 
 And check that the status is "running".
@@ -95,4 +95,4 @@ Build and run from source:
 
 See our [contributing guidelines](CONTRIBUTING.md)
 
-More detailed information about agent configuration, terminology and architecture can be found in our [wiki](https://github.com/DataDog/datadog-trace-agent/wiki)
+More detailed information about agent configuration, terminology and architecture can be found in our [wiki](https://github.com/StackVista/stackstate-trace-agent/wiki)

@@ -2,14 +2,14 @@
 
 The trace-agent sources configuration from the following locations:
 
-1. The Datadog Agent configuration file, provided to the `-config` command line flag (default: `/etc/datadog/datadog.conf`)
+1. The StackState Agent configuration file, provided to the `-config` command line flag (default: `/etc/stackstate/stackstate.conf`)
 2. Environment variables: See full list below
 
 Environment variables will override settings defined in configuration files.
 
 ## File configuration
 
-Refer to the [Datadog Agent example configuration](https://github.com/DataDog/dd-agent/blob/master/datadog.conf.example) to see all available options.
+Refer to the [StackState Agent example configuration](https://github.com/StackVista/dd-agent/blob/master/stackstate.conf.example) to see all available options.
 
 
 ## Environment variables

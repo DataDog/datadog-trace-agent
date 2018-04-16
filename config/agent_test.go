@@ -51,7 +51,7 @@ func TestOnlyDDAgentConfig(t *testing.T) {
 }
 
 func TestDDAgentMultiAPIKeys(t *testing.T) {
-	// old feature Datadog Agent feature, got dropped since
+	// old feature StackState Agent feature, got dropped since
 	// TODO: at some point, expire this case
 	assert := assert.New(t)
 
@@ -76,7 +76,7 @@ func TestFullIniConfig(t *testing.T) {
 	assert.Equal("api_key_test", c.APIKey)
 	assert.Equal("mymachine", c.HostName)
 	assert.Equal("https://user:password@proxy_for_https:1234", c.ProxyURL.String())
-	assert.Equal("https://datadog.unittests", c.APIEndpoint)
+	assert.Equal("https://stackstate.unittests", c.APIEndpoint)
 	assert.Equal(false, c.Enabled)
 	assert.Equal("test", c.DefaultEnv)
 	assert.Equal(18126, c.ReceiverPort)
@@ -99,7 +99,7 @@ func TestFullYamlConfig(t *testing.T) {
 	assert.Equal("api_key_test", c.APIKey)
 	assert.Equal("mymachine", c.HostName)
 	assert.Equal("https://user:password@proxy_for_https:1234", c.ProxyURL.String())
-	assert.Equal("https://datadog.unittests", c.APIEndpoint)
+	assert.Equal("https://stackstate.unittests", c.APIEndpoint)
 	assert.Equal(false, c.Enabled)
 	assert.Equal("test", c.DefaultEnv)
 	assert.Equal(18126, c.ReceiverPort)

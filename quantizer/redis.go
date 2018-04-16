@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"strings"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"stackstate-trace-agent/model"
 )
 
 // redisTruncationMark is used as suffix by tracing libraries to indicate that a

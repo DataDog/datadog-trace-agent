@@ -7,14 +7,14 @@ import (
 
 	log "github.com/cihub/seelog"
 
-	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/filters"
-	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/DataDog/datadog-trace-agent/quantizer"
-	"github.com/DataDog/datadog-trace-agent/sampler"
-	"github.com/DataDog/datadog-trace-agent/watchdog"
-	"github.com/DataDog/datadog-trace-agent/writer"
+	"stackstate-trace-agent/config"
+	"stackstate-trace-agent/filters"
+	"stackstate-trace-agent/info"
+	"stackstate-trace-agent/model"
+	"stackstate-trace-agent/quantizer"
+	"stackstate-trace-agent/sampler"
+	"stackstate-trace-agent/watchdog"
+	"stackstate-trace-agent/writer"
 )
 
 const (
