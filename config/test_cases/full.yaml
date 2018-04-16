@@ -1,4 +1,4 @@
-dd_url: https://app.datadoghq.com
+dd_url: https://app.stackstatehq.com
 api_key: api_key_test
 hostname: mymachine
 proxy:
@@ -9,7 +9,7 @@ dogstatsd_non_local_traffic: yes
 log_level: debug
 apm_config:
   enabled: false
-  apm_dd_url: https://datadog.unittests
+  apm_dd_url: https://stackstate.unittests
   env: test
   receiver_port: 18126
   apm_non_local_traffic: yes

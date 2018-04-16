@@ -3,7 +3,7 @@ package fixtures
 import (
 	"math/rand"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"stackstate-trace-agent/model"
 )
 
 // genNextLevel generates a new level for the trace tree structure,

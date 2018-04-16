@@ -3,7 +3,7 @@ package fixtures
 import (
 	"encoding/json"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"stackstate-trace-agent/model"
 )
 
 var defaultAggregators = []string{"service", "resource"}

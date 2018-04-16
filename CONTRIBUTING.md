@@ -1,4 +1,4 @@
-# Contributing to Datadog Trace Agent
+# Contributing to StackState Trace Agent
 
 :tada: First of all, thanks for contributing! :tada:
 

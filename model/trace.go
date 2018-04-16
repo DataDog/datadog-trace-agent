@@ -102,7 +102,7 @@ func NewTraceFlushMarker() Trace {
 	return []*Span{NewFlushMarker()}
 }
 
-// APITrace returns an APITrace from the trace, as required by the Datadog API.
+// APITrace returns an APITrace from the trace, as required by the StackState API.
 func (t Trace) APITrace() *APITrace {
 	start := t[0].Start
 	end := t[0].End()

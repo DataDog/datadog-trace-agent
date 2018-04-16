@@ -10,7 +10,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"stackstate-trace-agent/model"
 )
 
 // YearNS is the number of nanoseconds in a year
@@ -79,7 +79,7 @@ var metas = map[string][]string{
 		"/dev/null",
 		"138.195.130.42",
 		"raclette.service",
-		"datadoghq.com",
+		"stackstatehq.com",
 	},
 	"in.section": []string{
 		"4242",

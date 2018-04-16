@@ -31,13 +31,13 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "CompanyName", "Datadog, Inc."
-            VALUE "FileDescription", "Datadog Trace Agent"
+            VALUE "CompanyName", "StackState, Inc."
+            VALUE "FileDescription", "StackState Trace Agent"
             VALUE "FileVersion", FILE_VERSION_STRING
             VALUE "InternalName", "trace-agent"
             VALUE "LegalCopyright", "Copyright (C) 2017"
             VALUE "OriginalFilename", "trace-agent.exe"
-            VALUE "ProductName", "Datadog Trace Agent"
+            VALUE "ProductName", "StackState Trace Agent"
             VALUE "ProductVersion", FILE_VERSION_STRING
         END
     END

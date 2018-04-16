@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"stackstate-trace-agent/model"
 	"github.com/stretchr/testify/assert"
 )
 

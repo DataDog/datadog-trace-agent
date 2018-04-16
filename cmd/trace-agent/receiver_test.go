@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/fixtures"
-	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/DataDog/datadog-trace-agent/sampler"
+	"stackstate-trace-agent/config"
+	"stackstate-trace-agent/fixtures"
+	"stackstate-trace-agent/info"
+	"stackstate-trace-agent/model"
+	"stackstate-trace-agent/sampler"
 	"github.com/stretchr/testify/assert"
 	"github.com/tinylib/msgp/msgp"
 )
@@ -27,10 +27,10 @@ var langs = []string{"python", "ruby", "go", "java", "C#"}
 
 // headerFields is a map used to decode the header metas
 var headerFields = map[string]string{
-	"lang":           "Datadog-Meta-Lang",
-	"lang_version":   "Datadog-Meta-Lang-Version",
-	"interpreter":    "Datadog-Meta-Lang-Interpreter",
-	"tracer_version": "Datadog-Meta-Tracer-Version",
+	"lang":           "StackState-Meta-Lang",
+	"lang_version":   "StackState-Meta-Lang-Version",
+	"interpreter":    "StackState-Meta-Lang-Interpreter",
+	"tracer_version": "StackState-Meta-Tracer-Version",
 }
 
 func NewTestReceiverFromConfig(conf *config.AgentConfig) *HTTPReceiver {
@@ -514,7 +514,7 @@ func TestHandleTraces(t *testing.T) {
 		req.Header.Set("Content-Type", "application/msgpack")
 
 		// Add meta data to simulate data comming from multiple applications
-		req.Header.Set("Datadog-Meta-Lang", langs[n%len(langs)])
+		req.Header.Set("StackState-Meta-Lang", langs[n%len(langs)])
 
 		handler.ServeHTTP(rr, req)
 	}

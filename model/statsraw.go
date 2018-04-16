@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"sort"
 
-	"github.com/DataDog/datadog-trace-agent/quantile"
+	"stackstate-trace-agent/quantile"
 )
 
 // Most "algorithm" stuff here is tested with stats_test.go as what is important

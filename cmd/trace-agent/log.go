@@ -7,8 +7,8 @@ import (
 
 	log "github.com/cihub/seelog"
 
-	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/watchdog"
+	"stackstate-trace-agent/config"
+	"stackstate-trace-agent/watchdog"
 )
 
 const agentLoggerConfigFmt = `

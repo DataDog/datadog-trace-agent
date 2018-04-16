@@ -35,7 +35,7 @@ func (s *Span) Normalize() error {
 	if len(s.Service) > MaxServiceLen {
 		return fmt.Errorf("span.normalize: `Service` too long (max %d chars): %s", MaxServiceLen, s.Service)
 	}
-	// service shall comply with Datadog tag normalization as it's eventually a tag
+	// service shall comply with StackState tag normalization as it's eventually a tag
 	s.Service = NormalizeTag(s.Service)
 	if s.Service == "" {
 		return errors.New("span.normalize: `Service` could not be normalized")
@@ -48,7 +48,7 @@ func (s *Span) Normalize() error {
 	if len(s.Name) > MaxNameLen {
 		return fmt.Errorf("span.normalize: `Name` too long (max %d chars): %s", MaxNameLen, s.Name)
 	}
-	// name shall comply with Datadog metric name normalization
+	// name shall comply with StackState metric name normalization
 	var ok bool
 	s.Name, ok = normMetricNameParse(s.Name)
 	if !ok {

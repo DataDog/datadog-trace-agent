@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/quantile"
+	"stackstate-trace-agent/quantile"
 	"github.com/stretchr/testify/assert"
 )
 
