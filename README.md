@@ -29,7 +29,7 @@ The APM agent (aka Trace Agent) isn't part of the OSX StackState Agent yet, it n
 
 ```
 2017-04-24 13:46:35 INFO (main.go:166) - using configuration from /opt/stackstate-agent/etc/stackstate.conf
-2017-04-24 13:46:36 INFO (agent.go:200) - Failed to parse hostname from dd-agent config
+2017-04-24 13:46:36 INFO (agent.go:200) - Failed to parse hostname from sts-agent config
 2017-04-24 13:46:36 DEBUG (agent.go:288) - No aggregator configuration, using defaults
 2017-04-24 13:46:36 INFO (main.go:220) - trace-agent running on host My-MacBook-Pro.local
 2017-04-24 13:46:36 INFO (receiver.go:137) - listening for traces at http://localhost:8126

@@ -26,12 +26,12 @@ func TestDefaultConfig(t *testing.T) {
 
 func TestOnlyEnvConfig(t *testing.T) {
 	// setting an API Key should be enough to generate valid config
-	os.Setenv("DD_API_KEY", "apikey_from_env")
+	os.Setenv("STS_API_KEY", "apikey_from_env")
 
 	agentConfig, _ := NewAgentConfig(nil, nil, nil)
 	assert.Equal(t, "apikey_from_env", agentConfig.APIKey)
 
-	os.Setenv("DD_API_KEY", "")
+	os.Setenv("STS_API_KEY", "")
 }
 
 func TestOnlyDDAgentConfig(t *testing.T) {

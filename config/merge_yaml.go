@@ -58,7 +58,7 @@ type traceAgent struct {
 
 	AnalyzedRateByService map[string]float64 `yaml:"analyzed_rate_by_service"`
 
-	DDAgentBin string `yaml:"dd_agent_bin"`
+	STSAgentBin string `yaml:"dd_agent_bin"`
 }
 
 type ReplaceRule struct {
@@ -217,9 +217,9 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
 	agentConf.AnalyzedRateByService = yc.TraceAgent.AnalyzedRateByService
 
 	// undocumented
-	agentConf.DDAgentBin = defaultDDAgentBin
-	if yc.TraceAgent.DDAgentBin != "" {
-		agentConf.DDAgentBin = yc.TraceAgent.DDAgentBin
+	agentConf.STSAgentBin = defaultSTSAgentBin
+	if yc.TraceAgent.STSAgentBin != "" {
+		agentConf.STSAgentBin = yc.TraceAgent.STSAgentBin
 	}
 
 	return nil

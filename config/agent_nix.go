@@ -7,9 +7,9 @@ const (
 	DefaultLogFilePath = "/var/log/stackstate/trace-agent.log"
 
 	// Agent 5
-	defaultDDAgentPy    = "/opt/stackstate-agent/embedded/bin/python"
-	defaultDDAgentPyEnv = "PYTHONPATH=/opt/stackstate-agent/agent"
+	defaultSTSAgentPy    = "/opt/stackstate-agent/embedded/bin/python"
+	defaultSTSAgentPyEnv = "PYTHONPATH=/opt/stackstate-agent/agent"
 
 	// Agent 6
-	defaultDDAgentBin = "/opt/stackstate-agent/bin/agent/agent"
+	defaultSTSAgentBin = "/opt/stackstate-agent/bin/agent/agent"
 )

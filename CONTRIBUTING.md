@@ -34,6 +34,6 @@ category: short description of matter
 
 E.g.
 
-- config: respect DD_LOG_LEVEL env var
+- config: respect STS_LOG_LEVEL env var
 - agent: explicit message when no API key is given
 - quantizer: add test for multiline queries
