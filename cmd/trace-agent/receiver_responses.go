@@ -33,7 +33,7 @@ func HTTPFormatError(tags []string, w http.ResponseWriter) {
 func HTTPDecodingError(err error, tags []string, w http.ResponseWriter) {
 	status := http.StatusBadRequest
 	errtag := "decoding-error"
-	msg := errtag
+	msg := err.Error()
 
 	if err == model.ErrLimitedReaderLimitReached {
 		status = http.StatusRequestEntityTooLarge
