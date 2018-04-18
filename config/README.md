@@ -9,7 +9,7 @@ Environment variables will override settings defined in configuration files.
 
 ## File configuration
 
-Refer to the [StackState Agent example configuration](https://github.com/StackVista/dd-agent/blob/master/stackstate.conf.example) to see all available options.
+Refer to the [StackState Agent example configuration](https://github.com/StackVista/sts-agent/blob/master/stackstate.conf.example) to see all available options.
 
 
 ## Environment variables
