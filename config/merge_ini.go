@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/backoff"
-	"github.com/DataDog/datadog-trace-agent/model"
-	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
+	"stackstate-trace-agent/backoff"
+	"stackstate-trace-agent/model"
+	writerconfig "stackstate-trace-agent/writer/config"
 	log "github.com/cihub/seelog"
 	"github.com/go-ini/ini"
 )

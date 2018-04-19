@@ -18,10 +18,10 @@ import (
 	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/datadog-agent/pkg/pidfile"
-	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/statsd"
-	"github.com/DataDog/datadog-trace-agent/watchdog"
+	"stackstate-trace-agent/config"
+	"stackstate-trace-agent/info"
+	"stackstate-trace-agent/statsd"
+	"stackstate-trace-agent/watchdog"
 )
 
 // handleSignal closes a channel to exit cleanly from routines
@@ -66,9 +66,9 @@ var opts struct {
 }
 
 const agentDisabledMessage = `trace-agent not enabled.
-Set env var DD_APM_ENABLED=true or add
+Set env var STS_APM_ENABLED=true or add
 apm_enabled: true
-to your datadog.conf file.
+to your stackstate.conf file.
 Exiting.`
 
 // runAgent is the entrypoint of our code
@@ -117,9 +117,9 @@ func runAgent(ctx context.Context) {
 	var err error
 	// trace-agent configuration
 	var agentConf *config.AgentConfig
-	// Agent 6 datadog.yaml config
+	// Agent 6 stackstate.yaml config
 	var yamlConf *config.YamlAgentConfig
-	// Agent 5 datadog.conf config
+	// Agent 5 stackstate.conf config
 	var conf *config.File
 	// deprecated Agent 5 trace-agent.ini config
 	var legacyConf *config.File
@@ -127,7 +127,7 @@ func runAgent(ctx context.Context) {
 	if filepath.Ext(opts.configFile) == ".conf" || filepath.Ext(opts.configFile) == ".ini" {
 		conf, err = config.NewIniIfExists(opts.configFile)
 		if err != nil {
-			log.Criticalf("Error reading datadog.conf: %s", err)
+			log.Criticalf("Error reading stackstate.conf: %s", err)
 		}
 		if conf != nil {
 			log.Infof("Loading configuration from %s", opts.configFile)
@@ -135,7 +135,7 @@ func runAgent(ctx context.Context) {
 	} else if filepath.Ext(opts.configFile) == ".yaml" {
 		yamlConf, err = config.NewYamlIfExists(opts.configFile)
 		if err != nil {
-			log.Criticalf("Error reading datadog.yaml: %s", err)
+			log.Criticalf("Error reading stackstate.yaml: %s", err)
 		}
 		if conf != nil {
 			log.Infof("Loading configuration from %s", opts.configFile)

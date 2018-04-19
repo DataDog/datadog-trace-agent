@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/DataDog/datadog-trace-agent/config"
+	"stackstate-trace-agent/config"
 	"github.com/stretchr/testify/assert"
 )
 

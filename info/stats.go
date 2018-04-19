@@ -6,7 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/DataDog/datadog-trace-agent/statsd"
+	"stackstate-trace-agent/statsd"
 )
 
 // ReceiverStats is used to store all the stats per tags.
@@ -134,21 +134,21 @@ func (ts *TagStats) publish() {
 	// Publish the stats
 	tags := ts.Tags.toArray()
 
-	statsd.Client.Count("datadog.trace_agent.receiver.trace", tracesReceived, tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_received", tracesReceived, tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_dropped", tracesDropped, tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_filtered", tracesFiltered, tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_priority", tracesPriorityNone, append(tags, "priority:none"), 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_priority", tracesPriorityNeg, append(tags, "priority:neg"), 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_priority", tracesPriority0, append(tags, "priority:0"), 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_priority", tracesPriority1, append(tags, "priority:1"), 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_priority", tracesPriority2, append(tags, "priority:2"), 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.traces_bytes", tracesBytes, tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.spans_received", spansReceived, tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.spans_dropped", spansDropped, tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.spans_filtered", spansFiltered, tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.services_received", servicesReceived, tags, 1)
-	statsd.Client.Count("datadog.trace_agent.receiver.services_bytes", servicesBytes, tags, 1)
+	statsd.Client.Count("stackstate.trace_agent.receiver.trace", tracesReceived, tags, 1)
+	statsd.Client.Count("stackstate.trace_agent.receiver.traces_received", tracesReceived, tags, 1)
+	statsd.Client.Count("stackstate.trace_agent.receiver.traces_dropped", tracesDropped, tags, 1)
+	statsd.Client.Count("stackstate.trace_agent.receiver.traces_filtered", tracesFiltered, tags, 1)
+	statsd.Client.Count("stackstate.trace_agent.receiver.traces_priority", tracesPriorityNone, append(tags, "priority:none"), 1)
+	statsd.Client.Count("stackstate.trace_agent.receiver.traces_priority", tracesPriorityNeg, append(tags, "priority:neg"), 1)
+	statsd.Client.Count("stackstate.trace_agent.receiver.traces_priority", tracesPriority0, append(tags, "priority:0"), 1)
+	statsd.Client.Count("stackstate.trace_agent.receiver.traces_priority", tracesPriority1, append(tags, "priority:1"), 1)
+	statsd.Client.Count("stackstate.trace_agent.receiver.traces_priority", tracesPriority2, append(tags, "priority:2"), 1)
+	statsd.Client.Count("stackstate.trace_agent.receiver.traces_bytes", tracesBytes, tags, 1)
+	statsd.Client.Count("stackstate.trace_agent.receiver.spans_received", spansReceived, tags, 1)
+	statsd.Client.Count("stackstate.trace_agent.receiver.spans_dropped", spansDropped, tags, 1)
+	statsd.Client.Count("stackstate.trace_agent.receiver.spans_filtered", spansFiltered, tags, 1)
+	statsd.Client.Count("stackstate.trace_agent.receiver.services_received", servicesReceived, tags, 1)
+	statsd.Client.Count("stackstate.trace_agent.receiver.services_bytes", servicesBytes, tags, 1)
 }
 
 // Stats holds the metrics that will be reported every 10s by the agent.

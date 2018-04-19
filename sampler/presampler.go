@@ -16,7 +16,7 @@ import (
 const (
 	// TraceCountHeader is the header client implementation should fill
 	// with the number of traces contained in the payload.
-	TraceCountHeader = "X-Datadog-Trace-Count"
+	TraceCountHeader = "X-StackState-Trace-Count"
 )
 
 // PreSamplerStats contains pre-sampler data. The public content

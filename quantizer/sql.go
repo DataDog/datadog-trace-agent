@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"stackstate-trace-agent/model"
 	log "github.com/cihub/seelog"
 )
 

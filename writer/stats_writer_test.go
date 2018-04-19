@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/fixtures"
-	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
-	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
+	"stackstate-trace-agent/config"
+	"stackstate-trace-agent/fixtures"
+	"stackstate-trace-agent/info"
+	"stackstate-trace-agent/model"
+	writerconfig "stackstate-trace-agent/writer/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -54,7 +54,7 @@ func TestStatsWriter_StatHandling(t *testing.T) {
 	payload2 := payloads[1]
 
 	expectedHeaders := map[string]string{
-		"X-Datadog-Reported-Languages": strings.Join(info.Languages(), "|"),
+		"X-StackState-Reported-Languages": strings.Join(info.Languages(), "|"),
 		"Content-Type":                 "application/json",
 		"Content-Encoding":             "gzip",
 	}
@@ -144,27 +144,27 @@ func TestStatsWriter_UpdateInfoHandling(t *testing.T) {
 	countSummaries := statsClient.GetCountSummaries()
 
 	// Payload counts
-	payloadSummary := countSummaries["datadog.trace_agent.stats_writer.payloads"]
+	payloadSummary := countSummaries["stackstate.trace_agent.stats_writer.payloads"]
 	assert.True(len(payloadSummary.Calls) >= 3, "There should have been multiple payload count calls")
 	assert.Equal(expectedNumPayloads, payloadSummary.Sum)
 
 	// Traces counts
-	bucketsSummary := countSummaries["datadog.trace_agent.stats_writer.stats_buckets"]
+	bucketsSummary := countSummaries["stackstate.trace_agent.stats_writer.stats_buckets"]
 	assert.True(len(bucketsSummary.Calls) >= 3, "There should have been multiple stats_buckets count calls")
 	assert.Equal(expectedNumBuckets, bucketsSummary.Sum)
 
 	// Bytes counts
-	bytesSummary := countSummaries["datadog.trace_agent.stats_writer.bytes"]
+	bytesSummary := countSummaries["stackstate.trace_agent.stats_writer.bytes"]
 	assert.True(len(bytesSummary.Calls) >= 3, "There should have been multiple bytes count calls")
 	assert.Equal(expectedNumBytes, bytesSummary.Sum)
 
 	// Retry counts
-	retriesSummary := countSummaries["datadog.trace_agent.stats_writer.retries"]
+	retriesSummary := countSummaries["stackstate.trace_agent.stats_writer.retries"]
 	assert.True(len(retriesSummary.Calls) >= 3, "There should have been multiple retries count calls")
 	assert.True(retriesSummary.Sum >= expectedMinNumRetries)
 
 	// Error counts
-	errorsSummary := countSummaries["datadog.trace_agent.stats_writer.errors"]
+	errorsSummary := countSummaries["stackstate.trace_agent.stats_writer.errors"]
 	assert.True(len(errorsSummary.Calls) >= 3, "There should have been multiple errors count calls")
 	assert.Equal(expectedNumErrors, errorsSummary.Sum)
 }

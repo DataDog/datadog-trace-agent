@@ -11,13 +11,13 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/DataDog/datadog-trace-agent/backoff"
-	"github.com/DataDog/datadog-trace-agent/model"
-	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
+	"stackstate-trace-agent/backoff"
+	"stackstate-trace-agent/model"
+	writerconfig "stackstate-trace-agent/writer/config"
 	log "github.com/cihub/seelog"
 )
 
-// YamlAgentConfig is a structure used for marshaling the datadog.yaml configuration
+// YamlAgentConfig is a structure used for marshaling the stackstate.yaml configuration
 // available in Agent versions >= 6
 type YamlAgentConfig struct {
 	APIKey            string `yaml:"api_key"`
@@ -58,7 +58,7 @@ type traceAgent struct {
 
 	AnalyzedRateByService map[string]float64 `yaml:"analyzed_rate_by_service"`
 
-	DDAgentBin string `yaml:"dd_agent_bin"`
+	STSAgentBin string `yaml:"dd_agent_bin"`
 }
 
 type ReplaceRule struct {
@@ -217,9 +217,9 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
 	agentConf.AnalyzedRateByService = yc.TraceAgent.AnalyzedRateByService
 
 	// undocumented
-	agentConf.DDAgentBin = defaultDDAgentBin
-	if yc.TraceAgent.DDAgentBin != "" {
-		agentConf.DDAgentBin = yc.TraceAgent.DDAgentBin
+	agentConf.STSAgentBin = defaultSTSAgentBin
+	if yc.TraceAgent.STSAgentBin != "" {
+		agentConf.STSAgentBin = yc.TraceAgent.STSAgentBin
 	}
 
 	return nil

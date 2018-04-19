@@ -14,7 +14,7 @@
 package sampler
 
 import (
-	"github.com/DataDog/datadog-trace-agent/model"
+	"stackstate-trace-agent/model"
 )
 
 // ScoreEngine is the main component of the sampling logic

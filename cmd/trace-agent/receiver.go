@@ -16,12 +16,12 @@ import (
 	log "github.com/cihub/seelog"
 	"github.com/tinylib/msgp/msgp"
 
-	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/DataDog/datadog-trace-agent/sampler"
-	"github.com/DataDog/datadog-trace-agent/statsd"
-	"github.com/DataDog/datadog-trace-agent/watchdog"
+	"stackstate-trace-agent/config"
+	"stackstate-trace-agent/info"
+	"stackstate-trace-agent/model"
+	"stackstate-trace-agent/sampler"
+	"stackstate-trace-agent/statsd"
+	"stackstate-trace-agent/watchdog"
 )
 
 const (
@@ -215,10 +215,10 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 
 	// We parse the tags from the header
 	tags := info.Tags{
-		Lang:          req.Header.Get("Datadog-Meta-Lang"),
-		LangVersion:   req.Header.Get("Datadog-Meta-Lang-Version"),
-		Interpreter:   req.Header.Get("Datadog-Meta-Lang-Interpreter"),
-		TracerVersion: req.Header.Get("Datadog-Meta-Tracer-Version"),
+		Lang:          req.Header.Get("StackState-Meta-Lang"),
+		LangVersion:   req.Header.Get("StackState-Meta-Lang-Version"),
+		Interpreter:   req.Header.Get("StackState-Meta-Lang-Interpreter"),
+		TracerVersion: req.Header.Get("StackState-Meta-Tracer-Version"),
 	}
 
 	// We get the address of the struct holding the stats associated to the tags
@@ -281,10 +281,10 @@ func (r *HTTPReceiver) handleServices(v APIVersion, w http.ResponseWriter, req *
 
 	// We parse the tags from the header
 	tags := info.Tags{
-		Lang:          req.Header.Get("Datadog-Meta-Lang"),
-		LangVersion:   req.Header.Get("Datadog-Meta-Lang-Version"),
-		Interpreter:   req.Header.Get("Datadog-Meta-Lang-Interpreter"),
-		TracerVersion: req.Header.Get("Datadog-Meta-Tracer-Version"),
+		Lang:          req.Header.Get("StackState-Meta-Lang"),
+		LangVersion:   req.Header.Get("StackState-Meta-Lang-Version"),
+		Interpreter:   req.Header.Get("StackState-Meta-Lang-Interpreter"),
+		TracerVersion: req.Header.Get("StackState-Meta-Tracer-Version"),
 	}
 
 	// We get the address of the struct holding the stats associated to the tags
@@ -306,7 +306,7 @@ func (r *HTTPReceiver) logStats() {
 	accStats := info.NewReceiverStats()
 
 	for now := range time.Tick(10 * time.Second) {
-		statsd.Client.Gauge("datadog.trace_agent.heartbeat", 1, []string{"version:" + info.Version}, 1)
+		statsd.Client.Gauge("stackstate.trace_agent.heartbeat", 1, []string{"version:" + info.Version}, 1)
 
 		// We update accStats with the new stats we collected
 		accStats.Acc(r.stats)

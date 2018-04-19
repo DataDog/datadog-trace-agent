@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
+	writerconfig "stackstate-trace-agent/writer/config"
 )
 
 // AgentConfig handles the interpretation of the configuration (with default
@@ -80,7 +80,7 @@ type AgentConfig struct {
 	AnalyzedRateByService map[string]float64
 
 	// infrastructure agent binary
-	DDAgentBin string // DDAgentBin will be "" for Agent5 scenarios
+	STSAgentBin string // STSAgentBin will be "" for Agent5 scenarios
 }
 
 // NewDefaultAgentConfig returns a configuration with the default values
@@ -88,7 +88,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 	return &AgentConfig{
 		Enabled:     true,
 		DefaultEnv:  "none",
-		APIEndpoint: "https://trace.agent.datadoghq.com",
+		APIEndpoint: "https://trace.agent.stackstatehq.com",
 		APIKey:      "",
 		APIEnabled:  true,
 
@@ -135,8 +135,8 @@ func getHostname(ddAgentBin string) (string, error) {
 		cmd.Env = []string{}
 	} else {
 		getHostnameCmd := "from utils.hostname import get_hostname; print get_hostname()"
-		cmd = exec.Command(defaultDDAgentPy, "-c", getHostnameCmd)
-		cmd.Env = []string{defaultDDAgentPyEnv}
+		cmd = exec.Command(defaultSTSAgentPy, "-c", getHostnameCmd)
+		cmd.Env = []string{defaultSTSAgentPyEnv}
 	}
 
 	var stdout, stderr bytes.Buffer
@@ -144,7 +144,7 @@ func getHostname(ddAgentBin string) (string, error) {
 	cmd.Stderr = &stderr
 	// Copying all environment variables to child process
 	// Windows: Required, so the child process can load DLLs, etc.
-	// Linux:   Optional, but will make use of DD_HOSTNAME and DOCKER_DD_AGENT if they exist
+	// Linux:   Optional, but will make use of STS_HOSTNAME and DOCKER_STS_AGENT if they exist
 	osEnv := os.Environ()
 	cmd.Env = append(osEnv, cmd.Env...)
 
@@ -196,14 +196,14 @@ func NewAgentConfig(conf *File, legacyConf *File, agentYaml *YamlAgentConfig) (*
 
 	// check for api-endpoint parity after all possible overrides have been applied
 	if c.APIKey == "" {
-		return c, errors.New("you must specify an API Key, either via a configuration file or the DD_API_KEY env var")
+		return c, errors.New("you must specify an API Key, either via a configuration file or the STS_API_KEY env var")
 	}
 
 	// If hostname isn't provided in the configuration, try to guess it.
 	if c.HostName == "" {
-		hostname, err := getHostname(c.DDAgentBin)
+		hostname, err := getHostname(c.STSAgentBin)
 		if err != nil {
-			return c, errors.New("failed to automatically set the hostname, you must specify it via configuration for or the DD_HOSTNAME env var")
+			return c, errors.New("failed to automatically set the hostname, you must specify it via configuration for or the STS_HOSTNAME env var")
 		}
 		c.HostName = hostname
 	}

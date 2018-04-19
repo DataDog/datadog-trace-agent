@@ -11,10 +11,10 @@ import (
 
 	log "github.com/cihub/seelog"
 
-	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/fixtures"
-	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/DataDog/datadog-trace-agent/quantizer"
+	"stackstate-trace-agent/config"
+	"stackstate-trace-agent/fixtures"
+	"stackstate-trace-agent/model"
+	"stackstate-trace-agent/quantizer"
 	"github.com/stretchr/testify/assert"
 )
 

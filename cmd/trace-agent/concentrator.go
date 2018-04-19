@@ -7,9 +7,9 @@ import (
 
 	log "github.com/cihub/seelog"
 
-	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/DataDog/datadog-trace-agent/statsd"
-	"github.com/DataDog/datadog-trace-agent/watchdog"
+	"stackstate-trace-agent/model"
+	"stackstate-trace-agent/statsd"
+	"stackstate-trace-agent/watchdog"
 )
 
 // Concentrator produces time bucketed statistics from a stream of raw traces.
@@ -130,10 +130,10 @@ func (c *Concentrator) Flush() []model.StatsBucket {
 
 		log.Debugf("flushing bucket %d", ts)
 		for _, d := range bucket.Distributions {
-			statsd.Client.Histogram("datadog.trace_agent.distribution.len", float64(d.Summary.N), nil, 1)
+			statsd.Client.Histogram("stackstate.trace_agent.distribution.len", float64(d.Summary.N), nil, 1)
 		}
 		for _, d := range bucket.ErrDistributions {
-			statsd.Client.Histogram("datadog.trace_agent.err_distribution.len", float64(d.Summary.N), nil, 1)
+			statsd.Client.Histogram("stackstate.trace_agent.err_distribution.len", float64(d.Summary.N), nil, 1)
 		}
 		sb = append(sb, bucket)
 		delete(c.buckets, ts)
