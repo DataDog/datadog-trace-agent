@@ -19,12 +19,12 @@ import (
 
 // TraceWriter ingests sampled traces and flushes them to the API.
 type TraceWriter struct {
+	stats          info.TraceWriterInfo
 	hostName       string
 	env            string
 	conf           writerconfig.TraceWriterConfig
 	InTraces       <-chan *model.Trace
 	InTransactions <-chan *model.Span
-	stats          info.TraceWriterInfo
 
 	traces        []*model.APITrace
 	transactions  []*model.Span

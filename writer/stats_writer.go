@@ -16,11 +16,11 @@ import (
 
 // StatsWriter ingests stats buckets and flushes their aggregation to the API.
 type StatsWriter struct {
+	stats    info.StatsWriterInfo
 	hostName string
 	env      string
 	conf     writerconfig.StatsWriterConfig
 	InStats  <-chan []model.StatsBucket
-	stats    info.StatsWriterInfo
 
 	BaseWriter
 }

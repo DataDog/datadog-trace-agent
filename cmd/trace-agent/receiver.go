@@ -337,7 +337,6 @@ func (r *HTTPReceiver) logStats() {
 }
 
 // Languages returns the list of the languages used in the traces the agent receives.
-// Eventually this list will be send to our backend through the payload header.
 func (r *HTTPReceiver) Languages() string {
 	// We need to use this map because we can have several tags for a same language.
 	langs := make(map[string]bool)
