@@ -180,8 +180,8 @@ func (a *Agent) Process(t model.Trace) {
 		a.ScoreSampler,
 	}
 
-	priority, ok := root.Metrics[samplingPriorityKey]
-	if ok {
+	priority, hasPriority := root.Metrics[samplingPriorityKey]
+	if hasPriority {
 		// If Priority is defined, send to priority sampling, regardless of priority value.
 		// The sampler will keep or discard the trace, but we send everything so that it
 		// gets the big picture and can set the sampling rates accordingly.
@@ -189,7 +189,7 @@ func (a *Agent) Process(t model.Trace) {
 	}
 
 	priorityPtr := &ts.TracesPriorityNone
-	if ok {
+	if hasPriority {
 		if priority < 0 {
 			priorityPtr = &ts.TracesPriorityNeg
 		} else if priority == 0 {
@@ -266,6 +266,11 @@ func (a *Agent) Process(t model.Trace) {
 		a.Concentrator.Add(pt)
 
 	}()
+	if hasPriority && priority < 0 {
+		// If the trace has a negative priority we absolutely don't want it
+		// sampled either by the trace or transaction pipeline so we return here
+		return
+	}
 	go func() {
 		defer watchdog.LogOnPanic()
 		sampled := false
