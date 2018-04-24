@@ -24,6 +24,8 @@ install:
 ci:
 	# task used by CI
 	GOOS=windows go build ./cmd/trace-agent # ensure windows builds
+	# temporary workaround https://github.com/golang/lint/issues/397
+	mkdir -p $(GOPATH)/src/golang.org/x && git clone https://github.com/golang/lint.git $(GOPATH)/src/golang.org/x/lint
 	go get -u github.com/golang/lint/golint/...
 	golint ./cmd/trace-agent ./filters ./fixtures ./info ./quantile ./quantizer ./sampler ./statsd ./watchdog ./writer
 	go test ./...
