@@ -36,6 +36,11 @@ const (
 	GE                = 57362
 	NE                = 57363
 	As                = 57365
+	Select            = 57367
+	Set               = 57368
+
+	// UpdateFinishedKeyword marks the end of a set of UPDATE SET value tuples.
+	UpdateFinishedKeyword = 57369
 
 	// Filtered specifies that the given token has been discarded by one of the
 	// token filters.
@@ -44,6 +49,10 @@ const (
 	// FilteredComma specifies that the token is a comma and was discarded by one
 	// of the filters.
 	FilteredComma = 57366
+
+	// FilteredAlias specifies that the token is an alias (AS) argument and has
+	// been discarded by a filter.
+	FilteredAlias = 57370
 )
 
 // Tokenizer is the struct used to generate SQL
@@ -75,13 +84,18 @@ var keywords = map[string]int{
 	"SAVEPOINT": Savepoint,
 	"LIMIT":     Limit,
 	"AS":        As,
+	"SELECT":    Select,
+	"SET":       Set,
+	"WHERE":     UpdateFinishedKeyword,
+	"FROM":      UpdateFinishedKeyword,
+	"ORDER":     UpdateFinishedKeyword,
+	"SORT":      UpdateFinishedKeyword,
+	"RETURNING": UpdateFinishedKeyword,
+	"IF":        UpdateFinishedKeyword,
 }
 
 // Scan scans the tokenizer for the next token and returns
 // the token type and the token buffer.
-// TODO[manu]: the current implementation returns a new Buffer
-// for each Scan(). An improvement to reduce the overhead of
-// the Scan() is to return slices instead of buffers.
 func (tkn *Tokenizer) Scan() (int, []byte) {
 	if tkn.lastChar == 0 {
 		tkn.next()
