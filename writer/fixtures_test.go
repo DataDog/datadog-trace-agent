@@ -6,7 +6,7 @@ import (
 
 	log "github.com/cihub/seelog"
 
-	"stackstate-trace-agent/fixtures"
+	"github.com/StackVista/stackstate-trace-agent/fixtures"
 )
 
 // payloadConstructedHandlerArgs encodes the arguments passed to a PayloadConstructedHandler call.

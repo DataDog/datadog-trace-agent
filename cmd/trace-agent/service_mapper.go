@@ -4,8 +4,8 @@ import (
 	"sync"
 	"time"
 
-	"stackstate-trace-agent/model"
-	"stackstate-trace-agent/watchdog"
+	"github.com/StackVista/stackstate-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/watchdog"
 	log "github.com/cihub/seelog"
 )
 

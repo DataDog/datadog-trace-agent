@@ -9,11 +9,11 @@ import (
 
 	log "github.com/cihub/seelog"
 
-	"stackstate-trace-agent/config"
-	"stackstate-trace-agent/info"
-	"stackstate-trace-agent/model"
-	"stackstate-trace-agent/watchdog"
-	writerconfig "stackstate-trace-agent/writer/config"
+	"github.com/StackVista/stackstate-trace-agent/config"
+	"github.com/StackVista/stackstate-trace-agent/info"
+	"github.com/StackVista/stackstate-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/watchdog"
+	writerconfig "github.com/StackVista/stackstate-trace-agent/writer/config"
 	"github.com/golang/protobuf/proto"
 )
 

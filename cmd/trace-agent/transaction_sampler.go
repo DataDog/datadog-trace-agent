@@ -1,9 +1,9 @@
 package main
 
 import (
-	"stackstate-trace-agent/config"
-	"stackstate-trace-agent/model"
-	"stackstate-trace-agent/sampler"
+	"github.com/StackVista/stackstate-trace-agent/config"
+	"github.com/StackVista/stackstate-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/sampler"
 )
 
 // TransactionSampler extracts and samples analyzed spans

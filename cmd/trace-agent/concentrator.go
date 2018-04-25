@@ -7,9 +7,9 @@ import (
 
 	log "github.com/cihub/seelog"
 
-	"stackstate-trace-agent/model"
-	"stackstate-trace-agent/statsd"
-	"stackstate-trace-agent/watchdog"
+	"github.com/StackVista/stackstate-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/statsd"
+	"github.com/StackVista/stackstate-trace-agent/watchdog"
 )
 
 // Concentrator produces time bucketed statistics from a stream of raw traces.

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 
-	"stackstate-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/model"
 )
 
 // RandomServices generates random services metadata

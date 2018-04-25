@@ -11,10 +11,10 @@ import (
 
 	log "github.com/cihub/seelog"
 
-	"stackstate-trace-agent/config"
-	"stackstate-trace-agent/fixtures"
-	"stackstate-trace-agent/model"
-	"stackstate-trace-agent/quantizer"
+	"github.com/StackVista/stackstate-trace-agent/config"
+	"github.com/StackVista/stackstate-trace-agent/fixtures"
+	"github.com/StackVista/stackstate-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/quantizer"
 	"github.com/stretchr/testify/assert"
 )
 

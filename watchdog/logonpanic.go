@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"runtime"
 
-	"stackstate-trace-agent/statsd"
+	"github.com/StackVista/stackstate-trace-agent/statsd"
 	log "github.com/cihub/seelog"
 )
 

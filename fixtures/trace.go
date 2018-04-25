@@ -3,7 +3,7 @@ package fixtures
 import (
 	"math/rand"
 
-	"stackstate-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/model"
 )
 
 // genNextLevel generates a new level for the trace tree structure,

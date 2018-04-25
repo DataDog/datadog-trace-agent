@@ -10,7 +10,7 @@ import (
 	"math/rand"
 	"time"
 
-	"stackstate-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/model"
 )
 
 // YearNS is the number of nanoseconds in a year

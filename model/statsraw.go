@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"sort"
 
-	"stackstate-trace-agent/quantile"
+	"github.com/StackVista/stackstate-trace-agent/quantile"
 )
 
 // Most "algorithm" stuff here is tested with stats_test.go as what is important

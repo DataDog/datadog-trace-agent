@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"stackstate-trace-agent/config"
-	"stackstate-trace-agent/fixtures"
-	"stackstate-trace-agent/info"
-	"stackstate-trace-agent/model"
-	writerconfig "stackstate-trace-agent/writer/config"
+	"github.com/StackVista/stackstate-trace-agent/config"
+	"github.com/StackVista/stackstate-trace-agent/fixtures"
+	"github.com/StackVista/stackstate-trace-agent/info"
+	"github.com/StackVista/stackstate-trace-agent/model"
+	writerconfig "github.com/StackVista/stackstate-trace-agent/writer/config"
 	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 )

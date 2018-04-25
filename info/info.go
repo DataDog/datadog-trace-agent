@@ -15,9 +15,9 @@ import (
 	"text/template"
 	"time"
 
-	"stackstate-trace-agent/config"
-	"stackstate-trace-agent/sampler"
-	"stackstate-trace-agent/watchdog"
+	"github.com/StackVista/stackstate-trace-agent/config"
+	"github.com/StackVista/stackstate-trace-agent/sampler"
+	"github.com/StackVista/stackstate-trace-agent/watchdog"
 )
 
 var (

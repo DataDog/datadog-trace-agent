@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"stackstate-trace-agent/backoff"
-	"stackstate-trace-agent/fixtures"
-	writerconfig "stackstate-trace-agent/writer/config"
+	"github.com/StackVista/stackstate-trace-agent/backoff"
+	"github.com/StackVista/stackstate-trace-agent/fixtures"
+	writerconfig "github.com/StackVista/stackstate-trace-agent/writer/config"
 	"github.com/stretchr/testify/assert"
 )
 

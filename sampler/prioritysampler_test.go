@@ -7,8 +7,8 @@ import (
 
 	log "github.com/cihub/seelog"
 
-	"stackstate-trace-agent/config"
-	"stackstate-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/config"
+	"github.com/StackVista/stackstate-trace-agent/model"
 	"github.com/stretchr/testify/assert"
 )
 

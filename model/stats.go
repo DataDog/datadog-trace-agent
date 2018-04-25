@@ -3,7 +3,7 @@ package model
 import (
 	"fmt"
 
-	"stackstate-trace-agent/quantile"
+	"github.com/StackVista/stackstate-trace-agent/quantile"
 )
 
 // Hardcoded measures names for ease of reference

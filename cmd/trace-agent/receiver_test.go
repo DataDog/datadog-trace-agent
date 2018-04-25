@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"stackstate-trace-agent/config"
-	"stackstate-trace-agent/fixtures"
-	"stackstate-trace-agent/info"
-	"stackstate-trace-agent/model"
-	"stackstate-trace-agent/sampler"
+	"github.com/StackVista/stackstate-trace-agent/config"
+	"github.com/StackVista/stackstate-trace-agent/fixtures"
+	"github.com/StackVista/stackstate-trace-agent/info"
+	"github.com/StackVista/stackstate-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/sampler"
 	"github.com/stretchr/testify/assert"
 	"github.com/tinylib/msgp/msgp"
 )

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"strings"
 
-	"stackstate-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/model"
 )
 
 // redisTruncationMark is used as suffix by tracing libraries to indicate that a

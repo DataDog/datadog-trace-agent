@@ -7,7 +7,7 @@ import (
 	"flag"
 	_ "net/http/pprof"
 
-	"stackstate-trace-agent/watchdog"
+	"github.com/StackVista/stackstate-trace-agent/watchdog"
 )
 
 func init() {

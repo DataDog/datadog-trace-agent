@@ -3,7 +3,7 @@ package config
 import (
 	"time"
 
-	"stackstate-trace-agent/backoff"
+	"github.com/StackVista/stackstate-trace-agent/backoff"
 )
 
 // QueuablePayloadSenderConf contains the configuration needed by a QueuablePayloadSender to operate.

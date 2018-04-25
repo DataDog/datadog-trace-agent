@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"stackstate-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/model"
 )
 
 type redisTestCase struct {

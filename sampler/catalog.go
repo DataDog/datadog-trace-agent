@@ -1,7 +1,7 @@
 package sampler
 
 import (
-	"stackstate-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/model"
 )
 
 const defaultServiceRateKey = "service:,env:"

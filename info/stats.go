@@ -6,7 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"stackstate-trace-agent/statsd"
+	"github.com/StackVista/stackstate-trace-agent/statsd"
 )
 
 // ReceiverStats is used to store all the stats per tags.

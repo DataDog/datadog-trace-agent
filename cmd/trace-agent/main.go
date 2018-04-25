@@ -18,10 +18,10 @@ import (
 	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/datadog-agent/pkg/pidfile"
-	"stackstate-trace-agent/config"
-	"stackstate-trace-agent/info"
-	"stackstate-trace-agent/statsd"
-	"stackstate-trace-agent/watchdog"
+	"github.com/StackVista/stackstate-trace-agent/config"
+	"github.com/StackVista/stackstate-trace-agent/info"
+	"github.com/StackVista/stackstate-trace-agent/statsd"
+	"github.com/StackVista/stackstate-trace-agent/watchdog"
 )
 
 // handleSignal closes a channel to exit cleanly from routines

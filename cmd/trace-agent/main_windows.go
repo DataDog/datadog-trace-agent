@@ -12,7 +12,7 @@ import (
 
 	_ "net/http/pprof"
 
-	"stackstate-trace-agent/watchdog"
+	"github.com/StackVista/stackstate-trace-agent/watchdog"
 	log "github.com/cihub/seelog"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"

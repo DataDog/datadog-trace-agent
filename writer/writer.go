@@ -3,10 +3,10 @@ package writer
 import (
 	"sync"
 
-	"stackstate-trace-agent/statsd"
+	"github.com/StackVista/stackstate-trace-agent/statsd"
 	log "github.com/cihub/seelog"
 
-	"stackstate-trace-agent/config"
+	"github.com/StackVista/stackstate-trace-agent/config"
 )
 
 // BaseWriter encodes the base components and behaviour of a typical Writer.

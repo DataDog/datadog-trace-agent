@@ -4,7 +4,7 @@ import (
 	"hash/fnv"
 	"sort"
 
-	"stackstate-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/model"
 )
 
 // Signature is a simple representation of trace, used to identify simlar traces

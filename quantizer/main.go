@@ -3,7 +3,7 @@ package quantizer
 import (
 	"regexp"
 
-	"stackstate-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/model"
 )
 
 const (

@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"stackstate-trace-agent/config"
+	"github.com/StackVista/stackstate-trace-agent/config"
 	"github.com/stretchr/testify/assert"
 )
 

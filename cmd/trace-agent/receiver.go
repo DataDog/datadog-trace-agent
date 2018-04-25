@@ -16,12 +16,12 @@ import (
 	log "github.com/cihub/seelog"
 	"github.com/tinylib/msgp/msgp"
 
-	"stackstate-trace-agent/config"
-	"stackstate-trace-agent/info"
-	"stackstate-trace-agent/model"
-	"stackstate-trace-agent/sampler"
-	"stackstate-trace-agent/statsd"
-	"stackstate-trace-agent/watchdog"
+	"github.com/StackVista/stackstate-trace-agent/config"
+	"github.com/StackVista/stackstate-trace-agent/info"
+	"github.com/StackVista/stackstate-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/sampler"
+	"github.com/StackVista/stackstate-trace-agent/statsd"
+	"github.com/StackVista/stackstate-trace-agent/watchdog"
 )
 
 const (

@@ -6,8 +6,8 @@ package main
 import (
 	"testing"
 
-	"stackstate-trace-agent/fixtures"
-	"stackstate-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/fixtures"
+	"github.com/StackVista/stackstate-trace-agent/model"
 )
 
 const (

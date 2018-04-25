@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"stackstate-trace-agent/config"
+	"github.com/StackVista/stackstate-trace-agent/config"
 	log "github.com/cihub/seelog"
 )
 

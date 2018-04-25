@@ -8,9 +8,9 @@ import (
 
 	log "github.com/cihub/seelog"
 
-	"stackstate-trace-agent/backoff"
-	"stackstate-trace-agent/watchdog"
-	writerconfig "stackstate-trace-agent/writer/config"
+	"github.com/StackVista/stackstate-trace-agent/backoff"
+	"github.com/StackVista/stackstate-trace-agent/watchdog"
+	writerconfig "github.com/StackVista/stackstate-trace-agent/writer/config"
 )
 
 // Payload represents a data payload to be sent to some endpoint

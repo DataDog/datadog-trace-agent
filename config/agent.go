@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	writerconfig "stackstate-trace-agent/writer/config"
+	writerconfig "github.com/StackVista/stackstate-trace-agent/writer/config"
 )
 
 // AgentConfig handles the interpretation of the configuration (with default

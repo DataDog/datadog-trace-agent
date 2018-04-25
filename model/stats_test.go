@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"stackstate-trace-agent/quantile"
+	"github.com/StackVista/stackstate-trace-agent/quantile"
 	"github.com/stretchr/testify/assert"
 )
 

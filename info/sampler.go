@@ -1,6 +1,6 @@
 package info
 
-import "stackstate-trace-agent/sampler"
+import "github.com/StackVista/stackstate-trace-agent/sampler"
 
 // SamplerInfo represents internal stats and state of a sampler
 type SamplerInfo struct {
