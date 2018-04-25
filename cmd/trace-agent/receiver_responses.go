@@ -6,13 +6,13 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/DataDog/datadog-trace-agent/statsd"
+	"github.com/StackVista/stackstate-trace-agent/config"
+	"github.com/StackVista/stackstate-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/statsd"
 )
 
 const (
-	receiverErrorKey = "datadog.trace_agent.receiver.error"
+	receiverErrorKey = "stackstate.trace_agent.receiver.error"
 )
 
 // We encaspulate the answers in a container, this is to ease-up transition,

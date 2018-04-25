@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/config"
+	"github.com/StackVista/stackstate-trace-agent/config"
 	log "github.com/cihub/seelog"
 )
 
-// timeout is the HTTP timeout for POST requests to the Datadog backend
+// timeout is the HTTP timeout for POST requests to the StackState backend
 const timeout = 10 * time.Second
 
 // NewClient returns a http.Client configured with the Agent options.

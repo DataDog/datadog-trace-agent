@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/DataDog/datadog-go/statsd"
-	"github.com/DataDog/datadog-trace-agent/config"
+	"github.com/StackVista/stackstate-trace-agent/config"
 )
 
 // StatsClient represents a client capable of sending stats to some stat endpoint.

@@ -3,9 +3,9 @@ package filters
 import (
 	"testing"
 
-	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/fixtures"
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/config"
+	"github.com/StackVista/stackstate-trace-agent/fixtures"
+	"github.com/StackVista/stackstate-trace-agent/model"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/model"
 )
 
 // TraceServiceExtractor extracts service metadata from top-level spans

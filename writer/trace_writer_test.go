@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/fixtures"
-	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
-	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
+	"github.com/StackVista/stackstate-trace-agent/config"
+	"github.com/StackVista/stackstate-trace-agent/fixtures"
+	"github.com/StackVista/stackstate-trace-agent/info"
+	"github.com/StackVista/stackstate-trace-agent/model"
+	writerconfig "github.com/StackVista/stackstate-trace-agent/writer/config"
 	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 )
@@ -60,7 +60,7 @@ func TestTraceWriter_TraceHandling(t *testing.T) {
 
 	// Then the endpoint should have received 2 payloads, containing all sent traces
 	expectedHeaders := map[string]string{
-		"X-Datadog-Reported-Languages": strings.Join(info.Languages(), "|"),
+		"X-StackState-Reported-Languages": strings.Join(info.Languages(), "|"),
 		"Content-Type":                 "application/x-protobuf",
 		"Content-Encoding":             "gzip",
 	}
@@ -101,7 +101,7 @@ func TestTraceWriter_BigTraceHandling(t *testing.T) {
 	// Then the endpoint should have received several payloads, containing all sent traces but not going over
 	// the span limit.
 	expectedHeaders := map[string]string{
-		"X-Datadog-Reported-Languages": strings.Join(info.Languages(), "|"),
+		"X-StackState-Reported-Languages": strings.Join(info.Languages(), "|"),
 		"Content-Type":                 "application/x-protobuf",
 		"Content-Encoding":             "gzip",
 	}
@@ -219,33 +219,33 @@ func TestTraceWriter_UpdateInfoHandling(t *testing.T) {
 	countSummaries := statsClient.GetCountSummaries()
 
 	// Payload counts
-	payloadSummary := countSummaries["datadog.trace_agent.trace_writer.payloads"]
+	payloadSummary := countSummaries["stackstate.trace_agent.trace_writer.payloads"]
 	assert.True(len(payloadSummary.Calls) >= 3, "There should have been multiple payload count calls")
 	assert.Equal(expectedNumPayloads, payloadSummary.Sum)
 
 	// Traces counts
-	tracesSummary := countSummaries["datadog.trace_agent.trace_writer.traces"]
+	tracesSummary := countSummaries["stackstate.trace_agent.trace_writer.traces"]
 	assert.True(len(tracesSummary.Calls) >= 3, "There should have been multiple traces count calls")
 	assert.Equal(expectedNumTraces, tracesSummary.Sum)
 
 	// Spans counts
-	spansSummary := countSummaries["datadog.trace_agent.trace_writer.spans"]
+	spansSummary := countSummaries["stackstate.trace_agent.trace_writer.spans"]
 	assert.True(len(spansSummary.Calls) >= 3, "There should have been multiple spans count calls")
 	assert.Equal(expectedNumSpans, spansSummary.Sum)
 
 	// Bytes counts
-	bytesSummary := countSummaries["datadog.trace_agent.trace_writer.bytes"]
+	bytesSummary := countSummaries["stackstate.trace_agent.trace_writer.bytes"]
 	assert.True(len(bytesSummary.Calls) >= 3, "There should have been multiple bytes count calls")
 	// FIXME: Is GZIP non-deterministic? Why won't equal work here?
 	assert.True(math.Abs(float64(expectedNumBytes-bytesSummary.Sum)) < 100., "Bytes should be within expectations")
 
 	// Retry counts
-	retriesSummary := countSummaries["datadog.trace_agent.trace_writer.retries"]
+	retriesSummary := countSummaries["stackstate.trace_agent.trace_writer.retries"]
 	assert.True(len(retriesSummary.Calls) >= 3, "There should have been multiple retries count calls")
 	assert.True(retriesSummary.Sum >= expectedMinNumRetries)
 
 	// Error counts
-	errorsSummary := countSummaries["datadog.trace_agent.trace_writer.errors"]
+	errorsSummary := countSummaries["stackstate.trace_agent.trace_writer.errors"]
 	assert.True(len(errorsSummary.Calls) >= 3, "There should have been multiple errors count calls")
 	assert.Equal(expectedNumErrors, errorsSummary.Sum)
 }

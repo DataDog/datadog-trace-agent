@@ -3,10 +3,10 @@ package writer
 import (
 	"sync"
 
-	"github.com/DataDog/datadog-trace-agent/statsd"
+	"github.com/StackVista/stackstate-trace-agent/statsd"
 	log "github.com/cihub/seelog"
 
-	"github.com/DataDog/datadog-trace-agent/config"
+	"github.com/StackVista/stackstate-trace-agent/config"
 )
 
 // BaseWriter encodes the base components and behaviour of a typical Writer.
@@ -25,7 +25,7 @@ func NewBaseWriter(conf *config.AgentConfig, path string, senderFactory func(End
 
 	if conf.APIEnabled {
 		client := NewClient(conf)
-		endpoint = NewDatadogEndpoint(client, conf.APIEndpoint, path, conf.APIKey)
+		endpoint = NewStackStateEndpoint(client, conf.APIEndpoint, path, conf.APIKey)
 	} else {
 		log.Info("API interface is disabled, flushing to /dev/null instead")
 		endpoint = &NullEndpoint{}

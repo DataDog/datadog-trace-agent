@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/backoff"
-	"github.com/DataDog/datadog-trace-agent/fixtures"
-	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
+	"github.com/StackVista/stackstate-trace-agent/backoff"
+	"github.com/StackVista/stackstate-trace-agent/fixtures"
+	writerconfig "github.com/StackVista/stackstate-trace-agent/writer/config"
 	"github.com/stretchr/testify/assert"
 )
 

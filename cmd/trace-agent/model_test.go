@@ -6,8 +6,8 @@ package main
 import (
 	"testing"
 
-	"github.com/DataDog/datadog-trace-agent/fixtures"
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/fixtures"
+	"github.com/StackVista/stackstate-trace-agent/model"
 )
 
 const (

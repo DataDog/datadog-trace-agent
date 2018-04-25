@@ -3,7 +3,7 @@ package sampler
 import (
 	"testing"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/model"
 	"github.com/stretchr/testify/assert"
 )
 

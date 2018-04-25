@@ -12,7 +12,7 @@ import (
 
 	_ "net/http/pprof"
 
-	"github.com/DataDog/datadog-trace-agent/watchdog"
+	"github.com/StackVista/stackstate-trace-agent/watchdog"
 	log "github.com/cihub/seelog"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
@@ -22,7 +22,7 @@ import (
 
 var elog debug.Log
 
-const ServiceName = "datadog-trace-agent"
+const ServiceName = "stackstate-trace-agent"
 
 // opts are the command-line options
 var winopts struct {
@@ -34,8 +34,8 @@ var winopts struct {
 
 func init() {
 	// command-line arguments
-	flag.StringVar(&opts.configFile, "config", "c:\\programdata\\datadog\\datadog.conf", "Datadog Agent config file location.")
-	flag.StringVar(&opts.legacyConfigFile, "ddconfig", "c:\\programdata\\datadog\\trace-agent.ini", "Deprecated extra configuration option.")
+	flag.StringVar(&opts.configFile, "config", "c:\\programdata\\stackstate\\stackstate.conf", "StackState Agent config file location.")
+	flag.StringVar(&opts.legacyConfigFile, "ddconfig", "c:\\programdata\\stackstate\\trace-agent.ini", "Deprecated extra configuration option.")
 	flag.StringVar(&opts.pidfilePath, "pid", "", "Path to set pidfile for process")
 	flag.BoolVar(&opts.version, "version", false, "Show version information and exit")
 	flag.BoolVar(&opts.info, "info", false, "Show info about running trace agent process and exit")
@@ -261,7 +261,7 @@ func installService() error {
 		s.Close()
 		return fmt.Errorf("service %s already exists", ServiceName)
 	}
-	s, err = m.CreateService(ServiceName, exepath, mgr.Config{DisplayName: "Datadog Agent Service"})
+	s, err = m.CreateService(ServiceName, exepath, mgr.Config{DisplayName: "StackState Agent Service"})
 	if err != nil {
 		return err
 	}

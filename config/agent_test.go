@@ -26,15 +26,15 @@ func TestDefaultConfig(t *testing.T) {
 
 func TestOnlyEnvConfig(t *testing.T) {
 	// setting an API Key should be enough to generate valid config
-	os.Setenv("DD_API_KEY", "apikey_from_env")
+	os.Setenv("STS_API_KEY", "apikey_from_env")
 
 	agentConfig, _ := NewAgentConfig(nil, nil, nil)
 	assert.Equal(t, "apikey_from_env", agentConfig.APIKey)
 
-	os.Setenv("DD_API_KEY", "")
+	os.Setenv("STS_API_KEY", "")
 }
 
-func TestOnlyDDAgentConfig(t *testing.T) {
+func TestOnlySTSAgentConfig(t *testing.T) {
 	assert := assert.New(t)
 
 	iniConf, err := NewIni("./test_cases/no_apm_config.ini")
@@ -50,8 +50,8 @@ func TestOnlyDDAgentConfig(t *testing.T) {
 	assert.Equal("DEBUG", agentConfig.LogLevel)
 }
 
-func TestDDAgentMultiAPIKeys(t *testing.T) {
-	// old feature Datadog Agent feature, got dropped since
+func TestSTSAgentMultiAPIKeys(t *testing.T) {
+	// old feature StackState Agent feature, got dropped since
 	// TODO: at some point, expire this case
 	assert := assert.New(t)
 
@@ -76,7 +76,7 @@ func TestFullIniConfig(t *testing.T) {
 	assert.Equal("api_key_test", c.APIKey)
 	assert.Equal("mymachine", c.HostName)
 	assert.Equal("https://user:password@proxy_for_https:1234", c.ProxyURL.String())
-	assert.Equal("https://datadog.unittests", c.APIEndpoint)
+	assert.Equal("https://stackstate.unittests", c.APIEndpoint)
 	assert.Equal(false, c.Enabled)
 	assert.Equal("test", c.DefaultEnv)
 	assert.Equal(18126, c.ReceiverPort)
@@ -99,7 +99,7 @@ func TestFullYamlConfig(t *testing.T) {
 	assert.Equal("api_key_test", c.APIKey)
 	assert.Equal("mymachine", c.HostName)
 	assert.Equal("https://user:password@proxy_for_https:1234", c.ProxyURL.String())
-	assert.Equal("https://datadog.unittests", c.APIEndpoint)
+	assert.Equal("https://stackstate.unittests", c.APIEndpoint)
 	assert.Equal(false, c.Enabled)
 	assert.Equal("test", c.DefaultEnv)
 	assert.Equal(18126, c.ReceiverPort)

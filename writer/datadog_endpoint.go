@@ -6,10 +6,10 @@ import (
 	"net/http"
 )
 
-const apiHTTPHeaderKey = "DD-Api-Key"
+const apiHTTPHeaderKey = "STS-Api-Key"
 
-// DatadogEndpoint sends payloads to Datadog API.
-type DatadogEndpoint struct {
+// StackStateEndpoint sends payloads to StackState API.
+type StackStateEndpoint struct {
 	apiKey string
 	url    string
 	client *http.Client
@@ -17,13 +17,13 @@ type DatadogEndpoint struct {
 	path string
 }
 
-// NewDatadogEndpoint returns an initialized DatadogEndpoint, from a provided http client and remote endpoint path.
-func NewDatadogEndpoint(client *http.Client, url, path, apiKey string) *DatadogEndpoint {
+// NewStackStateEndpoint returns an initialized StackStateEndpoint, from a provided http client and remote endpoint path.
+func NewStackStateEndpoint(client *http.Client, url, path, apiKey string) *StackStateEndpoint {
 	if apiKey == "" {
 		panic(fmt.Errorf("No API key"))
 	}
 
-	return &DatadogEndpoint{
+	return &StackStateEndpoint{
 		apiKey: apiKey,
 		url:    url,
 		path:   path,
@@ -31,8 +31,8 @@ func NewDatadogEndpoint(client *http.Client, url, path, apiKey string) *DatadogE
 	}
 }
 
-// Write will send the serialized traces payload to the Datadog traces endpoint.
-func (e *DatadogEndpoint) Write(payload *Payload) error {
+// Write will send the serialized traces payload to the StackState traces endpoint.
+func (e *StackStateEndpoint) Write(payload *Payload) error {
 	// Create the request to be sent to the API
 	url := e.url + e.path
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload.Bytes))
@@ -76,6 +76,6 @@ func (e *DatadogEndpoint) Write(payload *Payload) error {
 	return nil
 }
 
-func (e *DatadogEndpoint) String() string {
-	return fmt.Sprintf("DD endpoint(url=%s, path=%s)", e.url, e.path)
+func (e *StackStateEndpoint) String() string {
+	return fmt.Sprintf("STS endpoint(url=%s, path=%s)", e.url, e.path)
 }

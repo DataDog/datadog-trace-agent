@@ -7,8 +7,8 @@ import (
 
 	log "github.com/cihub/seelog"
 
-	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/config"
+	"github.com/StackVista/stackstate-trace-agent/model"
 	"github.com/stretchr/testify/assert"
 )
 

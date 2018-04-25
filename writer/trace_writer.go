@@ -9,11 +9,11 @@ import (
 
 	log "github.com/cihub/seelog"
 
-	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/DataDog/datadog-trace-agent/watchdog"
-	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
+	"github.com/StackVista/stackstate-trace-agent/config"
+	"github.com/StackVista/stackstate-trace-agent/info"
+	"github.com/StackVista/stackstate-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/watchdog"
+	writerconfig "github.com/StackVista/stackstate-trace-agent/writer/config"
 	"github.com/golang/protobuf/proto"
 )
 
@@ -88,7 +88,7 @@ func (w *TraceWriter) Run() {
 			case SenderSuccessEvent:
 				log.Infof("flushed trace payload to the API, time:%s, size:%d bytes", event.SendStats.SendTime,
 					len(event.Payload.Bytes))
-				w.statsClient.Gauge("datadog.trace_agent.trace_writer.flush_duration",
+				w.statsClient.Gauge("stackstate.trace_agent.trace_writer.flush_duration",
 					event.SendStats.SendTime.Seconds(), nil, 1)
 				atomic.AddInt64(&w.stats.Payloads, 1)
 			case SenderFailureEvent:
@@ -267,13 +267,13 @@ func (w *TraceWriter) updateInfo() {
 	twInfo.Retries = atomic.SwapInt64(&w.stats.Retries, 0)
 	twInfo.Errors = atomic.SwapInt64(&w.stats.Errors, 0)
 
-	w.statsClient.Count("datadog.trace_agent.trace_writer.payloads", int64(twInfo.Payloads), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.trace_writer.traces", int64(twInfo.Traces), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.trace_writer.transactions", int64(twInfo.Transactions), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.trace_writer.spans", int64(twInfo.Spans), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.trace_writer.bytes", int64(twInfo.Bytes), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.trace_writer.retries", int64(twInfo.Retries), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.trace_writer.errors", int64(twInfo.Errors), nil, 1)
+	w.statsClient.Count("stackstate.trace_agent.trace_writer.payloads", int64(twInfo.Payloads), nil, 1)
+	w.statsClient.Count("stackstate.trace_agent.trace_writer.traces", int64(twInfo.Traces), nil, 1)
+	w.statsClient.Count("stackstate.trace_agent.trace_writer.transactions", int64(twInfo.Transactions), nil, 1)
+	w.statsClient.Count("stackstate.trace_agent.trace_writer.spans", int64(twInfo.Spans), nil, 1)
+	w.statsClient.Count("stackstate.trace_agent.trace_writer.bytes", int64(twInfo.Bytes), nil, 1)
+	w.statsClient.Count("stackstate.trace_agent.trace_writer.retries", int64(twInfo.Retries), nil, 1)
+	w.statsClient.Count("stackstate.trace_agent.trace_writer.errors", int64(twInfo.Errors), nil, 1)
 
 	info.UpdateTraceWriterInfo(twInfo)
 }

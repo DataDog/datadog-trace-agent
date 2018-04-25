@@ -17,8 +17,8 @@ import (
 	"math"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/DataDog/datadog-trace-agent/watchdog"
+	"github.com/StackVista/stackstate-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/watchdog"
 )
 
 const (

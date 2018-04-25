@@ -1,8 +1,8 @@
 package filters
 
 import (
-	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/config"
+	"github.com/StackVista/stackstate-trace-agent/model"
 )
 
 // Filter is the interface implemented by all span-filters

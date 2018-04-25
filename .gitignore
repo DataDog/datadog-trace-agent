@@ -23,3 +23,6 @@ prof*
 /cmd/trace-agent/windows_resources/*.bin
 # file generated at build time by message compiler
 trace-agent-msg.h
+
+.idea
+*.iml

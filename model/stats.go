@@ -3,7 +3,7 @@ package model
 import (
 	"fmt"
 
-	"github.com/DataDog/datadog-trace-agent/quantile"
+	"github.com/StackVista/stackstate-trace-agent/quantile"
 )
 
 // Hardcoded measures names for ease of reference

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/DataDog/datadog-trace-agent/statsd"
+	"github.com/StackVista/stackstate-trace-agent/statsd"
 	log "github.com/cihub/seelog"
 )
 
@@ -31,7 +31,7 @@ func LogOnPanic() {
 		errMsg := fmt.Sprintf("%v", err)
 		logMsg := "Unexpected panic: " + errMsg + "\n" + stacktrace
 
-		statsd.Client.Gauge("datadog.trace_agent.panic", 1, []string{
+		statsd.Client.Gauge("stackstate.trace_agent.panic", 1, []string{
 			"err:" + shortErrMsg(errMsg),
 		}, 1)
 

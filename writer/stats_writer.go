@@ -7,11 +7,11 @@ import (
 
 	log "github.com/cihub/seelog"
 
-	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/DataDog/datadog-trace-agent/watchdog"
-	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
+	"github.com/StackVista/stackstate-trace-agent/config"
+	"github.com/StackVista/stackstate-trace-agent/info"
+	"github.com/StackVista/stackstate-trace-agent/model"
+	"github.com/StackVista/stackstate-trace-agent/watchdog"
+	writerconfig "github.com/StackVista/stackstate-trace-agent/writer/config"
 )
 
 // StatsWriter ingests stats buckets and flushes their aggregation to the API.
@@ -72,7 +72,7 @@ func (w *StatsWriter) Run() {
 			case SenderSuccessEvent:
 				log.Infof("flushed stat payload to the API, time:%s, size:%d bytes", event.SendStats.SendTime,
 					len(event.Payload.Bytes))
-				w.statsClient.Gauge("datadog.trace_agent.stats_writer.flush_duration",
+				w.statsClient.Gauge("stackstate.trace_agent.stats_writer.flush_duration",
 					event.SendStats.SendTime.Seconds(), nil, 1)
 				atomic.AddInt64(&w.stats.Payloads, 1)
 			case SenderFailureEvent:
@@ -154,11 +154,11 @@ func (w *StatsWriter) updateInfo() {
 	swInfo.Retries = atomic.SwapInt64(&w.stats.Retries, 0)
 	swInfo.Errors = atomic.SwapInt64(&w.stats.Errors, 0)
 
-	w.statsClient.Count("datadog.trace_agent.stats_writer.payloads", int64(swInfo.Payloads), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.stats_writer.stats_buckets", int64(swInfo.StatsBuckets), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.stats_writer.bytes", int64(swInfo.Bytes), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.stats_writer.retries", int64(swInfo.Retries), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.stats_writer.errors", int64(swInfo.Errors), nil, 1)
+	w.statsClient.Count("stackstate.trace_agent.stats_writer.payloads", int64(swInfo.Payloads), nil, 1)
+	w.statsClient.Count("stackstate.trace_agent.stats_writer.stats_buckets", int64(swInfo.StatsBuckets), nil, 1)
+	w.statsClient.Count("stackstate.trace_agent.stats_writer.bytes", int64(swInfo.Bytes), nil, 1)
+	w.statsClient.Count("stackstate.trace_agent.stats_writer.retries", int64(swInfo.Retries), nil, 1)
+	w.statsClient.Count("stackstate.trace_agent.stats_writer.errors", int64(swInfo.Errors), nil, 1)
 
 	info.UpdateStatsWriterInfo(swInfo)
 }
