@@ -34,7 +34,7 @@ func TestOnlyEnvConfig(t *testing.T) {
 	os.Setenv("STS_API_KEY", "")
 }
 
-func TestOnlyDDAgentConfig(t *testing.T) {
+func TestOnlySTSAgentConfig(t *testing.T) {
 	assert := assert.New(t)
 
 	iniConf, err := NewIni("./test_cases/no_apm_config.ini")
@@ -50,7 +50,7 @@ func TestOnlyDDAgentConfig(t *testing.T) {
 	assert.Equal("DEBUG", agentConfig.LogLevel)
 }
 
-func TestDDAgentMultiAPIKeys(t *testing.T) {
+func TestSTSAgentMultiAPIKeys(t *testing.T) {
 	// old feature StackState Agent feature, got dropped since
 	// TODO: at some point, expire this case
 	assert := assert.New(t)

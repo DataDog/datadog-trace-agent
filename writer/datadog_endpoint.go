@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-const apiHTTPHeaderKey = "DD-Api-Key"
+const apiHTTPHeaderKey = "STS-Api-Key"
 
 // StackStateEndpoint sends payloads to StackState API.
 type StackStateEndpoint struct {
@@ -77,5 +77,5 @@ func (e *StackStateEndpoint) Write(payload *Payload) error {
 }
 
 func (e *StackStateEndpoint) String() string {
-	return fmt.Sprintf("DD endpoint(url=%s, path=%s)", e.url, e.path)
+	return fmt.Sprintf("STS endpoint(url=%s, path=%s)", e.url, e.path)
 }

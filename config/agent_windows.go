@@ -5,9 +5,9 @@ const (
 	DefaultLogFilePath = "c:\\programdata\\stackstate\\logs\\trace-agent.log"
 
 	// Agent 5
-	defaultDDAgentPy    = "c:\\Program Files\\StackState\\StackState Agent\\embedded\\python.exe"
-	defaultDDAgentPyEnv = "PYTHONPATH=c:\\Program Files\\StackState\\StackState Agent\\agent"
+	defaultSTSAgentPy    = "c:\\Program Files\\StackState\\StackState Agent\\embedded\\python.exe"
+	defaultSTSAgentPyEnv = "PYTHONPATH=c:\\Program Files\\StackState\\StackState Agent\\agent"
 
 	// Agent 6
-	defaultDDAgentBin = "c:\\Program Files\\StackState\\StackState Agent\\embedded\\agent.exe"
+	defaultSTSAgentBin = "c:\\Program Files\\StackState\\StackState Agent\\embedded\\agent.exe"
 )
