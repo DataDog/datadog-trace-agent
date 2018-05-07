@@ -34,6 +34,7 @@ var (
 	watchdogInfo        watchdog.Info
 	samplerInfo         SamplerInfo
 	prioritySamplerInfo SamplerInfo
+	errorsSamplerInfo   SamplerInfo
 	rateByService       map[string]float64
 	preSamplerStats     sampler.PreSamplerStats
 	start               = time.Now()
@@ -155,7 +156,7 @@ func publishSamplerInfo() interface{} {
 	return samplerInfo
 }
 
-// UpdatePrioritySamplerInfo updates internal stats about priority sampking
+// UpdatePrioritySamplerInfo updates internal stats about priority sampling
 func UpdatePrioritySamplerInfo(ss SamplerInfo) {
 	infoMu.Lock()
 	defer infoMu.Unlock()
@@ -167,6 +168,20 @@ func publishPrioritySamplerInfo() interface{} {
 	infoMu.RLock()
 	defer infoMu.RUnlock()
 	return prioritySamplerInfo
+}
+
+// UpdateErrorsSamplerInfo updates internal stats about error sampling
+func UpdateErrorsSamplerInfo(ss SamplerInfo) {
+	infoMu.Lock()
+	defer infoMu.Unlock()
+
+	errorsSamplerInfo = ss
+}
+
+func publishErrorsSamplerInfo() interface{} {
+	infoMu.RLock()
+	defer infoMu.RUnlock()
+	return errorsSamplerInfo
 }
 
 // UpdateRateByService updates the RateByService map
@@ -239,6 +254,7 @@ func InitInfo(conf *config.AgentConfig) error {
 		expvar.Publish("stats_writer", expvar.Func(publishStatsWriterInfo))
 		expvar.Publish("service_writer", expvar.Func(publishServiceWriterInfo))
 		expvar.Publish("prioritysampler", expvar.Func(publishPrioritySamplerInfo))
+		expvar.Publish("errorssampler", expvar.Func(publishErrorsSamplerInfo))
 		expvar.Publish("ratebyservice", expvar.Func(publishRateByService))
 		expvar.Publish("watchdog", expvar.Func(publishWatchdogInfo))
 		expvar.Publish("presampler", expvar.Func(publishPreSamplerStats))

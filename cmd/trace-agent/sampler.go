@@ -31,6 +31,13 @@ func NewScoreSampler(conf *config.AgentConfig) *Sampler {
 	}
 }
 
+// NewErrorsSampler creates a new empty error sampler ready to be started
+func NewErrorsSampler(conf *config.AgentConfig) *Sampler {
+	return &Sampler{
+		engine: sampler.NewErrorsEngine(conf.ExtraSampleRate, conf.MaxTPS),
+	}
+}
+
 // NewPrioritySampler creates a new empty distributed sampler ready to be started
 func NewPrioritySampler(conf *config.AgentConfig, dynConf *config.DynamicConfig) *Sampler {
 	return &Sampler{
@@ -66,7 +73,6 @@ func (s *Sampler) Add(t processedTrace) bool {
 // Stop stops the sampler
 func (s *Sampler) Stop() {
 	s.engine.Stop()
-
 }
 
 // logStats reports statistics and update the info exposed.
@@ -99,11 +105,13 @@ func (s *Sampler) logStats() {
 
 			// publish through expvar
 			// TODO: avoid type switch, prefer engine method
-			switch s.engine.(type) {
-			case *sampler.ScoreEngine:
-				info.UpdateSamplerInfo(info.SamplerInfo{EngineType: engineType, Stats: stats, State: state})
-			case *sampler.PriorityEngine:
-				info.UpdatePrioritySamplerInfo(info.SamplerInfo{EngineType: engineType, Stats: stats, State: state})
+			switch s.engine.GetType() {
+			case sampler.NormalScoreEngineType:
+				info.UpdateSamplerInfo(info.SamplerInfo{Stats: stats, State: state})
+			case sampler.ErrorsScoreEngineType:
+				info.UpdateErrorsSamplerInfo(info.SamplerInfo{Stats: stats, State: state})
+			case sampler.PriorityEngineType:
+				info.UpdatePrioritySamplerInfo(info.SamplerInfo{Stats: stats, State: state})
 			}
 		default:
 			log.Debugf("unhandled sampler engine, can't log state")

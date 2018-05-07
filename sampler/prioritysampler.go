@@ -135,3 +135,8 @@ func (s *PriorityEngine) getRateByService() map[string]float64 {
 	s.catalogMu.Lock()
 	return s.catalog.getRateByService(s.Sampler.GetAllSignatureSampleRates(), s.Sampler.GetDefaultSampleRate())
 }
+
+// GetType return the type of the sampler engine
+func (s *PriorityEngine) GetType() EngineType {
+	return PriorityEngineType
+}
