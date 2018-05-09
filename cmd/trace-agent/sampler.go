@@ -31,7 +31,9 @@ func NewScoreSampler(conf *config.AgentConfig) *Sampler {
 	}
 }
 
-// NewErrorsSampler creates a new empty error sampler ready to be started
+// NewErrorsSampler creates a new sampler dedicated to traces containing errors
+// to isolate them from the global max tps. It behaves exactly like the normal
+// ScoreSampler except that its statistics are reported under a different name.
 func NewErrorsSampler(conf *config.AgentConfig) *Sampler {
 	return &Sampler{
 		engine: sampler.NewErrorsEngine(conf.ExtraSampleRate, conf.MaxTPS),

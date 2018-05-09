@@ -33,15 +33,15 @@ const (
 	defaultSignatureScoreSlope  float64       = 3
 )
 
-// EngineType represent the type of a sampler engine
+// EngineType represents the type of a sampler engine.
 type EngineType int
 
 const (
-	// NormalScoreEngineType is the type of the ScoreEngine sampling non-error traces
+	// NormalScoreEngineType is the type of the ScoreEngine sampling non-error traces.
 	NormalScoreEngineType EngineType = iota
-	// ErrorScoreEngineType is the type of the ScoreEngine sampling error traces
+	// ErrorScoreEngineType is the type of the ScoreEngine sampling error traces.
 	ErrorsScoreEngineType
-	// PriorityEngineType is type of the priority sampler engine type
+	// PriorityEngineType is type of the priority sampler engine type.
 	PriorityEngineType
 )
 
@@ -55,7 +55,7 @@ type Engine interface {
 	Sample(trace model.Trace, root *model.Span, env string) bool
 	// GetState returns information about the sampler.
 	GetState() interface{}
-	// GetType returns the type of the sampler
+	// GetType returns the type of the sampler.
 	GetType() EngineType
 }
 
