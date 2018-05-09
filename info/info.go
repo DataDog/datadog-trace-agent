@@ -34,6 +34,7 @@ var (
 	watchdogInfo        watchdog.Info
 	samplerInfo         SamplerInfo
 	prioritySamplerInfo SamplerInfo
+	errorsSamplerInfo   SamplerInfo
 	rateByService       map[string]float64
 	preSamplerStats     sampler.PreSamplerStats
 	start               = time.Now()
@@ -109,7 +110,7 @@ const (
 `
 )
 
-// UpdateReceiverStats updates internal stats about the receiver
+// UpdateReceiverStats updates internal stats about the receiver.
 func UpdateReceiverStats(rs *ReceiverStats) {
 	infoMu.Lock()
 	defer infoMu.Unlock()
@@ -127,7 +128,7 @@ func UpdateReceiverStats(rs *ReceiverStats) {
 	languages = rs.Languages()
 }
 
-// Languages exposes languages reporting traces to the Agent
+// Languages exposes languages reporting traces to the Agent.
 func Languages() []string {
 	infoMu.Lock()
 	defer infoMu.Unlock()
@@ -141,7 +142,7 @@ func publishReceiverStats() interface{} {
 	return receiverStats
 }
 
-// UpdateSamplerInfo updates internal stats about signature sampling
+// UpdateSamplerInfo updates internal stats about signature sampling.
 func UpdateSamplerInfo(ss SamplerInfo) {
 	infoMu.Lock()
 	defer infoMu.Unlock()
@@ -155,7 +156,7 @@ func publishSamplerInfo() interface{} {
 	return samplerInfo
 }
 
-// UpdatePrioritySamplerInfo updates internal stats about priority sampking
+// UpdatePrioritySamplerInfo updates internal stats about priority sampling.
 func UpdatePrioritySamplerInfo(ss SamplerInfo) {
 	infoMu.Lock()
 	defer infoMu.Unlock()
@@ -169,7 +170,21 @@ func publishPrioritySamplerInfo() interface{} {
 	return prioritySamplerInfo
 }
 
-// UpdateRateByService updates the RateByService map
+// UpdateErrorsSamplerInfo updates internal stats about error sampling.
+func UpdateErrorsSamplerInfo(ss SamplerInfo) {
+	infoMu.Lock()
+	defer infoMu.Unlock()
+
+	errorsSamplerInfo = ss
+}
+
+func publishErrorsSamplerInfo() interface{} {
+	infoMu.RLock()
+	defer infoMu.RUnlock()
+	return errorsSamplerInfo
+}
+
+// UpdateRateByService updates the RateByService map.
 func UpdateRateByService(rbs map[string]float64) {
 	infoMu.Lock()
 	defer infoMu.Unlock()
@@ -182,7 +197,7 @@ func publishRateByService() interface{} {
 	return rateByService
 }
 
-// UpdateWatchdogInfo updates internal stats about the watchdog
+// UpdateWatchdogInfo updates internal stats about the watchdog.
 func UpdateWatchdogInfo(wi watchdog.Info) {
 	infoMu.Lock()
 	defer infoMu.Unlock()
@@ -195,7 +210,7 @@ func publishWatchdogInfo() interface{} {
 	return watchdogInfo
 }
 
-// UpdatePreSampler updates internal stats about the pre-sampling
+// UpdatePreSampler updates internal stats about the pre-sampling.
 func UpdatePreSampler(ss sampler.PreSamplerStats) {
 	infoMu.Lock()
 	defer infoMu.Unlock()
@@ -239,6 +254,7 @@ func InitInfo(conf *config.AgentConfig) error {
 		expvar.Publish("stats_writer", expvar.Func(publishStatsWriterInfo))
 		expvar.Publish("service_writer", expvar.Func(publishServiceWriterInfo))
 		expvar.Publish("prioritysampler", expvar.Func(publishPrioritySamplerInfo))
+		expvar.Publish("errorssampler", expvar.Func(publishErrorsSamplerInfo))
 		expvar.Publish("ratebyservice", expvar.Func(publishRateByService))
 		expvar.Publish("watchdog", expvar.Func(publishWatchdogInfo))
 		expvar.Publish("presampler", expvar.Func(publishPreSamplerStats))

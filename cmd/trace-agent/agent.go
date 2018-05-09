@@ -43,6 +43,7 @@ type Agent struct {
 	Concentrator       *Concentrator
 	Filters            []filters.Filter
 	ScoreSampler       *Sampler
+	ErrorsScoreSampler *Sampler
 	PrioritySampler    *Sampler
 	TransactionSampler *TransactionSampler
 	TraceWriter        *writer.TraceWriter
@@ -86,6 +87,7 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	f := filters.Setup(conf)
 
 	ss := NewScoreSampler(conf)
+	ess := NewErrorsSampler(conf)
 	ps := NewPrioritySampler(conf, dynConf)
 	ts := NewTransactionSampler(conf, analyzedTransactionChan)
 	se := NewTraceServiceExtractor(serviceChan)
@@ -99,6 +101,7 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 		Concentrator:       c,
 		Filters:            f,
 		ScoreSampler:       ss,
+		ErrorsScoreSampler: ess,
 		PrioritySampler:    ps,
 		TransactionSampler: ts,
 		TraceWriter:        tw,
@@ -134,6 +137,7 @@ func (a *Agent) Run() {
 	a.ServiceWriter.Start()
 	a.Concentrator.Start()
 	a.ScoreSampler.Run()
+	a.ErrorsScoreSampler.Run()
 	a.PrioritySampler.Run()
 
 	for {
@@ -153,6 +157,7 @@ func (a *Agent) Run() {
 			a.ServiceMapper.Stop()
 			a.ServiceWriter.Stop()
 			a.ScoreSampler.Stop()
+			a.ErrorsScoreSampler.Stop()
 			a.PrioritySampler.Stop()
 			return
 		}
@@ -175,9 +180,13 @@ func (a *Agent) Process(t model.Trace) {
 	// TODO: get the real tagStats related to this trace payload.
 	ts := a.Receiver.stats.GetTagStats(info.Tags{})
 
-	samplers := []*Sampler{
-		// Always use score sampler so it has a real idea of trace distribution
-		a.ScoreSampler,
+	// All traces should go through either through the normal score sampler or
+	// the one dedicated to errors
+	samplers := make([]*Sampler, 0, 2)
+	if traceContainsError(t) {
+		samplers = append(samplers, a.ErrorsScoreSampler)
+	} else {
+		samplers = append(samplers, a.ScoreSampler)
 	}
 
 	priority, hasPriority := root.Metrics[samplingPriorityKey]
@@ -319,4 +328,13 @@ func (a *Agent) watchdog() {
 	a.Receiver.preSampler.SetError(err)
 
 	info.UpdatePreSampler(*a.Receiver.preSampler.Stats())
+}
+
+func traceContainsError(trace model.Trace) bool {
+	for _, span := range trace {
+		if span.Error != 0 {
+			return true
+		}
+	}
+	return false
 }

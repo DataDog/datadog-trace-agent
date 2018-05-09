@@ -4,8 +4,6 @@ import "github.com/DataDog/datadog-trace-agent/sampler"
 
 // SamplerInfo represents internal stats and state of a sampler
 type SamplerInfo struct {
-	// EngineType contains the type of the engine (tells old sampler and new distributed sampler apart)
-	EngineType string
 	// Stats contains statistics about what the sampler is doing.
 	Stats SamplerStats
 	// State is the internal state of the sampler (for debugging mostly)
