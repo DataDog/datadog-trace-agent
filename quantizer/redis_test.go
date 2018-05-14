@@ -24,6 +24,9 @@ func TestRedisQuantizer(t *testing.T) {
 	assert := assert.New(t)
 
 	queryToExpected := []redisTestCase{
+		{"CLIENT",
+			"CLIENT"}, // regression test for DataDog/datadog-trace-agent#421
+
 		{"CLIENT LIST",
 			"CLIENT LIST"},
 
