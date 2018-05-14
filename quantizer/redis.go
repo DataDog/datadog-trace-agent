@@ -53,7 +53,7 @@ func QuantizeRedis(span *model.Span) {
 
 		command := strings.ToUpper(args[0])
 
-		if redisCompoundCommandSet[command] {
+		if redisCompoundCommandSet[command] && len(args) > 1 {
 			if strings.HasSuffix(args[1], redisTruncationMark) {
 				truncated = true
 				continue
