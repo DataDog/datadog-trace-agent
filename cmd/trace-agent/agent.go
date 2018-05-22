@@ -13,6 +13,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/quantizer"
 	"github.com/DataDog/datadog-trace-agent/sampler"
+	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 	"github.com/DataDog/datadog-trace-agent/writer"
 )
@@ -327,7 +328,9 @@ func (a *Agent) watchdog() {
 	a.Receiver.preSampler.SetRate(rate)
 	a.Receiver.preSampler.SetError(err)
 
-	info.UpdatePreSampler(*a.Receiver.preSampler.Stats())
+	preSamplerStats := a.Receiver.preSampler.Stats()
+	statsd.Client.Gauge("datadog.trace_agent.presampler_rate", preSamplerStats.Rate, nil, 1)
+	info.UpdatePreSampler(*preSamplerStats)
 }
 
 func traceContainsError(trace model.Trace) bool {
