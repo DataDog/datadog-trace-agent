@@ -13,7 +13,7 @@ func createTrace(serviceName string, operationName string, topLevel bool) proces
 	return processedTrace{WeightedTrace: wt}
 }
 
-func TestAdd(t *testing.T) {
+func TestTransactionSampler(t *testing.T) {
 	assert := assert.New(t)
 
 	config := make(map[string]map[string]float64)
