@@ -130,7 +130,32 @@ func mergeIniConfig(c *AgentConfig, conf *File) error {
 				continue
 			}
 
-			c.AnalyzedRateByService[service] = rate
+			c.AnalyzedRateByServiceLegacy[service] = rate
+		}
+	}
+
+	// [trace.analyzed_spans] section
+	// undocumented
+	if v, e := conf.GetSection("trace.analyzed_spans"); e == nil {
+		rates := v.KeysHash()
+		for key, rate := range rates {
+			serviceName, operationName, err := parseAnalyzedSpanFormat(key)
+			if err != nil {
+				log.Errorf("Error when parsing names", err)
+				continue
+			}
+			rate, err := strconv.ParseFloat(rate, 64)
+			if err != nil {
+				log.Errorf("failed to parse rate for analyzed service: %v", key)
+				continue
+			}
+
+			service := c.AnalyzedSpansByService[serviceName]
+			if service == nil {
+				service = make(map[string]float64)
+				c.AnalyzedSpansByService[serviceName] = service
+			}
+			service[operationName] = rate
 		}
 	}
 
@@ -338,4 +363,12 @@ func readProxyURL(m *ini.Section) (*url.URL, error) {
 	}
 
 	return url.Parse(path)
+}
+
+func parseAnalyzedSpanFormat(name string) (string, string, error) {
+	splits := strings.Split(name, "/")
+	if len(splits) != 2 {
+		return "", "", fmt.Errorf("Bad format for operation name and service name in: %s, it should have format: service_name/operation_name", name)
+	}
+	return splits[0], splits[1], nil
 }

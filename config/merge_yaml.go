@@ -57,7 +57,8 @@ type traceAgent struct {
 	ServiceWriter serviceWriter `yaml:"service_writer"`
 	StatsWriter   statsWriter   `yaml:"stats_writer"`
 
-	AnalyzedRateByService map[string]float64 `yaml:"analyzed_rate_by_service"`
+	AnalyzedRateByServiceLegacy map[string]float64 `yaml:"analyzed_rate_by_service"`
+	AnalyzedSpans               map[string]float64 `yaml:"analyzed_spans"`
 
 	DDAgentBin string `yaml:"dd_agent_bin"`
 }
@@ -221,8 +222,23 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
 	agentConf.StatsWriterConfig = readStatsWriterConfigYaml(yc.TraceAgent.StatsWriter)
 	agentConf.TraceWriterConfig = readTraceWriterConfigYaml(yc.TraceAgent.TraceWriter)
 
-	// undocumented
-	agentConf.AnalyzedRateByService = yc.TraceAgent.AnalyzedRateByService
+	// undocumented deprecated
+	agentConf.AnalyzedRateByServiceLegacy = yc.TraceAgent.AnalyzedRateByServiceLegacy
+	// undocumeted
+	for key, rate := range yc.TraceAgent.AnalyzedSpans {
+		serviceName, operationName, err := parseAnalyzedSpanFormat(key)
+		if err != nil {
+			log.Errorf("Error when parsing names", err)
+			continue
+		}
+
+		service := agentConf.AnalyzedSpansByService[serviceName]
+		if service == nil {
+			service = make(map[string]float64)
+			agentConf.AnalyzedSpansByService[serviceName] = service
+		}
+		service[operationName] = rate
+	}
 
 	// undocumented
 	agentConf.DDAgentBin = defaultDDAgentBin

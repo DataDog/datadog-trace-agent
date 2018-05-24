@@ -147,10 +147,17 @@ func TestUndocumentedYamlConfig(t *testing.T) {
 	assert.Equal(15*time.Second, agentConfig.StatsWriterConfig.SenderConfig.MaxAge)
 	assert.Equal(int64(2048), agentConfig.StatsWriterConfig.SenderConfig.MaxQueuedBytes)
 	assert.Equal(100, agentConfig.StatsWriterConfig.SenderConfig.MaxQueuedPayloads)
+	// analysis legacy
+	assert.Equal(1.0, agentConfig.AnalyzedRateByServiceLegacy["db"])
+	assert.Equal(0.9, agentConfig.AnalyzedRateByServiceLegacy["web"])
+	assert.Equal(0.5, agentConfig.AnalyzedRateByServiceLegacy["index"])
 	// analysis
-	assert.Equal(1.0, agentConfig.AnalyzedRateByService["db"])
-	assert.Equal(0.9, agentConfig.AnalyzedRateByService["web"])
-	assert.Equal(0.5, agentConfig.AnalyzedRateByService["index"])
+	assert.Len(agentConfig.AnalyzedSpansByService, 2)
+	assert.Len(agentConfig.AnalyzedSpansByService["web"], 2)
+	assert.Len(agentConfig.AnalyzedSpansByService["db"], 1)
+	assert.Equal(agentConfig.AnalyzedSpansByService["web"]["request"], 0.8)
+	assert.Equal(agentConfig.AnalyzedSpansByService["web"]["django.request"], 0.9)
+	assert.Equal(agentConfig.AnalyzedSpansByService["db"]["intake"], 0.05)
 }
 
 func TestConfigNewIfExists(t *testing.T) {
@@ -189,6 +196,14 @@ func TestUndocumentedIni(t *testing.T) {
 	c, err := NewAgentConfig(iniConf, nil, nil)
 	assert.NoError(err)
 
-	assert.Equal(c.AnalyzedRateByService["web"], 0.8)
-	assert.Equal(c.AnalyzedRateByService["intake"], 0.05)
+	// analysis legacy
+	assert.Equal(c.AnalyzedRateByServiceLegacy["web"], 0.8)
+	assert.Equal(c.AnalyzedRateByServiceLegacy["intake"], 0.05)
+	// analysis
+	assert.Len(c.AnalyzedSpansByService, 2)
+	assert.Len(c.AnalyzedSpansByService["web"], 2)
+	assert.Len(c.AnalyzedSpansByService["db"], 1)
+	assert.Equal(c.AnalyzedSpansByService["web"]["request"], 0.8)
+	assert.Equal(c.AnalyzedSpansByService["web"]["django.request"], 0.9)
+	assert.Equal(c.AnalyzedSpansByService["db"]["intake"], 0.05)
 }
