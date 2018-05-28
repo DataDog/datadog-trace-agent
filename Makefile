@@ -16,8 +16,7 @@ VERSION_MINOR := $(if $(VERSION_MINOR),$(VERSION_MINOR), 0)
 VERSION_PATCH := $(if $(VERSION_PATCH),$(VERSION_PATCH), 0)
 
 install:
-	# prepares all dependencies by running the 'deps' task, generating
-	# versioning information and installing the binary.
+	# generate versioning information and installing the binary.
 	go generate ./info
 	go install ./cmd/trace-agent
 
