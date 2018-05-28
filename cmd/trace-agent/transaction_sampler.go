@@ -6,11 +6,13 @@ import (
 	"github.com/DataDog/datadog-trace-agent/sampler"
 )
 
-// TransactionSampler extracts and samples analyzed spans
+// TransactionSampler filters and samples interesting spans in a trace based
+// on the criteria and rates set in the config and returns them via an output
+// channel.
 type TransactionSampler interface {
 	// Enabled tells if the transaction analysis is enabled
 	Enabled() bool
-	// Add extracts analyzed spans and send them to its `analyzed` channel
+	// Add extracts matching spans from the given trace and returns them via the output channel.
 	Add(processedTrace)
 }
 
@@ -25,15 +27,13 @@ func NewTransactionSampler(conf *config.AgentConfig, analyzed chan *model.Span) 
 	return &disabledTransactionSampler{}
 }
 
-type disabledTransactionSampler struct {
-}
+type disabledTransactionSampler struct{}
 
 func (s *disabledTransactionSampler) Enabled() bool {
 	return false
 }
 
-func (s *disabledTransactionSampler) Add(t processedTrace) {
-}
+func (s *disabledTransactionSampler) Add(t processedTrace) {}
 
 type transactionSampler struct {
 	analyzed               chan *model.Span
