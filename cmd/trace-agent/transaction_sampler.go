@@ -63,10 +63,6 @@ func (s *transactionSampler) Add(t processedTrace) {
 }
 
 func (s *transactionSampler) shouldAnalyze(span *model.WeightedSpan) bool {
-	if !span.TopLevel {
-		return false
-	}
-
 	if operations, ok := s.analyzedSpansByService[span.Service]; ok {
 		if analyzeRate, ok := operations[span.Name]; ok {
 			if sampler.SampleByRate(span.TraceID, analyzeRate) {

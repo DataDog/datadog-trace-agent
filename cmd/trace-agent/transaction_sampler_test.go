@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/DataDog/datadog-trace-agent/model"
@@ -20,21 +21,39 @@ func TestTransactionSampler(t *testing.T) {
 	config["myService"] = make(map[string]float64)
 	config["myService"]["myOperation"] = 1
 
-	analyzed := make(chan *model.Span, 10)
-
-	ts := newTransactionSampler(config, analyzed)
-	ts.Add(createTrace("myService", "myOperation", true))
-	ts.Add(createTrace("otherService", "myOperation", true))
-	ts.Add(createTrace("myService", "otherOperation", true))
-	ts.Add(createTrace("otherService", "otherOperation", true))
-	ts.Add(createTrace("myService", "myOperation", false))
-	close(analyzed)
-
-	analyzedSpans := make([]*model.Span, 0)
-	for s := range analyzed {
-		analyzedSpans = append(analyzedSpans, s)
+	tests := []struct {
+		name             string
+		trace            processedTrace
+		expectedSampling bool
+	}{
+		{"Top-level service and span name match", createTrace("myService", "myOperation", true), true},
+		{"Top-level service name doesn't match", createTrace("otherService", "myOperation", true), false},
+		{"Top-level span name doesn't match", createTrace("myService", "otherOperation", true), false},
+		{"Top-level service and span name don't match", createTrace("otherService", "otherOperation", true), false},
+		{"Non top-level service and span name match", createTrace("myService", "myOperation", false), true},
+		{"Non top-level service name doesn't match", createTrace("otherService", "myOperation", false), false},
+		{"Non top-level span name doesn't match", createTrace("myService", "otherOperation", false), false},
+		{"Non top-level service and span name don't match", createTrace("otherService", "otherOperation", false), false},
 	}
 
-	assert.True(ts.Enabled())
-	assert.Len(analyzedSpans, 1)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			analyzed := make(chan *model.Span, 1)
+			ts := newTransactionSampler(config, analyzed)
+			ts.Add(test.trace)
+			close(analyzed)
+
+			analyzedSpans := make([]*model.Span, 0)
+			for s := range analyzed {
+				analyzedSpans = append(analyzedSpans, s)
+			}
+
+			assert.True(ts.Enabled())
+			if test.expectedSampling {
+				assert.Len(analyzedSpans, 1, fmt.Sprintf("Trace %v should have been sampled", test.trace))
+			} else {
+				assert.Len(analyzedSpans, 0, fmt.Sprintf("Trace %v should not have been sampled", test.trace))
+			}
+		})
+	}
 }
