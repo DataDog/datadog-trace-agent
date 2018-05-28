@@ -39,8 +39,8 @@ func TestTransactionSampler(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			analyzed := make(chan *model.Span, 1)
-			ts := newTransactionSampler(config, analyzed)
-			ts.Add(test.trace)
+			ts := newTransactionSampler(config)
+			ts.Extract(test.trace, analyzed)
 			close(analyzed)
 
 			analyzedSpans := make([]*model.Span, 0)

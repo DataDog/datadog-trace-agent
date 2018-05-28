@@ -53,7 +53,8 @@ type Agent struct {
 	ServiceExtractor   *TraceServiceExtractor
 	ServiceMapper      *ServiceMapper
 
-	sampledTraceChan chan *model.Trace
+	sampledTraceChan        chan *model.Trace
+	analyzedTransactionChan chan *model.Span
 
 	// config
 	conf    *config.AgentConfig
@@ -90,7 +91,7 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	ss := NewScoreSampler(conf)
 	ess := NewErrorsSampler(conf)
 	ps := NewPrioritySampler(conf, dynConf)
-	ts := NewTransactionSampler(conf, analyzedTransactionChan)
+	ts := NewTransactionSampler(conf)
 	se := NewTraceServiceExtractor(serviceChan)
 	sm := NewServiceMapper(serviceChan, filteredServiceChan)
 	tw := writer.NewTraceWriter(conf, sampledTraceChan, analyzedTransactionChan)
@@ -98,23 +99,24 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	svcW := writer.NewServiceWriter(conf, filteredServiceChan)
 
 	return &Agent{
-		Receiver:           r,
-		Concentrator:       c,
-		Filters:            f,
-		ScoreSampler:       ss,
-		ErrorsScoreSampler: ess,
-		PrioritySampler:    ps,
-		TransactionSampler: ts,
-		TraceWriter:        tw,
-		StatsWriter:        sw,
-		ServiceWriter:      svcW,
-		ServiceExtractor:   se,
-		ServiceMapper:      sm,
-		sampledTraceChan:   sampledTraceChan,
-		conf:               conf,
-		dynConf:            dynConf,
-		ctx:                ctx,
-		die:                die,
+		Receiver:                r,
+		Concentrator:            c,
+		Filters:                 f,
+		ScoreSampler:            ss,
+		ErrorsScoreSampler:      ess,
+		PrioritySampler:         ps,
+		TransactionSampler:      ts,
+		TraceWriter:             tw,
+		StatsWriter:             sw,
+		ServiceWriter:           svcW,
+		ServiceExtractor:        se,
+		ServiceMapper:           sm,
+		sampledTraceChan:        sampledTraceChan,
+		analyzedTransactionChan: analyzedTransactionChan,
+		conf:    conf,
+		dynConf: dynConf,
+		ctx:     ctx,
+		die:     die,
 	}
 }
 
@@ -297,7 +299,7 @@ func (a *Agent) Process(t model.Trace) {
 	if a.TransactionSampler.Enabled() {
 		go func() {
 			defer watchdog.LogOnPanic()
-			a.TransactionSampler.Add(pt)
+			a.TransactionSampler.Extract(pt, a.analyzedTransactionChan)
 		}()
 	}
 }

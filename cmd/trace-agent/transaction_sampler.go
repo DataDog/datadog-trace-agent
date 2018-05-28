@@ -12,17 +12,17 @@ import (
 type TransactionSampler interface {
 	// Enabled tells if the transaction analysis is enabled
 	Enabled() bool
-	// Add extracts matching spans from the given trace and returns them via the output channel.
-	Add(processedTrace)
+	// Extracts extracts matching spans from the given trace and returns them via the `out` channel.
+	Extract(t processedTrace, out chan *model.Span)
 }
 
 // NewTransactionSampler creates a new empty transaction sampler
-func NewTransactionSampler(conf *config.AgentConfig, analyzed chan *model.Span) TransactionSampler {
+func NewTransactionSampler(conf *config.AgentConfig) TransactionSampler {
 	if len(conf.AnalyzedSpansByService) > 0 {
-		return newTransactionSampler(conf.AnalyzedSpansByService, analyzed)
+		return newTransactionSampler(conf.AnalyzedSpansByService)
 	}
 	if len(conf.AnalyzedRateByServiceLegacy) > 0 {
-		return newLegacyTransactionSampler(conf.AnalyzedRateByServiceLegacy, analyzed)
+		return newLegacyTransactionSampler(conf.AnalyzedRateByServiceLegacy)
 	}
 	return &disabledTransactionSampler{}
 }
@@ -33,16 +33,14 @@ func (s *disabledTransactionSampler) Enabled() bool {
 	return false
 }
 
-func (s *disabledTransactionSampler) Add(t processedTrace) {}
+func (s *disabledTransactionSampler) Extract(t processedTrace, out chan *model.Span) {}
 
 type transactionSampler struct {
-	analyzed               chan *model.Span
 	analyzedSpansByService map[string]map[string]float64
 }
 
-func newTransactionSampler(analyzedSpansByService map[string]map[string]float64, analyzed chan *model.Span) *transactionSampler {
+func newTransactionSampler(analyzedSpansByService map[string]map[string]float64) *transactionSampler {
 	return &transactionSampler{
-		analyzed:               analyzed,
 		analyzedSpansByService: analyzedSpansByService,
 	}
 }
@@ -53,11 +51,11 @@ func (s *transactionSampler) Enabled() bool {
 }
 
 // Add extracts analyzed spans and send them to its `analyzed` channel
-func (s *transactionSampler) Add(t processedTrace) {
+func (s *transactionSampler) Extract(t processedTrace, out chan *model.Span) {
 	// inspect the WeightedTrace so that we can identify top-level spans
 	for _, span := range t.WeightedTrace {
 		if s.shouldAnalyze(span) {
-			s.analyzed <- span.Span
+			out <- span.Span
 		}
 	}
 }
@@ -74,13 +72,11 @@ func (s *transactionSampler) shouldAnalyze(span *model.WeightedSpan) bool {
 }
 
 type legacyTransactionSampler struct {
-	analyzed              chan *model.Span
 	analyzedRateByService map[string]float64
 }
 
-func newLegacyTransactionSampler(analyzedRateByService map[string]float64, analyzed chan *model.Span) *legacyTransactionSampler {
+func newLegacyTransactionSampler(analyzedRateByService map[string]float64) *legacyTransactionSampler {
 	return &legacyTransactionSampler{
-		analyzed:              analyzed,
 		analyzedRateByService: analyzedRateByService,
 	}
 }
@@ -90,12 +86,12 @@ func (s *legacyTransactionSampler) Enabled() bool {
 	return true
 }
 
-// Add extracts analyzed spans and send them to its `analyzed` channel
-func (s *legacyTransactionSampler) Add(t processedTrace) {
+// Add extracts analyzed spans and send them to the `out` channel
+func (s *legacyTransactionSampler) Extract(t processedTrace, out chan *model.Span) {
 	// inspect the WeightedTrace so that we can identify top-level spans
 	for _, span := range t.WeightedTrace {
 		if s.shouldAnalyze(span) {
-			s.analyzed <- span.Span
+			out <- span.Span
 		}
 	}
 }
