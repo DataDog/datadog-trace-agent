@@ -369,7 +369,7 @@ func readProxyURL(m *ini.Section) (*url.URL, error) {
 func parseAnalyzedSpanFormat(name string) (string, string, error) {
 	splits := strings.Split(name, "|")
 	if len(splits) != 2 {
-		return "", "", fmt.Errorf("Bad format for operation name and service name in: %s, it should have format: service_name/operation_name", name)
+		return "", "", fmt.Errorf("Bad format for operation name and service name in: %s, it should have format: service_name|operation_name", name)
 	}
 	return splits[0], splits[1], nil
 }
