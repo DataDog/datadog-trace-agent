@@ -122,6 +122,7 @@ func mergeIniConfig(c *AgentConfig, conf *File) error {
 	// [trace.analyzed_rate_by_service] section
 	// undocumented
 	if v, e := conf.GetSection("trace.analyzed_rate_by_service"); e == nil {
+		log.Warn("analyzed_rate_by_service is deprecated, please use analyzed_spans instead")
 		rates := v.KeysHash()
 		for service, rate := range rates {
 			rate, err := strconv.ParseFloat(rate, 64)

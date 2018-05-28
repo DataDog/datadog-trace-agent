@@ -224,6 +224,9 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
 
 	// undocumented deprecated
 	agentConf.AnalyzedRateByServiceLegacy = yc.TraceAgent.AnalyzedRateByServiceLegacy
+	if len(yc.TraceAgent.AnalyzedRateByServiceLegacy) > 0 {
+		log.Warn("analyzed_rate_by_service is deprecated, please use analyzed_spans instead")
+	}
 	// undocumeted
 	for key, rate := range yc.TraceAgent.AnalyzedSpans {
 		serviceName, operationName, err := parseAnalyzedSpanFormat(key)
