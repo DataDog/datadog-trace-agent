@@ -13,7 +13,7 @@ type TransactionSampler interface {
 	// Enabled tells if the transaction analysis is enabled
 	Enabled() bool
 	// Extracts extracts matching spans from the given trace and returns them via the `out` channel.
-	Extract(t processedTrace, out chan *model.Span)
+	Extract(t processedTrace, out chan<- *model.Span)
 }
 
 // NewTransactionSampler creates a new empty transaction sampler
@@ -33,7 +33,7 @@ func (s *disabledTransactionSampler) Enabled() bool {
 	return false
 }
 
-func (s *disabledTransactionSampler) Extract(t processedTrace, out chan *model.Span) {}
+func (s *disabledTransactionSampler) Extract(t processedTrace, out chan<- *model.Span) {}
 
 type transactionSampler struct {
 	analyzedSpansByService map[string]map[string]float64
@@ -51,7 +51,7 @@ func (s *transactionSampler) Enabled() bool {
 }
 
 // Add extracts analyzed spans and send them to its `analyzed` channel
-func (s *transactionSampler) Extract(t processedTrace, out chan *model.Span) {
+func (s *transactionSampler) Extract(t processedTrace, out chan<- *model.Span) {
 	// inspect the WeightedTrace so that we can identify top-level spans
 	for _, span := range t.WeightedTrace {
 		if s.shouldAnalyze(span) {
@@ -87,7 +87,7 @@ func (s *legacyTransactionSampler) Enabled() bool {
 }
 
 // Add extracts analyzed spans and send them to the `out` channel
-func (s *legacyTransactionSampler) Extract(t processedTrace, out chan *model.Span) {
+func (s *legacyTransactionSampler) Extract(t processedTrace, out chan<- *model.Span) {
 	// inspect the WeightedTrace so that we can identify top-level spans
 	for _, span := range t.WeightedTrace {
 		if s.shouldAnalyze(span) {
