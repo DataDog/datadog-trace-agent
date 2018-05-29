@@ -48,7 +48,6 @@ func TestTransactionSampler(t *testing.T) {
 				analyzedSpans = append(analyzedSpans, s)
 			}
 
-			assert.True(ts.Enabled())
 			if test.expectedSampling {
 				assert.Len(analyzedSpans, 1, fmt.Sprintf("Trace %v should have been sampled", test.trace))
 			} else {

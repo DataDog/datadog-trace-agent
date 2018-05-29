@@ -283,10 +283,13 @@ func (a *Agent) Process(t model.Trace) {
 		// sampled either by the trace or transaction pipeline so we return here
 		return
 	}
+
+	// Run both full trace sampling and transaction extraction in another goroutine
 	go func() {
 		defer watchdog.LogOnPanic()
-		sampled := false
 
+		// Trace sampling
+		sampled := false
 		for _, s := range samplers {
 			// Consider trace as sampled if at least one of the samplers kept it
 			sampled = s.Add(pt) || sampled
@@ -295,13 +298,10 @@ func (a *Agent) Process(t model.Trace) {
 		if sampled {
 			a.sampledTraceChan <- &pt.Trace
 		}
+
+		// Transactions extraction
+		a.TransactionSampler.Extract(pt, a.analyzedTransactionChan)
 	}()
-	if a.TransactionSampler.Enabled() {
-		go func() {
-			defer watchdog.LogOnPanic()
-			a.TransactionSampler.Extract(pt, a.analyzedTransactionChan)
-		}()
-	}
 }
 
 func (a *Agent) watchdog() {
