@@ -11,6 +11,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/filters"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/poller"
 	"github.com/DataDog/datadog-trace-agent/quantizer"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/statsd"
@@ -78,6 +79,12 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	serviceChan := make(chan model.ServicesMetadata, 50)
 	filteredServiceChan := make(chan model.ServicesMetadata, 50)
 
+	var p *poller.Poller
+	if conf.EnableConfigPolling {
+		// poll for new config
+		p = poller.NewDefaultConfigPoller(conf.APIKey, conf.ConfigPersistPath)
+	}
+
 	// create components
 	r := NewHTTPReceiver(conf, dynConf, rawTraceChan, serviceChan)
 	c := NewConcentrator(
@@ -90,9 +97,11 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	ss := NewScoreSampler(conf)
 	ess := NewErrorsSampler(conf)
 	ps := NewPrioritySampler(conf, dynConf)
-	ts := NewTransactionSampler(conf, analyzedTransactionChan)
+	ts := NewTransactionSampler(conf, analyzedTransactionChan, p)
+
 	se := NewTraceServiceExtractor(serviceChan)
 	sm := NewServiceMapper(serviceChan, filteredServiceChan)
+
 	tw := writer.NewTraceWriter(conf, sampledTraceChan, analyzedTransactionChan)
 	sw := writer.NewStatsWriter(conf, statsChan)
 	svcW := writer.NewServiceWriter(conf, filteredServiceChan)
