@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"text/template"
@@ -332,7 +331,7 @@ func Info(w io.Writer, conf *config.AgentConfig) error {
 	if host == "0.0.0.0" {
 		host = "127.0.0.1" // [FIXME:christian] not fool-proof
 	}
-	url := "http://localhost:" + strconv.Itoa(conf.ReceiverPort) + "/debug/vars"
+	url := fmt.Sprintf("http://%s:%d/debug/vars", conf.ReceiverHost, conf.ReceiverPort)
 	client := http.Client{Timeout: 3 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
