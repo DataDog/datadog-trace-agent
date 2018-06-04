@@ -75,13 +75,19 @@ it manually.
 
 ## Development
 
-Pre-requisites:
-- `go` 1.9+
+First, make sure Go 1.9+ is installed. You can do this by following the steps on the [official website](https://golang.org/dl/).
 
-
-Build and run from source:
-- Run `make install` to install the `trace-agent` binary in $GOPATH/bin
-- You may then run it with `trace-agent --config PATH_TO_YOUR_DATADOG_CONFIG_FILE`
+Then, download (or update) the latest source by running:
+```bash
+go get -u github.com/DataDog/datadog-trace-agent/...
+```
+Navigate to the download location and install the `trace-agent` binary in $GOPATH/bin:
+```bash
+cd $GOPATH/src/github.com/DataDog/datadog-trace-agent
+make install
+```
+You may now run the agent using `trace-agent --config /etc/dd-agent/datadog.conf`, considering
+that $GOPATH/bin has been added to your $PATH.
 
 
 ## Testing
