@@ -84,6 +84,7 @@ type serviceWriter struct {
 }
 
 type statsWriter struct {
+	MaxEntriesPerPayload   int                    `yaml:"max_entries_per_payload"`
 	UpdateInfoPeriod       int                    `yaml:"update_info_period_seconds"`
 	QueueablePayloadSender queueablePayloadSender `yaml:"queue"`
 }
@@ -267,6 +268,10 @@ func readServiceWriterConfigYaml(yc serviceWriter) writerconfig.ServiceWriterCon
 
 func readStatsWriterConfigYaml(yc statsWriter) writerconfig.StatsWriterConfig {
 	c := writerconfig.DefaultStatsWriterConfig()
+
+	if yc.MaxEntriesPerPayload > 0 {
+		c.MaxEntriesPerPayload = yc.MaxEntriesPerPayload
+	}
 
 	if yc.UpdateInfoPeriod > 0 {
 		c.UpdateInfoPeriod = getDuration(yc.UpdateInfoPeriod)
