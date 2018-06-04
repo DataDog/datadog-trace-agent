@@ -99,25 +99,16 @@ func (w *StatsWriter) Stop() {
 }
 
 func (w *StatsWriter) handleStats(stats []model.StatsBucket) {
-	numStats := len(stats)
-	if numStats == 0 {
+	payloads, nbStatBuckets, nbEntries := w.buildPayloads(stats, w.conf.MaxEntriesPerPayload)
+	if len(payloads) == 0 {
 		return
 	}
 
-	log.Debugf("going to flush stats buckets, %d buckets", numStats)
-	atomic.AddInt64(&w.info.StatsBuckets, int64(numStats))
+	log.Debugf("going to flush %v entries in %v stat buckets in %v payloads",
+		nbEntries, nbStatBuckets, len(payloads),
+	)
 
-	statsPayload := &model.StatsPayload{
-		HostName: w.hostName,
-		Env:      w.env,
-		Stats:    stats,
-	}
-
-	data, err := model.EncodeStatsPayload(statsPayload)
-	if err != nil {
-		log.Errorf("encoding issue: %v", err)
-		return
-	}
+	atomic.AddInt64(&w.info.StatsBuckets, int64(nbStatBuckets))
 
 	headers := map[string]string{
 		languageHeaderKey:  strings.Join(info.Languages(), "|"),
@@ -125,11 +116,128 @@ func (w *StatsWriter) handleStats(stats []model.StatsBucket) {
 		"Content-Encoding": "gzip",
 	}
 
-	atomic.AddInt64(&w.info.Bytes, int64(len(data)))
+	for _, p := range payloads {
+		// synchronously send the payloads one after the other
+		data, err := model.EncodeStatsPayload(p)
+		if err != nil {
+			log.Errorf("encoding issue: %v", err)
+			return
+		}
 
-	payload := NewPayload(data, headers)
+		payload := NewPayload(data, headers)
+		w.payloadSender.Send(payload)
 
-	w.payloadSender.Send(payload)
+		atomic.AddInt64(&w.info.Bytes, int64(len(data)))
+	}
+}
+
+type timeWindow struct {
+	start, duration int64
+}
+
+// buildPayloads returns a set of payload to send out, each paylods guaranteed
+// to have the number of stats buckets under the given maximum.
+func (w *StatsWriter) buildPayloads(stats []model.StatsBucket, maxEntriesPerPayloads int) ([]*model.StatsPayload, int, int) {
+	if len(stats) == 0 {
+		return []*model.StatsPayload{}, 0, 0
+	}
+
+	// 1. Get an estimate of how many payloads we need, based on the total
+	//    number of map entries (i.e.: sum of number of items in the stats
+	//    bucket's count map).
+	//    NOTE: we use the number of items in the count map as the
+	//    reference, but in reality, what take place are the
+	//    distributions. We are guaranteed the number of entries in the
+	//    count map is > than the number of entries in the distributions
+	//    maps, so the algorithm is correct, but indeed this means we could
+	//    do better.
+	nbEntries := 0
+	for _, s := range stats {
+		nbEntries += len(s.Counts)
+	}
+
+	if maxEntriesPerPayloads <= 0 || nbEntries < maxEntriesPerPayloads {
+		// nothing to do, break early
+		return []*model.StatsPayload{&model.StatsPayload{
+			HostName: w.hostName,
+			Env:      w.env,
+			Stats:    stats,
+		}}, len(stats), nbEntries
+	}
+
+	nbPayloads := nbEntries / maxEntriesPerPayloads
+	if nbEntries%maxEntriesPerPayloads != 0 {
+		nbPayloads++
+	}
+
+	// 2. Create a slice of nbPayloads maps, mapping a time window (stat +
+	//    duration) to a stat bucket. We will build the payloads from these
+	//    maps. This allows is to have one stat bucket per time window.
+	pMaps := make([]map[timeWindow]model.StatsBucket, nbPayloads)
+	for i := 0; i < nbPayloads; i++ {
+		pMaps[i] = make(map[timeWindow]model.StatsBucket, nbPayloads)
+	}
+
+	// 3. Iterate over all entries of each stats. Add the entry to one of
+	//    the payload container mappings, in a round robin fashion. In some
+	//    edge cases, we can end up having the same entry in several
+	//    inputted stat buckets. We must check that we never overwrite an
+	//    entry in the new stats buckets but cleanly merge instead.
+	i := 0
+	for _, b := range stats {
+		tw := timeWindow{b.Start, b.Duration}
+
+		for ekey, e := range b.Counts {
+			pm := pMaps[i%nbPayloads]
+			newsb, ok := pm[tw]
+			if !ok {
+				newsb = model.NewStatsBucket(tw.start, tw.duration)
+			}
+			pm[tw] = newsb
+
+			if _, ok := newsb.Counts[ekey]; ok {
+				newsb.Counts[ekey].Merge(e)
+			} else {
+				newsb.Counts[ekey] = e
+			}
+
+			if _, ok := b.Distributions[ekey]; ok {
+				if _, ok := newsb.Distributions[ekey]; ok {
+					newsb.Distributions[ekey].Merge(b.Distributions[ekey])
+				} else {
+					newsb.Distributions[ekey] = b.Distributions[ekey]
+				}
+			}
+			if _, ok := b.ErrDistributions[ekey]; ok {
+				if _, ok := newsb.ErrDistributions[ekey]; ok {
+					newsb.ErrDistributions[ekey].Merge(b.ErrDistributions[ekey])
+				} else {
+					newsb.ErrDistributions[ekey] = b.ErrDistributions[ekey]
+				}
+			}
+			i++
+		}
+	}
+
+	// 4. Create the nbPayloads payloads from the maps.
+	nbStats := 0
+	nbEntries = 0
+	payloads := make([]*model.StatsPayload, 0, nbPayloads)
+	for _, pm := range pMaps {
+		pstats := make([]model.StatsBucket, 0, len(pm))
+		for _, sb := range pm {
+			pstats = append(pstats, sb)
+			nbEntries += len(sb.Counts)
+		}
+		payloads = append(payloads, &model.StatsPayload{
+			HostName: w.hostName,
+			Env:      w.env,
+			Stats:    pstats,
+		})
+
+		nbStats += len(pstats)
+	}
+	return payloads, nbStats, nbEntries
 }
 
 // monitor runs the event loop of the writer's monitoring
