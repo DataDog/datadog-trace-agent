@@ -77,7 +77,8 @@ type AgentConfig struct {
 	ReplaceTags []*ReplaceRule
 
 	// transaction analytics
-	AnalyzedRateByService map[string]float64
+	AnalyzedRateByServiceLegacy map[string]float64
+	AnalyzedSpansByService      map[string]map[string]float64
 
 	// infrastructure agent binary
 	DDAgentBin string // DDAgentBin will be "" for Agent5 scenarios
@@ -119,8 +120,9 @@ func NewDefaultAgentConfig() *AgentConfig {
 		MaxConnections:   200, // in practice, rarely goes over 20
 		WatchdogInterval: time.Minute,
 
-		Ignore:                make(map[string][]string),
-		AnalyzedRateByService: make(map[string]float64),
+		Ignore: make(map[string][]string),
+		AnalyzedRateByServiceLegacy: make(map[string]float64),
+		AnalyzedSpansByService:      make(map[string]map[string]float64),
 	}
 }
 
