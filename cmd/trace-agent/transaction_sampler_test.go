@@ -38,15 +38,8 @@ func TestTransactionSampler(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			analyzed := make(chan *model.Span, 1)
 			ts := newTransactionSampler(config)
-			ts.Extract(test.trace, analyzed)
-			close(analyzed)
-
-			analyzedSpans := make([]*model.Span, 0)
-			for s := range analyzed {
-				analyzedSpans = append(analyzedSpans, s)
-			}
+			analyzedSpans := ts.Extract(test.trace)
 
 			if test.expectedSampling {
 				assert.Len(analyzedSpans, 1, fmt.Sprintf("Trace %v should have been sampled", test.trace))

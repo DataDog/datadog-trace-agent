@@ -53,8 +53,7 @@ type Agent struct {
 	ServiceExtractor   *TraceServiceExtractor
 	ServiceMapper      *ServiceMapper
 
-	sampledTraceChan        chan *model.Trace
-	analyzedTransactionChan chan *model.Span
+	sampledTraceChan chan *writer.SampledTrace
 
 	// config
 	conf    *config.AgentConfig
@@ -73,8 +72,7 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 
 	// inter-component channels
 	rawTraceChan := make(chan model.Trace, 5000) // about 1000 traces/sec for 5 sec, TODO: move to *model.Trace
-	sampledTraceChan := make(chan *model.Trace)
-	analyzedTransactionChan := make(chan *model.Span)
+	sampledTraceChan := make(chan *writer.SampledTrace)
 	statsChan := make(chan []model.StatsBucket)
 	serviceChan := make(chan model.ServicesMetadata, 50)
 	filteredServiceChan := make(chan model.ServicesMetadata, 50)
@@ -94,29 +92,28 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	ts := NewTransactionSampler(conf)
 	se := NewTraceServiceExtractor(serviceChan)
 	sm := NewServiceMapper(serviceChan, filteredServiceChan)
-	tw := writer.NewTraceWriter(conf, sampledTraceChan, analyzedTransactionChan)
+	tw := writer.NewTraceWriter(conf, sampledTraceChan)
 	sw := writer.NewStatsWriter(conf, statsChan)
 	svcW := writer.NewServiceWriter(conf, filteredServiceChan)
 
 	return &Agent{
-		Receiver:                r,
-		Concentrator:            c,
-		Filters:                 f,
-		ScoreSampler:            ss,
-		ErrorsScoreSampler:      ess,
-		PrioritySampler:         ps,
-		TransactionSampler:      ts,
-		TraceWriter:             tw,
-		StatsWriter:             sw,
-		ServiceWriter:           svcW,
-		ServiceExtractor:        se,
-		ServiceMapper:           sm,
-		sampledTraceChan:        sampledTraceChan,
-		analyzedTransactionChan: analyzedTransactionChan,
-		conf:    conf,
-		dynConf: dynConf,
-		ctx:     ctx,
-		die:     die,
+		Receiver:           r,
+		Concentrator:       c,
+		Filters:            f,
+		ScoreSampler:       ss,
+		ErrorsScoreSampler: ess,
+		PrioritySampler:    ps,
+		TransactionSampler: ts,
+		TraceWriter:        tw,
+		StatsWriter:        sw,
+		ServiceWriter:      svcW,
+		ServiceExtractor:   se,
+		ServiceMapper:      sm,
+		sampledTraceChan:   sampledTraceChan,
+		conf:               conf,
+		dynConf:            dynConf,
+		ctx:                ctx,
+		die:                die,
 	}
 }
 
@@ -295,12 +292,17 @@ func (a *Agent) Process(t model.Trace) {
 			sampled = s.Add(pt) || sampled
 		}
 
+		var sampledTrace writer.SampledTrace
+
 		if sampled {
-			a.sampledTraceChan <- &pt.Trace
+			sampledTrace.Trace = &pt.Trace
 		}
 
-		// Transactions extraction
-		a.TransactionSampler.Extract(pt, a.analyzedTransactionChan)
+		sampledTrace.Transactions = a.TransactionSampler.Extract(pt)
+
+		if !sampledTrace.Empty() {
+			a.sampledTraceChan <- &sampledTrace
+		}
 	}()
 }
 

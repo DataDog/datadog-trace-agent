@@ -17,14 +17,24 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
+// SampledTrace represents the result of a trace sample operation.
+type SampledTrace struct {
+	Trace        *model.Trace
+	Transactions []*model.Span
+}
+
+// Empty returns true if this SampledTrace has no data.
+func (s *SampledTrace) Empty() bool {
+	return s.Trace == nil && len(s.Transactions) == 0
+}
+
 // TraceWriter ingests sampled traces and flushes them to the API.
 type TraceWriter struct {
-	stats          info.TraceWriterInfo
-	hostName       string
-	env            string
-	conf           writerconfig.TraceWriterConfig
-	InTraces       <-chan *model.Trace
-	InTransactions <-chan *model.Span
+	stats    info.TraceWriterInfo
+	hostName string
+	env      string
+	conf     writerconfig.TraceWriterConfig
+	in       <-chan *SampledTrace
 
 	traces        []*model.APITrace
 	transactions  []*model.Span
@@ -34,7 +44,7 @@ type TraceWriter struct {
 }
 
 // NewTraceWriter returns a new writer for traces.
-func NewTraceWriter(conf *config.AgentConfig, InTraces <-chan *model.Trace, InTransactions <-chan *model.Span) *TraceWriter {
+func NewTraceWriter(conf *config.AgentConfig, in <-chan *SampledTrace) *TraceWriter {
 	writerConf := conf.TraceWriterConfig
 	log.Infof("Trace writer initializing with config: %+v", writerConf)
 
@@ -46,8 +56,7 @@ func NewTraceWriter(conf *config.AgentConfig, InTraces <-chan *model.Trace, InTr
 		traces:       []*model.APITrace{},
 		transactions: []*model.Span{},
 
-		InTraces:       InTraces,
-		InTransactions: InTransactions,
+		in: in,
 
 		BaseWriter: *NewBaseWriter(conf, "/api/v0.2/traces", func(endpoint Endpoint) PayloadSender {
 			return NewCustomQueuablePayloadSender(endpoint, writerConf.SenderConfig)
@@ -109,15 +118,8 @@ func (w *TraceWriter) Run() {
 
 	for {
 		select {
-		case trace := <-w.InTraces:
-			if trace == nil {
-				continue
-			}
-			w.handleTrace(trace)
-		case transaction := <-w.InTransactions:
-			// no need for lock for now as flush is sequential
-			// TODO: async flush/retry
-			w.transactions = append(w.transactions, transaction)
+		case sampledTrace := <-w.in:
+			w.handleSampledTrace(sampledTrace)
 		case <-flushTicker.C:
 			log.Debug("Flushing current traces")
 			w.flush()
@@ -126,6 +128,7 @@ func (w *TraceWriter) Run() {
 		case <-w.exit:
 			log.Info("exiting trace writer, flushing all remaining traces")
 			w.flush()
+			w.updateInfo()
 			log.Info("Flushed. Exiting")
 			return
 		}
@@ -139,52 +142,63 @@ func (w *TraceWriter) Stop() {
 	w.BaseWriter.Stop()
 }
 
-func (w *TraceWriter) handleTrace(trace *model.Trace) {
-	if len(*trace) == 0 {
-		log.Debugf("Ignoring 0-length trace")
+func (w *TraceWriter) handleSampledTrace(sampledTrace *SampledTrace) {
+	if sampledTrace == nil || sampledTrace.Empty() {
+		log.Debug("Ignoring empty sampled trace")
+		return
+	}
+
+	trace := sampledTrace.Trace
+	transactions := sampledTrace.Transactions
+
+	var n int
+
+	if trace != nil {
+		n += len(*trace)
+	}
+
+	if transactions != nil {
+		n += len(transactions)
+	}
+
+	if w.spansInBuffer > 0 && w.spansInBuffer+n > w.conf.MaxSpansPerPayload {
+		// If we have data pending and adding the new data would overflow max spans per payload, force a flush
+		w.flushDueToMaxSpansPerPayload()
+	}
+
+	w.appendTrace(sampledTrace.Trace)
+	w.appendTransactions(sampledTrace.Transactions)
+
+	if n > w.conf.MaxSpansPerPayload {
+		// If what we just added already goes over the limit, report this but lets carry on and flush
+		atomic.AddInt64(&w.stats.SingleMaxSpans, 1)
+		w.flushDueToMaxSpansPerPayload()
+	}
+}
+
+func (w *TraceWriter) appendTrace(trace *model.Trace) {
+	if trace == nil || len(*trace) == 0 {
 		return
 	}
 
 	log.Tracef("Handling new trace with %d spans: %v", len(*trace), trace)
 
-	spanOverflow := w.spansInBuffer + len(*trace) - w.conf.MaxSpansPerPayload
-
-	var splitTrace model.Trace
-
-	// If we overflow max spans per payload split last trace
-	// (necessarily the one that went over the limit otherwise we'd have split earlier)
-	if spanOverflow > 0 {
-		log.Debugf("Detected span overflow. Splitting trace: MaxSpansPerPayload=%d, len(trace)=%d, spanOverflow=%d",
-			w.conf.MaxSpansPerPayload, len(*trace), spanOverflow)
-		// Find the split index
-		splitIndex := len(*trace) - spanOverflow
-		log.Debugf("Splitting trace at index %d", splitIndex)
-		// Set the spans of the split trace to the ones over the split index
-		splitTrace = (*trace)[splitIndex:]
-		// Set the spans of the original to the ones below the split index so it ends up with a non-overflowing amount
-		// of traces
-		truncatedTrace := (*trace)[:splitIndex]
-		trace = &truncatedTrace
-	}
-
 	w.traces = append(w.traces, trace.APITrace())
 	w.spansInBuffer += len(*trace)
-	log.Tracef("Added new trace to buffer. spansInBuffer=%d, len(w.traces)=%d", w.spansInBuffer, len(w.traces))
+}
 
-	if w.spansInBuffer == w.conf.MaxSpansPerPayload {
-		log.Debugf("Flushing because we reached max per payload")
-		// If current number of spans in buffer reached the limit, flush
-		w.flush()
-	} else if w.spansInBuffer > w.conf.MaxSpansPerPayload {
-		// Should never happen due to overflow detection above but just in case
-		panic("Number of spans in buffer went over the limit")
+func (w *TraceWriter) appendTransactions(transactions []*model.Span) {
+	for _, transaction := range transactions {
+		log.Tracef("Handling new transaction: %v", transaction)
+		w.transactions = append(w.transactions, transaction)
 	}
 
-	// Handle the split trace if it exists (this allows a single trace to be split multiple times)
-	if len(splitTrace) > 0 {
-		log.Debugf("Found split trace, handling it")
-		w.handleTrace(&splitTrace)
-	}
+	w.spansInBuffer += len(transactions)
+}
+
+func (w *TraceWriter) flushDueToMaxSpansPerPayload() {
+	log.Debugf("Flushing because we reached max per payload")
+	w.flush()
 }
 
 func (w *TraceWriter) flush() {
@@ -266,6 +280,7 @@ func (w *TraceWriter) updateInfo() {
 	twInfo.Bytes = atomic.SwapInt64(&w.stats.Bytes, 0)
 	twInfo.Retries = atomic.SwapInt64(&w.stats.Retries, 0)
 	twInfo.Errors = atomic.SwapInt64(&w.stats.Errors, 0)
+	twInfo.SingleMaxSpans = atomic.SwapInt64(&w.stats.SingleMaxSpans, 0)
 
 	w.statsClient.Count("datadog.trace_agent.trace_writer.payloads", int64(twInfo.Payloads), nil, 1)
 	w.statsClient.Count("datadog.trace_agent.trace_writer.traces", int64(twInfo.Traces), nil, 1)
@@ -274,6 +289,7 @@ func (w *TraceWriter) updateInfo() {
 	w.statsClient.Count("datadog.trace_agent.trace_writer.bytes", int64(twInfo.Bytes), nil, 1)
 	w.statsClient.Count("datadog.trace_agent.trace_writer.retries", int64(twInfo.Retries), nil, 1)
 	w.statsClient.Count("datadog.trace_agent.trace_writer.errors", int64(twInfo.Errors), nil, 1)
+	w.statsClient.Count("datadog.trace_agent.trace_writer.single_max_spans", int64(twInfo.SingleMaxSpans), nil, 1)
 
 	info.UpdateTraceWriterInfo(twInfo)
 }

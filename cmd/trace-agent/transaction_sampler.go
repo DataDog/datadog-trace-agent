@@ -6,12 +6,10 @@ import (
 	"github.com/DataDog/datadog-trace-agent/sampler"
 )
 
-// TransactionSampler filters and samples interesting spans in a trace based
-// on the criteria and rates set in the config and returns them via an output
-// channel.
+// TransactionSampler filters and samples interesting spans in a trace based on implementation specific criteria.
 type TransactionSampler interface {
-	// Extracts extracts matching spans from the given trace and returns them via the `out` channel.
-	Extract(t processedTrace, out chan<- *model.Span)
+	// Extract extracts matching spans from the given trace and returns them.
+	Extract(t processedTrace) []*model.Span
 }
 
 // NewTransactionSampler creates a new empty transaction sampler
@@ -27,7 +25,9 @@ func NewTransactionSampler(conf *config.AgentConfig) TransactionSampler {
 
 type disabledTransactionSampler struct{}
 
-func (s *disabledTransactionSampler) Extract(t processedTrace, out chan<- *model.Span) {}
+func (s *disabledTransactionSampler) Extract(t processedTrace) []*model.Span {
+	return nil
+}
 
 type transactionSampler struct {
 	analyzedSpansByService map[string]map[string]float64
@@ -39,14 +39,18 @@ func newTransactionSampler(analyzedSpansByService map[string]map[string]float64)
 	}
 }
 
-// Add extracts analyzed spans and send them to its `analyzed` channel
-func (s *transactionSampler) Extract(t processedTrace, out chan<- *model.Span) {
+// Extract extracts analyzed spans and returns them as a slice
+func (s *transactionSampler) Extract(t processedTrace) []*model.Span {
+	var transactions []*model.Span
+
 	// inspect the WeightedTrace so that we can identify top-level spans
 	for _, span := range t.WeightedTrace {
 		if s.shouldAnalyze(span) {
-			out <- span.Span
+			transactions = append(transactions, span.Span)
 		}
 	}
+
+	return transactions
 }
 
 func (s *transactionSampler) shouldAnalyze(span *model.WeightedSpan) bool {
@@ -70,14 +74,18 @@ func newLegacyTransactionSampler(analyzedRateByService map[string]float64) *lega
 	}
 }
 
-// Add extracts analyzed spans and send them to the `out` channel
-func (s *legacyTransactionSampler) Extract(t processedTrace, out chan<- *model.Span) {
+// Extract extracts analyzed spans and returns them as a slice
+func (s *legacyTransactionSampler) Extract(t processedTrace) []*model.Span {
+	var transactions []*model.Span
+
 	// inspect the WeightedTrace so that we can identify top-level spans
 	for _, span := range t.WeightedTrace {
 		if s.shouldAnalyze(span) {
-			out <- span.Span
+			transactions = append(transactions, span.Span)
 		}
 	}
+
+	return transactions
 }
 
 // shouldAnalyze tells if a span should be considered as analyzed
