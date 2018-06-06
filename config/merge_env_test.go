@@ -15,22 +15,20 @@ func TestAnalyzedSpansEnvConfigParsing(t *testing.T) {
 	assert.Nil(err)
 	assert.Len(a, 1)
 	assert.Len(a["service"], 1)
-	assert.Equal(a["service"]["operation"], float64(1))
+	assert.Equal(float64(1), a["service"]["operation"])
 
-	a = nil
 	a, err = readAnalyzedSpanEnvVariable("service|operation=0.01")
 	assert.Nil(err)
 	assert.Len(a, 1)
 	assert.Len(a["service"], 1)
-	assert.Equal(a["service"]["operation"], 0.01)
+	assert.Equal(0.01, a["service"]["operation"])
 
-	a = nil
 	a, err = readAnalyzedSpanEnvVariable("service|operation=1,service2|operation2=1")
 	assert.Nil(err)
 	assert.Len(a, 2)
 	assert.Len(a["service"], 1)
-	assert.Equal(a["service"]["operation"], float64(1))
-	assert.Equal(a["service2"]["operation2"], float64(1))
+	assert.Equal(float64(1), a["service"]["operation"])
+	assert.Equal(float64(1), a["service2"]["operation2"])
 
 	a, err = readAnalyzedSpanEnvVariable("")
 	assert.Nil(err)
