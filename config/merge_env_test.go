@@ -9,8 +9,7 @@ import (
 func TestAnalyzedSpansEnvConfigParsing(t *testing.T) {
 	assert := assert.New(t)
 
-	// Check valid cases
-	t.Run("Check Valid Cases", func(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
 		a, err := parseAnalyzedSpans("service|operation=1")
 		assert.Nil(err)
 		assert.Len(a, 1)
@@ -35,7 +34,7 @@ func TestAnalyzedSpansEnvConfigParsing(t *testing.T) {
 		assert.Len(a, 0)
 	})
 
-	t.Run("Check Errors", func(t *testing.T) {
+	t.Run("errors", func(t *testing.T) {
 		_, err := parseAnalyzedSpans("service|operation=")
 		assert.NotNil(err)
 
