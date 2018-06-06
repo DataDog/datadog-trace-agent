@@ -71,49 +71,49 @@ func mergeEnv(c *AgentConfig) {
 	}
 
 	if v := os.Getenv("DD_APM_ANALYZED_SPANS"); v != "" {
-		var err error
-		c.AnalyzedSpansByService, err = readAnalyzedSpanEnvVariable(v)
-		if err != nil {
+		analyzedSpans, err := parseAnalyzedSpans(v)
+		if err == nil {
+			c.AnalyzedSpansByService = analyzedSpans
+		} else {
 			log.Errorf("Bad format for DD_APM_ANALYZED_SPANS it should be of the form \"service_name|operation_name=rate,other_service|other_operation=rate\", error: %v", err)
 		}
 	}
 }
 
 func parseNameAndRate(token string) (string, float64, error) {
-	splits := strings.Split(token, "=")
-	if len(splits) != 2 {
+	parts := strings.Split(token, "=")
+	if len(parts) != 2 {
 		return "", 0, fmt.Errorf("Bad format")
 	}
-	rate, err := strconv.ParseFloat(splits[1], 64)
+	rate, err := strconv.ParseFloat(parts[1], 64)
 	if err != nil {
 		return "", 0, fmt.Errorf("Unabled to parse rate")
 	}
-	return splits[0], rate, nil
+	return parts[0], rate, nil
 }
 
-func readAnalyzedSpanEnvVariable(analyzedSpansEnvVariable string) (map[string]map[string]float64, error) {
-	// the format is: service_name|operation_name=rate,other_service|other_operation=rate
-	analyzedSpansByService := make(map[string]map[string]float64)
-	if analyzedSpansEnvVariable == "" {
-		return analyzedSpansByService, nil
+// parseAnalyzedSpans parses the env string to extract a map of spans to be analyzed by service and operation.
+// the format is: service_name|operation_name=rate,other_service|other_operation=rate
+func parseAnalyzedSpans(env string) (analyzedSpans map[string]map[string]float64, err error) {
+	analyzedSpans = make(map[string]map[string]float64)
+	if env == "" {
+		return
 	}
-	tokens := strings.Split(analyzedSpansEnvVariable, ",")
+	tokens := strings.Split(env, ",")
 	for _, token := range tokens {
 		name, rate, err := parseNameAndRate(token)
 		if err != nil {
 			return nil, err
 		}
-		serviceName, operationName, err := parseAnalyzedSpanFormat(name)
+		serviceName, operationName, err := parseServiceAndOp(name)
 		if err != nil {
 			return nil, err
 		}
 
-		service := analyzedSpansByService[serviceName]
-		if service == nil {
-			service = make(map[string]float64)
-			analyzedSpansByService[serviceName] = service
+		if _, ok := analyzedSpans[serviceName]; !ok {
+			analyzedSpans[serviceName] = make(map[string]float64)
 		}
-		service[operationName] = rate
+		analyzedSpans[serviceName][operationName] = rate
 	}
-	return analyzedSpansByService, nil
+	return
 }

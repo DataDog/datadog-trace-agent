@@ -229,18 +229,16 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
 	}
 	// undocumeted
 	for key, rate := range yc.TraceAgent.AnalyzedSpans {
-		serviceName, operationName, err := parseAnalyzedSpanFormat(key)
+		serviceName, operationName, err := parseServiceAndOp(key)
 		if err != nil {
 			log.Errorf("Error when parsing names", err)
 			continue
 		}
 
-		service := agentConf.AnalyzedSpansByService[serviceName]
-		if service == nil {
-			service = make(map[string]float64)
-			agentConf.AnalyzedSpansByService[serviceName] = service
+		if _, ok := agentConf.AnalyzedSpansByService[serviceName]; !ok {
+			agentConf.AnalyzedSpansByService[serviceName] = make(map[string]float64)
 		}
-		service[operationName] = rate
+		agentConf.AnalyzedSpansByService[serviceName][operationName] = rate
 	}
 
 	// undocumented

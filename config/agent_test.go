@@ -211,6 +211,7 @@ func TestUndocumentedIni(t *testing.T) {
 func TestAnalyzedSpansEnvConfig(t *testing.T) {
 	assert := assert.New(t)
 	os.Setenv("DD_APM_ANALYZED_SPANS", "service1|operation1=0.5,service2|operation2=1,service1|operation3=0")
+	defer os.Unsetenv("DD_APM_ANALYZED_SPANS")
 
 	c, _ := NewAgentConfig(nil, nil, nil)
 
@@ -221,5 +222,4 @@ func TestAnalyzedSpansEnvConfig(t *testing.T) {
 	assert.Equal(float64(0), c.AnalyzedSpansByService["service1"]["operation3"])
 	assert.Equal(float64(1), c.AnalyzedSpansByService["service2"]["operation2"])
 
-	os.Setenv("DD_APM_ANALYZED_SPANS", "")
 }
