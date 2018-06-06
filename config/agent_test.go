@@ -207,3 +207,19 @@ func TestUndocumentedIni(t *testing.T) {
 	assert.Equal(c.AnalyzedSpansByService["web"]["django.request"], 0.9)
 	assert.Equal(c.AnalyzedSpansByService["db"]["intake"], 0.05)
 }
+
+func TestAnalyzedSpansEnvConfig(t *testing.T) {
+	assert := assert.New(t)
+	os.Setenv("DD_APM_ANALYZED_SPANS", "service1|operation1=0.5,service2|operation2=1,service1|operation3=0")
+
+	c, _ := NewAgentConfig(nil, nil, nil)
+
+	assert.Len(c.AnalyzedSpansByService, 2)
+	assert.Len(c.AnalyzedSpansByService["service1"], 2)
+	assert.Len(c.AnalyzedSpansByService["service2"], 1)
+	assert.Equal(c.AnalyzedSpansByService["service1"]["operation1"], 0.5)
+	assert.Equal(c.AnalyzedSpansByService["service1"]["operation3"], float64(0))
+	assert.Equal(c.AnalyzedSpansByService["service2"]["operation2"], float64(1))
+
+	os.Setenv("DD_APM_ANALYZED_SPANS", "")
+}
