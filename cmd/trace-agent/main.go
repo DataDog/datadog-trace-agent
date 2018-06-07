@@ -203,6 +203,11 @@ func runAgent(ctx context.Context) {
 		die("cannot configure dogstatsd: %v", err)
 	}
 
+	// count the number of times the agent started
+	statsd.Client.Count("datadog.trace_agent.started", 1, []string{
+		"version:" + info.Version,
+	}, 1)
+
 	// Seed rand
 	rand.Seed(time.Now().UTC().UnixNano())
 
