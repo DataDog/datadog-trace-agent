@@ -13,14 +13,14 @@ func TestDefaultConfig(t *testing.T) {
 	agentConfig := NewDefaultAgentConfig()
 
 	// assert that some sane defaults are set
-	assert.Equal(agentConfig.ReceiverHost, "localhost")
-	assert.Equal(agentConfig.ReceiverPort, 8126)
+	assert.Equal("localhost", agentConfig.ReceiverHost)
+	assert.Equal(8126, agentConfig.ReceiverPort)
 
-	assert.Equal(agentConfig.StatsdHost, "localhost")
-	assert.Equal(agentConfig.StatsdPort, 8125)
+	assert.Equal("localhost", agentConfig.StatsdHost)
+	assert.Equal(8125, agentConfig.StatsdPort)
 
-	assert.Equal(agentConfig.LogLevel, "INFO")
-	assert.Equal(agentConfig.Enabled, true)
+	assert.Equal("INFO", agentConfig.LogLevel)
+	assert.Equal(true, agentConfig.Enabled)
 
 }
 
@@ -155,9 +155,9 @@ func TestUndocumentedYamlConfig(t *testing.T) {
 	assert.Len(agentConfig.AnalyzedSpansByService, 2)
 	assert.Len(agentConfig.AnalyzedSpansByService["web"], 2)
 	assert.Len(agentConfig.AnalyzedSpansByService["db"], 1)
-	assert.Equal(agentConfig.AnalyzedSpansByService["web"]["request"], 0.8)
-	assert.Equal(agentConfig.AnalyzedSpansByService["web"]["django.request"], 0.9)
-	assert.Equal(agentConfig.AnalyzedSpansByService["db"]["intake"], 0.05)
+	assert.Equal(0.8, agentConfig.AnalyzedSpansByService["web"]["request"])
+	assert.Equal(0.9, agentConfig.AnalyzedSpansByService["web"]["django.request"])
+	assert.Equal(0.05, agentConfig.AnalyzedSpansByService["db"]["intake"])
 }
 
 func TestConfigNewIfExists(t *testing.T) {
@@ -197,13 +197,29 @@ func TestUndocumentedIni(t *testing.T) {
 	assert.NoError(err)
 
 	// analysis legacy
-	assert.Equal(c.AnalyzedRateByServiceLegacy["web"], 0.8)
-	assert.Equal(c.AnalyzedRateByServiceLegacy["intake"], 0.05)
+	assert.Equal(0.8, c.AnalyzedRateByServiceLegacy["web"])
+	assert.Equal(0.05, c.AnalyzedRateByServiceLegacy["intake"])
 	// analysis
 	assert.Len(c.AnalyzedSpansByService, 2)
 	assert.Len(c.AnalyzedSpansByService["web"], 2)
 	assert.Len(c.AnalyzedSpansByService["db"], 1)
-	assert.Equal(c.AnalyzedSpansByService["web"]["request"], 0.8)
-	assert.Equal(c.AnalyzedSpansByService["web"]["django.request"], 0.9)
-	assert.Equal(c.AnalyzedSpansByService["db"]["intake"], 0.05)
+	assert.Equal(0.8, c.AnalyzedSpansByService["web"]["request"])
+	assert.Equal(0.9, c.AnalyzedSpansByService["web"]["django.request"])
+	assert.Equal(0.05, c.AnalyzedSpansByService["db"]["intake"])
+}
+
+func TestAnalyzedSpansEnvConfig(t *testing.T) {
+	assert := assert.New(t)
+	os.Setenv("DD_APM_ANALYZED_SPANS", "service1|operation1=0.5,service2|operation2=1,service1|operation3=0")
+	defer os.Unsetenv("DD_APM_ANALYZED_SPANS")
+
+	c, _ := NewAgentConfig(nil, nil, nil)
+
+	assert.Len(c.AnalyzedSpansByService, 2)
+	assert.Len(c.AnalyzedSpansByService["service1"], 2)
+	assert.Len(c.AnalyzedSpansByService["service2"], 1)
+	assert.Equal(0.5, c.AnalyzedSpansByService["service1"]["operation1"], 0.5)
+	assert.Equal(float64(0), c.AnalyzedSpansByService["service1"]["operation3"])
+	assert.Equal(float64(1), c.AnalyzedSpansByService["service2"]["operation2"])
+
 }

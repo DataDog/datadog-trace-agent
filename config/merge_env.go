@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -68,4 +69,51 @@ func mergeEnv(c *AgentConfig) {
 	if v := os.Getenv("DD_LOG_LEVEL"); v != "" {
 		c.LogLevel = v
 	}
+
+	if v := os.Getenv("DD_APM_ANALYZED_SPANS"); v != "" {
+		analyzedSpans, err := parseAnalyzedSpans(v)
+		if err == nil {
+			c.AnalyzedSpansByService = analyzedSpans
+		} else {
+			log.Errorf("Bad format for DD_APM_ANALYZED_SPANS it should be of the form \"service_name|operation_name=rate,other_service|other_operation=rate\", error: %v", err)
+		}
+	}
+}
+
+func parseNameAndRate(token string) (string, float64, error) {
+	parts := strings.Split(token, "=")
+	if len(parts) != 2 {
+		return "", 0, fmt.Errorf("Bad format")
+	}
+	rate, err := strconv.ParseFloat(parts[1], 64)
+	if err != nil {
+		return "", 0, fmt.Errorf("Unabled to parse rate")
+	}
+	return parts[0], rate, nil
+}
+
+// parseAnalyzedSpans parses the env string to extract a map of spans to be analyzed by service and operation.
+// the format is: service_name|operation_name=rate,other_service|other_operation=rate
+func parseAnalyzedSpans(env string) (analyzedSpans map[string]map[string]float64, err error) {
+	analyzedSpans = make(map[string]map[string]float64)
+	if env == "" {
+		return
+	}
+	tokens := strings.Split(env, ",")
+	for _, token := range tokens {
+		name, rate, err := parseNameAndRate(token)
+		if err != nil {
+			return nil, err
+		}
+		serviceName, operationName, err := parseServiceAndOp(name)
+		if err != nil {
+			return nil, err
+		}
+
+		if _, ok := analyzedSpans[serviceName]; !ok {
+			analyzedSpans[serviceName] = make(map[string]float64)
+		}
+		analyzedSpans[serviceName][operationName] = rate
+	}
+	return
 }
