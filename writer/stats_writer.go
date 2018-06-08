@@ -108,6 +108,9 @@ func (w *StatsWriter) handleStats(stats []model.StatsBucket) {
 		nbEntries, nbStatBuckets, len(payloads),
 	)
 
+	if len(payloads) > 1 {
+		atomic.AddInt64(&w.info.Splits, 1)
+	}
 	atomic.AddInt64(&w.info.StatsBuckets, int64(nbStatBuckets))
 
 	headers := map[string]string{
@@ -285,12 +288,14 @@ func (w *StatsWriter) monitor() {
 			swInfo.StatsBuckets = atomic.SwapInt64(&w.info.StatsBuckets, 0)
 			swInfo.Bytes = atomic.SwapInt64(&w.info.Bytes, 0)
 			swInfo.Retries = atomic.SwapInt64(&w.info.Retries, 0)
+			swInfo.Splits = atomic.SwapInt64(&w.info.Splits, 0)
 			swInfo.Errors = atomic.SwapInt64(&w.info.Errors, 0)
 
 			w.statsClient.Count("datadog.trace_agent.stats_writer.payloads", int64(swInfo.Payloads), nil, 1)
 			w.statsClient.Count("datadog.trace_agent.stats_writer.stats_buckets", int64(swInfo.StatsBuckets), nil, 1)
 			w.statsClient.Count("datadog.trace_agent.stats_writer.bytes", int64(swInfo.Bytes), nil, 1)
 			w.statsClient.Count("datadog.trace_agent.stats_writer.retries", int64(swInfo.Retries), nil, 1)
+			w.statsClient.Count("datadog.trace_agent.stats_writer.splits", int64(swInfo.Splits), nil, 1)
 			w.statsClient.Count("datadog.trace_agent.stats_writer.errors", int64(swInfo.Errors), nil, 1)
 
 			info.UpdateStatsWriterInfo(swInfo)
