@@ -243,6 +243,10 @@ func readServiceWriterConfig(confFile *File, section string) writerconfig.Servic
 func readStatsWriterConfig(confFile *File, section string) writerconfig.StatsWriterConfig {
 	c := writerconfig.DefaultStatsWriterConfig()
 
+	if v, e := confFile.GetInt(section, "max_entries_per_payload"); e == nil {
+		c.MaxEntriesPerPayload = v
+	}
+
 	if v, e := confFile.GetInt(section, "update_info_period_seconds"); e == nil {
 		c.UpdateInfoPeriod = time.Duration(v) * time.Second
 	}

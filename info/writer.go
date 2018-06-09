@@ -27,6 +27,7 @@ type StatsWriterInfo struct {
 	StatsBuckets int64
 	Errors       int64
 	Retries      int64
+	Splits       int64
 	Bytes        int64
 }
 
