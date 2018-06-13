@@ -290,3 +290,81 @@ func TestIsValidStatusCode(t *testing.T) {
 	assert.False(isValidStatusCode("600"))
 	assert.False(isValidStatusCode("Invalid status code"))
 }
+
+func TestNormalizeInvalidUTF8(t *testing.T) {
+	invalidUTF8 := "test\x99\x8f"
+
+	t.Run("service", func(t *testing.T) {
+		assert := assert.New(t)
+
+		span := testSpan()
+		span.Service = invalidUTF8
+
+		err := span.Normalize()
+
+		assert.Nil(err)
+		assert.Equal("test", span.Service)
+	})
+
+	t.Run("resource", func(t *testing.T) {
+		assert := assert.New(t)
+
+		span := testSpan()
+		span.Resource = invalidUTF8
+
+		err := span.Normalize()
+
+		assert.Nil(err)
+		assert.Equal("test��", span.Resource)
+	})
+
+	t.Run("name", func(t *testing.T) {
+		assert := assert.New(t)
+
+		span := testSpan()
+		span.Name = invalidUTF8
+
+		err := span.Normalize()
+
+		assert.Nil(err)
+		assert.Equal("test", span.Name)
+	})
+
+	t.Run("type", func(t *testing.T) {
+		assert := assert.New(t)
+
+		span := testSpan()
+		span.Type = invalidUTF8
+
+		err := span.Normalize()
+
+		assert.Nil(err)
+		assert.Equal("test��", span.Type)
+	})
+
+	t.Run("meta", func(t *testing.T) {
+		assert := assert.New(t)
+
+		span := testSpan()
+		span.Meta = map[string]string{
+			invalidUTF8: "test1",
+			"test2":     invalidUTF8,
+		}
+
+		err := span.Normalize()
+
+		assert.Nil(err)
+		assert.EqualValues(map[string]string{
+			"test��": "test1",
+			"test2":  "test��",
+		}, span.Meta)
+	})
+}
+
+func BenchmarkNormalization(b *testing.B) {
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i += 1 {
+		testSpan().Normalize()
+	}
+}

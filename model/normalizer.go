@@ -1,10 +1,13 @@
 package model
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	log "github.com/cihub/seelog"
 )
@@ -56,6 +59,7 @@ func (s *Span) Normalize() error {
 	s.Name = name
 
 	// Resource
+	s.Resource = toUTF8(s.Resource)
 	if s.Resource == "" {
 		return errors.New("span.normalize: empty `Resource`")
 	}
@@ -98,8 +102,20 @@ func (s *Span) Normalize() error {
 	// ParentID set on the client side, no way of checking
 
 	// Type
+	s.Type = toUTF8(s.Type)
 	if len(s.Type) > MaxTypeLen {
 		return fmt.Errorf("span.normalize: `Type` too long (max %d chars): %s", MaxTypeLen, s.Type)
+	}
+
+	for k, v := range s.Meta {
+		utf8K := toUTF8(k)
+
+		if k != utf8K {
+			delete(s.Meta, k)
+			k = utf8K
+		}
+
+		s.Meta[k] = toUTF8(v)
 	}
 
 	// Environment
@@ -225,4 +241,29 @@ func normMetricNameParse(name string) (string, bool) {
 	}
 
 	return string(res), true
+}
+
+// toUTF8 forces the string to utf-8 by replacing illegal character sequences with the utf-8 replacement character.
+func toUTF8(s string) string {
+	if utf8.ValidString(s) {
+		// if string is already valid utf8, return it as-is. Checking validity is cheaper than blindly rewriting.
+		return s
+	}
+
+	in := strings.NewReader(s)
+	var out bytes.Buffer
+	out.Grow(len(s))
+
+	for {
+		r, _, err := in.ReadRune()
+		if err != nil {
+			// note: by contract, if `in` contains non-valid utf-8, no error is returned. Rather the utf-8 replacement
+			// character is returned. Therefore, the only error should usually be io.EOF indicating end of string.
+			// If any other error is returned by chance, we quit as well, outputting whatever part of the string we
+			// had already constructed.
+			return out.String()
+		}
+
+		out.WriteRune(r)
+	}
 }
