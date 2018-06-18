@@ -22,7 +22,10 @@ import (
 
 var elog debug.Log
 
-const ServiceName = "datadog-trace-agent"
+const (
+	ServiceName       = "datadog-trace-agent"
+	defaultConfigPath = "c:\\programdata\\datadog\\datadog.yaml"
+)
 
 // opts are the command-line options
 var winopts struct {
@@ -34,8 +37,7 @@ var winopts struct {
 
 func init() {
 	// command-line arguments
-	flag.StringVar(&opts.configFile, "config", "c:\\programdata\\datadog\\datadog.conf", "Datadog Agent config file location.")
-	flag.StringVar(&opts.legacyConfigFile, "ddconfig", "c:\\programdata\\datadog\\trace-agent.ini", "Deprecated extra configuration option.")
+	flag.StringVar(&opts.configFile, "config", defaultConfigPath, "Datadog Agent config file location.")
 	flag.StringVar(&opts.pidfilePath, "pid", "", "Path to set pidfile for process")
 	flag.BoolVar(&opts.version, "version", false, "Show version information and exit")
 	flag.BoolVar(&opts.info, "info", false, "Show info about running trace agent process and exit")
