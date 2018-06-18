@@ -22,10 +22,9 @@ import (
 
 var elog debug.Log
 
-const (
-	ServiceName       = "datadog-trace-agent"
-	defaultConfigPath = "c:\\programdata\\datadog\\datadog.yaml"
-)
+const ServiceName = "datadog-trace-agent"
+
+const defaultConfigPath = "c:\\programdata\\datadog\\datadog.yaml"
 
 // opts are the command-line options
 var winopts struct {
@@ -35,25 +34,11 @@ var winopts struct {
 	stopService      bool
 }
 
-func init() {
-	// command-line arguments
-	flag.StringVar(&opts.configFile, "config", defaultConfigPath, "Datadog Agent config file location.")
-	flag.StringVar(&opts.pidfilePath, "pid", "", "Path to set pidfile for process")
-	flag.BoolVar(&opts.version, "version", false, "Show version information and exit")
-	flag.BoolVar(&opts.info, "info", false, "Show info about running trace agent process and exit")
-
-	// profiling arguments
-	// TODO: remove it from regular stable build
-	flag.StringVar(&opts.cpuprofile, "cpuprofile", "", "Write cpu profile to file")
-	flag.StringVar(&opts.memprofile, "memprofile", "", "Write memory profile to `file`")
-
-	// windows-specific options for installing the service, uninstalling the service, etc.
+func registerOSSpecificFlags() {
 	flag.BoolVar(&winopts.installService, "install-service", false, "Install the trace agent to the Service Control Manager")
 	flag.BoolVar(&winopts.uninstallService, "uninstall-service", false, "Remove the trace agent from the Service Control Manager")
 	flag.BoolVar(&winopts.startService, "start-service", false, "Starts the trace agent service")
 	flag.BoolVar(&winopts.stopService, "stop-service", false, "Stops the trace agent service")
-
-	flag.Parse()
 }
 
 type myservice struct{}

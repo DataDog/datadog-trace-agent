@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	_ "net/http/pprof"
 
 	"github.com/DataDog/datadog-trace-agent/watchdog"
@@ -12,20 +11,7 @@ import (
 
 const defaultConfigPath = "/opt/datadog-agent/etc/datadog.yaml"
 
-func init() {
-	// command-line arguments
-	flag.StringVar(&opts.configFile, "config", defaultConfigPath, "Datadog Agent config file location")
-	flag.StringVar(&opts.pidfilePath, "pid", "", "Path to set pidfile for process")
-	flag.BoolVar(&opts.version, "version", false, "Show version information and exit")
-	flag.BoolVar(&opts.info, "info", false, "Show info about running trace agent process and exit")
-
-	// profiling arguments
-	// TODO: remove it from regular stable build
-	flag.StringVar(&opts.cpuprofile, "cpuprofile", "", "Write cpu profile to file")
-	flag.StringVar(&opts.memprofile, "memprofile", "", "Write memory profile to `file`")
-
-	flag.Parse()
-}
+func registerOSSpecificFlags() {}
 
 // main is the main application entry point
 func main() {
