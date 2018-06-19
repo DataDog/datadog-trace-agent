@@ -47,7 +47,7 @@ func NewStatsWriter(conf *config.AgentConfig, InStats <-chan []model.StatsBucket
 	return &StatsWriter{
 		BaseWriter: bw,
 		InStats:    InStats,
-		hostName:   conf.HostName,
+		hostName:   conf.Hostname,
 		env:        conf.DefaultEnv,
 		conf:       writerConf,
 	}

@@ -1,6 +1,6 @@
 {
     "cmdline": ["./trace-agent"],
-    "config": {"Enabled":true,"HostName":"localhost.localdomain","DefaultEnv":"none","APIEndpoint":"https://trace.agent.datadoghq.com","APIEnabled":true,"APIPayloadBufferMaxSize":16777216,"BucketInterval":10000000000,"ExtraAggregators":[],"ExtraSampleRate":1,"MaxTPS":10,"ReceiverHost":"localhost","ReceiverPort":8126,"ConnectionLimit":2000,"ReceiverTimeout":0,"StatsdHost":"127.0.0.1","StatsdPort":8125,"LogLevel":"INFO","LogFilePath":"/var/log/datadog/trace-agent.log"},
+    "config": {"Enabled":true,"Hostname":"localhost.localdomain","DefaultEnv":"none","APIEndpoint":"https://trace.agent.datadoghq.com","APIEnabled":true,"APIPayloadBufferMaxSize":16777216,"BucketInterval":10000000000,"ExtraAggregators":[],"ExtraSampleRate":1,"MaxTPS":10,"ReceiverHost":"localhost","ReceiverPort":8126,"ConnectionLimit":2000,"ReceiverTimeout":0,"StatsdHost":"127.0.0.1","StatsdPort":8125,"LogLevel":"INFO","LogFilePath":"/var/log/datadog/trace-agent.log"},
     "trace_writer": {"Payloads":4,"Bytes":3245,"Traces":26,"Transactions":123,"Errors":0},
     "stats_writer": {"Payloads":6,"Bytes":8329,"StatsBuckets":12,"Errors":0},
     "service_writer": {"Payloads":1,"Bytes":1234,"Services":2,"Errors":0},

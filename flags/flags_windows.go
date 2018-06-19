@@ -4,7 +4,7 @@ package flags
 
 import "flag"
 
-const defaultConfigFile = "c:\\programdata\\datadog\\datadog.yaml"
+const DefaultConfigPath = "c:\\programdata\\datadog\\datadog.yaml"
 
 func registerOSSpecificFlags() {
 	flag.BoolVar(&Win.InstallService, "install-service", false, "Install the trace agent to the Service Control Manager")

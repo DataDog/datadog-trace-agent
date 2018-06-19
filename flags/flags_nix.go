@@ -2,6 +2,6 @@
 
 package flags
 
-const defaultConfigFile = "/opt/datadog-agent/etc/datadog.yaml"
+const DefaultConfigPath = "/opt/datadog-agent/etc/datadog.yaml"
 
 func registerOSSpecificFlags() {}

@@ -17,10 +17,10 @@ type File struct {
 	Path     string
 }
 
-// NewINI reads the file in configPath and returns a corresponding *File
+// NewIni reads the file in configPath and returns a corresponding *File
 // or an error if encountered.  This File is set as the default active
 // config file.
-func NewINI(configPath string) (*File, error) {
+func NewIni(configPath string) (*File, error) {
 	config, err := ini.Load(configPath)
 	if err != nil {
 		return nil, err

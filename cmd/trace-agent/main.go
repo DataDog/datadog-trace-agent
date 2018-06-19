@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"runtime"
 	"runtime/pprof"
 	"strings"
@@ -25,10 +24,6 @@ import (
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
-
-func init() {
-	flags.Parse()
-}
 
 // handleSignal closes a channel to exit cleanly from routines
 func handleSignal(onSignal func()) {
@@ -51,46 +46,6 @@ Set env var DD_APM_ENABLED=true or add
 apm_enabled: true
 to your datadog.conf file.
 Exiting.`
-
-const legacyConfigFile = "/etc/dd-agent/datadog.conf"
-
-func loadConfigFiles() (*config.File, *config.YamlAgentConfig) {
-	exit := func() {
-		osutil.Exitf("Configuration file not found: %s", flags.ConfigFile)
-	}
-	if !osutil.Exists(flags.ConfigFile) {
-		if !flags.IsSet("config") && osutil.Exists(legacyConfigFile) {
-			// use fallback legacy config as a potential default
-			conf, err := config.NewINI(legacyConfigFile)
-			if err != nil {
-				exit()
-			}
-			log.Warnf("Using deprecated configuration file %q", legacyConfigFile)
-			return conf, nil
-		}
-		exit()
-	}
-	switch filepath.Ext(flags.ConfigFile) {
-	case ".ini", ".conf":
-		conf, err := config.NewINI(flags.ConfigFile)
-		if err != nil {
-			exit()
-		}
-		log.Infof("Using configuration from %s", flags.ConfigFile)
-		return conf, nil
-	case ".yaml":
-		yamlConf, err := config.NewYAML(flags.ConfigFile)
-		if err != nil {
-			exit()
-		}
-		log.Infof("Using configuration from %s", flags.ConfigFile)
-		return nil, yamlConf
-	default:
-		log.Errorf("Configuration file '%s' not supported, it must be a .yaml or .ini file. File ignored.", flags.ConfigFile)
-	}
-	exit()
-	return nil, nil
-}
 
 // runAgent is the entrypoint of our code
 func runAgent(ctx context.Context) {
@@ -120,33 +75,40 @@ func runAgent(ctx context.Context) {
 		return
 	}
 
-	if !flags.Info && flags.PIDFilepath != "" {
-		err := pidfile.WritePID(flags.PIDFilepath)
+	if !flags.Info && flags.PIDFilePath != "" {
+		err := pidfile.WritePID(flags.PIDFilePath)
 		if err != nil {
 			log.Errorf("Error while writing PID file, exiting: %v", err)
 			os.Exit(1)
 		}
 
-		log.Infof("pid '%d' written to pid file '%s'", os.Getpid(), flags.PIDFilepath)
+		log.Infof("pid '%d' written to pid file '%s'", os.Getpid(), flags.PIDFilePath)
 		defer func() {
 			// remove pidfile if set
-			os.Remove(flags.PIDFilepath)
+			os.Remove(flags.PIDFilePath)
 		}()
 	}
 
-	conf, yamlConf := loadConfigFiles()
-	agentConf, err := config.NewAgentConfig(conf, yamlConf)
+	cfg, err := config.Load(flags.ConfigPath)
 	if err != nil {
+		if !os.IsNotExist(err) {
+			osutil.Exitf("%v", err)
+		}
+	} else {
+		log.Infof("Loaded configuration: %s", cfg.ConfigPath)
+	}
+	cfg.LoadEnv()
+	if err := cfg.Validate(); err != nil {
 		osutil.Exitf("%v", err)
 	}
 
-	err = info.InitInfo(agentConf) // for expvar & -info option
+	err = info.InitInfo(cfg) // for expvar & -info option
 	if err != nil {
 		panic(err)
 	}
 
 	if flags.Info {
-		if err := info.Info(os.Stdout, agentConf); err != nil {
+		if err := info.Info(os.Stdout, cfg); err != nil {
 			os.Stdout.WriteString(fmt.Sprintf("failed to print info: %s\n", err))
 			os.Exit(1)
 		}
@@ -154,7 +116,7 @@ func runAgent(ctx context.Context) {
 	}
 
 	// Exit if tracing is not enabled
-	if !agentConf.Enabled {
+	if !cfg.Enabled {
 		log.Info(agentDisabledMessage)
 
 		// a sleep is necessary to ensure that supervisor registers this process as "STARTED"
@@ -167,21 +129,21 @@ func runAgent(ctx context.Context) {
 	// Initialize logging (replacing the default logger). No need
 	// to defer log.Flush, it was already done when calling
 	// "SetupDefaultLogger" earlier.
-	logLevel, ok := log.LogLevelFromString(strings.ToLower(agentConf.LogLevel))
+	logLevel, ok := log.LogLevelFromString(strings.ToLower(cfg.LogLevel))
 	if !ok {
 		logLevel = log.InfoLvl
 	}
 	duration := 10 * time.Second
-	if !agentConf.LogThrottlingEnabled {
+	if !cfg.LogThrottlingEnabled {
 		duration = 0
 	}
-	err = SetupLogger(logLevel, agentConf.LogFilePath, duration, 10)
+	err = SetupLogger(logLevel, cfg.LogFilePath, duration, 10)
 	if err != nil {
 		osutil.Exitf("cannot create logger: %v", err)
 	}
 
 	// Initialize dogstatsd client
-	err = statsd.Configure(agentConf)
+	err = statsd.Configure(cfg)
 	if err != nil {
 		osutil.Exitf("cannot configure dogstatsd: %v", err)
 	}
@@ -194,9 +156,9 @@ func runAgent(ctx context.Context) {
 	// Seed rand
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	agent := NewAgent(ctx, agentConf)
+	agent := NewAgent(ctx, cfg)
 
-	log.Infof("trace-agent running on host %s", agentConf.HostName)
+	log.Infof("trace-agent running on host %s", cfg.Hostname)
 	agent.Run()
 
 	// collect memory profile

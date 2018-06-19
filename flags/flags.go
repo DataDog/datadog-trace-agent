@@ -3,14 +3,28 @@ package flags
 import "flag"
 
 var (
-	ConfigFile       string
-	LegacyConfigFile string
-	PIDFilepath      string
-	LogLevel         string
-	Version          bool
-	Info             bool
-	CPUProfile       string
-	MemProfile       string
+	// ConfigPath specifies the path to the configuration file.
+	ConfigPath string
+
+	// PIDFilepath specifies the path to the PID file.
+	PIDFilePath string
+
+	// LogLevel specifies the log output level.
+	LogLevel string
+
+	// Version will cause the agent to show version information.
+	Version bool
+
+	// Info will display information about a running agent.
+	Info bool
+
+	// CPUProfile specifies the path to output CPU profiling information to.
+	// When empty, CPU profiling is disabled.
+	CPUProfile string
+
+	// MemProfile specifies the path to output memory profiling information to.
+	// When empty, memory profiling is disabled.
+	MemProfile string
 )
 
 // Win holds a set of flags which will be populated only during the Windows build.
@@ -21,9 +35,9 @@ var Win = struct {
 	StopService      bool
 }{}
 
-func Parse() {
-	flag.StringVar(&ConfigFile, "config", defaultConfigFile, "Datadog Agent config file location")
-	flag.StringVar(&PIDFilepath, "pid", "", "Path to set pidfile for process")
+func init() {
+	flag.StringVar(&ConfigPath, "config", DefaultConfigPath, "Datadog Agent config file location")
+	flag.StringVar(&PIDFilePath, "pid", "", "Path to set pidfile for process")
 	flag.BoolVar(&Version, "version", false, "Show version information and exit")
 	flag.BoolVar(&Info, "info", false, "Show info about running trace agent process and exit")
 
@@ -34,14 +48,4 @@ func Parse() {
 	registerOSSpecificFlags()
 
 	flag.Parse()
-}
-
-// IsSet reports whether the flag with the given name was set to any other
-// value than its default.
-func IsSet(flagName string) bool {
-	fs := flag.Lookup(flagName)
-	if fs == nil {
-		return false
-	}
-	return fs.DefValue != fs.Value.String()
 }

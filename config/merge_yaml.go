@@ -12,6 +12,7 @@ import (
 
 	"github.com/DataDog/datadog-trace-agent/backoff"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/osutil"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	log "github.com/cihub/seelog"
 )
@@ -108,7 +109,7 @@ func newYamlFromBytes(bytes []byte) (*YamlAgentConfig, error) {
 }
 
 // NewYamlIfExists returns a new YamlAgentConfig if the given configPath is exists.
-func NewYAML(configPath string) (*YamlAgentConfig, error) {
+func NewYaml(configPath string) (*YamlAgentConfig, error) {
 	fileContent, err := ioutil.ReadFile(configPath)
 	if err != nil {
 		return nil, err
@@ -116,29 +117,29 @@ func NewYAML(configPath string) (*YamlAgentConfig, error) {
 	return newYamlFromBytes(fileContent)
 }
 
-func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
+func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 	if yc == nil {
-		return nil
+		return
 	}
 
 	if yc.APIKey != "" {
-		agentConf.APIKey = yc.APIKey
+		c.APIKey = yc.APIKey
 	}
 	if yc.HostName != "" {
-		agentConf.HostName = yc.HostName
+		c.Hostname = yc.HostName
 	}
 	if yc.LogLevel != "" {
-		agentConf.LogLevel = yc.LogLevel
+		c.LogLevel = yc.LogLevel
 	}
 	if yc.StatsdPort > 0 {
-		agentConf.StatsdPort = yc.StatsdPort
+		c.StatsdPort = yc.StatsdPort
 	}
 
 	// respect Agent proxy configuration knowing we only have to support the APIEndpoint HTTPS case
 	if yc.Proxy.HTTPS != "" {
 		traceAgentNoProxy := false
 		for _, host := range yc.Proxy.NoProxy {
-			if host == agentConf.APIEndpoint {
+			if host == c.APIEndpoint {
 				log.Info("Trace Agent endpoint matches proxy.no_proxy list item '%s': not using any proxy", host)
 				traceAgentNoProxy = true
 				break
@@ -148,7 +149,7 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
 		if !traceAgentNoProxy {
 			url, err := url.Parse(yc.Proxy.HTTPS)
 			if err == nil {
-				agentConf.ProxyURL = url
+				c.ProxyURL = url
 			} else {
 				log.Errorf("Failed to parse proxy URL from proxy.https configuration: %s", err)
 			}
@@ -156,70 +157,70 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
 	}
 
 	if yc.SkipSSLValidation != nil {
-		agentConf.SkipSSLValidation = *yc.SkipSSLValidation
+		c.SkipSSLValidation = *yc.SkipSSLValidation
 	}
 
 	if yc.TraceAgent.Enabled != nil {
-		agentConf.Enabled = *yc.TraceAgent.Enabled
+		c.Enabled = *yc.TraceAgent.Enabled
 	}
 
 	if yc.TraceAgent.Endpoint != "" {
-		agentConf.APIEndpoint = yc.TraceAgent.Endpoint
+		c.APIEndpoint = yc.TraceAgent.Endpoint
 	}
 
 	if yc.TraceAgent.LogFilePath != "" {
-		agentConf.LogFilePath = yc.TraceAgent.LogFilePath
+		c.LogFilePath = yc.TraceAgent.LogFilePath
 	}
 
 	if yc.TraceAgent.Env != "" {
-		agentConf.DefaultEnv = model.NormalizeTag(yc.TraceAgent.Env)
+		c.DefaultEnv = model.NormalizeTag(yc.TraceAgent.Env)
 	}
 
 	if yc.TraceAgent.ReceiverPort > 0 {
-		agentConf.ReceiverPort = yc.TraceAgent.ReceiverPort
+		c.ReceiverPort = yc.TraceAgent.ReceiverPort
 	}
 
 	if yc.TraceAgent.ExtraSampleRate > 0 {
-		agentConf.ExtraSampleRate = yc.TraceAgent.ExtraSampleRate
+		c.ExtraSampleRate = yc.TraceAgent.ExtraSampleRate
 	}
 	if yc.TraceAgent.MaxTracesPerSecond > 0 {
-		agentConf.MaxTPS = yc.TraceAgent.MaxTracesPerSecond
+		c.MaxTPS = yc.TraceAgent.MaxTracesPerSecond
 	}
 
 	if len(yc.TraceAgent.IgnoreResources) > 0 {
-		agentConf.Ignore["resource"] = yc.TraceAgent.IgnoreResources
+		c.Ignore["resource"] = yc.TraceAgent.IgnoreResources
 	}
 
 	if rt := yc.TraceAgent.ReplaceTags; rt != nil {
 		err := compileReplaceRules(rt)
 		if err != nil {
-			return fmt.Errorf("replace_tags: %s", err)
+			osutil.Exitf("replace_tags: %s", err)
 		}
-		agentConf.ReplaceTags = rt
+		c.ReplaceTags = rt
 	}
 
 	if yc.TraceAgent.APMNonLocalTraffic != nil && *yc.TraceAgent.APMNonLocalTraffic {
-		agentConf.ReceiverHost = "0.0.0.0"
+		c.ReceiverHost = "0.0.0.0"
 	}
 
 	// undocumented
 	if yc.TraceAgent.WatchdogMaxCPUPct > 0 {
-		agentConf.MaxCPU = yc.TraceAgent.WatchdogMaxCPUPct / 100
+		c.MaxCPU = yc.TraceAgent.WatchdogMaxCPUPct / 100
 	}
 	if yc.TraceAgent.WatchdogMaxMemory > 0 {
-		agentConf.MaxMemory = yc.TraceAgent.WatchdogMaxMemory
+		c.MaxMemory = yc.TraceAgent.WatchdogMaxMemory
 	}
 	if yc.TraceAgent.WatchdogMaxConns > 0 {
-		agentConf.MaxConnections = yc.TraceAgent.WatchdogMaxConns
+		c.MaxConnections = yc.TraceAgent.WatchdogMaxConns
 	}
 
 	// undocumented
-	agentConf.ServiceWriterConfig = readServiceWriterConfigYaml(yc.TraceAgent.ServiceWriter)
-	agentConf.StatsWriterConfig = readStatsWriterConfigYaml(yc.TraceAgent.StatsWriter)
-	agentConf.TraceWriterConfig = readTraceWriterConfigYaml(yc.TraceAgent.TraceWriter)
+	c.ServiceWriterConfig = readServiceWriterConfigYaml(yc.TraceAgent.ServiceWriter)
+	c.StatsWriterConfig = readStatsWriterConfigYaml(yc.TraceAgent.StatsWriter)
+	c.TraceWriterConfig = readTraceWriterConfigYaml(yc.TraceAgent.TraceWriter)
 
 	// undocumented deprecated
-	agentConf.AnalyzedRateByServiceLegacy = yc.TraceAgent.AnalyzedRateByServiceLegacy
+	c.AnalyzedRateByServiceLegacy = yc.TraceAgent.AnalyzedRateByServiceLegacy
 	if len(yc.TraceAgent.AnalyzedRateByServiceLegacy) > 0 {
 		log.Warn("analyzed_rate_by_service is deprecated, please use analyzed_spans instead")
 	}
@@ -231,19 +232,17 @@ func mergeYamlConfig(agentConf *AgentConfig, yc *YamlAgentConfig) error {
 			continue
 		}
 
-		if _, ok := agentConf.AnalyzedSpansByService[serviceName]; !ok {
-			agentConf.AnalyzedSpansByService[serviceName] = make(map[string]float64)
+		if _, ok := c.AnalyzedSpansByService[serviceName]; !ok {
+			c.AnalyzedSpansByService[serviceName] = make(map[string]float64)
 		}
-		agentConf.AnalyzedSpansByService[serviceName][operationName] = rate
+		c.AnalyzedSpansByService[serviceName][operationName] = rate
 	}
 
 	// undocumented
-	agentConf.DDAgentBin = defaultDDAgentBin
+	c.DDAgentBin = defaultDDAgentBin
 	if yc.TraceAgent.DDAgentBin != "" {
-		agentConf.DDAgentBin = yc.TraceAgent.DDAgentBin
+		c.DDAgentBin = yc.TraceAgent.DDAgentBin
 	}
-
-	return nil
 }
 
 func readServiceWriterConfigYaml(yc serviceWriter) writerconfig.ServiceWriterConfig {

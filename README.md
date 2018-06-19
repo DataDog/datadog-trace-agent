@@ -28,7 +28,7 @@ The APM agent (aka Trace Agent) isn't part of the OSX Datadog Agent yet, it need
 - The Trace Agent should now be running in foreground, with an initial output similar to:
 
 ```
-2017-04-24 13:46:35 INFO (main.go:166) - Loading configuration from /opt/datadog-agent/etc/datadog.yaml
+2017-04-24 13:46:35 INFO (main.go:166) - Loaded configuration: /opt/datadog-agent/etc/datadog.yaml
 2017-04-24 13:46:36 INFO (agent.go:200) - Failed to parse hostname from dd-agent config
 2017-04-24 13:46:36 DEBUG (agent.go:288) - No aggregator configuration, using defaults
 2017-04-24 13:46:36 INFO (main.go:220) - trace-agent running on host My-MacBook-Pro.local

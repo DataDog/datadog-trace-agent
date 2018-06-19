@@ -52,7 +52,7 @@ const (
   Uptime: {{.Status.Uptime}} seconds
   Mem alloc: {{.Status.MemStats.Alloc}} bytes
 
-  Hostname: {{.Status.Config.HostName}}
+  Hostname: {{.Status.Config.Hostname}}
   Receiver: {{.Status.Config.ReceiverHost}}:{{.Status.Config.ReceiverPort}}
   API Endpoint: {{.Status.Config.APIEndpoint}}
 
