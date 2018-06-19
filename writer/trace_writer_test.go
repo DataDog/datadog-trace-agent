@@ -141,9 +141,9 @@ func TestTraceWriter(t *testing.T) {
 		}
 		expectedNumPayloads++
 		expectedNumSpans += 20
-		expectedNumTraces += 1
+		expectedNumTraces++
 		expectedNumBytes += calculateTracePayloadSize(payload2SampledTraces)
-		expectedNumSingleMaxSpans += 1
+		expectedNumSingleMaxSpans++
 
 		for _, sampledTrace := range payload2SampledTraces {
 			traceChannel <- sampledTrace
@@ -313,18 +313,18 @@ func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expecte
 				return
 			}
 
-			expectedTraceIdx += 1
+			expectedTraceIdx++
 		}
 
 		for _, seenTransaction := range tracePayload.Transactions {
-			numSpans += 1
+			numSpans++
 
 			if !assert.True(proto.Equal(expectedTransactions[expectedTransactionIdx], seenTransaction),
 				"Unmarshalled transaction should match expectation at index %d", expectedTraceIdx) {
 				return
 			}
 
-			expectedTransactionIdx += 1
+			expectedTransactionIdx++
 		}
 
 		// If there's more than 1 trace or transaction in this payload, don't let it go over the limit. Otherwise,

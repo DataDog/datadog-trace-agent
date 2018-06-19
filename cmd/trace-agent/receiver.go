@@ -153,6 +153,7 @@ func (r *HTTPReceiver) Listen(addr, logExtra string) error {
 	return nil
 }
 
+// Stop stops the receiver and shuts down the HTTP server.
 func (r *HTTPReceiver) Stop() error {
 	expiry := time.Now().Add(20 * time.Second) // give it 20 seconds
 	ctx, _ := context.WithDeadline(context.Background(), expiry)

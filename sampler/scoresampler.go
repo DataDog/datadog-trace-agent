@@ -34,7 +34,7 @@ func NewScoreEngine(extraRate float64, maxTPS float64) *ScoreEngine {
 	return s
 }
 
-// NewErrorEngine returns an initialized Sampler dedicate to errors. It behaves
+// NewErrorsEngine returns an initialized Sampler dedicate to errors. It behaves
 // just like the the normal ScoreEngine except for its GetType method (useful
 // for reporting).
 func NewErrorsEngine(extraRate float64, maxTPS float64) *ScoreEngine {
