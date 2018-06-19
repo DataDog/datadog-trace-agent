@@ -113,7 +113,6 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 		conf:               conf,
 		dynConf:            dynConf,
 		ctx:                ctx,
-		die:                die,
 	}
 }
 

@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +11,7 @@ import (
 
 	_ "net/http/pprof"
 
+	"github.com/DataDog/datadog-trace-agent/flags"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 	log "github.com/cihub/seelog"
 	"golang.org/x/sys/windows/svc"
@@ -23,23 +23,6 @@ import (
 var elog debug.Log
 
 const ServiceName = "datadog-trace-agent"
-
-const defaultConfigPath = "c:\\programdata\\datadog\\datadog.yaml"
-
-// opts are the command-line options
-var winopts struct {
-	installService   bool
-	uninstallService bool
-	startService     bool
-	stopService      bool
-}
-
-func registerOSSpecificFlags() {
-	flag.BoolVar(&winopts.installService, "install-service", false, "Install the trace agent to the Service Control Manager")
-	flag.BoolVar(&winopts.uninstallService, "uninstall-service", false, "Remove the trace agent from the Service Control Manager")
-	flag.BoolVar(&winopts.startService, "start-service", false, "Starts the trace agent service")
-	flag.BoolVar(&winopts.stopService, "stop-service", false, "Stops the trace agent service")
-}
 
 type myservice struct{}
 
@@ -117,41 +100,41 @@ func main() {
 	// sigh.  Go doesn't have boolean xor operator.  The options are mutually exclusive,
 	// make sure more than one wasn't specified
 	optcount := 0
-	if winopts.installService {
+	if flags.Win.InstallService {
 		optcount++
 	}
-	if winopts.uninstallService {
+	if flags.Win.UninstallService {
 		optcount++
 	}
-	if winopts.startService {
+	if flags.Win.StartService {
 		optcount++
 	}
-	if winopts.stopService {
+	if flags.Win.StopService {
 		optcount++
 	}
 	if optcount > 1 {
 		fmt.Printf("Incompatible options chosen")
 		return
 	}
-	if winopts.installService {
+	if flags.Win.InstallService {
 		if err = installService(); err != nil {
 			fmt.Printf("Error installing service %v\n", err)
 		}
 		return
 	}
-	if winopts.uninstallService {
+	if flags.Win.UninstallService {
 		if err = removeService(); err != nil {
 			fmt.Printf("Error removing service %v\n", err)
 		}
 		return
 	}
-	if winopts.startService {
+	if flags.Win.StartService {
 		if err = startService(); err != nil {
 			fmt.Printf("Error starting service %v\n", err)
 		}
 		return
 	}
-	if winopts.stopService {
+	if flags.Win.StopService {
 		if err = stopService(); err != nil {
 			fmt.Printf("Error stopping service %v\n", err)
 		}

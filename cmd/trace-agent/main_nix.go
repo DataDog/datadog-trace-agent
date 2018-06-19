@@ -9,10 +9,6 @@ import (
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
-const defaultConfigPath = "/opt/datadog-agent/etc/datadog.yaml"
-
-func registerOSSpecificFlags() {}
-
 // main is the main application entry point
 func main() {
 	ctx, cancelFunc := context.WithCancel(context.Background())
