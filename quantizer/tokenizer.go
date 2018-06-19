@@ -93,13 +93,16 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 		return tkn.scanIdentifier()
 	case isDigit(ch):
 		return tkn.scanNumber(false)
-	case ch == ':':
-		return tkn.scanBindVar()
 	default:
 		tkn.next()
 		switch ch {
 		case EOFChar:
 			return EOFChar, nil
+		case ':':
+			if tkn.lastChar != '=' {
+				return tkn.scanBindVar()
+			}
+			fallthrough
 		case '=', ',', ';', '(', ')', '+', '*', '&', '|', '^', '~', '[', ']', '?':
 			return int(ch), []byte{byte(ch)}
 		case '.':
@@ -296,10 +299,8 @@ func (tkn *Tokenizer) scanEscapeSequence(braces rune) (int, []byte) {
 }
 
 func (tkn *Tokenizer) scanBindVar() (int, []byte) {
-	buffer := &bytes.Buffer{}
-	buffer.WriteByte(byte(tkn.lastChar))
+	buffer := bytes.NewBufferString(":")
 	token := ValueArg
-	tkn.next()
 	if tkn.lastChar == ':' {
 		token = ListArg
 		buffer.WriteByte(byte(tkn.lastChar))
