@@ -3,9 +3,7 @@ package config
 import (
 	"encoding/csv"
 	"fmt"
-	"os"
 	"strings"
-	"syscall"
 
 	"github.com/go-ini/ini"
 )
@@ -19,28 +17,16 @@ type File struct {
 	Path     string
 }
 
-// NewIni reads the file in configPath and returns a corresponding *File
+// NewINI reads the file in configPath and returns a corresponding *File
 // or an error if encountered.  This File is set as the default active
 // config file.
-func NewIni(configPath string) (*File, error) {
+func NewINI(configPath string) (*File, error) {
 	config, err := ini.Load(configPath)
 	if err != nil {
 		return nil, err
 	}
 	globalConfig = &File{instance: config, Path: configPath}
 	return globalConfig, nil
-}
-
-// NewIniIfExists works as New, but does not return an error if the file does not
-// exist. Instead, it returns a null File pointer.
-func NewIniIfExists(configPath string) (*File, error) {
-	config, err := NewIni(configPath)
-	if terr, ok := err.(*os.PathError); ok {
-		if terr, ok := terr.Err.(syscall.Errno); ok && terr == syscall.ENOENT {
-			return nil, nil
-		}
-	}
-	return config, err
 }
 
 // Get returns the currently active global config (the previous config opened

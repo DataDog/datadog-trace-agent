@@ -166,7 +166,7 @@ func getHostname(ddAgentBin string) (string, error) {
 }
 
 // NewAgentConfig creates the AgentConfig from the standard config
-func NewAgentConfig(conf *File, legacyConf *File, agentYaml *YamlAgentConfig) (*AgentConfig, error) {
+func NewAgentConfig(conf *File, agentYaml *YamlAgentConfig) (*AgentConfig, error) {
 	c := NewDefaultAgentConfig()
 	var err error
 
@@ -181,13 +181,6 @@ func NewAgentConfig(conf *File, legacyConf *File, agentYaml *YamlAgentConfig) (*
 	if agentYaml != nil {
 		// Agent 6
 		err = mergeYamlConfig(c, agentYaml)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if legacyConf != nil {
-		err = mergeIniConfig(c, legacyConf)
 		if err != nil {
 			return nil, err
 		}

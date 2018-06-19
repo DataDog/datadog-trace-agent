@@ -89,6 +89,50 @@ apm_enabled: true
 to your datadog.conf file.
 Exiting.`
 
+const legacyConfigFile = "/etc/dd-agent/datadog.conf"
+
+func loadConfigFiles() (*config.File, *config.YamlAgentConfig) {
+	exit := func() {
+		die("Configuration file not found: %s", opts.configFile)
+	}
+	exists := func(name string) bool {
+		_, err := os.Stat(name)
+		return !os.IsNotExist(err)
+	}
+	if !exists(opts.configFile) {
+		if opts.configFile == defaultConfigPath && exists(legacyConfigFile) {
+			// use fallback legacy config as a potential default
+			conf, err := config.NewINI(legacyConfigFile)
+			if err != nil {
+				exit()
+			}
+			log.Warnf("Using deprecated configuration file %q", legacyConfigFile)
+			return conf, nil
+		}
+		exit()
+	}
+	switch filepath.Ext(opts.configFile) {
+	case ".ini", ".conf":
+		conf, err := config.NewINI(opts.configFile)
+		if err != nil {
+			exit()
+		}
+		log.Infof("Using configuration from %s", opts.configFile)
+		return conf, nil
+	case ".yaml":
+		yamlConf, err := config.NewYAML(opts.configFile)
+		if err != nil {
+			exit()
+		}
+		log.Infof("Using configuration from %s", opts.configFile)
+		return nil, yamlConf
+	default:
+		log.Errorf("Configuration file '%s' not supported, it must be a .yaml or .ini file. File ignored.", opts.configFile)
+	}
+	exit()
+	return nil, nil
+}
+
 // runAgent is the entrypoint of our code
 func runAgent(ctx context.Context) {
 	// configure a default logger before anything so we can observe initialization
@@ -131,46 +175,8 @@ func runAgent(ctx context.Context) {
 		}()
 	}
 
-	// Instantiate the config
-	var err error
-	// trace-agent configuration
-	var agentConf *config.AgentConfig
-	// Agent 6 datadog.yaml config
-	var yamlConf *config.YamlAgentConfig
-	// Agent 5 datadog.conf config
-	var conf *config.File
-	// deprecated Agent 5 trace-agent.ini config
-	var legacyConf *config.File
-
-	if filepath.Ext(opts.configFile) == ".conf" || filepath.Ext(opts.configFile) == ".ini" {
-		conf, err = config.NewIniIfExists(opts.configFile)
-		if err != nil {
-			log.Criticalf("Error reading datadog.conf: %s", err)
-		}
-		if conf != nil {
-			log.Infof("Loading configuration from %s", opts.configFile)
-		}
-	} else if filepath.Ext(opts.configFile) == ".yaml" {
-		yamlConf, err = config.NewYamlIfExists(opts.configFile)
-		if err != nil {
-			log.Criticalf("Error reading datadog.yaml: %s", err)
-		}
-		if conf != nil {
-			log.Infof("Loading configuration from %s", opts.configFile)
-		}
-	} else {
-		log.Errorf("Configuration file '%s' not supported, it must be a .yaml or .ini file. File ignored.", opts.configFile)
-	}
-
-	legacyConf, err = config.NewIniIfExists(opts.legacyConfigFile)
-	if err != nil {
-		log.Errorf("error reading %s: %s", opts.legacyConfigFile, err)
-	}
-	if legacyConf != nil {
-		log.Errorf("using legacy configuration from %s, -ddconfig option is deprecated and will be removed in future versions", opts.legacyConfigFile)
-	}
-
-	agentConf, err = config.NewAgentConfig(conf, legacyConf, yamlConf)
+	conf, yamlConf := loadConfigFiles()
+	agentConf, err := config.NewAgentConfig(conf, yamlConf)
 	if err != nil {
 		die("%v", err)
 	}

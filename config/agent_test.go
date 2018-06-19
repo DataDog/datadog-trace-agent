@@ -28,7 +28,7 @@ func TestOnlyEnvConfig(t *testing.T) {
 	// setting an API Key should be enough to generate valid config
 	os.Setenv("DD_API_KEY", "apikey_from_env")
 
-	agentConfig, _ := NewAgentConfig(nil, nil, nil)
+	agentConfig, _ := NewAgentConfig(nil, nil)
 	assert.Equal(t, "apikey_from_env", agentConfig.APIKey)
 
 	os.Setenv("DD_API_KEY", "")
@@ -37,10 +37,10 @@ func TestOnlyEnvConfig(t *testing.T) {
 func TestOnlyDDAgentConfig(t *testing.T) {
 	assert := assert.New(t)
 
-	iniConf, err := NewIni("./test_cases/no_apm_config.ini")
+	iniConf, err := NewINI("./test_cases/no_apm_config.ini")
 	assert.NoError(err)
 
-	agentConfig, err := NewAgentConfig(iniConf, nil, nil)
+	agentConfig, err := NewAgentConfig(iniConf, nil)
 	assert.NoError(err)
 
 	assert.Equal("thing", agentConfig.HostName)
@@ -55,10 +55,10 @@ func TestDDAgentMultiAPIKeys(t *testing.T) {
 	// TODO: at some point, expire this case
 	assert := assert.New(t)
 
-	iniConf, err := NewIni("./test_cases/multi_api_keys.ini")
+	iniConf, err := NewINI("./test_cases/multi_api_keys.ini")
 	assert.NoError(err)
 
-	agentConfig, err := NewAgentConfig(iniConf, nil, nil)
+	agentConfig, err := NewAgentConfig(iniConf, nil)
 	assert.NoError(err)
 
 	assert.Equal("foo", agentConfig.APIKey)
@@ -67,10 +67,10 @@ func TestDDAgentMultiAPIKeys(t *testing.T) {
 func TestFullIniConfig(t *testing.T) {
 	assert := assert.New(t)
 
-	iniConf, err := NewIni("./test_cases/full.ini")
+	iniConf, err := NewINI("./test_cases/full.ini")
 	assert.NoError(err, "failed to parse valid configuration")
 
-	c, err := NewAgentConfig(iniConf, nil, nil)
+	c, err := NewAgentConfig(iniConf, nil)
 	assert.NoError(err)
 
 	assert.Equal("api_key_test", c.APIKey)
@@ -90,10 +90,10 @@ func TestFullIniConfig(t *testing.T) {
 func TestFullYamlConfig(t *testing.T) {
 	assert := assert.New(t)
 
-	yamlConf, err := NewYamlIfExists("./test_cases/full.yaml")
+	yamlConf, err := NewYAML("./test_cases/full.yaml")
 	assert.NoError(err, "failed to parse valid configuration")
 
-	c, err := NewAgentConfig(nil, nil, yamlConf)
+	c, err := NewAgentConfig(nil, yamlConf)
 	assert.NoError(err)
 
 	assert.Equal("api_key_test", c.APIKey)
@@ -113,10 +113,10 @@ func TestFullYamlConfig(t *testing.T) {
 func TestUndocumentedYamlConfig(t *testing.T) {
 	assert := assert.New(t)
 
-	yamlConfig, err := NewYamlIfExists("./test_cases/undocumented.yaml")
+	yamlConfig, err := NewYAML("./test_cases/undocumented.yaml")
 	assert.NoError(err)
 
-	agentConfig, err := NewAgentConfig(nil, nil, yamlConfig)
+	agentConfig, err := NewAgentConfig(nil, yamlConfig)
 	assert.NoError(err)
 
 	assert.Equal("thing", agentConfig.HostName)
@@ -162,8 +162,8 @@ func TestUndocumentedYamlConfig(t *testing.T) {
 
 func TestConfigNewIfExists(t *testing.T) {
 	// The file does not exist: no error returned
-	conf, err := NewIniIfExists("/does-not-exist")
-	assert.Nil(t, err)
+	conf, err := NewINI("/does-not-exist")
+	assert.True(t, os.IsNotExist(err))
 	assert.Nil(t, conf)
 
 	// The file exists but cannot be read for another reason: an error is
@@ -173,7 +173,7 @@ func TestConfigNewIfExists(t *testing.T) {
 	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0200) // write only
 	assert.Nil(t, err)
 	f.Close()
-	conf, err = NewIniIfExists(filename)
+	conf, err = NewINI(filename)
 	assert.NotNil(t, err)
 	assert.Nil(t, conf)
 	os.Remove(filename)
@@ -190,10 +190,10 @@ func TestGetHostname(t *testing.T) {
 func TestUndocumentedIni(t *testing.T) {
 	assert := assert.New(t)
 
-	iniConf, err := NewIni("./test_cases/undocumented.ini")
+	iniConf, err := NewINI("./test_cases/undocumented.ini")
 	assert.NoError(err, "failed to parse valid configuration")
 
-	c, err := NewAgentConfig(iniConf, nil, nil)
+	c, err := NewAgentConfig(iniConf, nil)
 	assert.NoError(err)
 
 	// analysis legacy
@@ -213,7 +213,7 @@ func TestAnalyzedSpansEnvConfig(t *testing.T) {
 	os.Setenv("DD_APM_ANALYZED_SPANS", "service1|operation1=0.5,service2|operation2=1,service1|operation3=0")
 	defer os.Unsetenv("DD_APM_ANALYZED_SPANS")
 
-	c, _ := NewAgentConfig(nil, nil, nil)
+	c, _ := NewAgentConfig(nil, nil)
 
 	assert.Len(c.AnalyzedSpansByService, 2)
 	assert.Len(c.AnalyzedSpansByService["service1"], 2)

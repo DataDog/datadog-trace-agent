@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/url"
-	"os"
 	"regexp"
 	"time"
 
@@ -109,11 +108,7 @@ func newYamlFromBytes(bytes []byte) (*YamlAgentConfig, error) {
 }
 
 // NewYamlIfExists returns a new YamlAgentConfig if the given configPath is exists.
-func NewYamlIfExists(configPath string) (*YamlAgentConfig, error) {
-	if _, err := os.Stat(configPath); err != nil {
-		// file does not exist
-		return nil, nil
-	}
+func NewYAML(configPath string) (*YamlAgentConfig, error) {
 	fileContent, err := ioutil.ReadFile(configPath)
 	if err != nil {
 		return nil, err
