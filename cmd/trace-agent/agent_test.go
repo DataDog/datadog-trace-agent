@@ -93,12 +93,12 @@ func TestFormatTrace(t *testing.T) {
 	assert.Equal(5000, len(result.Resource))
 	assert.NotEqual("Non-parsable SQL query", result.Resource)
 	assert.NotContains(result.Resource, "42")
-	assert.Contains(result.Resource, "SELECT name FROM people WHERE age = ?")
+	assert.Contains(result.Resource, "SELECT name FROM people WHERE age=?")
 
 	assert.Equal(5003, len(result.Meta["sql.query"])) // Ellipsis added in quantizer
 	assert.NotEqual("Non-parsable SQL query", result.Meta["sql.query"])
 	assert.NotContains(result.Meta["sql.query"], "42")
-	assert.Contains(result.Meta["sql.query"], "SELECT name FROM people WHERE age = ?")
+	assert.Contains(result.Meta["sql.query"], "SELECT name FROM people WHERE age=?")
 }
 
 func BenchmarkAgentTraceProcessing(b *testing.B) {
