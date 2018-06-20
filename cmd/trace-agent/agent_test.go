@@ -12,7 +12,7 @@ import (
 	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/fixtures"
+	"github.com/DataDog/datadog-trace-agent/internal/testutil"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/quantizer"
 	"github.com/stretchr/testify/assert"
@@ -135,7 +135,7 @@ func runTraceProcessingBenchmark(b *testing.B, c *config.AgentConfig) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		agent.Process(fixtures.RandomTrace(10, 8))
+		agent.Process(testutil.RandomTrace(10, 8))
 	}
 }
 

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/backoff"
-	"github.com/DataDog/datadog-trace-agent/fixtures"
+	"github.com/DataDog/datadog-trace-agent/internal/testutil"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/stretchr/testify/assert"
 )
@@ -68,7 +68,7 @@ func TestQueuablePayloadSender_FlakyEndpoint(t *testing.T) {
 	flakyEndpoint := &testEndpoint{}
 
 	// And a test backoff timer that can be triggered on-demand
-	testBackoffTimer := fixtures.NewTestBackoffTimer()
+	testBackoffTimer := testutil.NewTestBackoffTimer()
 
 	// And a queuable sender using said endpoint and timer
 	conf := writerconfig.DefaultQueuablePayloadSenderConf()
@@ -167,7 +167,7 @@ func TestQueuablePayloadSender_MaxQueuedPayloads(t *testing.T) {
 	flakyEndpoint.SetError(&RetriableError{err: fmt.Errorf("bleh"), endpoint: flakyEndpoint})
 
 	// And a test backoff timer that can be triggered on-demand
-	testBackoffTimer := fixtures.NewTestBackoffTimer()
+	testBackoffTimer := testutil.NewTestBackoffTimer()
 
 	// And a queuable sender using said endpoint and timer and with a meager max queued payloads value of 1
 	conf := writerconfig.DefaultQueuablePayloadSenderConf()
@@ -237,7 +237,7 @@ func TestQueuablePayloadSender_MaxQueuedBytes(t *testing.T) {
 	flakyEndpoint.SetError(&RetriableError{err: fmt.Errorf("bleh"), endpoint: flakyEndpoint})
 
 	// And a test backoff timer that can be triggered on-demand
-	testBackoffTimer := fixtures.NewTestBackoffTimer()
+	testBackoffTimer := testutil.NewTestBackoffTimer()
 
 	// And a queuable sender using said endpoint and timer and with a meager max size of 10 bytes
 	conf := writerconfig.DefaultQueuablePayloadSenderConf()
@@ -306,7 +306,7 @@ func TestQueuablePayloadSender_DropBigPayloadsOnRetry(t *testing.T) {
 	flakyEndpoint.SetError(&RetriableError{err: fmt.Errorf("bleh"), endpoint: flakyEndpoint})
 
 	// And a test backoff timer that can be triggered on-demand
-	testBackoffTimer := fixtures.NewTestBackoffTimer()
+	testBackoffTimer := testutil.NewTestBackoffTimer()
 
 	// And a queuable sender using said endpoint and timer and with a meager max size of 10 bytes
 	conf := writerconfig.DefaultQueuablePayloadSenderConf()
@@ -362,7 +362,7 @@ func TestQueuablePayloadSender_SendBigPayloadsIfNoRetry(t *testing.T) {
 	workingEndpoint := &testEndpoint{}
 
 	// And a test backoff timer that can be triggered on-demand
-	testBackoffTimer := fixtures.NewTestBackoffTimer()
+	testBackoffTimer := testutil.NewTestBackoffTimer()
 
 	// And a queuable sender using said endpoint and timer and with a meager max size of 10 bytes
 	conf := writerconfig.DefaultQueuablePayloadSenderConf()
@@ -408,7 +408,7 @@ func TestQueuablePayloadSender_MaxAge(t *testing.T) {
 	flakyEndpoint.SetError(&RetriableError{err: fmt.Errorf("bleh"), endpoint: flakyEndpoint})
 
 	// And a test backoff timer that can be triggered on-demand
-	testBackoffTimer := fixtures.NewTestBackoffTimer()
+	testBackoffTimer := testutil.NewTestBackoffTimer()
 
 	// And a queuable sender using said endpoint and timer and with a meager max age of 100ms
 	conf := writerconfig.DefaultQueuablePayloadSenderConf()
