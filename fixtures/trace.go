@@ -1,6 +1,7 @@
 package fixtures
 
 import (
+	"math"
 	"math/rand"
 
 	"github.com/DataDog/datadog-trace-agent/model"
@@ -8,9 +9,12 @@ import (
 
 // genNextLevel generates a new level for the trace tree structure,
 // having maxSpans as the max number of spans for this level
-func genNextLevel(prevLevel []*model.Span, maxSpans int) []*model.Span {
+func genNextLevel(prevLevel []*model.Span, numSpans int, randomNumber bool, randomTimes bool) []*model.Span {
 	var spans []*model.Span
-	numSpans := rand.Intn(maxSpans) + 1
+
+	if randomNumber {
+		numSpans = rand.Intn(numSpans) + 1
+	}
 
 	// the spans have to be "nested" in the previous level
 	// choose randomly spans from prev level
@@ -45,14 +49,21 @@ func genNextLevel(prevLevel []*model.Span, maxSpans int) []*model.Span {
 			news.TraceID = prev.TraceID
 			news.ParentID = prev.SpanID
 
-			// distribute durations in prev span
-			// random start
-			randStart := rand.Int63n(timeLeft)
-			news.Start = prev.Start + randStart
-			// random duration
-			timeLeft -= randStart
-			news.Duration = rand.Int63n(timeLeft)
-			timeLeft -= news.Duration
+			if randomTimes {
+				// distribute durations in prev span
+				// random start
+				randStart := rand.Int63n(timeLeft)
+				news.Start = prev.Start + randStart
+				// random duration
+				timeLeft -= randStart
+				news.Duration = rand.Int63n(timeLeft)
+				timeLeft -= news.Duration
+			} else {
+				durationPerSpan := int64(math.Floor(float64(prev.Duration) / float64(childSpans)))
+				// uniformly distribute start times and durations over parent
+				news.Start = prev.Start + int64(j)*durationPerSpan
+				news.Duration = durationPerSpan
+			}
 
 			curSpans = append(curSpans, news)
 		}
@@ -73,9 +84,28 @@ func RandomTrace(maxLevels, maxSpans int) model.Trace {
 
 	for i := 0; i < maxDepth; i++ {
 		if len(prevLevel) > 0 {
-			prevLevel = genNextLevel(prevLevel, maxSpans)
+			prevLevel = genNextLevel(prevLevel, maxSpans, true, true)
 			t = append(t, prevLevel...)
 		}
+	}
+
+	return t
+}
+
+// RandomFixedSizeTrace generates a random trace with variable depth but a fixed number of spans.
+func RandomFixedSizeTrace(numSpans int) model.Trace {
+	t := make(model.Trace, 0, numSpans)
+	t = append(t, RandomSpan())
+	t[0].Duration = int64(numSpans * 1000)
+	numSpans--
+
+	prevLevel := t
+
+	for numSpans > 0 {
+		spansThisLevel := rand.Intn(numSpans) + 1
+		prevLevel = genNextLevel(prevLevel, spansThisLevel, false, false)
+		t = append(t, prevLevel...)
+		numSpans -= spansThisLevel
 	}
 
 	return t

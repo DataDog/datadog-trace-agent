@@ -3,9 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/rand"
+	"net"
 	"net/http"
 	"runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -160,4 +164,149 @@ func formatTrace(t model.Trace) model.Trace {
 		t[i].Truncate()
 	}
 	return t
+}
+
+func TestAgentWithTransactions(t *testing.T) {
+	fullTraceTest(t, 100, true)
+}
+
+func TestAgentWithoutTransactions(t *testing.T) {
+	fullTraceTest(t, 100, false)
+}
+
+func fullTraceTest(t *testing.T, numTraces int, transactions bool) {
+	if testing.Short() {
+		t.Skip("Skipping full trace short since we're running only short tests")
+	}
+
+	// Disable logs
+	log.UseLogger(log.Disabled)
+	defer log.UseLogger(log.Default)
+
+	// Create a listener on a free port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		panic(err)
+	}
+	defer listener.Close()
+
+	numSpansPerTrace := 20
+
+	exit := make(chan struct{})
+
+	// Create agent config
+	c := config.NewDefaultAgentConfig()
+	// Make agent send to listener we created at the beginning
+	c.APIEndpoint = fmt.Sprintf("http://%s", listener.Addr().String())
+	c.ReceiverPort = findFreePort()
+	c.APIKey = "apikey_2"
+	// Force each trace to go on its own payload to simplify end condition
+	c.TraceWriterConfig.FlushPeriod = 2 * time.Hour
+	c.TraceWriterConfig.MaxSpansPerPayload = numSpansPerTrace
+
+	// Set service to extract transactions from
+	transactionService := "mysql"
+	if transactions {
+		c.AnalyzedRateByService = map[string]float64{
+			transactionService: 1,
+		}
+	}
+
+	// Create agent
+	agent := NewAgent(c, exit)
+
+	rand.Seed(1)
+
+	// Create test traces
+	traces := make([]model.Trace, 0, numTraces)
+	for i := 0; i < numTraces; i++ {
+		trace := fixtures.RandomFixedSizeTrace(numSpansPerTrace)
+
+		// Panic if the number generator failed to preserve number of spans
+		if len(trace) != numSpansPerTrace {
+			panic(trace)
+		}
+
+		root := trace.GetRoot()
+
+		// Make sure all traces survive sampling
+		root.Metrics[samplingPriorityKey] = 2
+
+		// If we care about transactions lets set all root spans to the service transactions are being extracted from.
+		if transactions {
+			root.Service = transactionService
+		}
+
+		traces = append(traces, trace)
+	}
+
+	// Temporarily overwrite global servemux to prevent multiple func registration errors
+	oldDefaultServeMux := http.DefaultServeMux
+	http.DefaultServeMux = http.NewServeMux()
+	defer func() {
+		http.DefaultServeMux = oldDefaultServeMux
+	}()
+
+	// Start the agent with a waitgroup signaling when it stops
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		agent.Run()
+		wg.Done()
+	}()
+
+	// Create a mock http server tracking number of trace requests received and total trace request bytes.
+	totalBytesReceived := int64(0)
+	// Keep track of received trace payloads in a waitgroup so we can wait for this at the end
+	reqWg := sync.WaitGroup{}
+	reqWg.Add(len(traces))
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v0.2/traces", func(w http.ResponseWriter, r *http.Request) {
+		if transactions {
+			// When dealing with transactions, it's possible that there's one extra payload at the end containing a
+			// single transaction so reqWg.Done() might be called one more time than expected.
+			defer func() {
+				recover()
+			}()
+		}
+		atomic.AddInt64(&totalBytesReceived, r.ContentLength)
+		w.WriteHeader(200)
+		reqWg.Done()
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+	})
+
+	// Start said server
+	srv := http.Server{Addr: listener.Addr().String(), Handler: mux}
+	go srv.Serve(listener)
+
+	start := time.Now()
+
+	// Send the test traces to the agent receiver
+	for _, trace := range traces {
+		agent.Receiver.traces <- trace
+	}
+
+	// Wait for our mock server to acknowledge all trace payloads
+	reqWg.Wait()
+
+	fmt.Printf("Took %v\n", time.Since(start))
+	fmt.Printf("Wrote %fMB of data\n", float64(totalBytesReceived)/1024/1024)
+
+	// Stop the agent
+	close(exit)
+	wg.Wait()
+	// And the server
+	srv.Close()
+}
+
+// findFreePort returns a free tcp port or panics
+func findFreePort() int {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		panic(err)
+	}
+	defer listener.Close()
+	return listener.Addr().(*net.TCPAddr).Port
 }
