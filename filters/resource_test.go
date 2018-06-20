@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/fixtures"
+	"github.com/DataDog/datadog-trace-agent/internal/testutil"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -41,7 +41,7 @@ func TestRegexCompilationFailure(t *testing.T) {
 	filter := newTestFilter("[123", "]123", "{6}")
 
 	for i := 0; i < 100; i++ {
-		span := fixtures.RandomSpan()
+		span := testutil.RandomSpan()
 		trace := model.Trace{span}
 		assert.True(t, filter.Keep(span, &trace))
 	}
@@ -78,7 +78,7 @@ func newTestFilter(blacklist ...string) Filter {
 }
 
 func newTestSpan(resource string) *model.Span {
-	span := fixtures.RandomSpan()
+	span := testutil.RandomSpan()
 	span.Resource = resource
 	return span
 }

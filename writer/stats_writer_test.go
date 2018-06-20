@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/fixtures"
 	"github.com/DataDog/datadog-trace-agent/info"
+	"github.com/DataDog/datadog-trace-agent/internal/testutil"
 	"github.com/DataDog/datadog-trace-agent/model"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/stretchr/testify/assert"
@@ -28,14 +28,14 @@ func TestStatsWriter_StatHandling(t *testing.T) {
 
 	// Given 2 slices of 3 test buckets
 	testStats1 := []model.StatsBucket{
-		fixtures.RandomStatsBucket(3),
-		fixtures.RandomStatsBucket(3),
-		fixtures.RandomStatsBucket(3),
+		testutil.RandomStatsBucket(3),
+		testutil.RandomStatsBucket(3),
+		testutil.RandomStatsBucket(3),
 	}
 	testStats2 := []model.StatsBucket{
-		fixtures.RandomStatsBucket(3),
-		fixtures.RandomStatsBucket(3),
-		fixtures.RandomStatsBucket(3),
+		testutil.RandomStatsBucket(3),
+		testutil.RandomStatsBucket(3),
+		testutil.RandomStatsBucket(3),
 	}
 
 	// When sending those slices
@@ -82,9 +82,9 @@ func TestStatsWriter_UpdateInfoHandling(t *testing.T) {
 	// When sending 1 payload with 3 buckets
 	expectedNumPayloads++
 	payload1Buckets := []model.StatsBucket{
-		fixtures.RandomStatsBucket(5),
-		fixtures.RandomStatsBucket(5),
-		fixtures.RandomStatsBucket(5),
+		testutil.RandomStatsBucket(5),
+		testutil.RandomStatsBucket(5),
+		testutil.RandomStatsBucket(5),
 	}
 	statsChannel <- payload1Buckets
 	expectedNumBuckets += 3
@@ -93,9 +93,9 @@ func TestStatsWriter_UpdateInfoHandling(t *testing.T) {
 	// And another one with another 3 buckets
 	expectedNumPayloads++
 	payload2Buckets := []model.StatsBucket{
-		fixtures.RandomStatsBucket(5),
-		fixtures.RandomStatsBucket(5),
-		fixtures.RandomStatsBucket(5),
+		testutil.RandomStatsBucket(5),
+		testutil.RandomStatsBucket(5),
+		testutil.RandomStatsBucket(5),
 	}
 	statsChannel <- payload2Buckets
 	expectedNumBuckets += 3
@@ -108,9 +108,9 @@ func TestStatsWriter_UpdateInfoHandling(t *testing.T) {
 	testEndpoint.SetError(fmt.Errorf("non retriable error"))
 	expectedNumErrors++
 	payload3Buckets := []model.StatsBucket{
-		fixtures.RandomStatsBucket(5),
-		fixtures.RandomStatsBucket(5),
-		fixtures.RandomStatsBucket(5),
+		testutil.RandomStatsBucket(5),
+		testutil.RandomStatsBucket(5),
+		testutil.RandomStatsBucket(5),
 	}
 	statsChannel <- payload3Buckets
 	expectedNumBuckets += 3
@@ -126,9 +126,9 @@ func TestStatsWriter_UpdateInfoHandling(t *testing.T) {
 	})
 	expectedMinNumRetries++
 	payload4Buckets := []model.StatsBucket{
-		fixtures.RandomStatsBucket(5),
-		fixtures.RandomStatsBucket(5),
-		fixtures.RandomStatsBucket(5),
+		testutil.RandomStatsBucket(5),
+		testutil.RandomStatsBucket(5),
+		testutil.RandomStatsBucket(5),
 	}
 	statsChannel <- payload4Buckets
 	expectedNumBuckets += 3
@@ -180,9 +180,9 @@ func TestStatsWriter_BuildPayloads(t *testing.T) {
 		// spans per stat bucket. Each buckets have the same
 		// time window (start: 0, duration 1e9).
 		stats := []model.StatsBucket{
-			fixtures.RandomStatsBucket(5),
-			fixtures.RandomStatsBucket(5),
-			fixtures.RandomStatsBucket(5),
+			testutil.RandomStatsBucket(5),
+			testutil.RandomStatsBucket(5),
+			testutil.RandomStatsBucket(5),
 		}
 
 		// Remove duplicates so that we have a predictable state. In another
@@ -222,9 +222,9 @@ func TestStatsWriter_BuildPayloads(t *testing.T) {
 		// spans per stat bucket. Each buckets have the same
 		// time window (start: 0, duration 1e9).
 		stats := []model.StatsBucket{
-			fixtures.RandomStatsBucket(5),
-			fixtures.RandomStatsBucket(5),
-			fixtures.RandomStatsBucket(5),
+			testutil.RandomStatsBucket(5),
+			testutil.RandomStatsBucket(5),
+			testutil.RandomStatsBucket(5),
 		}
 
 		// Remove duplicates so that we have a predictable
@@ -286,9 +286,9 @@ func TestStatsWriter_BuildPayloads(t *testing.T) {
 		// stat bucket. Each buckets have the same time window (start:
 		// 0, duration 1e9).
 		stats := []model.StatsBucket{
-			fixtures.RandomStatsBucket(5),
-			fixtures.RandomStatsBucket(5),
-			fixtures.RandomStatsBucket(5),
+			testutil.RandomStatsBucket(5),
+			testutil.RandomStatsBucket(5),
+			testutil.RandomStatsBucket(5),
 		}
 
 		payloads, nbStatBuckets, nbEntries := sw.buildPayloads(stats, 1337)
@@ -384,7 +384,7 @@ func assertStatsPayload(assert *assert.Assertions, headers map[string]string, bu
 	assert.Equal(buckets, statsPayload.Stats, "Stat buckets should match expectation")
 }
 
-func testStatsWriter() (*StatsWriter, chan []model.StatsBucket, *testEndpoint, *fixtures.TestStatsClient) {
+func testStatsWriter() (*StatsWriter, chan []model.StatsBucket, *testEndpoint, *testutil.TestStatsClient) {
 	statsChannel := make(chan []model.StatsBucket)
 	conf := &config.AgentConfig{
 		HostName:          testHostName,
@@ -394,7 +394,7 @@ func testStatsWriter() (*StatsWriter, chan []model.StatsBucket, *testEndpoint, *
 	statsWriter := NewStatsWriter(conf, statsChannel)
 	testEndpoint := &testEndpoint{}
 	statsWriter.BaseWriter.payloadSender.setEndpoint(testEndpoint)
-	testStatsClient := &fixtures.TestStatsClient{}
+	testStatsClient := &testutil.TestStatsClient{}
 	statsWriter.statsClient = testStatsClient
 
 	return statsWriter, statsChannel, testEndpoint, testStatsClient

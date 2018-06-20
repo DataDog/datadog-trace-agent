@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/fixtures"
 	"github.com/DataDog/datadog-trace-agent/info"
+	"github.com/DataDog/datadog-trace-agent/internal/testutil"
 	"github.com/DataDog/datadog-trace-agent/model"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/stretchr/testify/assert"
@@ -38,20 +38,20 @@ func TestServiceWriter_ServiceHandling(t *testing.T) {
 	serviceWriter.Start()
 
 	// Given a set of service metadata
-	metadata1 := fixtures.RandomServices(10, 10)
+	metadata1 := testutil.RandomServices(10, 10)
 
 	// When sending it
 	serviceChannel <- metadata1
 
 	// And then immediately sending another set of service metadata
-	metadata2 := fixtures.RandomServices(10, 10)
+	metadata2 := testutil.RandomServices(10, 10)
 	serviceChannel <- metadata2
 
 	// And then waiting for more than flush period
 	time.Sleep(2 * serviceWriter.conf.FlushPeriod)
 
 	// And then sending a third set of service metadata
-	metadata3 := fixtures.RandomServices(10, 10)
+	metadata3 := testutil.RandomServices(10, 10)
 	serviceChannel <- metadata3
 
 	// And stopping service writer before flush ticker ticks (should still flush on exit though)
@@ -90,7 +90,7 @@ func TestServiceWriter_UpdateInfoHandling(t *testing.T) {
 
 	// When sending a set of metadata
 	expectedNumPayloads++
-	metadata1 := fixtures.RandomServices(10, 10)
+	metadata1 := testutil.RandomServices(10, 10)
 	serviceChannel <- metadata1
 	expectedNumServices += int64(len(metadata1))
 	expectedNumBytes += calculateMetadataPayloadSize(metadata1)
@@ -100,7 +100,7 @@ func TestServiceWriter_UpdateInfoHandling(t *testing.T) {
 
 	// And then sending a second set of metadata
 	expectedNumPayloads++
-	metadata2 := fixtures.RandomServices(10, 10)
+	metadata2 := testutil.RandomServices(10, 10)
 	serviceChannel <- metadata2
 	expectedNumServices += int64(len(metadata2))
 	expectedNumBytes += calculateMetadataPayloadSize(metadata2)
@@ -111,7 +111,7 @@ func TestServiceWriter_UpdateInfoHandling(t *testing.T) {
 	// And then sending a third payload with other 3 traces with an errored out endpoint with no retry
 	testEndpoint.SetError(fmt.Errorf("non retriable error"))
 	expectedNumErrors++
-	metadata3 := fixtures.RandomServices(10, 10)
+	metadata3 := testutil.RandomServices(10, 10)
 	serviceChannel <- metadata3
 	expectedNumServices += int64(len(metadata3))
 	expectedNumBytes += calculateMetadataPayloadSize(metadata3)
@@ -125,7 +125,7 @@ func TestServiceWriter_UpdateInfoHandling(t *testing.T) {
 		endpoint: testEndpoint,
 	})
 	expectedMinNumRetries++
-	metadata4 := fixtures.RandomServices(10, 10)
+	metadata4 := testutil.RandomServices(10, 10)
 	serviceChannel <- metadata4
 	expectedNumServices += int64(len(metadata4))
 	expectedNumBytes += calculateMetadataPayloadSize(metadata4)
@@ -193,7 +193,7 @@ func assertMetadata(assert *assert.Assertions, expectedHeaders map[string]string
 	assert.Equal(expectedMetadata, servicesMetadata, "Service metadata should match expectation")
 }
 
-func testServiceWriter() (*ServiceWriter, chan model.ServicesMetadata, *testEndpoint, *fixtures.TestStatsClient) {
+func testServiceWriter() (*ServiceWriter, chan model.ServicesMetadata, *testEndpoint, *testutil.TestStatsClient) {
 	serviceChannel := make(chan model.ServicesMetadata)
 	conf := &config.AgentConfig{
 		ServiceWriterConfig: writerconfig.DefaultServiceWriterConfig(),
@@ -201,7 +201,7 @@ func testServiceWriter() (*ServiceWriter, chan model.ServicesMetadata, *testEndp
 	serviceWriter := NewServiceWriter(conf, serviceChannel)
 	testEndpoint := &testEndpoint{}
 	serviceWriter.BaseWriter.payloadSender.setEndpoint(testEndpoint)
-	testStatsClient := &fixtures.TestStatsClient{}
+	testStatsClient := &testutil.TestStatsClient{}
 	serviceWriter.statsClient = testStatsClient
 
 	return serviceWriter, serviceChannel, testEndpoint, testStatsClient
