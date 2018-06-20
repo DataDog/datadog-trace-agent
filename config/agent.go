@@ -24,20 +24,6 @@ var (
 	ErrMissingHostname = errors.New("failed to automatically set the hostname, you must specify it via configuration for or the DD_HOSTNAME env var")
 )
 
-const (
-	envAPIKey          = "DD_API_KEY"               // API KEY
-	envAPMEnabled      = "DD_APM_ENABLED"           // APM enabled
-	envURL             = "DD_APM_DD_URL"            // APM URL
-	envHostname        = "DD_HOSTNAME"              // agent hostname
-	envBindHost        = "DD_BIND_HOST"             // statsd & receiver hostname
-	envReceiverPort    = "DD_RECEIVER_PORT"         // receiver port
-	envDogstatsdPort   = "DD_DOGSTATSD_PORT"        // dogstatsd port
-	envRemoteTraffic   = "DD_APM_NON_LOCAL_TRAFFIC" // alow non-local traffic
-	envIgnoreResources = "DD_IGNORE_RESOURCE"       // ignored resources
-	envLogLevel        = "DD_LOG_LEVEL"             // logging level
-	envAnalyzedSpans   = "DD_APM_ANALYZED_SPANS"    // spans to analyze for transactions
-)
-
 // AgentConfig handles the interpretation of the configuration (with default
 // behaviors) in one place. It is also a simple structure to share across all
 // the Agent components, with 100% safe and reliable values.

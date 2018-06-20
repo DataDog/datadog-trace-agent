@@ -9,7 +9,21 @@ import (
 	log "github.com/cihub/seelog"
 )
 
-// mergeEnv applies overrides from environment variables to the trace agent configuration
+const (
+	envAPIKey          = "DD_API_KEY"               // API KEY
+	envAPMEnabled      = "DD_APM_ENABLED"           // APM enabled
+	envURL             = "DD_APM_DD_URL"            // APM URL
+	envHostname        = "DD_HOSTNAME"              // agent hostname
+	envBindHost        = "DD_BIND_HOST"             // statsd & receiver hostname
+	envReceiverPort    = "DD_RECEIVER_PORT"         // receiver port
+	envDogstatsdPort   = "DD_DOGSTATSD_PORT"        // dogstatsd port
+	envRemoteTraffic   = "DD_APM_NON_LOCAL_TRAFFIC" // alow non-local traffic
+	envIgnoreResources = "DD_IGNORE_RESOURCE"       // ignored resources
+	envLogLevel        = "DD_LOG_LEVEL"             // logging level
+	envAnalyzedSpans   = "DD_APM_ANALYZED_SPANS"    // spans to analyze for transactions
+)
+
+// loadEnv applies overrides from environment variables to the trace agent configuration
 func (c *AgentConfig) loadEnv() {
 	if v := os.Getenv(envAPMEnabled); v == "true" {
 		c.Enabled = true
