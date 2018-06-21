@@ -19,6 +19,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/osutil"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
@@ -104,15 +105,12 @@ func (r *HTTPReceiver) Run() {
 	http.HandleFunc("/v0.4/services", r.httpHandleWithVersion(v04, r.handleServices))
 
 	// expvar implicitely publishes "/debug/vars" on the same port
-
 	addr := fmt.Sprintf("%s:%d", r.conf.ReceiverHost, r.conf.ReceiverPort)
 	if err := r.Listen(addr, ""); err != nil {
-		die("%v", err)
+		osutil.Exitf("%v", err)
 	}
 
-	go func() {
-		r.preSampler.Run()
-	}()
+	go r.preSampler.Run()
 
 	go func() {
 		defer watchdog.LogOnPanic()

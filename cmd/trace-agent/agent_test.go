@@ -23,7 +23,7 @@ func TestWatchdog(t *testing.T) {
 		return
 	}
 
-	conf := config.NewDefaultAgentConfig()
+	conf := config.New()
 	conf.APIKey = "apikey_2"
 	conf.MaxMemory = 1e7
 	conf.WatchdogInterval = time.Millisecond
@@ -43,8 +43,10 @@ func TestWatchdog(t *testing.T) {
 		http.DefaultServeMux = defaultMux
 	}()
 
+	var killed bool
 	defer func() {
 		if r := recover(); r != nil {
+			killed = true
 			switch v := r.(type) {
 			case string:
 				if strings.HasPrefix(v, "exceeded max memory") {
@@ -63,7 +65,9 @@ func TestWatchdog(t *testing.T) {
 	buf[len(buf)-1] = 1
 
 	// override the default die, else our test would stop, use a plain panic() instead
-	agent.die = func(format string, args ...interface{}) {
+	oldDie := dieFunc
+	defer func() { dieFunc = oldDie }()
+	dieFunc = func(format string, args ...interface{}) {
 		panic(fmt.Sprintf(format, args...))
 	}
 
@@ -73,6 +77,8 @@ func TestWatchdog(t *testing.T) {
 	// without this. runtime could be smart and free memory before we Run()
 	buf[0] = 2
 	buf[len(buf)-1] = 2
+
+	assert.True(t, killed)
 }
 
 // Test to make sure that the joined effort of the quantizer and truncator, in that order, produce the
@@ -102,14 +108,14 @@ func TestFormatTrace(t *testing.T) {
 }
 
 func BenchmarkAgentTraceProcessing(b *testing.B) {
-	c := config.NewDefaultAgentConfig()
+	c := config.New()
 	c.APIKey = "test"
 
 	runTraceProcessingBenchmark(b, c)
 }
 
 func BenchmarkAgentTraceProcessingWithFiltering(b *testing.B) {
-	c := config.NewDefaultAgentConfig()
+	c := config.New()
 	c.APIKey = "test"
 	c.Ignore["resource"] = []string{"[0-9]{3}", "foobar", "G.T [a-z]+", "[^123]+_baz"}
 
@@ -119,7 +125,7 @@ func BenchmarkAgentTraceProcessingWithFiltering(b *testing.B) {
 // worst case scenario: spans are tested against multiple rules without any match.
 // this means we won't compesate the overhead of filtering by dropping traces
 func BenchmarkAgentTraceProcessingWithWorstCaseFiltering(b *testing.B) {
-	c := config.NewDefaultAgentConfig()
+	c := config.New()
 	c.APIKey = "test"
 	c.Ignore["resource"] = []string{"[0-9]{3}", "foobar", "aaaaa?aaaa", "[^123]+_baz"}
 
@@ -140,7 +146,7 @@ func runTraceProcessingBenchmark(b *testing.B, c *config.AgentConfig) {
 }
 
 func BenchmarkWatchdog(b *testing.B) {
-	conf := config.NewDefaultAgentConfig()
+	conf := config.New()
 	conf.APIKey = "apikey_2"
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()

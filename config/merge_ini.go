@@ -14,9 +14,9 @@ import (
 	"github.com/go-ini/ini"
 )
 
-func mergeIniConfig(c *AgentConfig, conf *File) error {
+func (c *AgentConfig) loadIniConfig(conf *File) {
 	if conf == nil {
-		return nil
+		return
 	}
 
 	// [Main] section
@@ -31,7 +31,7 @@ func mergeIniConfig(c *AgentConfig, conf *File) error {
 		}
 
 		if v := m.Key("hostname").MustString(""); v != "" {
-			c.HostName = v
+			c.Hostname = v
 		} else {
 			log.Error("Failed to parse hostname from dd-agent config")
 		}
@@ -220,8 +220,6 @@ func mergeIniConfig(c *AgentConfig, conf *File) error {
 	c.ServiceWriterConfig = readServiceWriterConfig(conf, "trace.writer.services")
 	c.StatsWriterConfig = readStatsWriterConfig(conf, "trace.writer.stats")
 	c.TraceWriterConfig = readTraceWriterConfig(conf, "trace.writer.traces")
-
-	return nil
 }
 
 func readServiceWriterConfig(confFile *File, section string) writerconfig.ServiceWriterConfig {

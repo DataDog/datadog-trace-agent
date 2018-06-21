@@ -338,7 +338,7 @@ func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expecte
 func testTraceWriter() (*TraceWriter, chan *SampledTrace, *testEndpoint, *fixtures.TestStatsClient) {
 	payloadChannel := make(chan *SampledTrace)
 	conf := &config.AgentConfig{
-		HostName:          testHostName,
+		Hostname:          testHostName,
 		DefaultEnv:        testEnv,
 		TraceWriterConfig: writerconfig.DefaultTraceWriterConfig(),
 	}
