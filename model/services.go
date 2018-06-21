@@ -2,7 +2,6 @@ package model
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 )
 
@@ -30,12 +29,6 @@ func (s1 ServicesMetadata) Merge(s2 ServicesMetadata) {
 // Hence watch for GlobalAgentPayloadVersion's value.
 func EncodeServicesPayload(sm ServicesMetadata) ([]byte, error) {
 	return json.Marshal(sm)
-}
-
-// ServicesPayloadAPIPath returns the path to append to the URL to get
-// the endpoint for submitting a services metadata payload.
-func ServicesPayloadAPIPath() string {
-	return fmt.Sprintf("/api/%s/services", GlobalAgentPayloadVersion)
 }
 
 // SetServicesPayloadHeaders takes a Header struct and adds the appropriate
