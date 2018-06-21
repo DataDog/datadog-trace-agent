@@ -219,7 +219,7 @@ func Load(path string) (*AgentConfig, error) {
 			return cfg, err
 		}
 	default:
-		return cfg, errors.New("unrecognised file extension (need .yaml)")
+		return cfg, errors.New("unrecognised file extension (need .yaml, .ini or .conf)")
 	}
 	cfg.ConfigPath = cfgPath
 	return cfg, nil
