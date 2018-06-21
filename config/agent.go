@@ -6,23 +6,36 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/flags"
+	"github.com/DataDog/datadog-trace-agent/osutil"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
+	log "github.com/cihub/seelog"
+)
+
+var (
+	// ErrMissingAPIKey is returned when the config could not be validated due to missing API key.
+	ErrMissingAPIKey = errors.New("you must specify an API Key, either via a configuration file or the DD_API_KEY env var")
+
+	// ErrMissingHostname is returned when the config could not be validated due to missing hostname.
+	ErrMissingHostname = errors.New("failed to automatically set the hostname, you must specify it via configuration for or the DD_HOSTNAME env var")
 )
 
 // AgentConfig handles the interpretation of the configuration (with default
 // behaviors) in one place. It is also a simple structure to share across all
 // the Agent components, with 100% safe and reliable values.
 // It is exposed with expvar, so make sure to exclude any sensible field
-// from JSON encoding.
+// from JSON encoding. Use New() to create an instance.
 type AgentConfig struct {
 	Enabled bool
 
 	// Global
-	HostName   string
+	Hostname   string
 	DefaultEnv string // the traces will default to this environment
+	ConfigPath string // the source of this config, if any
 
 	// API
 	APIEndpoint string
@@ -72,8 +85,7 @@ type AgentConfig struct {
 	Ignore map[string][]string
 
 	// ReplaceTags is used to filter out sensitive information from tag values.
-	// It maps tag keys to a set of replacements.
-	// TODO(x): Introduce into Agent5 ini config. Currently only supported in 6.
+	// It maps tag keys to a set of replacements. Only supported in A6.
 	ReplaceTags []*ReplaceRule
 
 	// transaction analytics
@@ -84,8 +96,8 @@ type AgentConfig struct {
 	DDAgentBin string // DDAgentBin will be "" for Agent5 scenarios
 }
 
-// NewDefaultAgentConfig returns a configuration with the default values
-func NewDefaultAgentConfig() *AgentConfig {
+// New returns a configuration with the default values.
+func New() *AgentConfig {
 	return &AgentConfig{
 		Enabled:     true,
 		DefaultEnv:  "none",
@@ -126,89 +138,89 @@ func NewDefaultAgentConfig() *AgentConfig {
 	}
 }
 
-// getHostname shells out to obtain the hostname used by the infra agent
-// falling back to os.Hostname() if it is unavailable
-func getHostname(ddAgentBin string) (string, error) {
-	var cmd *exec.Cmd
-
-	// In Agent 6 we will have an Agent binary defined.
-	if ddAgentBin != "" {
-		cmd = exec.Command(ddAgentBin, "hostname")
-		cmd.Env = []string{}
-	} else {
-		getHostnameCmd := "from utils.hostname import get_hostname; print get_hostname()"
-		cmd = exec.Command(defaultDDAgentPy, "-c", getHostnameCmd)
-		cmd.Env = []string{defaultDDAgentPyEnv}
-	}
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	// Copying all environment variables to child process
-	// Windows: Required, so the child process can load DLLs, etc.
-	// Linux:   Optional, but will make use of DD_HOSTNAME and DOCKER_DD_AGENT if they exist
-	osEnv := os.Environ()
-	cmd.Env = append(osEnv, cmd.Env...)
-
-	err := cmd.Run()
+// LoadIni reads the contents of the given INI file into the config.
+func (c *AgentConfig) LoadIni(path string) error {
+	conf, err := NewIni(path)
 	if err != nil {
-		return os.Hostname()
+		return err
 	}
-
-	hostname := strings.TrimSpace(stdout.String())
-
-	if hostname == "" {
-		return os.Hostname()
-	}
-
-	return hostname, nil
-
+	c.loadIniConfig(conf)
+	return nil
 }
 
-// NewAgentConfig creates the AgentConfig from the standard config
-func NewAgentConfig(conf *File, legacyConf *File, agentYaml *YamlAgentConfig) (*AgentConfig, error) {
-	c := NewDefaultAgentConfig()
-	var err error
-
-	if conf != nil {
-		// Agent 5
-		err = mergeIniConfig(c, conf)
-		if err != nil {
-			return nil, err
-		}
+// LoadYaml reads the contents of the given YAML file into the config.
+func (c *AgentConfig) LoadYaml(path string) error {
+	conf, err := NewYaml(path)
+	if err != nil {
+		return err
 	}
+	c.loadYamlConfig(conf)
+	return nil
+}
 
-	if agentYaml != nil {
-		// Agent 6
-		err = mergeYamlConfig(c, agentYaml)
-		if err != nil {
-			return nil, err
-		}
-	}
+// LoadEnv reads environment variable values into the config.
+func (c *AgentConfig) LoadEnv() { c.loadEnv() }
 
-	if legacyConf != nil {
-		err = mergeIniConfig(c, legacyConf)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// environment variables have precedence among defaults and the config file
-	mergeEnv(c)
-
-	// check for api-endpoint parity after all possible overrides have been applied
+// Validate validates if the current configuration is good for the agent to start with.
+func (c *AgentConfig) Validate() error {
 	if c.APIKey == "" {
-		return c, errors.New("you must specify an API Key, either via a configuration file or the DD_API_KEY env var")
+		return ErrMissingAPIKey
 	}
-
-	// If hostname isn't provided in the configuration, try to guess it.
-	if c.HostName == "" {
-		hostname, err := getHostname(c.DDAgentBin)
-		if err != nil {
-			return c, errors.New("failed to automatically set the hostname, you must specify it via configuration for or the DD_HOSTNAME env var")
+	if c.Hostname == "" {
+		if err := c.acquireHostname(); err != nil {
+			return ErrMissingHostname
 		}
-		c.HostName = hostname
 	}
+	return nil
+}
 
-	return c, nil
+// acquireHostname attempts to acquire a hostname for this configuration. It
+// tries to shell out to the infrastructure agent for this, if DD_AGENT_BIN is
+// set, otherwise falling back to os.Hostname.
+func (c *AgentConfig) acquireHostname() error {
+	var err error
+	if c.DDAgentBin == "" {
+		c.Hostname, err = os.Hostname()
+		return err
+	}
+	var out bytes.Buffer
+	cmd := exec.Command(c.DDAgentBin, "hostname")
+	cmd.Stdout = &out
+	cmd.Env = append(os.Environ(), cmd.Env...) // needed for Windows
+	err = cmd.Run()
+	if err != nil {
+		c.Hostname, err = os.Hostname()
+		return err
+	}
+	if strings.TrimSpace(out.String()) == "" {
+		c.Hostname, err = os.Hostname()
+	}
+	return err
+}
+
+// Load attempts to load the configuration from the given path. If it's not found
+// it returns an error and a default configuration.
+func Load(path string) (*AgentConfig, error) {
+	cfgPath := path
+	if cfgPath == flags.DefaultConfigPath && !osutil.Exists(cfgPath) && osutil.Exists(agent5Config) {
+		// attempting to load inexistent default path, but found existing Agent 5
+		// legacy config - try using it
+		log.Warnf("Attempting to use Agent 5 configuration: %s", agent5Config)
+		cfgPath = agent5Config
+	}
+	cfg := New()
+	switch filepath.Ext(cfgPath) {
+	case ".ini", ".conf":
+		if err := cfg.LoadIni(cfgPath); err != nil {
+			return cfg, err
+		}
+	case ".yaml":
+		if err := cfg.LoadYaml(cfgPath); err != nil {
+			return cfg, err
+		}
+	default:
+		return cfg, errors.New("unrecognised file extension (need .yaml, .ini or .conf)")
+	}
+	cfg.ConfigPath = cfgPath
+	return cfg, nil
 }

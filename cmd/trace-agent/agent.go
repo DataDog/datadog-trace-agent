@@ -11,6 +11,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/filters"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/osutil"
 	"github.com/DataDog/datadog-trace-agent/quantizer"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/statsd"
@@ -61,8 +62,6 @@ type Agent struct {
 
 	// Used to synchronize on a clean exit
 	ctx context.Context
-
-	die func(format string, args ...interface{})
 }
 
 // NewAgent returns a new Agent object, ready to be started. It takes a context
@@ -113,7 +112,6 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 		conf:               conf,
 		dynConf:            dynConf,
 		ctx:                ctx,
-		die:                die,
 	}
 }
 
@@ -306,6 +304,11 @@ func (a *Agent) Process(t model.Trace) {
 	}()
 }
 
+// dieFunc is used by watchdog to kill the agent; replaced in tests.
+var dieFunc = func(fmt string, args ...interface{}) {
+	osutil.Exitf(fmt, args...)
+}
+
 func (a *Agent) watchdog() {
 	var wi watchdog.Info
 	wi.CPU = watchdog.CPU()
@@ -313,10 +316,10 @@ func (a *Agent) watchdog() {
 	wi.Net = watchdog.Net()
 
 	if float64(wi.Mem.Alloc) > a.conf.MaxMemory && a.conf.MaxMemory > 0 {
-		a.die("exceeded max memory (current=%d, max=%d)", wi.Mem.Alloc, int64(a.conf.MaxMemory))
+		dieFunc("exceeded max memory (current=%d, max=%d)", wi.Mem.Alloc, int64(a.conf.MaxMemory))
 	}
 	if int(wi.Net.Connections) > a.conf.MaxConnections && a.conf.MaxConnections > 0 {
-		a.die("exceeded max connections (current=%d, max=%d)", wi.Net.Connections, a.conf.MaxConnections)
+		dieFunc("exceeded max connections (current=%d, max=%d)", wi.Net.Connections, a.conf.MaxConnections)
 	}
 
 	info.UpdateWatchdogInfo(wi)

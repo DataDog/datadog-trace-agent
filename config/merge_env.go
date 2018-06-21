@@ -9,29 +9,43 @@ import (
 	log "github.com/cihub/seelog"
 )
 
-// mergeEnv applies overrides from environment variables to the trace agent configuration
-func mergeEnv(c *AgentConfig) {
-	if v := os.Getenv("DD_APM_ENABLED"); v == "true" {
+const (
+	envAPIKey          = "DD_API_KEY"               // API KEY
+	envAPMEnabled      = "DD_APM_ENABLED"           // APM enabled
+	envURL             = "DD_APM_DD_URL"            // APM URL
+	envHostname        = "DD_HOSTNAME"              // agent hostname
+	envBindHost        = "DD_BIND_HOST"             // statsd & receiver hostname
+	envReceiverPort    = "DD_RECEIVER_PORT"         // receiver port
+	envDogstatsdPort   = "DD_DOGSTATSD_PORT"        // dogstatsd port
+	envRemoteTraffic   = "DD_APM_NON_LOCAL_TRAFFIC" // alow non-local traffic
+	envIgnoreResources = "DD_IGNORE_RESOURCE"       // ignored resources
+	envLogLevel        = "DD_LOG_LEVEL"             // logging level
+	envAnalyzedSpans   = "DD_APM_ANALYZED_SPANS"    // spans to analyze for transactions
+)
+
+// loadEnv applies overrides from environment variables to the trace agent configuration
+func (c *AgentConfig) loadEnv() {
+	if v := os.Getenv(envAPMEnabled); v == "true" {
 		c.Enabled = true
 	} else if v == "false" {
 		c.Enabled = false
 	}
 
-	if v := os.Getenv("DD_APM_NON_LOCAL_TRAFFIC"); v == "true" {
+	if v := os.Getenv(envRemoteTraffic); v == "true" {
 		c.ReceiverHost = "0.0.0.0"
 	} else if v == "false" {
 		c.ReceiverHost = "localhost"
 	}
 
-	if v := os.Getenv("DD_HOSTNAME"); v != "" {
-		c.HostName = v
+	if v := os.Getenv(envHostname); v != "" {
+		c.Hostname = v
 	}
 
-	if v := os.Getenv("DD_APM_DD_URL"); v != "" {
+	if v := os.Getenv(envURL); v != "" {
 		c.APIEndpoint = v
 	}
 
-	if v := os.Getenv("DD_API_KEY"); v != "" {
+	if v := os.Getenv(envAPIKey); v != "" {
 		vals := strings.Split(v, ",")
 		for i := range vals {
 			vals[i] = strings.TrimSpace(vals[i])
@@ -39,43 +53,43 @@ func mergeEnv(c *AgentConfig) {
 		c.APIKey = vals[0]
 	}
 
-	if v := os.Getenv("DD_RECEIVER_PORT"); v != "" {
+	if v := os.Getenv(envReceiverPort); v != "" {
 		port, err := strconv.Atoi(v)
 		if err != nil {
-			log.Error("Failed to parse DD_RECEIVER_PORT: it should be a port number")
+			log.Errorf("Failed to parse %s: it should be a number", envReceiverPort)
 		} else {
 			c.ReceiverPort = port
 		}
 	}
 
-	if v := os.Getenv("DD_BIND_HOST"); v != "" {
+	if v := os.Getenv(envBindHost); v != "" {
 		c.StatsdHost = v
 		c.ReceiverHost = v
 	}
 
-	if v := os.Getenv("DD_IGNORE_RESOURCE"); v != "" {
+	if v := os.Getenv(envIgnoreResources); v != "" {
 		c.Ignore["resource"], _ = splitString(v, ',')
 	}
 
-	if v := os.Getenv("DD_DOGSTATSD_PORT"); v != "" {
+	if v := os.Getenv(envDogstatsdPort); v != "" {
 		port, err := strconv.Atoi(v)
 		if err != nil {
-			log.Error("Failed to parse DD_DOGSTATSD_PORT: it should be a port number")
+			log.Errorf("Failed to parse %s: it should be a port number", envDogstatsdPort)
 		} else {
 			c.StatsdPort = port
 		}
 	}
 
-	if v := os.Getenv("DD_LOG_LEVEL"); v != "" {
+	if v := os.Getenv(envLogLevel); v != "" {
 		c.LogLevel = v
 	}
 
-	if v := os.Getenv("DD_APM_ANALYZED_SPANS"); v != "" {
+	if v := os.Getenv(envAnalyzedSpans); v != "" {
 		analyzedSpans, err := parseAnalyzedSpans(v)
 		if err == nil {
 			c.AnalyzedSpansByService = analyzedSpans
 		} else {
-			log.Errorf("Bad format for DD_APM_ANALYZED_SPANS it should be of the form \"service_name|operation_name=rate,other_service|other_operation=rate\", error: %v", err)
+			log.Errorf("Bad format for %s it should be of the form \"service_name|operation_name=rate,other_service|other_operation=rate\", error: %v", envAnalyzedSpans, err)
 		}
 	}
 }

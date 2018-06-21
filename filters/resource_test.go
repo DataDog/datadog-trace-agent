@@ -71,7 +71,7 @@ func TestMultipleEntries(t *testing.T) {
 }
 
 func newTestFilter(blacklist ...string) Filter {
-	c := config.NewDefaultAgentConfig()
+	c := config.New()
 	c.Ignore["resource"] = blacklist
 
 	return newResourceFilter(c)

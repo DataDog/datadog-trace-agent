@@ -11,3 +11,7 @@ const (
 	// Agent 6
 	defaultDDAgentBin = "c:\\Program Files\\Datadog\\Datadog Agent\\embedded\\agent.exe"
 )
+
+// agent5Config points to the default agent 5 configuration path. It is used
+// as a fallback when no configuration is set and the new default is missing.
+const agent5Config = "c:\\programdata\\datadog\\datadog.conf"

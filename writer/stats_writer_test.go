@@ -387,7 +387,7 @@ func assertStatsPayload(assert *assert.Assertions, headers map[string]string, bu
 func testStatsWriter() (*StatsWriter, chan []model.StatsBucket, *testEndpoint, *fixtures.TestStatsClient) {
 	statsChannel := make(chan []model.StatsBucket)
 	conf := &config.AgentConfig{
-		HostName:          testHostName,
+		Hostname:          testHostName,
 		DefaultEnv:        testEnv,
 		StatsWriterConfig: writerconfig.DefaultStatsWriterConfig(),
 	}

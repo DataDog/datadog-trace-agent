@@ -44,7 +44,7 @@ func NewTestReceiverFromConfig(conf *config.AgentConfig) *HTTPReceiver {
 }
 
 func NewTestReceiverConfig() *config.AgentConfig {
-	conf := config.NewDefaultAgentConfig()
+	conf := config.New()
 	conf.APIKey = "test"
 
 	return conf

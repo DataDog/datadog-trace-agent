@@ -50,7 +50,7 @@ func NewTraceWriter(conf *config.AgentConfig, in <-chan *SampledTrace) *TraceWri
 
 	return &TraceWriter{
 		conf:     writerConf,
-		hostName: conf.HostName,
+		hostName: conf.Hostname,
 		env:      conf.DefaultEnv,
 
 		traces:       []*model.APITrace{},

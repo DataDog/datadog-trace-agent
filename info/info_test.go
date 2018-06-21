@@ -109,7 +109,7 @@ func testServerError(t *testing.T) *httptest.Server {
 // need to have InitInfo be called before doing anything
 func testInit(t *testing.T) *config.AgentConfig {
 	assert := assert.New(t)
-	conf := config.NewDefaultAgentConfig()
+	conf := config.New()
 	assert.NotNil(conf)
 
 	err := InitInfo(conf)
