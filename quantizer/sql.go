@@ -157,8 +157,17 @@ func (t *TokenConsumer) Process(in string) (string, error) {
 		if buff != nil {
 			// ensure that whitespaces properly separate
 			// received tokens
-			if out.Len() != 0 && token != ',' {
-				out.WriteRune(' ')
+			if out.Len() != 0 {
+				switch token {
+				case ',':
+				case '=':
+					if t.lastToken == ':' {
+						break
+					}
+					fallthrough
+				default:
+					out.WriteRune(' ')
+				}
 			}
 
 			out.Write(buff)
