@@ -1,4 +1,5 @@
 raclette
+/bin/*
 /trace-agent
 /trace-agent-windows-386.exe
 /trace-agent-windows-amd64.exe
