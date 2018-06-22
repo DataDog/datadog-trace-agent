@@ -20,6 +20,16 @@ install:
 	go generate ./info
 	go install ./cmd/trace-agent
 
+binaries:
+	test -n "$(V)" # $$V must be set to the release version, e.g. "make binaries V=1.2.3"
+
+	# cross-compiling binaries using suffix $(V)
+	mkdir -p ./bin
+	TRACE_AGENT_VERSION=$(V) go generate ./info
+	GOOS=windows GOARCH=amd64 go build -o ./bin/trace-agent-windows-amd64-$(V).exe ./cmd/trace-agent
+	GOOS=linux GOARCH=amd64 go build -o ./bin/trace-agent-linux-amd64-$(V) ./cmd/trace-agent
+	GOOS=darwin GOARCH=amd64 go build -o ./bin/trace-agent-darwin-amd64-$(V) ./cmd/trace-agent
+
 ci:
 	# task used by CI
 	GOOS=windows go build ./cmd/trace-agent # ensure windows builds
