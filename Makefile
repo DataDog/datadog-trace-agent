@@ -11,9 +11,9 @@ VERSION_MINOR = $(shell echo $(word 2, $(SPLAT)) | sed 's/[^0-9]*//g')
 VERSION_PATCH = $(shell echo $(word 3, $(SPLAT)) | sed 's/[^0-9]*//g')
 
 # account for some defaults
-VERSION_MAJOR := $(if $(VERSION_MAJOR),$(VERSION_MAJOR), 0)
-VERSION_MINOR := $(if $(VERSION_MINOR),$(VERSION_MINOR), 0)
-VERSION_PATCH := $(if $(VERSION_PATCH),$(VERSION_PATCH), 0)
+VERSION_MAJOR := $(if $(VERSION_MAJOR),$(VERSION_MAJOR),0)
+VERSION_MINOR := $(if $(VERSION_MINOR),$(VERSION_MINOR),99)
+VERSION_PATCH := $(if $(VERSION_PATCH),$(VERSION_PATCH),0)
 
 install:
 	# generate versioning information and installing the binary.
