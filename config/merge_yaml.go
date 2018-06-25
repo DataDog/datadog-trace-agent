@@ -47,6 +47,7 @@ type traceAgent struct {
 	LogFilePath        string         `yaml:"log_file"`
 	ReplaceTags        []*ReplaceRule `yaml:"replace_tags"`
 	ReceiverPort       int            `yaml:"receiver_port"`
+	ConnectionLimit    int            `yaml:"connection_limit"`
 	APMNonLocalTraffic *bool          `yaml:"apm_non_local_traffic"`
 
 	WatchdogMaxMemory float64 `yaml:"max_memory"`
@@ -178,6 +179,10 @@ func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 
 	if yc.TraceAgent.ReceiverPort > 0 {
 		c.ReceiverPort = yc.TraceAgent.ReceiverPort
+	}
+
+	if yc.TraceAgent.ConnectionLimit > 0 {
+		c.ConnectionLimit = yc.TraceAgent.ConnectionLimit
 	}
 
 	if yc.TraceAgent.ExtraSampleRate > 0 {
