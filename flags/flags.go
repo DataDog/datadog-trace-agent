@@ -6,7 +6,7 @@ var (
 	// ConfigPath specifies the path to the configuration file.
 	ConfigPath string
 
-	// PIDFilepath specifies the path to the PID file.
+	// PIDFilePath specifies the path to the PID file.
 	PIDFilePath string
 
 	// LogLevel specifies the log output level.
