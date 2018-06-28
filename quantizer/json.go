@@ -1,7 +1,6 @@
 package quantizer
 
 import (
-	"bytes"
 	"encoding/json"
 	"io"
 	"strconv"
@@ -32,11 +31,7 @@ func quantizeJSON(cfg *config.JSONObfuscationConfig, span *model.Span, tag strin
 	if span.Meta == nil || span.Meta[tag] == "" {
 		return
 	}
-	keepValues := make(map[string]bool, len(cfg.KeepValues))
-	for _, v := range cfg.KeepValues {
-		keepValues[v] = true
-	}
-	str, err := obfuscateJSON(span.Meta[tag], keepValues)
+	str, err := obfuscateJSON(span.Meta[tag], cfg)
 	if err != nil {
 		return
 	}
@@ -45,19 +40,26 @@ func quantizeJSON(cfg *config.JSONObfuscationConfig, span *model.Span, tag strin
 
 // obfuscateJSON takes the JSON string found in str, replacing all the values of the keys found
 // as keys in the drop map with a "?" and returning the new JSON string.
-func obfuscateJSON(str string, drop map[string]bool) (string, error) {
+func obfuscateJSON(str string, cfg *config.JSONObfuscationConfig) (string, error) {
+	keepValue := make(map[string]bool, len(cfg.KeepValues))
+	// TODO: do this only once
+	for _, v := range cfg.KeepValues {
+		keepValue[v] = true
+	}
 	var (
-		key       bool         // true if token is a key
-		object    bool         // true if token is inside an object (as opposed to an array where we don't have keys)
-		depth     int          // tokenizer depth
-		dropping  bool         // true if we are dropping
-		dropDepth int          // the depth at which we are dropping
-		res       bytes.Buffer // result
+		key        bool            // true if token is a key
+		lastKey    string          // previous key
+		object     bool            // true if token is inside an object (as opposed to an array where we don't have keys)
+		lastObject int             // depth of nearest object
+		depth      int             // current depth
+		res        strings.Builder // result
 	)
 	dec := json.NewDecoder(strings.NewReader(str))
 	dec.UseNumber()
+	//log.Printf("%15s %6s %6s %3s %s\n", "Token", "Key", "Object", "Depth", "Last Key")
 	for {
 		t, err := dec.Token()
+		//log.Printf("%15q %6v %6v %3d %q\n", t, key, object, depth, lastKey)
 		if err == io.EOF {
 			break
 		}
@@ -67,61 +69,52 @@ func obfuscateJSON(str string, drop map[string]bool) (string, error) {
 		if v, ok := t.(json.Delim); ok {
 			if v == '[' || v == '{' {
 				// array or object starting
+				depth++
 				key = v == '{'
 				object = v != '['
-				depth++
-				if !dropping {
-					res.WriteString(string(v))
+				if object {
+					lastObject = depth
 				}
+				res.WriteString(string(v))
 			} else {
 				// array or object ending
-				key = true
 				depth--
-				if !dropping {
-					res.WriteString(string(v))
-					if dec.More() {
-						res.WriteString(",")
-					}
+				key = true
+				if lastObject == depth {
+					// the wrapping parent is not an array
+					object = true
 				}
-			}
-			if !dropping {
-				continue
-			}
-		}
-		if dropping {
-			if depth < dropDepth {
-				res.WriteString(`"?"`)
+				res.WriteString(string(v))
 				if dec.More() {
 					res.WriteString(",")
 				}
-				dropping = false
-				key = true
 			}
 			continue
 		}
-		switch v := t.(type) {
-		case bool:
-			if v {
-				res.WriteString(`"true"`)
-			} else {
-				res.WriteString(`"false"`)
-			}
-		case float64:
-			res.WriteString(strconv.FormatFloat(v, 'f', 2, 64))
-		case json.Number:
-			res.WriteString(string(v))
-		case string:
-			if key {
-				if _, ok := drop[v]; ok {
-					dropping = true
-					dropDepth = depth + 1
+		if !key && !keepValue[lastKey] {
+			res.WriteString(`"?"`)
+		} else {
+			switch v := t.(type) {
+			case bool:
+				if v {
+					res.WriteString(`"true"`)
+				} else {
+					res.WriteString(`"false"`)
 				}
+			case float64:
+				res.WriteString(strconv.FormatFloat(v, 'f', 2, 64))
+			case json.Number:
+				res.WriteString(string(v))
+			case string:
+				if key {
+					lastKey = v
+				}
+				res.WriteString(`"`)
+				res.WriteString(v)
+				res.WriteString(`"`)
+			case nil:
+				res.WriteString(`"null"`)
 			}
-			res.WriteString(`"`)
-			res.WriteString(v)
-			res.WriteString(`"`)
-		case nil:
-			res.WriteString(`"null"`)
 		}
 		if key {
 			res.WriteString(":")
