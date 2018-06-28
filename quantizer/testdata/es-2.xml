@@ -1,0 +1,37 @@
+<ObfuscateTest>
+	<Tag>elasticsearch.body</Tag>
+	<In>
+{
+    "query": {
+        "match" : {
+            "title" : "in action"
+        }
+    },
+    "size": 2,
+    "from": 0,
+    "_source": [ "title", "summary", "publish_date" ],
+    "highlight": {
+        "fields" : {
+            "title" : {}
+        }
+    }
+}
+	</In>
+	<Out>
+{
+    "query": {
+        "match" : {
+            "title" : "?"
+        }
+    },
+    "size": "?",
+    "from": "?",
+    "_source": [ "?", "?", "?" ],
+    "highlight": {
+        "fields" : {
+            "title" : {}
+        }
+    }
+}
+	</Out>
+</ObfuscateTest>

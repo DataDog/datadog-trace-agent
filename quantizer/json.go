@@ -31,29 +31,59 @@ func quantizeJSON(cfg *config.JSONObfuscationConfig, span *model.Span, tag strin
 	if span.Meta == nil || span.Meta[tag] == "" {
 		return
 	}
-	str, err := obfuscateJSON(span.Meta[tag], cfg)
+	str, err := newJSONObfuscator(cfg).obfuscate(span.Meta[tag])
 	if err != nil {
 		return
 	}
 	span.Meta[tag] = str
 }
 
-// obfuscateJSON takes the JSON string found in str, replacing all the values of the keys found
-// as keys in the drop map with a "?" and returning the new JSON string.
-func obfuscateJSON(str string, cfg *config.JSONObfuscationConfig) (string, error) {
+type jsonObfuscator struct {
+	keepValue  map[string]bool // keep the values for these keys
+	isKey      bool            // true if next token is a key
+	isObject   bool            // true if closure is an object
+	lastKey    string          // previous key
+	lastObject int             // depth of nearest object
+	depth      int             // current depth
+}
+
+func newJSONObfuscator(cfg *config.JSONObfuscationConfig) *jsonObfuscator {
 	keepValue := make(map[string]bool, len(cfg.KeepValues))
-	// TODO: do this only once
+	// TODO: parse this much earlier, not on every call
 	for _, v := range cfg.KeepValues {
 		keepValue[v] = true
 	}
-	var (
-		key        bool            // true if token is a key
-		lastKey    string          // previous key
-		object     bool            // true if token is inside an object (as opposed to an array where we don't have keys)
-		lastObject int             // depth of nearest object
-		depth      int             // current depth
-		res        strings.Builder // result
-	)
+	return &jsonObfuscator{keepValue: keepValue}
+}
+
+func (tok *jsonObfuscator) beginArray() {
+	tok.depth++
+	tok.isKey = false
+	tok.isObject = false
+}
+
+func (tok *jsonObfuscator) beginObject() {
+	tok.depth++
+	tok.isKey = true
+	tok.isObject = true
+	tok.lastObject = tok.depth
+}
+
+func (tok *jsonObfuscator) endClosure() {
+	tok.depth--
+	tok.isKey = true
+	if tok.lastObject == tok.depth {
+		// TODO: this is not reliable when nesting many things,
+		// we should use a stack?
+		// the wrapping parent is not an array
+		tok.isObject = true
+	}
+}
+
+// obfuscateJSON takes the JSON string found in str, replacing all the values of the keys found
+// as keys in the drop map with a "?" and returning the new JSON string.
+func (tok *jsonObfuscator) obfuscate(str string) (string, error) {
+	var res strings.Builder
 	dec := json.NewDecoder(strings.NewReader(str))
 	dec.UseNumber()
 	//log.Printf("%15s %6s %6s %3s %s\n", "Token", "Key", "Object", "Depth", "Last Key")
@@ -67,23 +97,15 @@ func obfuscateJSON(str string, cfg *config.JSONObfuscationConfig) (string, error
 			return "", err
 		}
 		if v, ok := t.(json.Delim); ok {
-			if v == '[' || v == '{' {
-				// array or object starting
-				depth++
-				key = v == '{'
-				object = v != '['
-				if object {
-					lastObject = depth
-				}
+			switch v {
+			case '[':
+				tok.beginArray()
 				res.WriteString(string(v))
-			} else {
-				// array or object ending
-				depth--
-				key = true
-				if lastObject == depth {
-					// the wrapping parent is not an array
-					object = true
-				}
+			case '{':
+				tok.beginObject()
+				res.WriteString(string(v))
+			case ']', '}':
+				tok.endClosure()
 				res.WriteString(string(v))
 				if dec.More() {
 					res.WriteString(",")
@@ -91,7 +113,7 @@ func obfuscateJSON(str string, cfg *config.JSONObfuscationConfig) (string, error
 			}
 			continue
 		}
-		if !key && !keepValue[lastKey] {
+		if !tok.isKey && !tok.keepValue[tok.lastKey] {
 			res.WriteString(`"?"`)
 		} else {
 			switch v := t.(type) {
@@ -106,8 +128,8 @@ func obfuscateJSON(str string, cfg *config.JSONObfuscationConfig) (string, error
 			case json.Number:
 				res.WriteString(string(v))
 			case string:
-				if key {
-					lastKey = v
+				if tok.isKey {
+					tok.lastKey = v
 				}
 				res.WriteString(`"`)
 				res.WriteString(v)
@@ -116,15 +138,15 @@ func obfuscateJSON(str string, cfg *config.JSONObfuscationConfig) (string, error
 				res.WriteString(`"null"`)
 			}
 		}
-		if key {
+		if tok.isKey {
 			res.WriteString(":")
 		} else {
 			if dec.More() {
 				res.WriteString(",")
 			}
 		}
-		if object {
-			key = !key
+		if tok.isObject {
+			tok.isKey = !tok.isKey
 		}
 	}
 	return res.String(), nil

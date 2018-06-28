@@ -1,0 +1,91 @@
+<ObfuscateTest>
+	<Tag>elasticsearch.body</Tag>
+	<KeepValues>
+		<value>_index</value>
+		<value>title</value>
+	</KeepValues>
+	<In>
+{
+	"hits": {
+	    "total": 2,
+	    "max_score": 0.9105287,
+	    "hits": [
+		 {
+		   "_index": "bookdb_index",
+		   "_type": "book",
+		   "_id": "3",
+		   "_score": 0.9105287,
+		   "_source": {
+			"summary": "build scalable search applications using Elasticsearch without having to do complex low-level programming or understand advanced data science algorithms",
+			"title": "Elasticsearch in Action",
+			"publish_date": "2015-12-03"
+		   },
+		   "highlight": {
+			"title": [
+			  "Elasticsearch <em>in</em> <em>Action</em>"
+			]
+		   }
+		 },
+		 {
+		   "_index": "bookdb_index",
+		   "_type": "book",
+		   "_id": "4",
+		   "_score": 0.9105287,
+		   "_source": {
+			"summary": "Comprehensive guide to implementing a scalable search engine using Apache Solr",
+			"title": "Solr in Action",
+			"publish_date": "2014-04-05"
+		   },
+		   "highlight": {
+			"title": [
+			  "Solr <em>in</em> <em>Action</em>"
+			]
+		   }
+		 }
+	    ]
+    }
+}
+	</In>
+	<Out>
+{
+	"hits": {
+	    "total": "?",
+	    "max_score": "?",
+	    "hits": [
+		 {
+		   "_index": "bookdb_index",
+		   "_type": "?",
+		   "_id": "?",
+		   "_score": "?",
+		   "_source": {
+			"summary": "?",
+			"title": "Elasticsearch in Action",
+			"publish_date": "?"
+		   },
+		   "highlight": {
+			"title": [
+			  "Elasticsearch <em>in</em> <em>Action</em>"
+			]
+		   }
+		 },
+		 {
+		   "_index": "bookdb_index",
+		   "_type": "?",
+		   "_id": "?",
+		   "_score": "?",
+		   "_source": {
+			"summary": "?",
+			"title": "Solr in Action",
+			"publish_date": "?"
+		   },
+		   "highlight": {
+			"title": [
+			  "Solr <em>in</em> <em>Action</em>"
+			]
+		   }
+		 }
+	    ]
+    }
+}
+	</Out>
+</ObfuscateTest>
