@@ -1,0 +1,16 @@
+Component,Origin,License
+core,github.com/StackExchange/wmi,MIT
+core,github.com/cihub/seelog,BSD-3-Clause
+core,github.com/davecgh/go-spew,ISC
+core,github.com/go-ini/ini,Apache-2.0
+core,github.com/go-ole/go-ole,MIT
+core,github.com/gogo/protobuf,BSD-3-Clause
+core,github.com/golang/protobuf,BSD-3-Clause
+core,github.com/philhofer/fwd,MIT
+core,github.com/pmezard/go-difflib,BSD-3-Clause
+core,github.com/shirou/gopsutil,BSD-3-Clause
+core,github.com/shirou/w32,BSD-3-Clause
+core,github.com/stretchr/testify,MIT
+core,github.com/tinylib/msgp,MIT
+core,golang.org/x/sys,BSD-3-Clause
+core,gopkg.in/yaml.v2,Apache-2.0
