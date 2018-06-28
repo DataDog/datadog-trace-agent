@@ -50,6 +50,8 @@ type traceAgent struct {
 	ConnectionLimit    int            `yaml:"connection_limit"`
 	APMNonLocalTraffic *bool          `yaml:"apm_non_local_traffic"`
 
+	Obfuscation *ObfuscationConfig `yaml:"obfuscation"`
+
 	WatchdogMaxMemory float64 `yaml:"max_memory"`
 	WatchdogMaxCPUPct float64 `yaml:"max_cpu_percent"`
 	WatchdogMaxConns  int     `yaml:"max_connections"`
@@ -62,6 +64,16 @@ type traceAgent struct {
 	AnalyzedSpans               map[string]float64 `yaml:"analyzed_spans"`
 
 	DDAgentBin string `yaml:"dd_agent_bin"`
+}
+
+type ObfuscationConfig struct {
+	ES    JSONObfuscationConfig `yaml:"elasticsearch"`
+	Mongo JSONObfuscationConfig `yaml:"mongodb"`
+}
+
+type JSONObfuscationConfig struct {
+	Enabled    bool     `yaml:"enabled"`
+	KeepValues []string `yaml:"keep_values"`
 }
 
 type ReplaceRule struct {
@@ -206,6 +218,10 @@ func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 
 	if yc.TraceAgent.APMNonLocalTraffic != nil && *yc.TraceAgent.APMNonLocalTraffic {
 		c.ReceiverHost = "0.0.0.0"
+	}
+
+	if o := yc.TraceAgent.Obfuscation; o != nil {
+		c.Obfuscation = o
 	}
 
 	// undocumented

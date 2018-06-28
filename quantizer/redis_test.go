@@ -84,7 +84,7 @@ func TestRedisQuantizer(t *testing.T) {
 
 	for _, testCase := range queryToExpected {
 		s := RedisSpan(testCase.query)
-		Quantize(s)
+		Quantize(nil, s)
 		assert.Equal(testCase.expectedResource, s.Resource)
 	}
 

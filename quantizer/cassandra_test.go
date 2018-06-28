@@ -53,7 +53,7 @@ func TestCassQuantizer(t *testing.T) {
 
 	for _, testCase := range queryToExpected {
 		s := CassSpan(testCase.in)
-		Quantize(s)
+		Quantize(nil, s)
 		assert.Equal(testCase.expected, s.Resource)
 	}
 }

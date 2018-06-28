@@ -45,7 +45,7 @@ func TestSQLResourceQuery(t *testing.T) {
 		},
 	}
 
-	Quantize(span)
+	Quantize(nil, span)
 	assert.Equal("SELECT * FROM users WHERE id = ?", span.Resource)
 	assert.Equal("SELECT * FROM users WHERE id = 42", span.Meta["sql.query"])
 }
@@ -57,7 +57,7 @@ func TestSQLResourceWithoutQuery(t *testing.T) {
 		Type:     "sql",
 	}
 
-	Quantize(span)
+	Quantize(nil, span)
 	assert.Equal("SELECT * FROM users WHERE id = ?", span.Resource)
 	assert.Equal("SELECT * FROM users WHERE id = ?", span.Meta["sql.query"])
 }
@@ -91,7 +91,7 @@ func TestSQLResourceWithError(t *testing.T) {
 		// copy test cases as Quantize mutates
 		testSpan := tc.span
 
-		Quantize(&tc.span)
+		Quantize(nil, &tc.span)
 		assert.Equal("Non-parsable SQL query", tc.span.Resource)
 		assert.Equal("Query not parsed", tc.span.Meta["agent.parse.error"])
 		assert.Equal(testSpan.Resource, tc.span.Meta["sql.query"])
@@ -318,7 +318,7 @@ func TestSQLQuantizer(t *testing.T) {
 
 	for _, c := range cases {
 		s := SQLSpan(c.query)
-		Quantize(s)
+		Quantize(nil, s)
 		assert.Equal(c.expected, s.Resource)
 	}
 }

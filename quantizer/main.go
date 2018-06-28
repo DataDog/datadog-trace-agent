@@ -1,31 +1,33 @@
+// Package quantizer implements quantizing and obfuscating of tags and resources for
+// a set of spans matching a certain criteria.
 package quantizer
 
 import (
 	"regexp"
 
+	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
 )
 
 const (
-	sqlType       = "sql"
-	redisType     = "redis"
-	cassandraType = "cassandra"
-	tabCode       = uint8(9)
-	newLineCode   = uint8(10)
-	spaceCode     = uint8(32)
+	tabCode     = uint8(9)
+	newLineCode = uint8(10)
+	spaceCode   = uint8(32)
 )
 
 var nonUniformSpacesRegexp = regexp.MustCompile("\\s+")
 
 // Quantize generates meaningful resource for a span, depending on its type
-func Quantize(span *model.Span) {
+func Quantize(cfg *config.AgentConfig, span *model.Span) {
 	switch span.Type {
-	case sqlType:
+	case "sql", "cassandra":
 		QuantizeSQL(span)
-	case cassandraType:
-		QuantizeSQL(span)
-	case redisType:
+	case "redis":
 		QuantizeRedis(span)
+	case "mongodb":
+		QuantizeMongo(cfg, span)
+	case "elasticsearch":
+		QuantizeES(cfg, span)
 	}
 }
 

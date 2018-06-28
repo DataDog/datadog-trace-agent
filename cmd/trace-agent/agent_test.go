@@ -162,7 +162,7 @@ func BenchmarkWatchdog(b *testing.B) {
 // Mimicks behaviour of agent Process function
 func formatTrace(t model.Trace) model.Trace {
 	for i := range t {
-		quantizer.Quantize(t[i])
+		quantizer.Quantize(nil, t[i])
 		t[i].Truncate()
 	}
 	return t
