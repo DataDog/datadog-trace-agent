@@ -40,12 +40,12 @@ func quantizeJSON(cfg *config.JSONObfuscationConfig, span *model.Span, tag strin
 }
 
 type jsonObfuscator struct {
-	keepValue map[string]bool // keep the values for these keys
-	isKey     bool            // true if next token is a key
-	prevKey   string          // previous key
-	closures  []bool          // parent closures count, true if object
-	out       bytes.Buffer
-	dec       *json.Decoder
+	keepValue map[string]bool // do not obfuscate values for these keys
+	isKey     bool            // next token is a key
+	prevKey   string          // last/current key
+	closures  []bool          // parent closure count, false if array (e.g. {[ => []bool{true, false})
+	out       bytes.Buffer    // resulting JSON
+	dec       *json.Decoder   // decoder
 }
 
 func newJSONObfuscator(cfg *config.JSONObfuscationConfig) *jsonObfuscator {
@@ -116,10 +116,9 @@ func (tok *jsonObfuscator) isObject() bool {
 func (tok *jsonObfuscator) obfuscate(str string) (string, error) {
 	tok.dec = json.NewDecoder(strings.NewReader(str))
 	tok.dec.UseNumber()
-	//log.Printf("%15s %6s %6s %3s %s\n", "Token", "isKey", "isObject", "Depth", "Last Key")
+
 	for {
 		t, err := tok.dec.Token()
-		//log.Printf("%15q %6v %6v %3d %q\n", t, tok.isKey, tok.isObject, len(tok.closures), tok.key)
 		if err == io.EOF {
 			break
 		}
@@ -127,22 +126,29 @@ func (tok *jsonObfuscator) obfuscate(str string) (string, error) {
 			return "", err
 		}
 		if v, ok := t.(json.Delim); ok {
+			// delimiter
 			tok.scanDelim(v)
 			continue
 		}
-		if !tok.isKey && !tok.keepValue[tok.prevKey] {
-			tok.out.WriteString(`"?"`)
-		} else {
-			tok.scanToken(t)
-		}
 		if tok.isKey {
+			// key
+			tok.scanToken(t)
 			tok.out.WriteString(":")
-		} else if tok.dec.More() {
-			tok.out.WriteString(",")
+		} else {
+			// value
+			if !tok.keepValue[tok.prevKey] {
+				tok.out.WriteString(`"?"`)
+			} else {
+				tok.scanToken(t)
+			}
+			if tok.dec.More() {
+				tok.out.WriteString(",")
+			}
 		}
 		if tok.isObject() {
 			tok.isKey = !tok.isKey
 		}
 	}
+
 	return tok.out.String(), nil
 }
