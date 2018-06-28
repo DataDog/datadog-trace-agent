@@ -72,8 +72,9 @@ type ObfuscationConfig struct {
 }
 
 type JSONObfuscationConfig struct {
-	Enabled    bool     `yaml:"enabled"`
-	KeepValues []string `yaml:"keep_values"`
+	Enabled    bool            `yaml:"enabled"`
+	KeepValues []string        `yaml:"keep_values"`
+	KeepMap    map[string]bool `yaml:"-"` // used by quantizer.Obfuscator
 }
 
 type ReplaceRule struct {

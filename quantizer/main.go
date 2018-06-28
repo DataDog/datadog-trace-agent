@@ -17,17 +17,36 @@ const (
 
 var nonUniformSpacesRegexp = regexp.MustCompile("\\s+")
 
-// Quantize generates meaningful resource for a span, depending on its type
-func Quantize(cfg *config.AgentConfig, span *model.Span) {
+// Obfuscator quantizes and obfuscates spans.
+type Obfuscator struct{ opts *config.ObfuscationConfig }
+
+// NewObfuscator creates a new Obfuscator.
+func NewObfuscator(cfg *config.ObfuscationConfig) *Obfuscator {
+	if cfg == nil {
+		cfg = new(config.ObfuscationConfig)
+	}
+	opts := *cfg
+	for _, v := range opts.ES.KeepValues {
+		opts.ES.KeepMap[v] = true
+	}
+	for _, v := range opts.Mongo.KeepValues {
+		opts.Mongo.KeepMap[v] = true
+	}
+	return &Obfuscator{opts: &opts}
+}
+
+// Obfuscate may obfuscate span's properties based on its type and on the Obfuscator's
+// configuration.
+func (o *Obfuscator) Obfuscate(span *model.Span) {
 	switch span.Type {
 	case "sql", "cassandra":
-		QuantizeSQL(span)
+		o.quantizeSQL(span)
 	case "redis":
-		QuantizeRedis(span)
+		o.quantizeRedis(span)
 	case "mongodb":
-		QuantizeMongo(cfg, span)
+		o.obfuscateMongo(span)
 	case "elasticsearch":
-		QuantizeES(cfg, span)
+		o.obfuscateES(span)
 	}
 }
 

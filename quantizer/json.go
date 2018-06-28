@@ -11,20 +11,20 @@ import (
 	"github.com/DataDog/datadog-trace-agent/model"
 )
 
-// QuantizeES obfuscates ElasticSearch JSON body values.
-func QuantizeES(cfg *config.AgentConfig, span *model.Span) {
-	if cfg.Obfuscation == nil || !cfg.Obfuscation.ES.Enabled {
+// obfuscateES obfuscates ElasticSearch JSON body values.
+func (o *Obfuscator) obfuscateES(span *model.Span) {
+	if !o.opts.ES.Enabled {
 		return
 	}
-	quantizeJSON(&cfg.Obfuscation.ES, span, "elasticsearch.body")
+	quantizeJSON(&o.opts.ES, span, "elasticsearch.body")
 }
 
-// QuantizeMongo obfuscates MongoDB JSON query values.
-func QuantizeMongo(cfg *config.AgentConfig, span *model.Span) {
-	if cfg.Obfuscation == nil || !cfg.Obfuscation.Mongo.Enabled {
+// obfuscateMongo obfuscates MongoDB JSON query values.
+func (o *Obfuscator) obfuscateMongo(span *model.Span) {
+	if !o.opts.Mongo.Enabled {
 		return
 	}
-	quantizeJSON(&cfg.Obfuscation.Mongo, span, "mongodb.query")
+	quantizeJSON(&o.opts.Mongo, span, "mongodb.query")
 }
 
 // quantizeJSON obfuscates JSON key values in the span's meta tag using the configuration from cfg.
@@ -49,13 +49,15 @@ type jsonObfuscator struct {
 }
 
 func newJSONObfuscator(cfg *config.JSONObfuscationConfig) *jsonObfuscator {
-	keepValue := make(map[string]bool, len(cfg.KeepValues))
-	// TODO: parse this much earlier, not on every call
-	for _, v := range cfg.KeepValues {
-		keepValue[v] = true
+	if cfg.KeepMap == nil {
+		keepValue := make(map[string]bool, len(cfg.KeepValues))
+		for _, v := range cfg.KeepValues {
+			keepValue[v] = true
+		}
+		cfg.KeepMap = keepValue
 	}
 	return &jsonObfuscator{
-		keepValue: keepValue,
+		keepValue: cfg.KeepMap,
 		closures:  []bool{},
 	}
 }

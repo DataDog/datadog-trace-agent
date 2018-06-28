@@ -53,6 +53,7 @@ type Agent struct {
 	StatsWriter        *writer.StatsWriter
 	ServiceExtractor   *TraceServiceExtractor
 	ServiceMapper      *ServiceMapper
+	obfuscator         *quantizer.Obfuscator
 
 	sampledTraceChan chan *writer.SampledTrace
 
@@ -85,6 +86,7 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	)
 	f := filters.Setup(conf)
 
+	obf := quantizer.NewObfuscator(conf.Obfuscation)
 	ss := NewScoreSampler(conf)
 	ess := NewErrorsSampler(conf)
 	ps := NewPrioritySampler(conf, dynConf)
@@ -108,6 +110,7 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 		ServiceWriter:      svcW,
 		ServiceExtractor:   se,
 		ServiceMapper:      sm,
+		obfuscator:         obf,
 		sampledTraceChan:   sampledTraceChan,
 		conf:               conf,
 		dynConf:            dynConf,
@@ -247,7 +250,7 @@ func (a *Agent) Process(t model.Trace) {
 	}
 
 	for i := range t {
-		quantizer.Quantize(a.conf, t[i])
+		a.obfuscator.Obfuscate(t[i])
 		t[i].Truncate()
 	}
 

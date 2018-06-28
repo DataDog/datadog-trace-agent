@@ -53,7 +53,7 @@ func TestCassQuantizer(t *testing.T) {
 
 	for _, testCase := range queryToExpected {
 		s := CassSpan(testCase.in)
-		Quantize(nil, s)
+		NewObfuscator(nil).Obfuscate(s)
 		assert.Equal(testCase.expected, s.Resource)
 	}
 }

@@ -84,7 +84,7 @@ func TestRedisQuantizer(t *testing.T) {
 
 	for _, testCase := range queryToExpected {
 		s := RedisSpan(testCase.query)
-		Quantize(nil, s)
+		NewObfuscator(nil).Obfuscate(s)
 		assert.Equal(testCase.expectedResource, s.Resource)
 	}
 
@@ -95,6 +95,6 @@ func BenchmarkTestRedisQuantizer(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		span := RedisSpan(`DEL k1\nDEL k2\nHMSET k1 "a" 1 "b" 2 "c" 3\nHMSET k2 "d" "4" "e" "4"\nDEL k3\nHMSET k3 "f" "5"\nDEL k1\nDEL k2\nHMSET k1 "a" 1 "b" 2 "c" 3\nHMSET k2 "d" "4" "e" "4"\nDEL k3\nHMSET k3 "f" "5"\nDEL k1\nDEL k2\nHMSET k1 "a" 1 "b" 2 "c" 3\nHMSET k2 "d" "4" "e" "4"\nDEL k3\nHMSET k3 "f" "5"\nDEL k1\nDEL k2\nHMSET k1 "a" 1 "b" 2 "c" 3\nHMSET k2 "d" "4" "e" "4"\nDEL k3\nHMSET k3 "f" "5"`)
-		QuantizeRedis(span)
+		NewObfuscator(nil).quantizeRedis(span)
 	}
 }
