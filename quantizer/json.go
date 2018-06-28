@@ -1,6 +1,7 @@
 package quantizer
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"strconv"
@@ -39,12 +40,12 @@ func quantizeJSON(cfg *config.JSONObfuscationConfig, span *model.Span, tag strin
 }
 
 type jsonObfuscator struct {
-	keepValue  map[string]bool // keep the values for these keys
-	isKey      bool            // true if next token is a key
-	isObject   bool            // true if closure is an object
-	lastKey    string          // previous key
-	lastObject int             // depth of nearest object
-	depth      int             // current depth
+	keepValue map[string]bool // keep the values for these keys
+	isKey     bool            // true if next token is a key
+	prevKey   string          // previous key
+	closures  []bool          // parent closures count, true if object
+	out       bytes.Buffer
+	dec       *json.Decoder
 }
 
 func newJSONObfuscator(cfg *config.JSONObfuscationConfig) *jsonObfuscator {
@@ -53,43 +54,70 @@ func newJSONObfuscator(cfg *config.JSONObfuscationConfig) *jsonObfuscator {
 	for _, v := range cfg.KeepValues {
 		keepValue[v] = true
 	}
-	return &jsonObfuscator{keepValue: keepValue}
-}
-
-func (tok *jsonObfuscator) beginArray() {
-	tok.depth++
-	tok.isKey = false
-	tok.isObject = false
-}
-
-func (tok *jsonObfuscator) beginObject() {
-	tok.depth++
-	tok.isKey = true
-	tok.isObject = true
-	tok.lastObject = tok.depth
-}
-
-func (tok *jsonObfuscator) endClosure() {
-	tok.depth--
-	tok.isKey = true
-	if tok.lastObject == tok.depth {
-		// TODO: this is not reliable when nesting many things,
-		// we should use a stack?
-		// the wrapping parent is not an array
-		tok.isObject = true
+	return &jsonObfuscator{
+		keepValue: keepValue,
+		closures:  []bool{},
 	}
+}
+
+func (tok *jsonObfuscator) scanDelim(v json.Delim) {
+	switch v {
+	case '[':
+		tok.closures = append(tok.closures, false)
+		tok.isKey = false
+		tok.out.WriteString(string(v))
+	case '{':
+		tok.closures = append(tok.closures, true)
+		tok.isKey = true
+		tok.out.WriteString(string(v))
+	case ']', '}':
+		tok.closures = tok.closures[:len(tok.closures)-1]
+		tok.isKey = tok.isObject()
+		tok.out.WriteString(string(v))
+		if tok.dec.More() {
+			tok.out.WriteString(",")
+		}
+	}
+}
+
+func (tok *jsonObfuscator) scanToken(t json.Token) {
+	switch v := t.(type) {
+	case bool:
+		if v {
+			tok.out.WriteString(`"true"`)
+		} else {
+			tok.out.WriteString(`"false"`)
+		}
+	case float64:
+		tok.out.WriteString(strconv.FormatFloat(v, 'f', 2, 64))
+	case json.Number:
+		tok.out.WriteString(string(v))
+	case string:
+		if tok.isKey {
+			tok.prevKey = v
+		}
+		tok.out.WriteString(`"`)
+		tok.out.WriteString(v)
+		tok.out.WriteString(`"`)
+	case nil:
+		tok.out.WriteString(`"null"`)
+	}
+}
+
+// isObject reports whether the current closure is an object.
+func (tok *jsonObfuscator) isObject() bool {
+	return len(tok.closures) == 0 || tok.closures[len(tok.closures)-1]
 }
 
 // obfuscateJSON takes the JSON string found in str, replacing all the values of the keys found
 // as keys in the drop map with a "?" and returning the new JSON string.
 func (tok *jsonObfuscator) obfuscate(str string) (string, error) {
-	var res strings.Builder
-	dec := json.NewDecoder(strings.NewReader(str))
-	dec.UseNumber()
-	//log.Printf("%15s %6s %6s %3s %s\n", "Token", "Key", "Object", "Depth", "Last Key")
+	tok.dec = json.NewDecoder(strings.NewReader(str))
+	tok.dec.UseNumber()
+	//log.Printf("%15s %6s %6s %3s %s\n", "Token", "isKey", "isObject", "Depth", "Last Key")
 	for {
-		t, err := dec.Token()
-		//log.Printf("%15q %6v %6v %3d %q\n", t, key, object, depth, lastKey)
+		t, err := tok.dec.Token()
+		//log.Printf("%15q %6v %6v %3d %q\n", t, tok.isKey, tok.isObject, len(tok.closures), tok.key)
 		if err == io.EOF {
 			break
 		}
@@ -97,57 +125,22 @@ func (tok *jsonObfuscator) obfuscate(str string) (string, error) {
 			return "", err
 		}
 		if v, ok := t.(json.Delim); ok {
-			switch v {
-			case '[':
-				tok.beginArray()
-				res.WriteString(string(v))
-			case '{':
-				tok.beginObject()
-				res.WriteString(string(v))
-			case ']', '}':
-				tok.endClosure()
-				res.WriteString(string(v))
-				if dec.More() {
-					res.WriteString(",")
-				}
-			}
+			tok.scanDelim(v)
 			continue
 		}
-		if !tok.isKey && !tok.keepValue[tok.lastKey] {
-			res.WriteString(`"?"`)
+		if !tok.isKey && !tok.keepValue[tok.prevKey] {
+			tok.out.WriteString(`"?"`)
 		} else {
-			switch v := t.(type) {
-			case bool:
-				if v {
-					res.WriteString(`"true"`)
-				} else {
-					res.WriteString(`"false"`)
-				}
-			case float64:
-				res.WriteString(strconv.FormatFloat(v, 'f', 2, 64))
-			case json.Number:
-				res.WriteString(string(v))
-			case string:
-				if tok.isKey {
-					tok.lastKey = v
-				}
-				res.WriteString(`"`)
-				res.WriteString(v)
-				res.WriteString(`"`)
-			case nil:
-				res.WriteString(`"null"`)
-			}
+			tok.scanToken(t)
 		}
 		if tok.isKey {
-			res.WriteString(":")
-		} else {
-			if dec.More() {
-				res.WriteString(",")
-			}
+			tok.out.WriteString(":")
+		} else if tok.dec.More() {
+			tok.out.WriteString(",")
 		}
-		if tok.isObject {
+		if tok.isObject() {
 			tok.isKey = !tok.isKey
 		}
 	}
-	return res.String(), nil
+	return tok.out.String(), nil
 }
