@@ -143,6 +143,9 @@ func (tok *jsonObfuscator) obfuscate(str string) (string, error) {
 			break
 		}
 		if err != nil {
+			// it might be that a truncated JSON was passed, in which
+			// case the tokenizer failed to process it entirely, we
+			// should return whatever we have.
 			tok.out.WriteString("...")
 			return tok.out.String(), err
 		}

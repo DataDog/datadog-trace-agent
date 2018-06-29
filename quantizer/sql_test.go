@@ -1,6 +1,7 @@
 package quantizer
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/DataDog/datadog-trace-agent/model"
@@ -378,7 +379,7 @@ func BenchmarkTokenizer(b *testing.B) {
 	consumer := NewTokenConsumer(filters)
 
 	for _, bm := range benchmarks {
-		b.Run(bm.name, func(b *testing.B) {
+		b.Run(bm.name+"/"+strconv.Itoa(len(bm.query)), func(b *testing.B) {
 			b.ResetTimer()
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
