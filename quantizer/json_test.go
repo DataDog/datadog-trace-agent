@@ -24,10 +24,11 @@ type xmlObfuscateTests struct {
 }
 
 type xmlObfuscateTest struct {
-	Tag        string
-	In         string
-	Out        string
-	KeepValues []string `xml:"KeepValues>key"`
+	Tag           string
+	DontNormalize bool // this test contains invalid JSON
+	In            string
+	Out           string
+	KeepValues    []string `xml:"KeepValues>key"`
 }
 
 // loadTests loads all XML tests from ./testdata/obfuscate.xml
@@ -47,8 +48,10 @@ func loadTests() ([]*xmlObfuscateTest, error) {
 	}
 	for _, test := range suite.Tests {
 		// normalize JSON output
-		test.Out = normalize(test.Out)
-		test.In = normalize(test.In)
+		if !test.DontNormalize {
+			test.Out = normalize(test.Out)
+			test.In = normalize(test.In)
+		}
 	}
 	return suite.Tests, err
 }
@@ -84,14 +87,24 @@ func TestMain(m *testing.M) {
 }
 
 func TestObfuscateJSON(t *testing.T) {
-	for i, s := range jsonSuite {
-		t.Run(strconv.Itoa(i+1), func(t *testing.T) {
+	runTest := func(s *xmlObfuscateTest) func(*testing.T) {
+		return func(t *testing.T) {
 			assert := assert.New(t)
 			cfg := &config.JSONObfuscationConfig{KeepValues: s.KeepValues}
 			out, err := newJSONObfuscator(cfg).obfuscate(s.In)
-			assert.NoError(err)
+			if !s.DontNormalize {
+				assert.NoError(err)
+			}
 			assert.Equal(s.Out, out)
-		})
+		}
+	}
+	for i, s := range jsonSuite {
+		var name string
+		if s.DontNormalize {
+			name += "invalid/"
+		}
+		name += strconv.Itoa(i + 1)
+		t.Run(name, runTest(s))
 	}
 }
 
@@ -111,7 +124,8 @@ func BenchmarkObfuscateJSON(b *testing.B) {
 		b.Run(strconv.Itoa(len(test.In)), func(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
-				if _, err := newJSONObfuscator(cfg).obfuscate(test.In); err != nil {
+				_, err := newJSONObfuscator(cfg).obfuscate(test.In)
+				if !test.DontNormalize && err != nil {
 					b.Fatal(err)
 				}
 			}

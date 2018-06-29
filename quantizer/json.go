@@ -33,11 +33,11 @@ func quantizeJSON(cfg *config.JSONObfuscationConfig, span *model.Span, tag strin
 	if span.Meta == nil || span.Meta[tag] == "" {
 		return
 	}
-	str, err := newJSONObfuscator(cfg).obfuscate(span.Meta[tag])
-	if err != nil {
-		return
-	}
-	span.Meta[tag] = str
+	span.Meta[tag], _ = newJSONObfuscator(cfg).obfuscate(span.Meta[tag])
+	// we should accept whatever the obfuscator returns, even if it's an error: a parsing
+	// error simply means that the JSON was invalid, meaning that we've only obfuscated
+	// as much of it as we could. This happens in cases when the JSON body (for example in the
+	// case of "elasticsearch.body" tag) is truncated, rendering the JSON invalid.
 }
 
 type jsonObfuscator struct {
@@ -143,7 +143,8 @@ func (tok *jsonObfuscator) obfuscate(str string) (string, error) {
 			break
 		}
 		if err != nil {
-			return "", err
+			tok.out.WriteString("...")
+			return tok.out.String(), err
 		}
 		if v, ok := t.(json.Delim); ok {
 			tok.scanDelim(v)
