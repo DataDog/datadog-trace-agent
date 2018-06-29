@@ -3,6 +3,7 @@ package quantizer
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -42,7 +43,8 @@ func quantizeJSON(cfg *config.JSONObfuscationConfig, span *model.Span, tag strin
 type jsonObfuscator struct {
 	keepValue map[string]bool // do not obfuscate values for these keys
 	isKey     bool            // next token is a key
-	prevKey   string          // last/current key
+	keeping   bool            // true if not obfuscating
+	keepDepth int             // depth after which we've stopped obfuscating
 	closures  []bool          // parent closure count, false if array (e.g. {[ => []bool{true, false})
 	out       bytes.Buffer    // resulting JSON
 	dec       *json.Decoder   // decoder
@@ -82,27 +84,45 @@ func (tok *jsonObfuscator) scanDelim(v json.Delim) {
 	}
 }
 
-func (tok *jsonObfuscator) scanToken(t json.Token) {
+func (tok *jsonObfuscator) scanKey(t json.Token) string {
+	var k string
 	switch v := t.(type) {
-	case bool:
-		if v {
-			tok.out.WriteString(`"true"`)
-		} else {
-			tok.out.WriteString(`"false"`)
-		}
-	case float64:
-		tok.out.WriteString(strconv.FormatFloat(v, 'f', 2, 64))
-	case json.Number:
-		tok.out.WriteString(string(v))
 	case string:
-		if tok.isKey {
-			tok.prevKey = v
+		k = v
+	default:
+		k = fmt.Sprint(v)
+	}
+	tok.out.WriteString(`"`)
+	tok.out.WriteString(k)
+	tok.out.WriteString(`":`)
+	return k
+}
+
+func (tok *jsonObfuscator) scanValue(t json.Token) {
+	if !tok.keeping {
+		tok.out.WriteString(`"?"`)
+	} else {
+		switch v := t.(type) {
+		case bool:
+			if v {
+				tok.out.WriteString(`"true"`)
+			} else {
+				tok.out.WriteString(`"false"`)
+			}
+		case float64:
+			tok.out.WriteString(strconv.FormatFloat(v, 'f', 2, 64))
+		case json.Number:
+			tok.out.WriteString(string(v))
+		case string:
+			tok.out.WriteString(`"`)
+			tok.out.WriteString(v)
+			tok.out.WriteString(`"`)
+		case nil:
+			tok.out.WriteString(`"null"`)
 		}
-		tok.out.WriteString(`"`)
-		tok.out.WriteString(v)
-		tok.out.WriteString(`"`)
-	case nil:
-		tok.out.WriteString(`"null"`)
+	}
+	if tok.dec.More() {
+		tok.out.WriteString(",")
 	}
 }
 
@@ -126,24 +146,25 @@ func (tok *jsonObfuscator) obfuscate(str string) (string, error) {
 			return "", err
 		}
 		if v, ok := t.(json.Delim); ok {
-			// delimiter
 			tok.scanDelim(v)
 			continue
 		}
+		depth := len(tok.closures)
 		if tok.isKey {
-			// key
-			tok.scanToken(t)
-			tok.out.WriteString(":")
+			k := tok.scanKey(t)
+			if !tok.keeping && tok.keepValue[k] {
+				// start keeping values
+				tok.keeping = true
+				tok.keepDepth = depth + 1
+				tok.isKey = false
+				continue
+			}
 		} else {
-			// value
-			if !tok.keepValue[tok.prevKey] {
-				tok.out.WriteString(`"?"`)
-			} else {
-				tok.scanToken(t)
-			}
-			if tok.dec.More() {
-				tok.out.WriteString(",")
-			}
+			tok.scanValue(t)
+		}
+		if tok.keeping && depth < tok.keepDepth {
+			// we've come back to the source closure, stop keeping
+			tok.keeping = false
 		}
 		if tok.isObject() {
 			tok.isKey = !tok.isKey

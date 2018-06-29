@@ -6,56 +6,49 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/stretchr/testify/assert"
 )
 
+// obfuscateTestFile contains all the tests for JSON obfuscation
+const obfuscateTestFile = "./testdata/json_tests.xml"
+
+type xmlObfuscateTests struct {
+	XMLName xml.Name            `xml:"ObfuscateTests,-"`
+	Tests   []*xmlObfuscateTest `xml:"TestSuite>Test"`
+}
+
 type xmlObfuscateTest struct {
-	XMLName    xml.Name `xml:"ObfuscateTest,-"`
 	Tag        string
 	In         string
 	Out        string
-	KeepValues []string `xml:"KeepValues>value"`
-	Filename   string   `xml:"-"`
+	KeepValues []string `xml:"KeepValues>key"`
 }
 
-// loadTests returns all tests found in the XML files at ./testdata
+// loadTests loads all XML tests from ./testdata/obfuscate.xml
 func loadTests() ([]*xmlObfuscateTest, error) {
-	dir, err := filepath.Abs("./testdata")
+	path, err := filepath.Abs(obfuscateTestFile)
 	if err != nil {
 		return nil, err
 	}
-	tests := make([]*xmlObfuscateTest, 0)
-	err = filepath.Walk(dir, func(path string, fi os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if fi.IsDir() {
-			return nil
-		}
-		if ext := filepath.Ext(fi.Name()); ext != ".xml" {
-			return nil
-		}
-		f, err := os.Open(filepath.Join(dir, fi.Name()))
-		if err != nil {
-			return err
-		}
-		var test xmlObfuscateTest
-		if err := xml.NewDecoder(f).Decode(&test); err != nil {
-			return err
-		}
-		test.Filename = fi.Name()
-
+	f, err := os.Open(path)
+	defer f.Close()
+	if err != nil {
+		return nil, err
+	}
+	var suite xmlObfuscateTests
+	if err := xml.NewDecoder(f).Decode(&suite); err != nil {
+		return nil, err
+	}
+	for _, test := range suite.Tests {
 		// normalize JSON output
 		test.Out = normalize(test.Out)
 		test.In = normalize(test.In)
-
-		tests = append(tests, &test)
-		return nil
-	})
-	return tests, err
+	}
+	return suite.Tests, err
 }
 
 func normalize(in string) string {
@@ -75,8 +68,11 @@ func TestObfuscateJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, s := range suite {
-		t.Run(s.Filename, func(t *testing.T) {
+	if len(suite) == 0 {
+		t.Fatal("no tests in suite")
+	}
+	for i, s := range suite {
+		t.Run(strconv.Itoa(i+1), func(t *testing.T) {
 			assert := assert.New(t)
 			cfg := &config.JSONObfuscationConfig{KeepValues: s.KeepValues}
 			out, err := newJSONObfuscator(cfg).obfuscate(s.In)
