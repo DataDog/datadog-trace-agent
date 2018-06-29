@@ -3,6 +3,7 @@ package quantizer
 import (
 	"encoding/json"
 	"encoding/xml"
+	"flag"
 	"log"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/DataDog/datadog-trace-agent/config"
+	"github.com/cihub/seelog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -63,21 +65,56 @@ func normalize(in string) string {
 	return string(out)
 }
 
-func TestObfuscateJSON(t *testing.T) {
+var jsonSuite []*xmlObfuscateTest
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+	// Disable debug logs in these tests
+	seelog.UseLogger(seelog.Disabled)
+
 	suite, err := loadTests()
 	if err != nil {
-		t.Fatal(err)
+		log.Fatal(err)
 	}
 	if len(suite) == 0 {
-		t.Fatal("no tests in suite")
+		log.Fatal("no tests in suite")
 	}
-	for i, s := range suite {
+	jsonSuite = suite
+	os.Exit(m.Run())
+}
+
+func TestObfuscateJSON(t *testing.T) {
+	for i, s := range jsonSuite {
 		t.Run(strconv.Itoa(i+1), func(t *testing.T) {
 			assert := assert.New(t)
 			cfg := &config.JSONObfuscationConfig{KeepValues: s.KeepValues}
 			out, err := newJSONObfuscator(cfg).obfuscate(s.In)
 			assert.NoError(err)
 			assert.Equal(s.Out, out)
+		})
+	}
+}
+
+func BenchmarkObfuscateJSON(b *testing.B) {
+	cfg := &config.JSONObfuscationConfig{KeepValues: []string{"highlight"}}
+	if len(jsonSuite) == 0 {
+		b.Fatal("no test suite loaded")
+	}
+	var ran int
+	for i := len(jsonSuite) - 1; i >= 0; i-- {
+		ran++
+		if ran > 3 {
+			// run max 3 benchmarks
+			break
+		}
+		test := jsonSuite[i]
+		b.Run(strconv.Itoa(len(test.In)), func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				if _, err := newJSONObfuscator(cfg).obfuscate(test.In); err != nil {
+					b.Fatal(err)
+				}
+			}
 		})
 	}
 }

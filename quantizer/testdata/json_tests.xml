@@ -14,6 +14,29 @@
 
 		<Test>
 			<Tag>elasticsearch.body</Tag>
+			<KeepValues></KeepValues>
+			<In><![CDATA[
+{
+  "highlight": {
+    "pre_tags": [ "<em>" ],
+    "post_tags": [ "</em>" ],
+    "index": 1
+  }
+}
+			]]></In>
+		<Out><![CDATA[
+{
+  "highlight": {
+    "pre_tags": [ "?" ],
+    "post_tags": [ "?" ],
+    "index": "?"
+  }
+}
+]]></Out>
+		</Test>
+
+		<Test>
+			<Tag>elasticsearch.body</Tag>
 			<KeepValues>
 				<key>other</key>
 			</KeepValues>
@@ -92,6 +115,222 @@
 
 		<Test>
 			<Tag>elasticsearch.body</Tag>
+			<KeepValues><key>_source</key></KeepValues>
+			<In>
+{
+    "query": {
+	   "match" : {
+		  "title" : "in action"
+	   }
+    },
+    "size": 2,
+    "from": 0,
+    "_source": [ "title", "summary", "publish_date" ],
+    "highlight": {
+	   "fields" : {
+		  "title" : {}
+	   }
+    }
+}
+			</In>
+			<Out>
+{
+    "query": {
+	   "match" : {
+		  "title" : "?"
+	   }
+    },
+    "size": "?",
+    "from": "?",
+    "_source": [ "title", "summary", "publish_date" ],
+    "highlight": {
+	   "fields" : {
+		  "title" : {}
+	   }
+    }
+}
+			</Out>
+		</Test>
+
+		<!-- ******************************************************************** -->
+
+		<Test>
+			<Tag>elasticsearch.body</Tag>
+			<KeepValues><key>query</key></KeepValues>
+			<In>
+{
+    "query": {
+	   "match" : {
+		  "title" : "in action"
+	   }
+    },
+    "size": 2,
+    "from": 0,
+    "_source": [ "title", "summary", "publish_date" ],
+    "highlight": {
+	   "fields" : {
+		  "title" : {}
+	   }
+    }
+}
+			</In>
+			<Out>
+{
+    "query": {
+	   "match" : {
+		  "title" : "in action"
+	   }
+    },
+    "size": "?",
+    "from": "?",
+    "_source": [ "?", "?", "?" ],
+    "highlight": {
+	   "fields" : {
+		  "title" : {}
+	   }
+    }
+}
+			</Out>
+		</Test>
+
+		<!-- ******************************************************************** -->
+
+		<Test>
+			<Tag>elasticsearch.body</Tag>
+			<KeepValues><key>match</key></KeepValues>
+			<In>
+{
+    "query": {
+	   "match" : {
+		  "title" : "in action"
+	   }
+    },
+    "size": 2,
+    "from": 0,
+    "_source": [ "title", "summary", "publish_date" ],
+    "highlight": {
+	   "fields" : {
+		  "title" : {}
+	   }
+    }
+}
+			</In>
+			<Out>
+{
+    "query": {
+	   "match" : {
+		  "title" : "in action"
+	   }
+    },
+    "size": "?",
+    "from": "?",
+    "_source": [ "?", "?", "?" ],
+    "highlight": {
+	   "fields" : {
+		  "title" : {}
+	   }
+    }
+}
+			</Out>
+		</Test>
+
+		<!-- ******************************************************************** -->
+
+		<Test>
+			<Tag>elasticsearch.body</Tag>
+			<KeepValues>
+				<key>hits</key>
+			</KeepValues>
+			<In><![CDATA[
+{
+	"outer": {
+	    "total": 2,
+	    "max_score": 0.9105287,
+	    "hits": [
+		 {
+		   "_index": "bookdb_index",
+		   "_type": "book",
+		   "_id": "3",
+		   "_score": 0.9105287,
+		   "_source": {
+			"summary": "build scalable search applications using Elasticsearch without having to do complex low-level programming or understand advanced data science algorithms",
+			"title": "Elasticsearch in Action",
+			"publish_date": "2015-12-03"
+		   },
+		   "highlight": {
+			"title": [
+			  "Elasticsearch Action"
+			]
+		   }
+		 },
+		 {
+		   "_index": "bookdb_index",
+		   "_type": "book",
+		   "_id": "4",
+		   "_score": 0.9105287,
+		   "_source": {
+			"summary": "Comprehensive guide to implementing a scalable search engine using Apache Solr",
+			"title": "Solr in Action",
+			"publish_date": "2014-04-05"
+		   },
+		   "highlight": {
+			"title": [
+			  "Solr in Action"
+			]
+		   }
+		 }
+	    ]
+    }
+}
+]]></In>
+			<Out><![CDATA[
+{
+	"outer": {
+	    "total": "?",
+	    "max_score": "?",
+	    "hits": [
+		 {
+		   "_index": "bookdb_index",
+		   "_type": "book",
+		   "_id": "3",
+		   "_score": 0.9105287,
+		   "_source": {
+			"summary": "build scalable search applications using Elasticsearch without having to do complex low-level programming or understand advanced data science algorithms",
+			"title": "Elasticsearch in Action",
+			"publish_date": "2015-12-03"
+		   },
+		   "highlight": {
+			"title": [
+			  "Elasticsearch Action"
+			]
+		   }
+		 },
+		 {
+		   "_index": "bookdb_index",
+		   "_type": "book",
+		   "_id": "4",
+		   "_score": 0.9105287,
+		   "_source": {
+			"summary": "Comprehensive guide to implementing a scalable search engine using Apache Solr",
+			"title": "Solr in Action",
+			"publish_date": "2014-04-05"
+		   },
+		   "highlight": {
+			"title": [
+			  "Solr in Action"
+			]
+		   }
+		 }
+	    ]
+    }
+}
+]]></Out>
+		</Test>
+
+		<!-- ******************************************************************** -->
+
+		<Test>
+			<Tag>elasticsearch.body</Tag>
 			<KeepValues>
 				<key>_index</key>
 				<key>title</key>
@@ -114,7 +353,7 @@
 		   },
 		   "highlight": {
 			"title": [
-			  "Elasticsearch <em>in</em> <em>Action</em>"
+			  "Elasticsearch Action"
 			]
 		   }
 		 },
@@ -130,7 +369,7 @@
 		   },
 		   "highlight": {
 			"title": [
-			  "Solr <em>in</em> <em>Action</em>"
+			  "Solr Action"
 			]
 		   }
 		 }
@@ -156,7 +395,7 @@
 		   },
 		   "highlight": {
 			"title": [
-			  "Elasticsearch <em>in</em> <em>Action</em>"
+			  "Elasticsearch Action"
 			]
 		   }
 		 },
@@ -172,7 +411,7 @@
 		   },
 		   "highlight": {
 			"title": [
-			  "Solr <em>in</em> <em>Action</em>"
+			  "Solr Action"
 			]
 		   }
 		 }
@@ -180,6 +419,64 @@
     }
 }
 			</Out>
+		</Test>
+		<Test>
+			<Tag>elasticsearch.body</Tag>
+			<KeepValues>
+				<key>_source</key>
+			</KeepValues>
+			<In><![CDATA[
+{
+  "query": {
+    "bool": {
+      "must": [ { "match": { "title": "smith" } } ],
+      "must_not": [ { "match_phrase": { "title": "granny smith" } } ],
+      "filter": [ { "exists": { "field": "title" } } ]
+    }
+  },
+  "aggs": {
+    "my_agg": { "terms": { "field": "user", "size": 10 } }
+  },
+  "highlight": {
+    "pre_tags": [ "<em>" ], "post_tags": [ "</em>" ],
+    "fields": {
+      "body": { "number_of_fragments": 1, "fragment_size": 20 },
+      "title": {}
+    }
+  },
+  "size": 20,
+  "from": 100,
+  "_source": [ "title", "id" ],
+  "sort": [ { "_id": { "order": "desc" } } ]
+}
+]]></In>
+			<Out><![CDATA[
+{
+  "query": {
+    "bool": {
+      "must": [ { "match": { "title": "?" } } ],
+      "must_not": [ { "match_phrase": { "title": "?" } } ],
+      "filter": [ { "exists": { "field": "?" } } ]
+    }
+  },
+  "aggs": {
+    "my_agg": { "terms": { "field": "?", "size": "?" } }
+  },
+  "highlight": {
+    "pre_tags": [ "?" ], "post_tags": [ "?" ],
+    "fields": {
+      "body": { "number_of_fragments": "?", "fragment_size": "?" },
+      "title": {}
+    }
+  },
+  "size": "?",
+  "from": "?",
+  "_source": [ "title", "id" ],
+  "sort": [ { "_id": { "order": "?" } }
+  ]
+}
+			
+]]></Out>
 		</Test>
 	</TestSuite>
 </ObfuscateTests>

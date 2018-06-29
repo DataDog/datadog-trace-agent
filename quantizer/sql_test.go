@@ -1,11 +1,7 @@
 package quantizer
 
 import (
-	"flag"
-	"os"
 	"testing"
-
-	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/stretchr/testify/assert"
@@ -24,15 +20,6 @@ func SQLSpan(query string) *model.Span {
 			"sql.query": query,
 		},
 	}
-}
-
-func TestMain(m *testing.M) {
-	flag.Parse()
-
-	// Disable debug logs in these tests
-	log.UseLogger(log.Disabled)
-
-	os.Exit(m.Run())
 }
 
 func TestSQLResourceQuery(t *testing.T) {
