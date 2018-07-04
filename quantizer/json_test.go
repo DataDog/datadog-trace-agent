@@ -91,7 +91,7 @@ func TestObfuscateJSON(t *testing.T) {
 		return func(t *testing.T) {
 			assert := assert.New(t)
 			cfg := &config.JSONObfuscationConfig{KeepValues: s.KeepValues}
-			out, err := newJSONObfuscator(cfg).obfuscate(s.In)
+			out, err := newJSONObfuscator(cfg).obfuscate([]byte(s.In))
 			if !s.DontNormalize {
 				assert.NoError(err)
 			}
@@ -124,7 +124,7 @@ func BenchmarkObfuscateJSON(b *testing.B) {
 		b.Run(strconv.Itoa(len(test.In)), func(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
-				_, err := newJSONObfuscator(cfg).obfuscate(test.In)
+				_, err := newJSONObfuscator(cfg).obfuscate([]byte(test.In))
 				if !test.DontNormalize && err != nil {
 					b.Fatal(err)
 				}

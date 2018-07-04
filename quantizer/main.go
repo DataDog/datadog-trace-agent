@@ -8,7 +8,10 @@ import (
 )
 
 // Obfuscator quantizes and obfuscates spans.
-type Obfuscator struct{ opts *config.ObfuscationConfig }
+type Obfuscator struct {
+	opts *config.ObfuscationConfig
+	json *jsonObfuscator
+}
 
 // NewObfuscator creates a new Obfuscator.
 func NewObfuscator(cfg *config.ObfuscationConfig) *Obfuscator {

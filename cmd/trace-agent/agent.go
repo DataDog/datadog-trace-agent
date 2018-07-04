@@ -249,9 +249,9 @@ func (a *Agent) Process(t model.Trace) {
 		model.SetSublayersOnSpan(subtrace.Root, subtraceSublayers)
 	}
 
-	for i := range t {
-		a.obfuscator.Obfuscate(t[i])
-		t[i].Truncate()
+	for _, span := range t {
+		a.obfuscator.Obfuscate(span)
+		span.Truncate()
 	}
 
 	pt := processedTrace{
