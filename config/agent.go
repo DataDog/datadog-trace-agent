@@ -95,7 +95,7 @@ type AgentConfig struct {
 	// infrastructure agent binary
 	DDAgentBin string // DDAgentBin will be "" for Agent5 scenarios
 
-	// Quantizer/obfuscator configuration.
+	// Obfuscation holds sensitive data obufscator's configuration.
 	Obfuscation *ObfuscationConfig
 }
 

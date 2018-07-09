@@ -3,7 +3,6 @@ package quantizer
 import (
 	"encoding/json"
 	"encoding/xml"
-	"flag"
 	"log"
 	"os"
 	"path/filepath"
@@ -11,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/cihub/seelog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -56,6 +54,8 @@ func loadTests() ([]*xmlObfuscateTest, error) {
 	return suite.Tests, err
 }
 
+// normalize normalizes JSON input. This allows us to write "pretty" JSON
+// inside the test file using \t, \r, \n, etc.
 func normalize(in string) string {
 	var tmp map[string]interface{}
 	if err := json.Unmarshal([]byte(in), &tmp); err != nil {
@@ -68,23 +68,8 @@ func normalize(in string) string {
 	return string(out)
 }
 
+// jsonSuite holds the JSON test suite. It is loaded in TestMain.
 var jsonSuite []*xmlObfuscateTest
-
-func TestMain(m *testing.M) {
-	flag.Parse()
-	// Disable debug logs in these tests
-	seelog.UseLogger(seelog.Disabled)
-
-	suite, err := loadTests()
-	if err != nil {
-		log.Fatal(err)
-	}
-	if len(suite) == 0 {
-		log.Fatal("no tests in suite")
-	}
-	jsonSuite = suite
-	os.Exit(m.Run())
-}
 
 func TestObfuscateJSON(t *testing.T) {
 	runTest := func(s *xmlObfuscateTest) func(*testing.T) {

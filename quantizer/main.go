@@ -9,8 +9,9 @@ import (
 
 // Obfuscator quantizes and obfuscates spans.
 type Obfuscator struct {
-	opts *config.ObfuscationConfig
-	json *jsonObfuscator
+	opts  *config.ObfuscationConfig
+	es    *jsonObfuscator // nil if disabled
+	mongo *jsonObfuscator // nil if disabled
 }
 
 // NewObfuscator creates a new Obfuscator.
@@ -18,14 +19,14 @@ func NewObfuscator(cfg *config.ObfuscationConfig) *Obfuscator {
 	if cfg == nil {
 		cfg = new(config.ObfuscationConfig)
 	}
-	opts := *cfg
-	for _, v := range opts.ES.KeepValues {
-		opts.ES.KeepMap[v] = true
+	o := Obfuscator{opts: cfg}
+	if cfg.ES.Enabled {
+		o.es = newJSONObfuscator(&cfg.ES)
 	}
-	for _, v := range opts.Mongo.KeepValues {
-		opts.Mongo.KeepMap[v] = true
+	if cfg.Mongo.Enabled {
+		o.mongo = newJSONObfuscator(&cfg.Mongo)
 	}
-	return &Obfuscator{opts: &opts}
+	return &o
 }
 
 // Obfuscate may obfuscate span's properties based on its type and on the Obfuscator's
@@ -37,9 +38,9 @@ func (o *Obfuscator) Obfuscate(span *model.Span) {
 	case "redis":
 		o.quantizeRedis(span)
 	case "mongodb":
-		o.obfuscateMongo(span)
+		o.obfuscateJSON(span, "mongodb.query", o.mongo)
 	case "elasticsearch":
-		o.obfuscateES(span)
+		o.obfuscateJSON(span, "elasticsearch.body", o.es)
 	}
 }
 

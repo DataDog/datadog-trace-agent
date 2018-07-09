@@ -8,32 +8,17 @@ import (
 	"github.com/DataDog/datadog-trace-agent/model"
 )
 
-// obfuscateES obfuscates ElasticSearch JSON body values.
-func (o *Obfuscator) obfuscateES(span *model.Span) {
-	if !o.opts.ES.Enabled {
+// obfuscateJSON obfuscates the given span's tag using the given obfuscator. If the obfuscator is
+// nil it is considered disabled.
+func (o *Obfuscator) obfuscateJSON(span *model.Span, tag string, obfuscator *jsonObfuscator) {
+	if obfuscator == nil || span.Meta == nil || span.Meta[tag] == "" {
+		// obfuscator is disabled or tag is not present
 		return
 	}
-	quantizeJSON(&o.opts.ES, span, "elasticsearch.body")
-}
-
-// obfuscateMongo obfuscates MongoDB JSON query values.
-func (o *Obfuscator) obfuscateMongo(span *model.Span) {
-	if !o.opts.Mongo.Enabled {
-		return
-	}
-	quantizeJSON(&o.opts.Mongo, span, "mongodb.query")
-}
-
-// quantizeJSON obfuscates JSON key values in the span's meta tag using the configuration from cfg.
-func quantizeJSON(cfg *config.JSONObfuscationConfig, span *model.Span, tag string) {
-	if span.Meta == nil || span.Meta[tag] == "" {
-		return
-	}
-	span.Meta[tag], _ = newJSONObfuscator(cfg).obfuscate([]byte(span.Meta[tag]))
+	span.Meta[tag], _ = obfuscator.obfuscate([]byte(span.Meta[tag]))
 	// we should accept whatever the obfuscator returns, even if it's an error: a parsing
 	// error simply means that the JSON was invalid, meaning that we've only obfuscated
-	// as much of it as we could. This happens in cases when the JSON body (for example in the
-	// case of "elasticsearch.body" tag) is truncated, rendering the JSON invalid.
+	// as much of it as we could. It is safe to accept the output, even if partial.
 }
 
 type jsonObfuscator struct {
@@ -49,23 +34,23 @@ type jsonObfuscator struct {
 }
 
 func newJSONObfuscator(cfg *config.JSONObfuscationConfig) *jsonObfuscator {
-	if cfg.KeepMap == nil {
-		keepValue := make(map[string]bool, len(cfg.KeepValues))
-		for _, v := range cfg.KeepValues {
-			keepValue[v] = true
-		}
-		cfg.KeepMap = keepValue
+	keepValue := make(map[string]bool, len(cfg.KeepValues))
+	for _, v := range cfg.KeepValues {
+		keepValue[v] = true
 	}
 	return &jsonObfuscator{
 		closures: []bool{},
-		keepers:  cfg.KeepMap,
+		keepers:  keepValue,
 		scan:     &scanner{},
 	}
 }
 
+// setKey verifies if we are currently scanning a key based on the current state
+// and updates the state accordingly. It must be called only after a closure or a
+// value scan has ended.
 func (p *jsonObfuscator) setKey() {
 	n := len(p.closures)
-	p.key = n == 0 || p.closures[n-1]
+	p.key = n == 0 || p.closures[n-1] // true if we are at top level or in an object
 	p.wiped = false
 }
 
@@ -77,32 +62,38 @@ func (p *jsonObfuscator) obfuscate(data []byte) (string, error) {
 		p.scan.bytes++
 		op := p.scan.step(p.scan, c)
 		depth := len(p.closures)
-		// fmt.Printf("%15s %s %5v\n", stringOp(op), string(c), p.keeping)
 		switch op {
 		case scanBeginObject:
+			// object begins: {
 			p.closures = append(p.closures, true)
 			p.setKey()
 
 		case scanBeginArray:
+			// array begins: [
 			p.closures = append(p.closures, false)
 			p.setKey()
 
 		case scanEndArray, scanEndObject:
+			// array or object closing
 			if n := len(p.closures) - 1; n > 0 {
 				p.closures = p.closures[:n]
 			}
 			fallthrough
 
 		case scanObjectValue, scanArrayValue:
+			// done scanning value
 			p.setKey()
 			if p.keeping && depth < p.keepDepth {
 				p.keeping = false
 			}
 
 		case scanBeginLiteral, scanContinue:
+			// starting or continuing a literal
 			if p.key {
+				// it's a key
 				buf = append(buf, c)
 			} else if !p.keeping {
+				// it's a value we're not keeping
 				if !p.wiped {
 					out.Write([]byte(`"?"`))
 					p.wiped = true
@@ -111,13 +102,10 @@ func (p *jsonObfuscator) obfuscate(data []byte) (string, error) {
 			}
 
 		case scanObjectKey:
-			var k string
-			if len(buf) >= 2 {
-				// strip quotes around key
-				k = string(buf[1 : len(buf)-1])
-			}
+			// done scanning key
+			k := strings.Trim(string(buf), `"`)
 			if !p.keeping && p.keepers[k] {
-				// we're keeping values for this key
+				// we should not obfuscate values of this key
 				p.keeping = true
 				p.keepDepth = depth + 1
 			}
@@ -128,12 +116,17 @@ func (p *jsonObfuscator) obfuscate(data []byte) (string, error) {
 			continue
 
 		case scanError:
+			// we've encountered an error, mark that there might be more JSON
+			// using the ellipsis and return whatever we've managed to obfuscate
+			// thus far.
 			out.Write([]byte("..."))
 			return out.String(), p.scan.err
 		}
 		out.WriteByte(c)
 	}
 	if p.scan.eof() == scanError {
+		// if an error occurred it's fine, simply add the ellipsis to indicate
+		// that the input has been truncated.
 		out.Write([]byte("..."))
 		return out.String(), p.scan.err
 	}
@@ -160,7 +153,7 @@ func stringOp(op int) string {
 //
 // The code that follows has been copied from go/src/encoding/json/scanner.go
 // It may contain minor edits, such as allowing multiple JSON objects within
-// the same input string (stateEndTop)
+// the same input string (see stateEndTop)
 //
 
 // A SyntaxError is a description of a JSON syntax error.
@@ -424,14 +417,12 @@ func stateEndValue(s *scanner, c byte) int {
 // Only space characters should be seen now.
 func stateEndTop(s *scanner, c byte) int {
 	if c != ' ' && c != '\t' && c != '\r' && c != '\n' {
-		// Complain about non-space byte on next call.
-		// s.error(c, "after top-level value")
-
 		// The former behaviour has been removed. Now, if anything
 		// other than whitespace follows, we assume a new JSON string
-		// is starting. This is to allow us to continue obfuscating
+		// might be starting. This allows us to continue obfuscating
 		// further strings in cases where there are multiple JSON
 		// objects enumerated sequentially within the same input.
+		// This is a common case for ElasticSearch response bodies.
 		s.reset()
 		return s.step(s, c)
 	}

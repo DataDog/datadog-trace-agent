@@ -66,15 +66,25 @@ type traceAgent struct {
 	DDAgentBin string `yaml:"dd_agent_bin"`
 }
 
+// ObfuscationConfig holds the configuration for obfuscating sensitive data
+// for various span types.
 type ObfuscationConfig struct {
-	ES    JSONObfuscationConfig `yaml:"elasticsearch"`
+	// ES holds the obfuscation configuration for ElasticSearch bodies.
+	ES JSONObfuscationConfig `yaml:"elasticsearch"`
+
+	// Mongo holds the obfuscation configuration for MongoDB queries.
 	Mongo JSONObfuscationConfig `yaml:"mongodb"`
 }
 
+// JSONObfuscationConfig holds the obfuscation configuration for sensitive
+// data found in JSON objects.
 type JSONObfuscationConfig struct {
-	Enabled    bool            `yaml:"enabled"`
-	KeepValues []string        `yaml:"keep_values"`
-	KeepMap    map[string]bool `yaml:"-"` // used by quantizer.Obfuscator
+	// Enabled will specify whether obfuscation should be enabled.
+	Enabled bool `yaml:"enabled"`
+
+	// KeepValues will specify a set of keys for which their values will
+	// not be obfuscated.
+	KeepValues []string `yaml:"keep_values"`
 }
 
 type ReplaceRule struct {

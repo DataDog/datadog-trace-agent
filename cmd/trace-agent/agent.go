@@ -53,7 +53,10 @@ type Agent struct {
 	StatsWriter        *writer.StatsWriter
 	ServiceExtractor   *TraceServiceExtractor
 	ServiceMapper      *ServiceMapper
-	obfuscator         *quantizer.Obfuscator
+
+	// obfuscator is used to obfuscate sensitive data from various span
+	// tags based on their type.
+	obfuscator *quantizer.Obfuscator
 
 	sampledTraceChan chan *writer.SampledTrace
 
