@@ -161,21 +161,17 @@ func (zspan *SpanModel) Convert() *model.Span {
 		}
 	}
 	if span.Resource == "" {
-		var set bool
+		span.Resource = span.Name
 		for _, tag := range []string{
 			"http.route",
 			"sql.query",
 			"cassandra.query",
 			"db.statement",
 		} {
-			if hasAnyOfTags(&span, tag) {
+			if _, ok := span.Meta[tag]; ok {
 				span.Resource = span.Meta[tag]
-				set = true
 				break
 			}
-		}
-		if !set {
-			span.Resource = span.Name
 		}
 	}
 	if span.Type == "" {

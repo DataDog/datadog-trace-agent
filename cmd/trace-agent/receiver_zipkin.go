@@ -24,7 +24,7 @@ func (r *HTTPReceiver) handleZipkinSpans(w http.ResponseWriter, req *http.Reques
 	case "application/json", "text/json":
 		// OK
 	default:
-		// unsupported Content-Type
+		// unsupported
 		log.Errorf("/zipkin/v2/spans: unsupported media type %q", v)
 		HTTPFormatError([]string{tagZipkinHandler}, w)
 		return
@@ -33,20 +33,24 @@ func (r *HTTPReceiver) handleZipkinSpans(w http.ResponseWriter, req *http.Reques
 	reader := req.Body
 	defer req.Body.Close()
 	if enc := req.Header.Get("Content-Encoding"); enc != "" {
-		// is the request body gzip encoded?
-		if enc != "gzip" {
+		switch enc {
+		case "gzip":
+			var err error
+			reader, err = gzip.NewReader(reader)
+			if err != nil {
+				log.Errorf("/zipkin/v2/spans: error reading gzipped content")
+				HTTPDecodingError(err, []string{tagZipkinHandler}, w)
+				return
+			}
+			defer reader.Close()
+		case "identity":
+			// OK
+		default:
+			// unsupported
 			log.Errorf("/zipkin/v2/spans: unsupported Content-Encoding: %s", enc)
 			HTTPDecodingError(errors.New("unsupported Content-Encoding"), []string{tagZipkinHandler}, w)
 			return
 		}
-		var err error
-		reader, err = gzip.NewReader(reader)
-		if err != nil {
-			log.Errorf("/zipkin/v2/spans: error reading gzipped content")
-			HTTPDecodingError(err, []string{tagZipkinHandler}, w)
-			return
-		}
-		defer reader.Close()
 	}
 	if err := json.NewDecoder(reader).Decode(&zipkinSpans); err != nil {
 		log.Errorf("/zipkin/v2/spans: cannot decode traces payload: %v", err)
@@ -85,15 +89,14 @@ func tracesFromZipkinSpans(zipkinSpans []*zipkin.SpanModel) model.Traces {
 			//
 			// This can however still prove problematic when the duplicate span comes
 			// in as part of a subsequent payload, in which case we will not be able
-			// to detect it. The best way to avoid this behaviour is to use the readily
-			// available Zipkin setting analogue to:
-			//
-			// https://godoc.org/github.com/openzipkin/zipkin-go#WithSharedSpans
-			//
-			// This is enabled by default in zipkin-go.
+			// to detect it. The best way to avoid this behaviour is to configure the
+			// client in such a way that duplicate span IDs are not created. This is
+			// possible in some languages such as Go (called "WithSharedSpans") or Java
+			// (called "supportsJoin").
 			zspan.ID = zipkin.ID(rand.Uint64())
-			// these spans generally have the same ParentID too, so let's assume that
-			// the span which was created first will become the new parent.
+
+			// These spans generally have the same ParentID too, so let's make the older
+			// one act as the parent.
 			if dup.ParentID == zspan.ParentID && dup.ParentID != nil {
 				if zspan.Timestamp.Before(dup.Timestamp) {
 					dup.ParentID = &zspan.ID
