@@ -104,6 +104,10 @@ func (r *HTTPReceiver) Run() {
 	http.HandleFunc("/v0.4/traces", r.httpHandleWithVersion(v04, r.handleTraces))
 	http.HandleFunc("/v0.4/services", r.httpHandleWithVersion(v04, r.handleServices))
 
+	// Zipkin v2 endpoint
+	// TODO(gbbr): disable by default, add yaml flag
+	http.HandleFunc("/zipkin/v2/spans", r.httpHandle(r.handleZipkinSpans))
+
 	// expvar implicitely publishes "/debug/vars" on the same port
 	addr := fmt.Sprintf("%s:%d", r.conf.ReceiverHost, r.conf.ReceiverPort)
 	if err := r.Listen(addr, ""); err != nil {
@@ -219,15 +223,20 @@ func (r *HTTPReceiver) handleTraces(v APIVersion, w http.ResponseWriter, req *ht
 		Interpreter:   req.Header.Get("Datadog-Meta-Lang-Interpreter"),
 		TracerVersion: req.Header.Get("Datadog-Meta-Tracer-Version"),
 	}
+	var size int64
+	lr, ok := req.Body.(*model.LimitedReader)
+	if ok {
+		size = lr.Count
+	}
+	r.receiveTraces(traces, tags, size)
+}
 
+func (r *HTTPReceiver) receiveTraces(traces []model.Trace, tags info.Tags, bytesRead int64) {
 	// We get the address of the struct holding the stats associated to the tags
 	ts := r.stats.GetTagStats(tags)
-
-	bytesRead := req.Body.(*model.LimitedReader).Count
 	if bytesRead > 0 {
 		atomic.AddInt64(&ts.TracesBytes, int64(bytesRead))
 	}
-
 	// normalize data
 	for i := range traces {
 		spans := len(traces[i])
