@@ -130,7 +130,6 @@ func (s *SpanModel) UnmarshalJSON(b []byte) error {
 func (zspan *SpanModel) Convert() *model.Span {
 	span := model.Span{
 		Name:     zspan.Name,
-		Resource: zspan.Name,
 		TraceID:  zspan.TraceID.Low,
 		SpanID:   uint64(zspan.ID),
 		Start:    zspan.Timestamp.UnixNano(),
@@ -159,6 +158,24 @@ func (zspan *SpanModel) Convert() *model.Span {
 			}
 		default:
 			span.Meta[k] = v
+		}
+	}
+	if span.Resource == "" {
+		var set bool
+		for _, tag := range []string{
+			"http.route",
+			"sql.query",
+			"cassandra.query",
+			"db.statement",
+		} {
+			if hasAnyOfTags(&span, tag) {
+				span.Resource = span.Meta[tag]
+				set = true
+				break
+			}
+		}
+		if !set {
+			span.Resource = span.Name
 		}
 	}
 	if span.Type == "" {
