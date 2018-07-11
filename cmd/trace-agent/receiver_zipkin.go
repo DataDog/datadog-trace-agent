@@ -74,26 +74,43 @@ func (r *HTTPReceiver) handleZipkinSpans(w http.ResponseWriter, req *http.Reques
 
 // tracesFromZipkinSpans creates Traces from a set of Zipkin spans.
 func tracesFromZipkinSpans(zipkinSpans []*zipkin.SpanModel) model.Traces {
-	// convert to Datadog spans
-	spans := make([]model.Span, len(zipkinSpans))
-	for i, zspan := range zipkinSpans {
-		spans[i] = *zspan.Convert()
+	seen := make(map[zipkin.ID]*zipkin.SpanModel, len(zipkinSpans))
+	for _, zspan := range zipkinSpans {
+		if dup, ok := seen[zspan.ID]; ok {
+			// We have a duplicate ID, this is a case where the Zipkin server
+			// normally merges spans together. As an example, this happens when a
+			// client initiates a span that finishes on the server. Since Datadog
+			// doesn't accept such behaviour, we'll keep the span and instead
+			// generate a new ID for it to resolve the collision.
+			//
+			// This can however still prove problematic when the duplicate span comes
+			// in as part of a subsequent payload, in which case we will not be able
+			// to detect it. The best way to avoid this behaviour is to use the readily
+			// available Zipkin setting analogue to:
+			//
+			// https://godoc.org/github.com/openzipkin/zipkin-go#WithSharedSpans
+			//
+			// This is enabled by default in zipkin-go.
+			zspan.ID = zipkin.ID(rand.Uint64())
+			// these spans generally have the same ParentID too, so let's assume that
+			// the span which was created first will become the new parent.
+			if dup.ParentID == zspan.ParentID && dup.ParentID != nil {
+				if zspan.Timestamp.Before(dup.Timestamp) {
+					dup.ParentID = &zspan.ID
+				} else {
+					zspan.ParentID = &dup.ID
+				}
+			}
+			seen[dup.ID] = dup
+		}
+		seen[zspan.ID] = zspan
 	}
 	// group by TraceID
 	traces := make(model.Traces, 0)
 	byID := make(map[uint64][]*model.Span)
-	seen := make(map[uint64]*model.Span)
-	for _, s := range spans {
-		if _, ok := seen[s.SpanID]; ok {
-			// we have a duplicate SpanID, this is a case where the Zipkin server
-			// normally merges spans together. As an example, this happens when a
-			// client initiates a span that finishes on the server. Since Datadog
-			// doesn't support such functionality, we'll keep the span and instead
-			// generate a new SpanID for it to resolve the collision.
-			s.SpanID = rand.Uint64()
-		}
-		seen[s.SpanID] = &s
-		byID[s.TraceID] = append(byID[s.TraceID], &s)
+	for _, zs := range seen {
+		s := zs.Convert()
+		byID[s.TraceID] = append(byID[s.TraceID], s)
 	}
 	for _, t := range byID {
 		traces = append(traces, t)

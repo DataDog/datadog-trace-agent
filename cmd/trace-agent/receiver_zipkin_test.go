@@ -11,6 +11,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var (
+	serverJSON = "[{\"traceId\":\"c05c1294e92ed3f3\",\"parentId\":\"c05c1294e92ed3f3\",\"id\":\"f8c552eb447f168e\",\"kind\":\"SERVER\",\"name\":\"get /api\",\"timestamp\":1531334662281215,\"duration\":12178,\"localEndpoint\":{\"serviceName\":\"backend\",\"ipv4\":\"10.43.30.117\"},\"remoteEndpoint\":{\"ipv4\":\"127.0.0.1\",\"port\":62592},\"tags\":{\"http.method\":\"GET\",\"http.path\":\"/api\",\"mvc.controller.class\":\"Backend\",\"mvc.controller.method\":\"printDate\"},\"shared\":true}]"
+	clientJSON = "[{\"traceId\":\"c05c1294e92ed3f3\",\"parentId\":\"c05c1294e92ed3f3\",\"id\":\"f8c552eb447f168e\",\"kind\":\"CLIENT\",\"name\":\"get\",\"timestamp\":1531334662266671,\"duration\":26144,\"localEndpoint\":{\"serviceName\":\"frontend\",\"ipv4\":\"10.43.30.117\"},\"tags\":{\"http.method\":\"GET\",\"http.path\":\"/api\"}},{\"traceId\":\"c05c1294e92ed3f3\",\"id\":\"c05c1294e92ed3f3\",\"kind\":\"SERVER\",\"name\":\"get /\",\"timestamp\":1531334662260870,\"duration\":39175,\"localEndpoint\":{\"serviceName\":\"frontend\",\"ipv4\":\"10.43.30.117\"},\"remoteEndpoint\":{\"ipv6\":\"::1\",\"port\":62505},\"tags\":{\"http.method\":\"GET\",\"http.path\":\"/\",\"mvc.controller.class\":\"Frontend\",\"mvc.controller.method\":\"callBackend\"}}]"
+)
+
 func TestZipkinReceiver(t *testing.T) {
 	type test struct {
 		status     int
@@ -24,6 +29,18 @@ func TestZipkinReceiver(t *testing.T) {
 		"empty": {
 			status: http.StatusOK,
 			data:   []byte(`[]`),
+		},
+		"server": {
+			status:     http.StatusOK,
+			data:       []byte(serverJSON),
+			traceCount: 1,
+			spanCount:  1,
+		},
+		"client": {
+			status:     http.StatusOK,
+			data:       []byte(clientJSON),
+			traceCount: 1,
+			spanCount:  2,
 		},
 		"invalid-json": {
 			status: http.StatusBadRequest,
