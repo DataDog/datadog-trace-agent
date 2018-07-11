@@ -1,10 +1,12 @@
 package main
 
 import (
+	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"math/rand"
 	"net/http"
-	"strconv"
 
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
@@ -22,22 +24,39 @@ func (r *HTTPReceiver) handleZipkinSpans(w http.ResponseWriter, req *http.Reques
 	case "application/json", "text/json":
 		// OK
 	default:
+		// unsupported Content-Type
 		log.Errorf("/zipkin/v2/spans: unsupported media type %q", v)
 		HTTPFormatError([]string{tagZipkinHandler}, w)
 		return
 	}
 	var zipkinSpans []*zipkin.SpanModel
-	if err := json.NewDecoder(req.Body).Decode(&zipkinSpans); err != nil {
+	reader := req.Body
+	defer req.Body.Close()
+	if enc := req.Header.Get("Content-Encoding"); enc != "" {
+		// is the request body gzip encoded?
+		if enc != "gzip" {
+			log.Errorf("/zipkin/v2/spans: unsupported Content-Encoding: %s", enc)
+			HTTPDecodingError(errors.New("unsupported Content-Encoding"), []string{tagZipkinHandler}, w)
+			return
+		}
+		var err error
+		reader, err = gzip.NewReader(reader)
+		if err != nil {
+			log.Errorf("/zipkin/v2/spans: error reading gzipped content")
+			HTTPDecodingError(err, []string{tagZipkinHandler}, w)
+			return
+		}
+		defer reader.Close()
+	}
+	if err := json.NewDecoder(reader).Decode(&zipkinSpans); err != nil {
 		log.Errorf("/zipkin/v2/spans: cannot decode traces payload: %v", err)
 		HTTPDecodingError(err, []string{tagZipkinHandler}, w)
 		return
 	}
 
-	spans := convertZipkinSpans(zipkinSpans)
-	traces := model.TracesFromSpans(spans)
-
+	traces := tracesFromZipkinSpans(zipkinSpans)
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "OK:%d:%d", len(traces), len(spans))
+	fmt.Fprintf(w, "OK:%d:%d", len(traces), len(zipkinSpans))
 
 	tags := info.Tags{
 		Lang:          "unknown",
@@ -53,98 +72,31 @@ func (r *HTTPReceiver) handleZipkinSpans(w http.ResponseWriter, req *http.Reques
 	r.receiveTraces(traces, tags, size)
 }
 
-// convertZipkinSpans returns a set of Datadog spans from a set of Zipkin spans.
-func convertZipkinSpans(zipkinSpans []*zipkin.SpanModel) []model.Span {
+// tracesFromZipkinSpans creates Traces from a set of Zipkin spans.
+func tracesFromZipkinSpans(zipkinSpans []*zipkin.SpanModel) model.Traces {
+	// convert to Datadog spans
 	spans := make([]model.Span, len(zipkinSpans))
 	for i, zspan := range zipkinSpans {
-		span := model.Span{
-			Name:     zspan.Name,
-			Resource: zspan.Name,
-			TraceID:  zspan.TraceID.Low,
-			SpanID:   uint64(zspan.ID),
-			Start:    zspan.Timestamp.UnixNano(),
-			Duration: int64(zspan.Duration),
-			Meta:     map[string]string{},
-			Metrics:  map[string]float64{samplingPriorityKey: 2},
-		}
-		if zspan.ParentID != nil {
-			span.ParentID = uint64(*zspan.ParentID)
-		}
-		if zspan.Err != nil {
-			span.Error = 1
-			span.Meta["error.msg"] = zspan.Err.Error()
-		}
-		for k, v := range zspan.Tags {
-			switch k {
-			case "service.name":
-				span.Service = v
-			case "resource.name":
-				span.Resource = v
-			case "span.type":
-				span.Type = v
-			case "sampling.priority":
-				if n, err := strconv.Atoi(v); err == nil {
-					span.Metrics[samplingPriorityKey] = float64(n)
-				}
-			default:
-				span.Meta[k] = v
-			}
-		}
-		if span.Type == "" {
-			switch zspan.Kind {
-			case zipkin.Producer, zipkin.Consumer:
-				span.Type = "queue"
-			case zipkin.Client:
-				if hasAnyOfTags(&span, "sql.query") {
-					span.Type = "sql"
-				}
-				if hasAnyOfTags(&span, "cassandra.query") {
-					span.Type = "cassandra"
-				}
-				if hasAnyOfTags(&span, "http.path", "http.uri") {
-					span.Type = "http"
-				}
-			case zipkin.Server:
-				if hasAnyOfTags(&span, "http.path", "http.uri") {
-					span.Type = "web"
-				}
-			}
-		}
-		if e := zspan.LocalEndpoint; e != nil {
-			if e.ServiceName != "" && span.Service == "" {
-				// if this is the local service, it should be fair to
-				// use it as the span's service name as a fallback
-				span.Service = e.ServiceName
-			}
-			if e.IPv4 != nil {
-				span.Meta["in.host"] = e.IPv4.String()
-			}
-			if e.Port != 0 {
-				span.Meta["in.port"] = strconv.Itoa(int(e.Port))
-			}
-		}
-		if e := zspan.RemoteEndpoint; e != nil {
-			if e.ServiceName != "" {
-				span.Meta["out.service"] = e.ServiceName
-			}
-			if e.IPv4 != nil {
-				span.Meta["out.host"] = e.IPv4.String()
-			}
-			if e.Port != 0 {
-				span.Meta["out.port"] = strconv.Itoa(int(e.Port))
-			}
-		}
-		spans[i] = span
+		spans[i] = *zspan.Convert()
 	}
-	return spans
-}
-
-// hasAnyOfTags reports whether the given span has any of the listed tags.
-func hasAnyOfTags(span *model.Span, tags ...string) bool {
-	for _, tag := range tags {
-		if _, ok := span.Meta[tag]; ok {
-			return true
+	// group by TraceID
+	traces := make(model.Traces, 0)
+	byID := make(map[uint64][]*model.Span)
+	seen := make(map[uint64]*model.Span)
+	for _, s := range spans {
+		if _, ok := seen[s.SpanID]; ok {
+			// we have a duplicate SpanID, this is a case where the Zipkin server
+			// normally merges spans together. As an example, this happens when a
+			// client initiates a span that finishes on the server. Since Datadog
+			// doesn't support such functionality, we'll keep the span and instead
+			// generate a new SpanID for it to resolve the collision.
+			s.SpanID = rand.Uint64()
 		}
+		seen[s.SpanID] = &s
+		byID[s.TraceID] = append(byID[s.TraceID], &s)
 	}
-	return false
+	for _, t := range byID {
+		traces = append(traces, t)
+	}
+	return traces
 }

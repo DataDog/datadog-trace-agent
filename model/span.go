@@ -11,6 +11,11 @@ const (
 	flushMarkerType = "_FLUSH_MARKER"
 )
 
+const (
+	// SamplingPriorityKey specifies the key used to set the sampling priority metric.
+	SamplingPriorityKey = "_sampling_priority_v1"
+)
+
 // RandomID generates a random uint64 that we use for IDs
 func RandomID() uint64 {
 	return uint64(rand.Int63())

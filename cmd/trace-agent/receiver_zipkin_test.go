@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -16,6 +17,7 @@ func TestZipkinReceiver(t *testing.T) {
 		data       []byte
 		traceCount int
 		spanCount  int
+		gzip       bool
 		err        string
 	}
 	testSuite := map[string]test{
@@ -31,9 +33,26 @@ func TestZipkinReceiver(t *testing.T) {
 	}
 	testdata, err := ioutil.ReadFile("./testdata/zipkin_spans.json")
 	if err == nil && len(testdata) > 0 {
+		// add the file as a test, both compressed and uncompressed
 		testSuite["zipkin-spans.json"] = test{
 			status:     http.StatusOK,
 			data:       testdata,
+			traceCount: 1,
+			spanCount:  8,
+		}
+		var buf bytes.Buffer
+		w := gzip.NewWriter(&buf)
+		_, err := w.Write(testdata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := w.Flush(); err != nil {
+			t.Fatal(err)
+		}
+		testSuite["zipkin-spans.json.gzip"] = test{
+			status:     http.StatusOK,
+			data:       buf.Bytes(),
+			gzip:       true,
 			traceCount: 1,
 			spanCount:  8,
 		}
@@ -44,7 +63,6 @@ func TestZipkinReceiver(t *testing.T) {
 	conf := NewTestReceiverConfig()
 	receiver := NewTestReceiverFromConfig(conf)
 
-	// TODO(gbbr): remove this terrible hack, we shouldn't override http.DefaultServeMux.
 	defaultMux := http.DefaultServeMux
 	http.DefaultServeMux = http.NewServeMux()
 
@@ -59,7 +77,15 @@ func TestZipkinReceiver(t *testing.T) {
 	for testname, tt := range testSuite {
 		t.Run(testname, func(t *testing.T) {
 			assert := assert.New(t)
-			resp, err := http.Post(url, "application/json", bytes.NewReader(tt.data))
+			req, err := http.NewRequest("POST", url, bytes.NewReader(tt.data))
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header.Add("Content-Type", "application/json")
+			if tt.gzip {
+				req.Header.Add("Content-Encoding", "gzip")
+			}
+			resp, err := http.DefaultClient.Do(req)
 			if tt.err == "" {
 				assert.NoError(err)
 			} else {

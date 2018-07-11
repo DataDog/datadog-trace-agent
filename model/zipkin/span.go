@@ -3,7 +3,10 @@ package zipkin
 import (
 	"encoding/json"
 	"errors"
+	"strconv"
 	"time"
+
+	"github.com/DataDog/datadog-trace-agent/model"
 )
 
 // unmarshal errors
@@ -121,4 +124,96 @@ func (s *SpanModel) UnmarshalJSON(b []byte) error {
 		s.RemoteEndpoint = nil
 	}
 	return nil
+}
+
+// Convert converts the Zipkin span to a Datadog span.
+func (zspan *SpanModel) Convert() *model.Span {
+	span := model.Span{
+		Name:     zspan.Name,
+		Resource: zspan.Name,
+		TraceID:  zspan.TraceID.Low,
+		SpanID:   uint64(zspan.ID),
+		Start:    zspan.Timestamp.UnixNano(),
+		Duration: int64(zspan.Duration),
+		Meta:     map[string]string{},
+		Metrics:  map[string]float64{"_sampling_priority_v1": 2},
+	}
+	if zspan.ParentID != nil {
+		span.ParentID = uint64(*zspan.ParentID)
+	}
+	if zspan.Err != nil {
+		span.Error = 1
+		span.Meta["error.msg"] = zspan.Err.Error()
+	}
+	for k, v := range zspan.Tags {
+		switch k {
+		case "service.name":
+			span.Service = v
+		case "resource.name":
+			span.Resource = v
+		case "span.type":
+			span.Type = v
+		case "sampling.priority":
+			if n, err := strconv.Atoi(v); err == nil {
+				span.Metrics["_sampling_priority_v1"] = float64(n)
+			}
+		default:
+			span.Meta[k] = v
+		}
+	}
+	if span.Type == "" {
+		switch zspan.Kind {
+		case Producer, Consumer:
+			span.Type = "queue"
+		case Client:
+			if hasAnyOfTags(&span, "sql.query") {
+				span.Type = "sql"
+			}
+			if hasAnyOfTags(&span, "cassandra.query") {
+				span.Type = "cassandra"
+			}
+			if hasAnyOfTags(&span, "http.path", "http.uri") {
+				span.Type = "http"
+			}
+		case Server:
+			if hasAnyOfTags(&span, "http.path", "http.uri") {
+				span.Type = "web"
+			}
+		}
+	}
+	if e := zspan.LocalEndpoint; e != nil {
+		if e.ServiceName != "" && span.Service == "" {
+			// if this is the local service, it should be fair to
+			// use it as the span's service name as a fallback
+			span.Service = e.ServiceName
+		}
+		if e.IPv4 != nil {
+			span.Meta["in.host"] = e.IPv4.String()
+		}
+		if e.Port != 0 {
+			span.Meta["in.port"] = strconv.Itoa(int(e.Port))
+		}
+	}
+	if e := zspan.RemoteEndpoint; e != nil {
+		if e.ServiceName != "" {
+			span.Meta["out.service"] = e.ServiceName
+		}
+		if e.IPv4 != nil {
+			span.Meta["out.host"] = e.IPv4.String()
+		}
+		if e.Port != 0 {
+			span.Meta["out.port"] = strconv.Itoa(int(e.Port))
+		}
+	}
+	return &span
+}
+
+// hasAnyOfTags reports whether the given span has any of the listed tags.
+func hasAnyOfTags(span *model.Span, tags ...string) bool {
+	for _, tag := range tags {
+		if _, ok := span.Meta[tag]; ok {
+			return true
+		}
+	}
+	return false
 }

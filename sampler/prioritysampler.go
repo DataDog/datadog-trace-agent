@@ -21,10 +21,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/model"
 )
 
-const (
-	samplingPriorityKey = "_sampling_priority_v1"
-	syncPeriod          = 3 * time.Second
-)
+const syncPeriod = 3 * time.Second
 
 // PriorityEngine is the main component of the sampling logic
 type PriorityEngine struct {
@@ -91,7 +88,7 @@ func (s *PriorityEngine) Sample(trace model.Trace, root *model.Span, env string)
 		return false
 	}
 
-	samplingPriority := root.Metrics[samplingPriorityKey]
+	samplingPriority := root.Metrics[model.SamplingPriorityKey]
 
 	// Regardless of rates, sampling here is based on the metadata set
 	// by the client library. Which, is turn, is based on agent hints,
