@@ -208,7 +208,7 @@ var tokenQuantizer = NewTokenConsumer(
 	})
 
 // QuantizeSQL generates resource and sql.query meta for SQL spans
-func QuantizeSQL(span *model.Span) {
+func (*Obfuscator) quantizeSQL(span *model.Span) {
 	if span.Resource == "" {
 		return
 	}

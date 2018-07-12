@@ -1,11 +1,8 @@
 package quantizer
 
 import (
-	"flag"
-	"os"
+	"strconv"
 	"testing"
-
-	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/stretchr/testify/assert"
@@ -26,15 +23,6 @@ func SQLSpan(query string) *model.Span {
 	}
 }
 
-func TestMain(m *testing.M) {
-	flag.Parse()
-
-	// Disable debug logs in these tests
-	log.UseLogger(log.Disabled)
-
-	os.Exit(m.Run())
-}
-
 func TestSQLResourceQuery(t *testing.T) {
 	assert := assert.New(t)
 	span := &model.Span{
@@ -45,7 +33,7 @@ func TestSQLResourceQuery(t *testing.T) {
 		},
 	}
 
-	Quantize(span)
+	NewObfuscator(nil).Obfuscate(span)
 	assert.Equal("SELECT * FROM users WHERE id = ?", span.Resource)
 	assert.Equal("SELECT * FROM users WHERE id = 42", span.Meta["sql.query"])
 }
@@ -57,7 +45,7 @@ func TestSQLResourceWithoutQuery(t *testing.T) {
 		Type:     "sql",
 	}
 
-	Quantize(span)
+	NewObfuscator(nil).Obfuscate(span)
 	assert.Equal("SELECT * FROM users WHERE id = ?", span.Resource)
 	assert.Equal("SELECT * FROM users WHERE id = ?", span.Meta["sql.query"])
 }
@@ -91,7 +79,7 @@ func TestSQLResourceWithError(t *testing.T) {
 		// copy test cases as Quantize mutates
 		testSpan := tc.span
 
-		Quantize(&tc.span)
+		NewObfuscator(nil).Obfuscate(&tc.span)
 		assert.Equal("Non-parsable SQL query", tc.span.Resource)
 		assert.Equal("Query not parsed", tc.span.Meta["agent.parse.error"])
 		assert.Equal(testSpan.Resource, tc.span.Meta["sql.query"])
@@ -318,7 +306,7 @@ func TestSQLQuantizer(t *testing.T) {
 
 	for _, c := range cases {
 		s := SQLSpan(c.query)
-		Quantize(s)
+		NewObfuscator(nil).Obfuscate(s)
 		assert.Equal(c.expected, s.Resource)
 	}
 }
@@ -391,7 +379,7 @@ func BenchmarkTokenizer(b *testing.B) {
 	consumer := NewTokenConsumer(filters)
 
 	for _, bm := range benchmarks {
-		b.Run(bm.name, func(b *testing.B) {
+		b.Run(bm.name+"/"+strconv.Itoa(len(bm.query)), func(b *testing.B) {
 			b.ResetTimer()
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {

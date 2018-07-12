@@ -94,6 +94,9 @@ type AgentConfig struct {
 
 	// infrastructure agent binary
 	DDAgentBin string // DDAgentBin will be "" for Agent5 scenarios
+
+	// Obfuscation holds sensitive data obufscator's configuration.
+	Obfuscation *ObfuscationConfig
 }
 
 // New returns a configuration with the default values.
