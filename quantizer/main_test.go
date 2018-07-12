@@ -68,6 +68,9 @@ func TestCompactWhitespaces(t *testing.T) {
 
 		{"aa    bb  cc  dd ",
 			"aa bb cc dd"},
+
+		{"   ¡™£¢∞§¶    •ªº–≠œ∑´®†¥¨ˆøπ “‘«åß∂ƒ©˙∆˚¬…æΩ≈ç√ ∫˜µ≤≥÷    ",
+			"¡™£¢∞§¶ •ªº–≠œ∑´®†¥¨ˆøπ “‘«åß∂ƒ©˙∆˚¬…æΩ≈ç√ ∫˜µ≤≥÷"},
 	}
 
 	for _, testCase := range resultsToExpect {
