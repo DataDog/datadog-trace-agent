@@ -18,3 +18,14 @@ apm_config:
   ignore_resources:
     - /health
     - /500
+  obfuscation:
+    elasticsearch:
+      enabled: true
+      keep_values:
+        - user_id
+        - category_id
+    mongodb:
+      enabled: true
+      keep_values:
+        - user_id
+        - category_id
