@@ -6,7 +6,8 @@ const (
 	// DefaultLogFilePath is where the agent will write logs if not overriden in the conf
 	DefaultLogFilePath = "/var/log/datadog/trace-agent.log"
 
-	// Agent 5
+	// Agent 5 Python Environment - exposes access to Python utilities
+	// such as obtaining the hostname from GCE, EC2, Kube, etc.
 	defaultDDAgentPy    = "/opt/datadog-agent/embedded/bin/python"
 	defaultDDAgentPyEnv = "PYTHONPATH=/opt/datadog-agent/agent"
 
