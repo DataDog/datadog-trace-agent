@@ -50,6 +50,8 @@ type traceAgent struct {
 	ConnectionLimit    int            `yaml:"connection_limit"`
 	APMNonLocalTraffic *bool          `yaml:"apm_non_local_traffic"`
 
+	Obfuscation *ObfuscationConfig `yaml:"obfuscation"`
+
 	WatchdogMaxMemory float64 `yaml:"max_memory"`
 	WatchdogMaxCPUPct float64 `yaml:"max_cpu_percent"`
 	WatchdogMaxConns  int     `yaml:"max_connections"`
@@ -62,6 +64,27 @@ type traceAgent struct {
 	AnalyzedSpans               map[string]float64 `yaml:"analyzed_spans"`
 
 	DDAgentBin string `yaml:"dd_agent_bin"`
+}
+
+// ObfuscationConfig holds the configuration for obfuscating sensitive data
+// for various span types.
+type ObfuscationConfig struct {
+	// ES holds the obfuscation configuration for ElasticSearch bodies.
+	ES JSONObfuscationConfig `yaml:"elasticsearch"`
+
+	// Mongo holds the obfuscation configuration for MongoDB queries.
+	Mongo JSONObfuscationConfig `yaml:"mongodb"`
+}
+
+// JSONObfuscationConfig holds the obfuscation configuration for sensitive
+// data found in JSON objects.
+type JSONObfuscationConfig struct {
+	// Enabled will specify whether obfuscation should be enabled.
+	Enabled bool `yaml:"enabled"`
+
+	// KeepValues will specify a set of keys for which their values will
+	// not be obfuscated.
+	KeepValues []string `yaml:"keep_values"`
 }
 
 type ReplaceRule struct {
@@ -206,6 +229,10 @@ func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 
 	if yc.TraceAgent.APMNonLocalTraffic != nil && *yc.TraceAgent.APMNonLocalTraffic {
 		c.ReceiverHost = "0.0.0.0"
+	}
+
+	if o := yc.TraceAgent.Obfuscation; o != nil {
+		c.Obfuscation = o
 	}
 
 	// undocumented

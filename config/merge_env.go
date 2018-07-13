@@ -21,10 +21,19 @@ const (
 	envIgnoreResources = "DD_IGNORE_RESOURCE"       // ignored resources
 	envLogLevel        = "DD_LOG_LEVEL"             // logging level
 	envAnalyzedSpans   = "DD_APM_ANALYZED_SPANS"    // spans to analyze for transactions
+	envConnectionLimit = "DD_CONNECTION_LIMIT"      // limit of unique connections
 )
 
 // loadEnv applies overrides from environment variables to the trace agent configuration
 func (c *AgentConfig) loadEnv() {
+	if v, ok := os.LookupEnv(envConnectionLimit); ok {
+		limit, err := strconv.Atoi(v)
+		if err != nil {
+			log.Errorf("failed to parse DD_CONNECTION_LIMIT: %v", err)
+		} else {
+			c.ConnectionLimit = limit
+		}
+	}
 	if v := os.Getenv(envAPMEnabled); v == "true" {
 		c.Enabled = true
 	} else if v == "false" {
