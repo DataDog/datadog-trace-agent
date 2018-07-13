@@ -54,6 +54,10 @@ type Agent struct {
 	ServiceExtractor   *TraceServiceExtractor
 	ServiceMapper      *ServiceMapper
 
+	// obfuscator is used to obfuscate sensitive data from various span
+	// tags based on their type.
+	obfuscator *quantizer.Obfuscator
+
 	sampledTraceChan chan *writer.SampledTrace
 
 	// config
@@ -85,6 +89,7 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	)
 	f := filters.Setup(conf)
 
+	obf := quantizer.NewObfuscator(conf.Obfuscation)
 	ss := NewScoreSampler(conf)
 	ess := NewErrorsSampler(conf)
 	ps := NewPrioritySampler(conf, dynConf)
@@ -108,6 +113,7 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 		ServiceWriter:      svcW,
 		ServiceExtractor:   se,
 		ServiceMapper:      sm,
+		obfuscator:         obf,
 		sampledTraceChan:   sampledTraceChan,
 		conf:               conf,
 		dynConf:            dynConf,
@@ -246,9 +252,9 @@ func (a *Agent) Process(t model.Trace) {
 		model.SetSublayersOnSpan(subtrace.Root, subtraceSublayers)
 	}
 
-	for i := range t {
-		quantizer.Quantize(t[i])
-		t[i].Truncate()
+	for _, span := range t {
+		a.obfuscator.Obfuscate(span)
+		span.Truncate()
 	}
 
 	pt := processedTrace{

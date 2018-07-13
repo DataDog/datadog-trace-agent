@@ -96,6 +96,9 @@ type AgentConfig struct {
 
 	// infrastructure agent binary
 	DDAgentBin string // DDAgentBin will be "" for Agent5 scenarios
+
+	// Obfuscation holds sensitive data obufscator's configuration.
+	Obfuscation *ObfuscationConfig
 }
 
 // New returns a configuration with the default values.
@@ -182,21 +185,26 @@ func (c *AgentConfig) Validate() error {
 // tries to shell out to the infrastructure agent for this, if DD_AGENT_BIN is
 // set, otherwise falling back to os.Hostname.
 func (c *AgentConfig) acquireHostname() error {
-	var err error
-	if c.DDAgentBin == "" {
-		c.Hostname, err = os.Hostname()
-		return err
+	var cmd *exec.Cmd
+	if c.DDAgentBin != "" {
+		// Agent 6
+		cmd = exec.Command(c.DDAgentBin, "hostname")
+		cmd.Env = []string{}
+	} else {
+		// Most likely Agent 5. Try and obtain the hostname using the Agent's
+		// Python environment, which will cover several additional installation
+		// scenarios such as GCE, EC2, Kube, Docker, etc. In these scenarios
+		// Go's os.Hostname will not be able to obtain the correct host. Do not
+		// remove!
+		cmd = exec.Command(defaultDDAgentPy, "-c", "from utils.hostname import get_hostname; print get_hostname()")
+		cmd.Env = []string{defaultDDAgentPyEnv}
 	}
 	var out bytes.Buffer
-	cmd := exec.Command(c.DDAgentBin, "hostname")
 	cmd.Stdout = &out
 	cmd.Env = append(os.Environ(), cmd.Env...) // needed for Windows
-	err = cmd.Run()
-	if err != nil {
-		c.Hostname, err = os.Hostname()
-		return err
-	}
-	if strings.TrimSpace(out.String()) == "" {
+	err := cmd.Run()
+	c.Hostname = strings.TrimSpace(out.String())
+	if err != nil || c.Hostname == "" {
 		c.Hostname, err = os.Hostname()
 	}
 	return err

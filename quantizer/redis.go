@@ -18,7 +18,7 @@ var redisCompoundCommandSet = map[string]bool{
 	"CLIENT": true, "CLUSTER": true, "COMMAND": true, "CONFIG": true, "DEBUG": true, "SCRIPT": true}
 
 // QuantizeRedis generates resource for Redis spans
-func QuantizeRedis(span *model.Span) {
+func (*Obfuscator) quantizeRedis(span *model.Span) {
 	query := compactWhitespaces(span.Resource)
 
 	var resource bytes.Buffer
