@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	log "github.com/cihub/seelog"
@@ -56,11 +57,12 @@ const (
 // HTTPReceiver is a collector that uses HTTP protocol and just holds
 // a chan where the spans received are sent one by one
 type HTTPReceiver struct {
-	traces   chan model.Trace
-	services chan model.ServicesMetadata
-	conf     *config.AgentConfig
-	dynConf  *config.DynamicConfig
-	server   *http.Server
+	traces    chan model.Trace
+	services  chan model.ServicesMetadata
+	conf      *config.AgentConfig
+	dynConf   *config.DynamicConfig
+	server    *http.Server
+	udsServer *http.Server
 
 	stats      *info.ReceiverStats
 	preSampler *sampler.PreSampler
@@ -88,8 +90,7 @@ func NewHTTPReceiver(
 	}
 }
 
-// Run starts doing the HTTP server and is ready to receive traces
-func (r *HTTPReceiver) Run() {
+func (r *HTTPReceiver) InitHTTP() {
 	// FIXME[1.x]: remove all those legacy endpoints + code that goes with it
 	http.HandleFunc("/spans", r.httpHandleWithVersion(v01, r.handleTraces))
 	http.HandleFunc("/services", r.httpHandleWithVersion(v01, r.handleServices))
@@ -103,6 +104,11 @@ func (r *HTTPReceiver) Run() {
 	// current collector API
 	http.HandleFunc("/v0.4/traces", r.httpHandleWithVersion(v04, r.handleTraces))
 	http.HandleFunc("/v0.4/services", r.httpHandleWithVersion(v04, r.handleServices))
+}
+
+// Run starts doing the HTTP server and is ready to receive traces
+func (r *HTTPReceiver) Run() {
+	r.InitHTTP()
 
 	// expvar implicitely publishes "/debug/vars" on the same port
 	addr := fmt.Sprintf("%s:%d", r.conf.ReceiverHost, r.conf.ReceiverPort)
@@ -116,6 +122,51 @@ func (r *HTTPReceiver) Run() {
 		defer watchdog.LogOnPanic()
 		r.logStats()
 	}()
+
+	// kick off the UDS Receiver if configured to do so
+	if r.conf.ReceiverUDSEnabled {
+		r.UDSRun()
+	}
+}
+
+// Run starts doing the HTTP server and is ready to receive traces
+func (r *HTTPReceiver) UDSRun() {
+	if err := r.UDSListen(r.conf.ReceiverUDSFile); err != nil {
+		osutil.Exitf("%v", err)
+	}
+
+	go r.preSampler.Run()
+
+	go func() {
+		defer watchdog.LogOnPanic()
+		r.logStats()
+	}()
+}
+
+// Listen creates a new HTTP server listening on the provided socket.
+func (r *HTTPReceiver) UDSListen(socket string) error {
+	syscall.Unlink(socket)
+	ln, err := net.Listen("unix", socket)
+	if err != nil {
+		return fmt.Errorf("cannot listen on %s: %v", socket, err)
+	}
+
+	timeout := 5 * time.Second
+	if r.conf.ReceiverTimeout > 0 {
+		timeout = time.Duration(r.conf.ReceiverTimeout) * time.Second
+	}
+	r.udsServer = &http.Server{
+		ReadTimeout:  timeout,
+		WriteTimeout: timeout,
+	}
+	log.Infof("listening for traces at http://%s", socket)
+
+	go func() {
+		defer watchdog.LogOnPanic()
+		r.udsServer.Serve(ln)
+	}()
+
+	return nil
 }
 
 // Listen creates a new HTTP server listening on the provided address.
