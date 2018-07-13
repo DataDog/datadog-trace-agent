@@ -33,3 +33,5 @@ apm_config:
       remove_query_string: true
       remove_paths_with_digits: true
     remove_stack_traces: true
+    redis:
+      enabled: true

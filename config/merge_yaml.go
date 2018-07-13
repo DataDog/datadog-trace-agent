@@ -81,14 +81,24 @@ type ObfuscationConfig struct {
 	// RemoveStackTraces specifies whether stack traces should be removed.
 	// More specifically "error.stack" tag values will be cleared.
 	RemoveStackTraces bool `yaml:"remove_stack_traces"`
+
+	// Redis holds the configuration for obfuscating the "redis.raw_command" tag
+	// for spans of type "redis".
+	Redis Enablable `yaml:"redis"`
 }
 
+// HTTPObfuscationConfig holds the configuration settings for HTTP obfuscation.
 type HTTPObfuscationConfig struct {
 	// RemoveQueryStrings determines query strings to be removed from HTTP URLs.
 	RemoveQueryString bool `yaml:"remove_query_string"`
 
 	// RemovePathDigits determines digits in path segments to be obfuscated.
 	RemovePathDigits bool `yaml:"remove_paths_with_digits"`
+}
+
+// Enablable can represent any option that has an "enabled" boolean sub-field.
+type Enablable struct {
+	Enabled bool `yaml:"enabled"`
 }
 
 // JSONObfuscationConfig holds the obfuscation configuration for sensitive
