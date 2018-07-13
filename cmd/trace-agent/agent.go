@@ -11,8 +11,8 @@ import (
 	"github.com/DataDog/datadog-trace-agent/filters"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/obfuscate"
 	"github.com/DataDog/datadog-trace-agent/osutil"
-	"github.com/DataDog/datadog-trace-agent/quantizer"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
@@ -56,7 +56,7 @@ type Agent struct {
 
 	// obfuscator is used to obfuscate sensitive data from various span
 	// tags based on their type.
-	obfuscator *quantizer.Obfuscator
+	obfuscator *obfuscate.Obfuscator
 
 	sampledTraceChan chan *writer.SampledTrace
 
@@ -89,7 +89,7 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	)
 	f := filters.Setup(conf)
 
-	obf := quantizer.NewObfuscator(conf.Obfuscation)
+	obf := obfuscate.NewObfuscator(conf.Obfuscation)
 	ss := NewScoreSampler(conf)
 	ess := NewErrorsSampler(conf)
 	ps := NewPrioritySampler(conf, dynConf)

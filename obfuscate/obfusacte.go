@@ -1,6 +1,6 @@
-// Package quantizer implements quantizing and obfuscating of tags and resources for
+// Package obfuscate implements quantizing and obfuscating of tags and resources for
 // a set of spans matching a certain criteria.
-package quantizer
+package obfuscate
 
 import (
 	"github.com/DataDog/datadog-trace-agent/config"

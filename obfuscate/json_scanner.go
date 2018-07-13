@@ -8,7 +8,7 @@
 // the same input string (see stateEndTop)
 //
 
-package quantizer
+package obfuscate
 
 import "strconv"
 

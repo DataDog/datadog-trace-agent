@@ -14,7 +14,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/fixtures"
 	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/DataDog/datadog-trace-agent/quantizer"
+	"github.com/DataDog/datadog-trace-agent/obfuscate"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -162,7 +162,7 @@ func BenchmarkWatchdog(b *testing.B) {
 // Mimicks behaviour of agent Process function
 func formatTrace(t model.Trace) model.Trace {
 	for _, span := range t {
-		quantizer.NewObfuscator(nil).Obfuscate(span)
+		obfuscate.NewObfuscator(nil).Obfuscate(span)
 		span.Truncate()
 	}
 	return t
