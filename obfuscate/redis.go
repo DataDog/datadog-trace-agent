@@ -1,7 +1,6 @@
-package quantizer
+package obfuscate
 
 import (
-	"bytes"
 	"strings"
 
 	"github.com/DataDog/datadog-trace-agent/model"
@@ -17,11 +16,11 @@ const maxRedisNbCommands = 3
 var redisCompoundCommandSet = map[string]bool{
 	"CLIENT": true, "CLUSTER": true, "COMMAND": true, "CONFIG": true, "DEBUG": true, "SCRIPT": true}
 
-// QuantizeRedis generates resource for Redis spans
+// quantizeRedis generates resource for Redis spans
 func (*Obfuscator) quantizeRedis(span *model.Span) {
 	query := compactWhitespaces(span.Resource)
 
-	var resource bytes.Buffer
+	var resource strings.Builder
 	truncated := false
 	nbCmds := 0
 
