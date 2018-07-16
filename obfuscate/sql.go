@@ -1,4 +1,4 @@
-package quantizer
+package obfuscate
 
 import (
 	"bytes"
