@@ -27,5 +27,9 @@ apm_config:
     mongodb:
       enabled: true
       keep_values:
-        - user_id
-        - category_id
+        - uid
+        - cat_id
+    http:
+      remove_query_string: true
+      remove_paths_with_digits: true
+    remove_stack_traces: true

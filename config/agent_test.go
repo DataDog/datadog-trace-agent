@@ -97,6 +97,16 @@ func TestFullYamlConfig(t *testing.T) {
 	assert.Equal("0.0.0.0", c.ReceiverHost)
 
 	assert.EqualValues([]string{"/health", "/500"}, c.Ignore["resource"])
+
+	o := c.Obfuscation
+	assert.NotNil(o)
+	assert.True(o.ES.Enabled)
+	assert.EqualValues([]string{"user_id", "category_id"}, o.ES.KeepValues)
+	assert.True(o.Mongo.Enabled)
+	assert.EqualValues([]string{"uid", "cat_id"}, o.Mongo.KeepValues)
+	assert.True(o.HTTP.RemoveQueryString)
+	assert.True(o.HTTP.RemovePathDigits)
+	assert.True(o.RemoveStackTraces)
 }
 
 func TestUndocumentedYamlConfig(t *testing.T) {
