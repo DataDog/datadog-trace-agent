@@ -34,9 +34,11 @@ func NewObfuscator(cfg *config.ObfuscationConfig) *Obfuscator {
 func (o *Obfuscator) Obfuscate(span *model.Span) {
 	switch span.Type {
 	case "sql", "cassandra":
-		o.quantizeSQL(span)
+		o.obfuscateSQL(span)
 	case "redis":
 		o.quantizeRedis(span)
+	case "http":
+		o.obfuscateHTTP(span)
 	case "mongodb":
 		o.obfuscateJSON(span, "mongodb.query", o.mongo)
 	case "elasticsearch":

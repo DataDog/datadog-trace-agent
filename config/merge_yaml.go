@@ -74,6 +74,21 @@ type ObfuscationConfig struct {
 
 	// Mongo holds the obfuscation configuration for MongoDB queries.
 	Mongo JSONObfuscationConfig `yaml:"mongodb"`
+
+	// HTTP holds the obfuscation settings for HTTP URLs.
+	HTTP HTTPObfuscationConfig `yaml:"http"`
+
+	// RemoveStackTraces specifies whether stack traces should be removed.
+	// More specifically "error.stack" tag values will be cleared.
+	RemoveStackTraces bool `yaml:remove_stack_traces`
+}
+
+type HTTPObfuscationConfig struct {
+	// RemoveQueryStrings determines query strings to be removed from HTTP URLs.
+	RemoveQueryString bool `yaml:remove_query_string`
+
+	// RemovePathDigits determines digits in path segments to be obfuscated.
+	RemovePathDigits bool `yaml:remove_path_digits`
 }
 
 // JSONObfuscationConfig holds the obfuscation configuration for sensitive
@@ -233,6 +248,10 @@ func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 
 	if o := yc.TraceAgent.Obfuscation; o != nil {
 		c.Obfuscation = o
+
+		if c.Obfuscation.RemoveStackTraces {
+			c.addReplaceRule("error.stack", `(?s).*`, "?")
+		}
 	}
 
 	// undocumented
@@ -275,6 +294,20 @@ func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 	if yc.TraceAgent.DDAgentBin != "" {
 		c.DDAgentBin = yc.TraceAgent.DDAgentBin
 	}
+}
+
+// addReplaceRule adds the specified replace rule to the agent configuration.
+func (c *AgentConfig) addReplaceRule(tag, pattern, repl string) {
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		osutil.Exitf("error adding replace rule: %s", err)
+	}
+	c.ReplaceTags = append(c.ReplaceTags, &ReplaceRule{
+		Name:    tag,
+		Pattern: pattern,
+		Re:      re,
+		Repl:    repl,
+	})
 }
 
 func readServiceWriterConfigYaml(yc serviceWriter) writerconfig.ServiceWriterConfig {

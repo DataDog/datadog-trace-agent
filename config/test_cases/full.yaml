@@ -29,3 +29,7 @@ apm_config:
       keep_values:
         - user_id
         - category_id
+    http:
+      remove_query_string: true
+      remove_path_digits: true
+    remove_stack_traces: true

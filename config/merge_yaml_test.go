@@ -22,3 +22,22 @@ func TestParseRepaceRules(t *testing.T) {
 		assert.Equal(r.Pattern, r.Re.String())
 	}
 }
+
+func TestLoadYamlAgentConfig(t *testing.T) {
+	t.Run("Obfuscation", func(t *testing.T) {
+		assert := assert.New(t)
+		conf := New()
+		yc := &YamlAgentConfig{
+			TraceAgent: traceAgent{
+				Obfuscation: &ObfuscationConfig{RemoveStackTraces: true},
+			},
+		}
+		conf.loadYamlConfig(yc)
+		assert.NotNil(conf.Obfuscation)
+		assert.NotNil(conf.ReplaceTags)
+		assert.Len(conf.ReplaceTags, 1)
+		assert.Equal("error.stack", conf.ReplaceTags[0].Name)
+		assert.NotNil(conf.ReplaceTags[0].Re)
+		assert.Equal("?", conf.ReplaceTags[0].Repl)
+	})
+}
