@@ -74,6 +74,21 @@ type ObfuscationConfig struct {
 
 	// Mongo holds the obfuscation configuration for MongoDB queries.
 	Mongo JSONObfuscationConfig `yaml:"mongodb"`
+
+	// HTTP holds the obfuscation settings for HTTP URLs.
+	HTTP HTTPObfuscationConfig `yaml:"http"`
+
+	// RemoveStackTraces specifies whether stack traces should be removed.
+	// More specifically "error.stack" tag values will be cleared.
+	RemoveStackTraces bool `yaml:"remove_stack_traces"`
+}
+
+type HTTPObfuscationConfig struct {
+	// RemoveQueryStrings determines query strings to be removed from HTTP URLs.
+	RemoveQueryString bool `yaml:"remove_query_string"`
+
+	// RemovePathDigits determines digits in path segments to be obfuscated.
+	RemovePathDigits bool `yaml:"remove_paths_with_digits"`
 }
 
 // JSONObfuscationConfig holds the obfuscation configuration for sensitive
@@ -88,10 +103,20 @@ type JSONObfuscationConfig struct {
 }
 
 type ReplaceRule struct {
-	Name    string         `yaml:"name"`
-	Pattern string         `yaml:"pattern"`
-	Re      *regexp.Regexp `yaml:"-"`
-	Repl    string         `yaml:"repl"`
+	// Name specifies the name of the tag that the replace rule addresses. However,
+	// some exceptions apply such as:
+	// • "resource.name" will target the resource
+	// • "*" will target all tags and the resource
+	Name string `yaml:"name"`
+
+	// Pattern specifies the regexp pattern to be used when replacing. It must compile.
+	Pattern string `yaml:"pattern"`
+
+	// Re holds the compiled Pattern and is only used internally.
+	Re *regexp.Regexp `yaml:"-"`
+
+	// Repl specifies the replacement string to be used when Pattern matches.
+	Repl string `yaml:"repl"`
 }
 
 type traceWriter struct {
@@ -233,6 +258,10 @@ func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 
 	if o := yc.TraceAgent.Obfuscation; o != nil {
 		c.Obfuscation = o
+
+		if c.Obfuscation.RemoveStackTraces {
+			c.addReplaceRule("error.stack", `(?s).*`, "?")
+		}
 	}
 
 	// undocumented
@@ -275,6 +304,21 @@ func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 	if yc.TraceAgent.DDAgentBin != "" {
 		c.DDAgentBin = yc.TraceAgent.DDAgentBin
 	}
+}
+
+// addReplaceRule adds the specified replace rule to the agent configuration. If the pattern fails
+// to compile as valid regexp, it exits the application with status code 1.
+func (c *AgentConfig) addReplaceRule(tag, pattern, repl string) {
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		osutil.Exitf("error adding replace rule: %s", err)
+	}
+	c.ReplaceTags = append(c.ReplaceTags, &ReplaceRule{
+		Name:    tag,
+		Pattern: pattern,
+		Re:      re,
+		Repl:    repl,
+	})
 }
 
 func readServiceWriterConfigYaml(yc serviceWriter) writerconfig.ServiceWriterConfig {

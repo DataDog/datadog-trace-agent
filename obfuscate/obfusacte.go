@@ -7,7 +7,8 @@ import (
 	"github.com/DataDog/datadog-trace-agent/model"
 )
 
-// Obfuscator quantizes and obfuscates spans.
+// Obfuscator quantizes and obfuscates spans. The obfuscator is not safe for
+// concurrent use.
 type Obfuscator struct {
 	opts  *config.ObfuscationConfig
 	es    *jsonObfuscator // nil if disabled
@@ -34,9 +35,11 @@ func NewObfuscator(cfg *config.ObfuscationConfig) *Obfuscator {
 func (o *Obfuscator) Obfuscate(span *model.Span) {
 	switch span.Type {
 	case "sql", "cassandra":
-		o.quantizeSQL(span)
+		o.obfuscateSQL(span)
 	case "redis":
 		o.quantizeRedis(span)
+	case "http":
+		o.obfuscateHTTP(span)
 	case "mongodb":
 		o.obfuscateJSON(span, "mongodb.query", o.mongo)
 	case "elasticsearch":
