@@ -7,7 +7,8 @@ import (
 	"github.com/DataDog/datadog-trace-agent/model"
 )
 
-// Obfuscator quantizes and obfuscates spans.
+// Obfuscator quantizes and obfuscates spans. The obfuscator is not safe for
+// concurrent use.
 type Obfuscator struct {
 	opts  *config.ObfuscationConfig
 	es    *jsonObfuscator // nil if disabled
