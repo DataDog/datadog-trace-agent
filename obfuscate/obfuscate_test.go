@@ -121,8 +121,8 @@ func TestObfuscateConfig(t *testing.T) {
 	t.Run("http/enabled", testConfig(
 		"http",
 		"http.url",
-		"http://foo.com/1/2?q=asd",
-		"http://foo.com/?/??",
+		"http://mysite.mydomain/1/2?q=asd",
+		"http://mysite.mydomain/?/??",
 		&config.ObfuscationConfig{
 			HTTP: config.HTTPObfuscationConfig{
 				RemovePathDigits:  true,
@@ -134,16 +134,16 @@ func TestObfuscateConfig(t *testing.T) {
 	t.Run("http/disabled", testConfig(
 		"http",
 		"http.url",
-		"http://foo.com/1/2?q=asd",
-		"http://foo.com/1/2?q=asd",
+		"http://mysite.mydomain/1/2?q=asd",
+		"http://mysite.mydomain/1/2?q=asd",
 		&config.ObfuscationConfig{},
 	))
 
 	t.Run("json/enabled", testConfig(
 		"elasticsearch",
 		"elasticsearch.body",
-		`{"foo": "bar"}`,
-		`{"foo":"?"}`,
+		`{"role": "database"}`,
+		`{"role":"?"}`,
 		&config.ObfuscationConfig{
 			ES: config.JSONObfuscationConfig{Enabled: true},
 		},
@@ -152,8 +152,8 @@ func TestObfuscateConfig(t *testing.T) {
 	t.Run("json/disabled", testConfig(
 		"elasticsearch",
 		"elasticsearch.body",
-		`{"foo": "bar"}`,
-		`{"foo": "bar"}`,
+		`{"role": "database"}`,
+		`{"role": "database"}`,
 		&config.ObfuscationConfig{},
 	))
 }
