@@ -91,7 +91,7 @@ func (*Obfuscator) obfuscateRedis(span *model.Span) {
 	}
 	t := newRedisTokenizer([]byte(span.Meta[redisRawCommand]))
 	var (
-		str  strings.Builder
+		str  bytes.Buffer
 		cmd  string
 		args []string
 	)
@@ -119,7 +119,7 @@ func (*Obfuscator) obfuscateRedis(span *model.Span) {
 	span.Meta[redisRawCommand] = str.String()
 }
 
-func obfuscateRedisCmd(out *strings.Builder, cmd string, args ...string) {
+func obfuscateRedisCmd(out *bytes.Buffer, cmd string, args ...string) {
 	out.WriteString(cmd)
 	if len(args) == 0 {
 		return
