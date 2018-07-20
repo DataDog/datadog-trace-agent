@@ -156,6 +156,24 @@ func TestObfuscateConfig(t *testing.T) {
 		`{"foo": "bar"}`,
 		&config.ObfuscationConfig{},
 	))
+
+	t.Run("memcached/enabled", testConfig(
+		"memcached",
+		"memcached.command",
+		"set key 0 0 0\r\nvalue",
+		"set key 0 0 0",
+		&config.ObfuscationConfig{
+			Memcached: config.Enablable{Enabled: true},
+		},
+	))
+
+	t.Run("memcached/disabled", testConfig(
+		"memcached",
+		"memcached.command",
+		"set key 0 0 0 noreply\r\nvalue",
+		"set key 0 0 0 noreply\r\nvalue",
+		&config.ObfuscationConfig{},
+	))
 }
 
 func BenchmarkCompactWhitespaces(b *testing.B) {

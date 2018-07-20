@@ -85,6 +85,10 @@ type ObfuscationConfig struct {
 	// Redis holds the configuration for obfuscating the "redis.raw_command" tag
 	// for spans of type "redis".
 	Redis Enablable `yaml:"redis"`
+
+	// Memcached holds the configuration for obfuscating the "memcached.command" tag
+	// for spans of type "memcached".
+	Memcached Enablable `yaml:"memcached"`
 }
 
 // HTTPObfuscationConfig holds the configuration settings for HTTP obfuscation.
