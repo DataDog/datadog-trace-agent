@@ -108,6 +108,7 @@ func TestFullYamlConfig(t *testing.T) {
 	assert.True(o.HTTP.RemovePathDigits)
 	assert.True(o.RemoveStackTraces)
 	assert.True(c.Obfuscation.Redis.Enabled)
+	assert.True(c.Obfuscation.Memcached.Enabled)
 }
 
 func TestUndocumentedYamlConfig(t *testing.T) {

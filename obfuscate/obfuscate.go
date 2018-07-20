@@ -43,6 +43,10 @@ func (o *Obfuscator) Obfuscate(span *model.Span) {
 		if o.opts.Redis.Enabled {
 			o.obfuscateRedis(span)
 		}
+	case "memcached":
+		if o.opts.Memcached.Enabled {
+			o.obfuscateMemcached(span)
+		}
 	case "http":
 		o.obfuscateHTTP(span)
 	case "mongodb":
