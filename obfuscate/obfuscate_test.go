@@ -85,6 +85,34 @@ func TestCompactWhitespaces(t *testing.T) {
 	}
 }
 
+// TestObfuscateDefaults ensures that running the obfuscator with no config continues to obfuscate/quantize
+// SQL queries and Redis commands in span resources.
+func TestObfuscateDefaults(t *testing.T) {
+	t.Run("redis", func(t *testing.T) {
+		cmd := "SET k v\nGET k"
+		span := &model.Span{
+			Type:     "redis",
+			Resource: cmd,
+			Meta:     map[string]string{"redis.raw_command": cmd},
+		}
+		NewObfuscator(nil).Obfuscate(span)
+		assert.Equal(t, cmd, span.Meta["redis.raw_command"])
+		assert.Equal(t, "SET GET", span.Resource)
+	})
+
+	t.Run("sql", func(t *testing.T) {
+		query := "UPDATE users(name) SET ('Jim')"
+		span := &model.Span{
+			Type:     "sql",
+			Resource: query,
+			Meta:     map[string]string{"sql.query": query},
+		}
+		NewObfuscator(nil).Obfuscate(span)
+		assert.Equal(t, query, span.Meta["sql.query"])
+		assert.Equal(t, "UPDATE users ( name ) SET ( ? )", span.Resource)
+	})
+}
+
 func TestObfuscateConfig(t *testing.T) {
 	// testConfig returns a test function which creates a span of type typ,
 	// having a tag with key/val, runs the obfuscator on it using the given
