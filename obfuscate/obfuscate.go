@@ -3,6 +3,8 @@
 package obfuscate
 
 import (
+	"bytes"
+
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
 )
@@ -38,6 +40,13 @@ func (o *Obfuscator) Obfuscate(span *model.Span) {
 		o.obfuscateSQL(span)
 	case "redis":
 		o.quantizeRedis(span)
+		if o.opts.Redis.Enabled {
+			o.obfuscateRedis(span)
+		}
+	case "memcached":
+		if o.opts.Memcached.Enabled {
+			o.obfuscateMemcached(span)
+		}
 	case "http":
 		o.obfuscateHTTP(span)
 	case "mongodb":
@@ -74,16 +83,6 @@ func compactWhitespaces(t string) string {
 		}
 	}
 	copy(r[nr:], t[nr+offset:n])
-
-	// Trim
-	rStart := 0
-	rEnd := n - offset
-	if isWhitespace(r[rEnd-1]) {
-		rEnd--
-	}
-	if isWhitespace(r[rStart]) {
-		rStart++
-	}
-
-	return string(r[rStart:rEnd])
+	r = r[:n-offset]
+	return string(bytes.Trim(r, " "))
 }

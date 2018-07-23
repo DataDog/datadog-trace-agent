@@ -89,3 +89,41 @@ apm_config:
 #   # Maximum number of simultaenous connections allowed by the agent.
 #   # The agent will be killed if this number is surpassed.
 #   max_connection: 200
+#
+#   # Defines obfuscation rules for sensitive data. Disabled by default.
+#   obfuscation:
+#     # ElasticSearch obfuscation rules. Applies to spans of type "elasticsearch".
+#     # More specifically, to the "elasticsearch.body" tag.
+#     elasticsearch:
+#       enabled: true
+#       # Values for the keys listed here will not be obfuscated.
+#       keep_values:
+#         - user_id
+#         - category_id
+#
+#     # MongoDB obfuscation rules. Applies to spans of type "mongodb".
+#     # More specifically, to the "mongodb.query" tag.
+#     mongodb:
+#       enabled: true
+#       # Values for the keys listed here will not be obfuscated.
+#       keep_values:
+#         - uid
+#         - cat_id
+#
+#     # HTTP obfuscation rules for "http.url" tags in spans of type "http".
+#     http:
+#       # If true, query strings in URLs will be obfuscated.
+#       remove_query_string: true
+#       # If true, path segments in URLs containing digits will be replaced by "?"
+#       remove_paths_with_digits: true
+#
+#     # When enabled, stack traces will be removed (replaced by "?").
+#     remove_stack_traces: true
+#
+#     # Obfuscation rules for spans of type "redis". Applies to the "redis.raw_command" tags.
+#     redis:
+#       enabled: true
+#
+#     # Obfuscation rules for spans of type "memcached". Applies to the "memcached.command" tag.
+#     memcached:
+#       enabled: true
