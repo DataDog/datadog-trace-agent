@@ -21,7 +21,6 @@ import (
 
 const (
 	processStatsInterval = time.Minute
-	samplingPriorityKey  = "_sampling_priority_v1"
 )
 
 type processedTrace struct {
@@ -37,6 +36,14 @@ func (pt *processedTrace) weight() float64 {
 		return 1.0
 	}
 	return pt.Root.Weight()
+}
+
+func (pt *processedTrace) getSamplingPriority() (int, bool) {
+	if pt.Root == nil {
+		return 0, false
+	}
+	priorityFloat, hasPriority := pt.Root.Metrics[sampler.SamplingPriorityKey]
+	return int(priorityFloat), hasPriority
 }
 
 // Agent struct holds all the sub-routines structs and make the data flow between them
@@ -193,7 +200,7 @@ func (a *Agent) Process(t model.Trace) {
 		samplers = append(samplers, a.ScoreSampler)
 	}
 
-	priority, hasPriority := root.Metrics[samplingPriorityKey]
+	priority, hasPriority := root.Metrics[sampler.SamplingPriorityKey]
 	if hasPriority {
 		// If Priority is defined, send to priority sampling, regardless of priority value.
 		// The sampler will keep or discard the trace, but we send everything so that it

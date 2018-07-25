@@ -5,13 +5,18 @@ import (
 	"testing"
 
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/stretchr/testify/assert"
 )
 
-func createTrace(serviceName string, operationName string, topLevel bool) processedTrace {
+func createTrace(serviceName string, operationName string, topLevel bool, hasPriority bool, priority int) processedTrace {
 	ws := model.WeightedSpan{TopLevel: topLevel, Span: &model.Span{Service: serviceName, Name: operationName}}
+	if hasPriority {
+		ws.Metrics = make(map[string]float64)
+		ws.Metrics[sampler.SamplingPriorityKey] = float64(priority)
+	}
 	wt := model.WeightedTrace{&ws}
-	return processedTrace{WeightedTrace: wt}
+	return processedTrace{WeightedTrace: wt, Root: ws.Span}
 }
 
 func TestTransactionSampler(t *testing.T) {
@@ -21,19 +26,25 @@ func TestTransactionSampler(t *testing.T) {
 	config["myService"] = make(map[string]float64)
 	config["myService"]["myOperation"] = 1
 
+	config["mySampledService"] = make(map[string]float64)
+	config["mySampledService"]["myOperation"] = 0
+
 	tests := []struct {
 		name             string
 		trace            processedTrace
 		expectedSampling bool
 	}{
-		{"Top-level service and span name match", createTrace("myService", "myOperation", true), true},
-		{"Top-level service name doesn't match", createTrace("otherService", "myOperation", true), false},
-		{"Top-level span name doesn't match", createTrace("myService", "otherOperation", true), false},
-		{"Top-level service and span name don't match", createTrace("otherService", "otherOperation", true), false},
-		{"Non top-level service and span name match", createTrace("myService", "myOperation", false), true},
-		{"Non top-level service name doesn't match", createTrace("otherService", "myOperation", false), false},
-		{"Non top-level span name doesn't match", createTrace("myService", "otherOperation", false), false},
-		{"Non top-level service and span name don't match", createTrace("otherService", "otherOperation", false), false},
+		{"Top-level service and span name match", createTrace("myService", "myOperation", true, false, 0), true},
+		{"Top-level service name doesn't match", createTrace("otherService", "myOperation", true, false, 0), false},
+		{"Top-level span name doesn't match", createTrace("myService", "otherOperation", true, false, 0), false},
+		{"Top-level service and span name don't match", createTrace("otherService", "otherOperation", true, false, 0), false},
+		{"Non top-level service and span name match", createTrace("myService", "myOperation", false, false, 0), true},
+		{"Non top-level service name doesn't match", createTrace("otherService", "myOperation", false, false, 0), false},
+		{"Non top-level span name doesn't match", createTrace("myService", "otherOperation", false, false, 0), false},
+		{"Non top-level service and span name don't match", createTrace("otherService", "otherOperation", false, false, 0), false},
+		{"Match, sampling rate 0, no priority", createTrace("mySampledService", "myOperation", true, false, 0), false},
+		{"Match, sampling rate 0, priority 1", createTrace("mySampledService", "myOperation", true, true, 1), false},
+		{"Match, sampling rate 0, priority 2", createTrace("mySampledService", "myOperation", true, true, 2), true},
 	}
 
 	for _, test := range tests {
