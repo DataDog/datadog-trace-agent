@@ -47,7 +47,7 @@ func (o *Obfuscator) Obfuscate(span *model.Span) {
 		if o.opts.Memcached.Enabled {
 			o.obfuscateMemcached(span)
 		}
-	case "http":
+	case "web", "http":
 		o.obfuscateHTTP(span)
 	case "mongodb":
 		o.obfuscateJSON(span, "mongodb.query", o.mongo)
