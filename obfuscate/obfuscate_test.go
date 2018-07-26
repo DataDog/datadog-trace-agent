@@ -167,6 +167,27 @@ func TestObfuscateConfig(t *testing.T) {
 		&config.ObfuscationConfig{},
 	))
 
+	t.Run("web/enabled", testConfig(
+		"web",
+		"http.url",
+		"http://mysite.mydomain/1/2?q=asd",
+		"http://mysite.mydomain/?/??",
+		&config.ObfuscationConfig{
+			HTTP: config.HTTPObfuscationConfig{
+				RemovePathDigits:  true,
+				RemoveQueryString: true,
+			},
+		},
+	))
+
+	t.Run("web/disabled", testConfig(
+		"web",
+		"http.url",
+		"http://mysite.mydomain/1/2?q=asd",
+		"http://mysite.mydomain/1/2?q=asd",
+		&config.ObfuscationConfig{},
+	))
+
 	t.Run("json/enabled", testConfig(
 		"elasticsearch",
 		"elasticsearch.body",

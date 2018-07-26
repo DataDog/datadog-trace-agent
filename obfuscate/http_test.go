@@ -134,7 +134,7 @@ func TestObfuscateHTTP(t *testing.T) {
 
 	t.Run("wrong-type", func(t *testing.T) {
 		assert := assert.New(t)
-		span := model.Span{Type: "web", Meta: map[string]string{"http.url": testURL}}
+		span := model.Span{Type: "web_server", Meta: map[string]string{"http.url": testURL}}
 		cfg := config.HTTPObfuscationConfig{RemoveQueryString: true, RemovePathDigits: true}
 		NewObfuscator(&config.ObfuscationConfig{HTTP: cfg}).Obfuscate(&span)
 		assert.Equal(testURL, span.Meta["http.url"])
