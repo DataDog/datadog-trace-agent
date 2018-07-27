@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	// SamplingPriorityKey is the key of the sampling priority value in the metrics dictionnary of the root span
+	// SamplingPriorityKey is the key of the sampling priority value in the metrics map of the root span
 	SamplingPriorityKey = "_sampling_priority_v1"
 	syncPeriod          = 3 * time.Second
 )

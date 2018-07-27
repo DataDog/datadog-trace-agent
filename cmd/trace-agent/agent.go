@@ -42,8 +42,8 @@ func (pt *processedTrace) getSamplingPriority() (int, bool) {
 	if pt.Root == nil {
 		return 0, false
 	}
-	priorityFloat, hasPriority := pt.Root.Metrics[sampler.SamplingPriorityKey]
-	return int(priorityFloat), hasPriority
+	p, ok := pt.Root.Metrics[sampler.SamplingPriorityKey]
+	return int(p), ok
 }
 
 // Agent struct holds all the sub-routines structs and make the data flow between them
