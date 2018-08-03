@@ -43,9 +43,11 @@ func newTransactionSampler(analyzedSpansByService map[string]map[string]float64)
 func (s *transactionSampler) Extract(t processedTrace) []*model.Span {
 	var transactions []*model.Span
 
+	// Get the trace priority
+	priority, hasPriority := t.getSamplingPriority()
 	// inspect the WeightedTrace so that we can identify top-level spans
 	for _, span := range t.WeightedTrace {
-		if s.shouldAnalyze(span) {
+		if s.shouldAnalyze(span, hasPriority, priority) {
 			transactions = append(transactions, span.Span)
 		}
 	}
@@ -53,10 +55,12 @@ func (s *transactionSampler) Extract(t processedTrace) []*model.Span {
 	return transactions
 }
 
-func (s *transactionSampler) shouldAnalyze(span *model.WeightedSpan) bool {
+func (s *transactionSampler) shouldAnalyze(span *model.WeightedSpan, hasPriority bool, priority int) bool {
 	if operations, ok := s.analyzedSpansByService[span.Service]; ok {
 		if analyzeRate, ok := operations[span.Name]; ok {
-			if sampler.SampleByRate(span.TraceID, analyzeRate) {
+			// If the trace has been manually sampled, we keep all matching spans
+			highPriority := hasPriority && priority >= 2
+			if highPriority || sampler.SampleByRate(span.TraceID, analyzeRate) {
 				return true
 			}
 		}
