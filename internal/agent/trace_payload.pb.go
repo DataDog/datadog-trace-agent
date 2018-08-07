@@ -42,7 +42,7 @@ func (m *TracePayload) GetTransactions() []*Span {
 }
 
 func init() {
-	proto.RegisterType((*TracePayload)(nil), "model.TracePayload")
+	proto.RegisterType((*TracePayload)(nil), "agent.TracePayload")
 }
 func (m *TracePayload) Marshal() (data []byte, err error) {
 	size := m.Size()

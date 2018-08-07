@@ -35,7 +35,7 @@ func (m *APITrace) GetSpans() []*Span {
 }
 
 func init() {
-	proto.RegisterType((*APITrace)(nil), "model.APITrace")
+	proto.RegisterType((*APITrace)(nil), "agent.APITrace")
 }
 func (m *APITrace) Marshal() (data []byte, err error) {
 	size := m.Size()

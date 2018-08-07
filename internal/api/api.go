@@ -51,6 +51,11 @@ const (
 	// Traces: msgpack/JSON (Content-Type) slice of traces + returns service sampling ratios
 	// Services: msgpack/JSON, map[string]map[string][string]
 	v04 Version = "v0.4"
+
+	// v1
+	// Content-Type: application/msgpack
+	// Receives a msgpack encoded array of spans.
+	v1 Version = "v1"
 )
 
 // HTTPReceiver is a collector that uses HTTP protocol and just holds
@@ -103,6 +108,8 @@ func (r *HTTPReceiver) Run() {
 	// current collector API
 	http.HandleFunc("/v0.4/traces", r.httpHandleWithVersion(v04, r.handleTraces))
 	http.HandleFunc("/v0.4/services", r.httpHandleWithVersion(v04, r.handleServices))
+
+	http.Handle("/v1/", http.StripPrefix("/v1", newCollector(r)))
 
 	// expvar implicitely publishes "/debug/vars" on the same port
 	addr := fmt.Sprintf("%s:%d", r.conf.ReceiverHost, r.conf.ReceiverPort)
@@ -228,6 +235,10 @@ func (r *HTTPReceiver) handleTraces(v Version, w http.ResponseWriter, req *http.
 		atomic.AddInt64(&ts.TracesBytes, int64(bytesRead))
 	}
 
+	r.processTraces(ts, traces)
+}
+
+func (r *HTTPReceiver) processTraces(ts *info.TagStats, traces agent.Traces) {
 	// normalize data
 	for i := range traces {
 		spans := len(traces[i])
@@ -360,7 +371,7 @@ func getTraces(v Version, w http.ResponseWriter, req *http.Request) (agent.Trace
 
 	switch v {
 	case v01:
-		// We cannot use decodeReceiverPayload because []model.Span does not
+		// We cannot use decodeReceiverPayload because []agent.Span does not
 		// implement msgp.Decodable. This hack can be removed once we
 		// drop v01 support.
 		if contentType != "application/json" && contentType != "text/json" && contentType != "" {

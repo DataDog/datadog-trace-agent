@@ -59,7 +59,7 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	dynConf := sampler.NewDynamicConfig(conf.DefaultEnv)
 
 	// inter-component channels
-	rawTraceChan := make(chan agent.Trace, 5000) // about 1000 traces/sec for 5 sec, TODO: move to *model.Trace
+	rawTraceChan := make(chan agent.Trace, 5000) // about 1000 traces/sec for 5 sec, TODO: move to *agent.Trace
 	tracePkgChan := make(chan *writer.TracePackage)
 	statsChan := make(chan []agent.StatsBucket)
 	serviceChan := make(chan agent.ServicesMetadata, 50)

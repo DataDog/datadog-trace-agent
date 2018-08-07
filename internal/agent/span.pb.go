@@ -70,7 +70,7 @@ func (m *Span) GetMetrics() map[string]float64 {
 }
 
 func init() {
-	proto.RegisterType((*Span)(nil), "model.Span")
+	proto.RegisterType((*Span)(nil), "agent.Span")
 }
 func (m *Span) Marshal() (data []byte, err error) {
 	size := m.Size()

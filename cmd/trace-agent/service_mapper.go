@@ -9,7 +9,7 @@ import (
 	log "github.com/cihub/seelog"
 )
 
-// ServiceMapper provides a cache layer over model.ServicesMetadata pipeline
+// ServiceMapper provides a cache layer over agent.ServicesMetadata pipeline
 // Used in conjunction with ServiceWriter: in-> ServiceMapper out-> ServiceWriter
 type ServiceMapper struct {
 	in    <-chan agent.ServicesMetadata
@@ -46,7 +46,7 @@ func (s *ServiceMapper) Stop() {
 	s.done.Wait()
 }
 
-// Run triggers the event-loop that consumes model.ServicesMeta
+// Run triggers the event-loop that consumes agent.ServicesMeta
 func (s *ServiceMapper) Run() {
 	telemetryTicker := time.NewTicker(1 * time.Minute)
 	defer telemetryTicker.Stop()
