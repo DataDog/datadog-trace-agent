@@ -81,6 +81,10 @@ type AgentConfig struct {
 	ProxyURL          *url.URL
 	SkipSSLValidation bool
 
+	// NoProxy will be set to true when the proxy setting for the trace API endpoint
+	// needs to be ignored (e.g. it is part of the "no_proxy" list in the yaml settings).
+	NoProxy bool
+
 	// filtering
 	Ignore map[string][]string
 

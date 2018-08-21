@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -13,6 +14,8 @@ const (
 	envAPIKey          = "DD_API_KEY"               // API KEY
 	envAPMEnabled      = "DD_APM_ENABLED"           // APM enabled
 	envURL             = "DD_APM_DD_URL"            // APM URL
+	envProxyDeprecated = "HTTPS_PROXY"              // proxy URL (deprecated)
+	envProxy           = "DD_PROXY_HTTPS"           // proxy URL (overrides deprecated)
 	envHostname        = "DD_HOSTNAME"              // agent hostname
 	envBindHost        = "DD_BIND_HOST"             // statsd & receiver hostname
 	envReceiverPort    = "DD_RECEIVER_PORT"         // receiver port
@@ -99,6 +102,16 @@ func (c *AgentConfig) loadEnv() {
 			c.AnalyzedSpansByService = analyzedSpans
 		} else {
 			log.Errorf("Bad format for %s it should be of the form \"service_name|operation_name=rate,other_service|other_operation=rate\", error: %v", envAnalyzedSpans, err)
+		}
+	}
+	for _, env := range []string{envProxyDeprecated, envProxy} {
+		if v, ok := os.LookupEnv(env); ok {
+			url, err := url.Parse(v)
+			if err == nil {
+				c.ProxyURL = url
+			} else {
+				log.Errorf("Failed to parse proxy URL from proxy.https configuration: %s", err)
+			}
 		}
 	}
 }
