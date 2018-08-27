@@ -30,7 +30,7 @@ api_key: 1234
 #   https: https://my-proxy.com
 #   # Override proxy for this list of entries.
 #   no_proxy:
-#     - https://trace.agent.datadog.com
+#     - https://trace.agent.datadoghq.com
 # 
 # # True to skip SSL validation when connecting through a trusted proxy.
 # skip_ssl_validation: true

@@ -17,8 +17,8 @@ func NewClient(conf *config.AgentConfig) *http.Client {
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: conf.SkipSSLValidation},
 	}
-	if conf.ProxyURL != nil {
-		log.Infof("configuring proxy through host %s", conf.ProxyURL.Hostname())
+	if conf.ProxyURL != nil && !conf.NoProxy {
+		log.Infof("configuring proxy through: %s", conf.ProxyURL.String())
 		transport.Proxy = http.ProxyURL(conf.ProxyURL)
 	}
 	return &http.Client{Timeout: timeout, Transport: transport}

@@ -197,28 +197,21 @@ func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 	if yc.StatsdPort > 0 {
 		c.StatsdPort = yc.StatsdPort
 	}
-
-	// respect Agent proxy configuration knowing we only have to support the APIEndpoint HTTPS case
-	if yc.Proxy.HTTPS != "" {
-		traceAgentNoProxy := false
-		for _, host := range yc.Proxy.NoProxy {
-			if host == c.APIEndpoint {
-				log.Info("Trace Agent endpoint matches proxy.no_proxy list item '%s': not using any proxy", host)
-				traceAgentNoProxy = true
-				break
-			}
-		}
-
-		if !traceAgentNoProxy {
-			url, err := url.Parse(yc.Proxy.HTTPS)
-			if err == nil {
-				c.ProxyURL = url
-			} else {
-				log.Errorf("Failed to parse proxy URL from proxy.https configuration: %s", err)
-			}
+	for _, host := range yc.Proxy.NoProxy {
+		if host == c.APIEndpoint {
+			log.Infof("Trace Agent endpoint matches `proxy.no_proxy` list item %q: ignoring proxy", host)
+			c.NoProxy = true
+			break
 		}
 	}
-
+	if yc.Proxy.HTTPS != "" {
+		url, err := url.Parse(yc.Proxy.HTTPS)
+		if err == nil {
+			c.ProxyURL = url
+		} else {
+			log.Errorf("Failed to parse proxy URL from proxy.https configuration: %s", err)
+		}
+	}
 	if yc.SkipSSLValidation != nil {
 		c.SkipSSLValidation = *yc.SkipSSLValidation
 	}
