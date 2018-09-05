@@ -235,3 +235,64 @@ func TestConcentratorSublayersStatsCounts(t *testing.T) {
 		assert.Equal(val, int64(count.Value), "Wrong value for count %s", key)
 	}
 }
+
+func TestConcentratorForNonTopLevelMetrics(t *testing.T) {
+	assert := assert.New(t)
+	statsChan := make(chan []model.StatsBucket)
+	c := NewConcentrator([]string{}, testBucketInterval, statsChan)
+
+	now := model.Now()
+	alignedNow := now - now%c.bsize
+
+	trace := model.Trace{
+		testSpan(c, 1, 0, 2000, 3, "A1", "resource1", 0),
+		testSpan(c, 2, 1, 1000, 3, "A2", "resource2", 0),
+		testSpan(c, 4, 2, 40, 3, "A3", "resource4", 0),
+		testSpan(c, 5, 4, 300, 3, "A3", "resource5", 0),
+	}
+
+	// A non-top-level span with forced metrics
+	nonTopLevel := testSpan(c, 3, 2, 1000, 3, "A2", "resource3", 0)
+	nonTopLevel.Name = "insert"
+	nonTopLevel.Meta = map[string]string{model.TraceMetricsKey: "true"}
+	trace = append(trace, nonTopLevel)
+
+	trace.ComputeTopLevel()
+	wt := model.NewWeightedTrace(trace, trace.GetRoot())
+	testTrace := processedTrace{Env: "none", Trace: trace, WeightedTrace: wt}
+
+	c.Add(testTrace)
+	stats := c.Flush()
+
+	if !assert.Equal(1, len(stats), "We should get exactly 1 StatsBucket") {
+		t.FailNow()
+	}
+
+	assert.Equal(alignedNow-3*testBucketInterval, stats[0].Start)
+
+	var receivedCounts map[string]model.Count
+	receivedCounts = stats[0].Counts
+	expectedCountValByKey := map[string]int64{
+		"query|duration|env:none,resource:resource1,service:A1":  2000,
+		"query|duration|env:none,resource:resource2,service:A2":  1000,
+		"insert|duration|env:none,resource:resource3,service:A2": 1000,
+		"query|duration|env:none,resource:resource4,service:A3":  40,
+		"query|errors|env:none,resource:resource1,service:A1":    0,
+		"query|errors|env:none,resource:resource2,service:A2":    0,
+		"insert|errors|env:none,resource:resource3,service:A2":   0,
+		"query|errors|env:none,resource:resource4,service:A3":    0,
+		"query|hits|env:none,resource:resource1,service:A1":      1,
+		"query|hits|env:none,resource:resource2,service:A2":      1,
+		"insert|hits|env:none,resource:resource3,service:A2":     1,
+		"query|hits|env:none,resource:resource4,service:A3":      1,
+	}
+
+	assert.Equal(len(expectedCountValByKey), len(receivedCounts))
+
+	// verify values
+	for key, val := range expectedCountValByKey {
+		count, ok := receivedCounts[key]
+		assert.True(ok, "%s was expected from concentrator", key)
+		assert.Equal(val, int64(count.Value), "Wrong value for count %s", key)
+	}
+}
