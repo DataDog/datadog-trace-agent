@@ -101,12 +101,8 @@ func (c *Concentrator) Add(t processedTrace) {
 			c.buckets[btime] = b
 		}
 
-		sublayers, ok := t.Sublayers[s.Span]
-		if ok {
-			b.HandleSpan(s, t.Env, c.aggregators, &sublayers)
-		} else {
-			b.HandleSpan(s, t.Env, c.aggregators, nil)
-		}
+		sublayers, _ := t.Sublayers[s.Span]
+		b.HandleSpan(s, t.Env, c.aggregators, sublayers)
 	}
 
 	c.mu.Unlock()
