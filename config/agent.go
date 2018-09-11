@@ -175,7 +175,7 @@ func (c *AgentConfig) Validate() error {
 	}
 	if c.Hostname == "" {
 		if err := c.acquireHostname(); err != nil {
-			return ErrMissingHostname
+			return err
 		}
 	}
 	return nil
@@ -206,6 +206,9 @@ func (c *AgentConfig) acquireHostname() error {
 	c.Hostname = strings.TrimSpace(out.String())
 	if err != nil || c.Hostname == "" {
 		c.Hostname, err = os.Hostname()
+	}
+	if c.Hostname == "" {
+		err = ErrMissingHostname
 	}
 	return err
 }
