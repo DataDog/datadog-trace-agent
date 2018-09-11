@@ -14,7 +14,7 @@ const (
 	envAPIKey          = "DD_API_KEY"               // API KEY
 	envAPMEnabled      = "DD_APM_ENABLED"           // APM enabled
 	envURL             = "DD_APM_DD_URL"            // APM URL
-	envProxyDeprecated = "HTTPS_PROXY"              // proxy URL (deprecated)
+	envProxyDeprecated = "HTTPS_PROXY"              // (deprecated) proxy URL
 	envProxy           = "DD_PROXY_HTTPS"           // proxy URL (overrides deprecated)
 	envHostname        = "DD_HOSTNAME"              // agent hostname
 	envBindHost        = "DD_BIND_HOST"             // statsd & receiver hostname
@@ -24,7 +24,7 @@ const (
 	envIgnoreResources = "DD_IGNORE_RESOURCE"       // ignored resources
 	envLogLevel        = "DD_LOG_LEVEL"             // logging level
 	envAnalyzedSpans   = "DD_APM_ANALYZED_SPANS"    // spans to analyze for transactions
-	envConnectionLimit = "DD_CONNECTION_LIMIT"      // limit of unique connections
+	envConnectionLimit = "DD_CONNECTION_LIMIT"      // (deprecated) limit of unique connections
 )
 
 // loadEnv applies overrides from environment variables to the trace agent configuration
