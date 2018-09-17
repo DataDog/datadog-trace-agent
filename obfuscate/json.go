@@ -1,7 +1,6 @@
 package obfuscate
 
 import (
-	"bytes"
 	"strings"
 
 	"github.com/DataDog/datadog-trace-agent/config"
@@ -55,7 +54,7 @@ func (p *jsonObfuscator) setKey() {
 }
 
 func (p *jsonObfuscator) obfuscate(data []byte) (string, error) {
-	var out bytes.Buffer
+	var out strings.Builder
 	buf := make([]byte, 0, 10) // recording key token
 	p.scan.reset()
 	for _, c := range data {
