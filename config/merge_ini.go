@@ -142,7 +142,7 @@ func (c *AgentConfig) loadIniConfig(conf *File) {
 		for key, rate := range rates {
 			serviceName, operationName, err := parseServiceAndOp(key)
 			if err != nil {
-				log.Errorf("Error when parsing names", err)
+				log.Errorf("Error when parsing names: %v", err)
 				continue
 			}
 			rate, err := strconv.ParseFloat(rate, 64)
