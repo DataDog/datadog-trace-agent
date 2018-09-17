@@ -2,6 +2,7 @@ package obfuscate
 
 import (
 	"bytes"
+	"strings"
 )
 
 // redisTokenType specifies the token type returned by the tokenizer.
@@ -82,7 +83,7 @@ func (t *redisTokenizer) next() {
 // scanCommand scans a command from the buffer.
 func (t *redisTokenizer) scanCommand() (tok string, typ redisTokenType, done bool) {
 	var (
-		str     bytes.Buffer
+		str     strings.Builder
 		started bool
 	)
 	for {
@@ -113,7 +114,7 @@ func (t *redisTokenizer) scanCommand() (tok string, typ redisTokenType, done boo
 // scanArg scans an argument from the buffer.
 func (t *redisTokenizer) scanArg() (tok string, typ redisTokenType, done bool) {
 	var (
-		str    bytes.Buffer
+		str    strings.Builder
 		quoted bool // in quoted string
 		escape bool // escape sequence
 	)

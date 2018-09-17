@@ -75,7 +75,7 @@ it manually.
 
 ## Development
 
-First, make sure Go 1.9+ is installed. You can do this by following the steps on the [official website](https://golang.org/dl/).
+First, make sure Go 1.10+ is installed. You can do this by following the steps on the [official website](https://golang.org/dl/).
 
 Then, download (or update) the latest source by running:
 ```bash

@@ -1,7 +1,6 @@
 package obfuscate
 
 import (
-	"bytes"
 	"strings"
 
 	"github.com/DataDog/datadog-trace-agent/model"
@@ -24,7 +23,7 @@ var redisCompoundCommandSet = map[string]bool{
 func (*Obfuscator) quantizeRedis(span *model.Span) {
 	query := compactWhitespaces(span.Resource)
 
-	var resource bytes.Buffer
+	var resource strings.Builder
 	truncated := false
 	nbCmds := 0
 
@@ -91,7 +90,7 @@ func (*Obfuscator) obfuscateRedis(span *model.Span) {
 	}
 	t := newRedisTokenizer([]byte(span.Meta[redisRawCommand]))
 	var (
-		str  bytes.Buffer
+		str  strings.Builder
 		cmd  string
 		args []string
 	)
@@ -119,7 +118,7 @@ func (*Obfuscator) obfuscateRedis(span *model.Span) {
 	span.Meta[redisRawCommand] = str.String()
 }
 
-func obfuscateRedisCmd(out *bytes.Buffer, cmd string, args ...string) {
+func obfuscateRedisCmd(out *strings.Builder, cmd string, args ...string) {
 	out.WriteString(cmd)
 	if len(args) == 0 {
 		return
