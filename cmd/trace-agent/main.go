@@ -91,17 +91,8 @@ func runAgent(ctx context.Context) {
 
 	cfg, err := config.Load(flags.ConfigPath)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			osutil.Exitf("%v", err)
-		}
-	} else {
-		log.Infof("Loaded configuration: %s", cfg.ConfigPath)
-	}
-	cfg.LoadEnv()
-	if err := cfg.Validate(); err != nil {
 		osutil.Exitf("%v", err)
 	}
-
 	err = info.InitInfo(cfg) // for expvar & -info option
 	if err != nil {
 		panic(err)

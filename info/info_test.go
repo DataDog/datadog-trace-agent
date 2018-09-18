@@ -25,7 +25,7 @@ type testServerHandler struct {
 func (h *testServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	json, err := ioutil.ReadFile("./test_cases/okay.json")
+	json, err := ioutil.ReadFile("./testdata/okay.json")
 	if err != nil {
 		h.t.Errorf("error loading json file: %v", err)
 	}
@@ -56,7 +56,7 @@ type testServerWarningHandler struct {
 func (h *testServerWarningHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	json, err := ioutil.ReadFile("./test_cases/warning.json")
+	json, err := ioutil.ReadFile("./testdata/warning.json")
 	if err != nil {
 		h.t.Errorf("error loading json file: %v", err)
 	}
@@ -142,7 +142,7 @@ func TestInfo(t *testing.T) {
 	assert.NoError(err)
 	info := buf.String()
 	t.Logf("Info:\n%s\n", info)
-	expectedInfo, err := ioutil.ReadFile("./test_cases/okay.info")
+	expectedInfo, err := ioutil.ReadFile("./testdata/okay.info")
 	assert.NoError(err)
 	assert.Equal(string(expectedInfo), info)
 }
@@ -171,7 +171,7 @@ func TestWarning(t *testing.T) {
 	assert.Nil(err)
 	info := buf.String()
 
-	expectedWarning, err := ioutil.ReadFile("./test_cases/warning.info")
+	expectedWarning, err := ioutil.ReadFile("./testdata/warning.info")
 	assert.NoError(err)
 	assert.Equal(string(expectedWarning), info)
 
