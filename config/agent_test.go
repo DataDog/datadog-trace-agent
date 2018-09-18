@@ -8,6 +8,61 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestConfigHostname(t *testing.T) {
+	t.Run("nothing", func(t *testing.T) {
+		assert := assert.New(t)
+		fallbackHostnameFunc = func() (string, error) {
+			return "", nil
+		}
+		defer func() {
+			fallbackHostnameFunc = os.Hostname
+		}()
+		_, err := Load("./testdata/multi_api_keys.ini")
+		assert.Equal(ErrMissingHostname, err)
+	})
+
+	t.Run("fallback", func(t *testing.T) {
+		host, err := os.Hostname()
+		if err != nil || host == "" {
+			// can't say
+			t.Skip()
+		}
+		assert := assert.New(t)
+		cfg, err := Load("./testdata/multi_api_keys.ini")
+		assert.NoError(err)
+		assert.Equal(host, cfg.Hostname)
+	})
+
+	t.Run("file", func(t *testing.T) {
+		assert := assert.New(t)
+		cfg, err := Load("./testdata/full.yaml")
+		assert.NoError(err)
+		assert.Equal("mymachine", cfg.Hostname)
+	})
+
+	t.Run("env", func(t *testing.T) {
+		// hostname from env
+		assert := assert.New(t)
+		err := os.Setenv(envHostname, "onlyenv")
+		defer os.Unsetenv(envHostname)
+		assert.NoError(err)
+		cfg, err := Load("./testdata/multi_api_keys.ini")
+		assert.NoError(err)
+		assert.Equal("onlyenv", cfg.Hostname)
+	})
+
+	t.Run("file+env", func(t *testing.T) {
+		// hostname from file, overwritten from env
+		assert := assert.New(t)
+		err := os.Setenv(envHostname, "envoverride")
+		defer os.Unsetenv(envHostname)
+		assert.NoError(err)
+		cfg, err := Load("./testdata/full.yaml")
+		assert.NoError(err)
+		assert.Equal("envoverride", cfg.Hostname)
+	})
+}
+
 func TestDefaultConfig(t *testing.T) {
 	assert := assert.New(t)
 	c := New()
@@ -29,7 +84,7 @@ func TestOnlyEnvConfig(t *testing.T) {
 	os.Setenv("DD_API_KEY", "apikey_from_env")
 
 	c := New()
-	c.LoadEnv()
+	c.loadEnv()
 	assert.Equal(t, "apikey_from_env", c.APIKey)
 
 	os.Setenv("DD_API_KEY", "")
@@ -38,7 +93,7 @@ func TestOnlyEnvConfig(t *testing.T) {
 func TestOnlyDDAgentConfig(t *testing.T) {
 	assert := assert.New(t)
 
-	c, err := Load("./test_cases/no_apm_config.ini")
+	c, err := loadFile("./testdata/no_apm_config.ini")
 	assert.NoError(err)
 
 	assert.Equal("thing", c.Hostname)
@@ -53,7 +108,7 @@ func TestDDAgentMultiAPIKeys(t *testing.T) {
 	// TODO: at some point, expire this case
 	assert := assert.New(t)
 
-	c, err := Load("./test_cases/multi_api_keys.ini")
+	c, err := loadFile("./testdata/multi_api_keys.ini")
 	assert.NoError(err)
 
 	assert.Equal("foo", c.APIKey)
@@ -62,7 +117,7 @@ func TestDDAgentMultiAPIKeys(t *testing.T) {
 func TestFullIniConfig(t *testing.T) {
 	assert := assert.New(t)
 
-	c, err := Load("./test_cases/full.ini")
+	c, err := loadFile("./testdata/full.ini")
 	assert.NoError(err)
 
 	assert.Equal("api_key_test", c.APIKey)
@@ -82,7 +137,7 @@ func TestFullIniConfig(t *testing.T) {
 func TestFullYamlConfig(t *testing.T) {
 	assert := assert.New(t)
 
-	c, err := Load("./test_cases/full.yaml")
+	c, err := loadFile("./testdata/full.yaml")
 	assert.NoError(err)
 
 	assert.Equal("api_key_test", c.APIKey)
@@ -114,7 +169,7 @@ func TestFullYamlConfig(t *testing.T) {
 func TestUndocumentedYamlConfig(t *testing.T) {
 	assert := assert.New(t)
 
-	c, err := Load("./test_cases/undocumented.yaml")
+	c, err := loadFile("./testdata/undocumented.yaml")
 	assert.NoError(err)
 
 	assert.Equal("thing", c.Hostname)
@@ -188,7 +243,7 @@ func TestAcquireHostname(t *testing.T) {
 func TestUndocumentedIni(t *testing.T) {
 	assert := assert.New(t)
 
-	c, err := Load("./test_cases/undocumented.ini")
+	c, err := loadFile("./testdata/undocumented.ini")
 	assert.NoError(err)
 
 	// analysis legacy
@@ -209,7 +264,7 @@ func TestAnalyzedSpansEnvConfig(t *testing.T) {
 	defer os.Unsetenv("DD_APM_ANALYZED_SPANS")
 
 	c := New()
-	c.LoadEnv()
+	c.loadEnv()
 
 	assert.Len(c.AnalyzedSpansByService, 2)
 	assert.Len(c.AnalyzedSpansByService["service1"], 2)
