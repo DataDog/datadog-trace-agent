@@ -161,10 +161,10 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 			return LexError, []byte("!")
 		case '\'':
 			return tkn.scanString(ch, String)
+		case '"':
+			return tkn.scanString(ch, ID)
 		case '`':
 			return tkn.scanLiteralIdentifier('`')
-		case '"':
-			return tkn.scanLiteralIdentifier('"')
 		case '%':
 			if tkn.lastChar == '(' {
 				return tkn.scanVariableIdentifier('%')
