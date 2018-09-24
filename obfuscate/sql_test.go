@@ -373,14 +373,8 @@ func TestMultipleProcess(t *testing.T) {
 		},
 	}
 
-	filters := []TokenFilter{
-		&DiscardFilter{},
-		&ReplaceFilter{},
-		&GroupingFilter{},
-	}
-
 	// The consumer is the same between executions
-	consumer := NewTokenConsumer(filters)
+	consumer := newTokenConsumer()
 
 	for _, tc := range testCases {
 		output, err := consumer.Process(tc.query)
@@ -395,12 +389,7 @@ func TestConsumerError(t *testing.T) {
 	// Malformed SQL is not accepted and the outer component knows
 	// what to do with malformed SQL
 	input := "SELECT * FROM users WHERE users.id = '1 AND users.name = 'dog'"
-	filters := []TokenFilter{
-		&DiscardFilter{},
-		&ReplaceFilter{},
-		&GroupingFilter{},
-	}
-	consumer := NewTokenConsumer(filters)
+	consumer := newTokenConsumer()
 
 	output, err := consumer.Process(input)
 	assert.NotNil(err)
@@ -416,12 +405,7 @@ func BenchmarkTokenizer(b *testing.B) {
 		{"Escaping", `INSERT INTO delayed_jobs (attempts, created_at, failed_at, handler, last_error, locked_at, locked_by, priority, queue, run_at, updated_at) VALUES (0, '2016-12-04 17:09:59', NULL, '--- !ruby/object:Delayed::PerformableMethod\nobject: !ruby/object:Item\n  store:\n  - a simple string\n  - an \'escaped \' string\n  - another \'escaped\' string\n  - 42\n  string: a string with many \\\\\'escapes\\\\\'\nmethod_name: :show_store\nargs: []\n', NULL, NULL, NULL, 0, NULL, '2016-12-04 17:09:59', '2016-12-04 17:09:59')`},
 		{"Grouping", `INSERT INTO delayed_jobs (created_at, failed_at, handler) VALUES (0, '2016-12-04 17:09:59', NULL), (0, '2016-12-04 17:09:59', NULL), (0, '2016-12-04 17:09:59', NULL), (0, '2016-12-04 17:09:59', NULL)`},
 	}
-	filters := []TokenFilter{
-		&DiscardFilter{},
-		&ReplaceFilter{},
-		&GroupingFilter{},
-	}
-	consumer := NewTokenConsumer(filters)
+	consumer := newTokenConsumer()
 
 	for _, bm := range benchmarks {
 		b.Run(bm.name+"/"+strconv.Itoa(len(bm.query)), func(b *testing.B) {

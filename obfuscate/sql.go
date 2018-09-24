@@ -13,22 +13,22 @@ const (
 	sqlQuantizeError = "agent.parse.error"
 )
 
-// TokenFilter is a generic interface that a TokenConsumer expects. It defines
+// tokenFilter is a generic interface that a tokenConsumer expects. It defines
 // the Filter() function used to filter or replace given tokens.
 // A filter can be stateful and keep an internal state to apply the filter later;
 // this can be useful to prevent backtracking in some cases.
-type TokenFilter interface {
+type tokenFilter interface {
 	Filter(token, lastToken int, buffer []byte) (int, []byte)
 	Reset()
 }
 
-// DiscardFilter implements the TokenFilter interface so that the given
+// discardFilter implements the tokenFilter interface so that the given
 // token is discarded or accepted.
-type DiscardFilter struct{}
+type discardFilter struct{}
 
 // Filter the given token so that a `nil` slice is returned if the token
 // is in the token filtered list.
-func (f *DiscardFilter) Filter(token, lastToken int, buffer []byte) (int, []byte) {
+func (f *discardFilter) Filter(token, lastToken int, buffer []byte) (int, []byte) {
 	// filters based on previous token
 	switch lastToken {
 	case FilteredBracketedIdentifier:
@@ -49,7 +49,7 @@ func (f *DiscardFilter) Filter(token, lastToken int, buffer []byte) (int, []byte
 			// closing bracket counter-part. See GitHub issue #475.
 			return FilteredBracketedIdentifier, nil
 		}
-		// prevent the next comma from being part of a GroupingFilter
+		// prevent the next comma from being part of a groupingFilter
 		return FilteredComma, nil
 	}
 
@@ -65,15 +65,15 @@ func (f *DiscardFilter) Filter(token, lastToken int, buffer []byte) (int, []byte
 	}
 }
 
-// Reset in a DiscardFilter is a noop action
-func (f *DiscardFilter) Reset() {}
+// Reset in a discardFilter is a noop action
+func (f *discardFilter) Reset() {}
 
-// ReplaceFilter implements the TokenFilter interface so that the given
+// replaceFilter implements the tokenFilter interface so that the given
 // token is replaced with '?' or left unchanged.
-type ReplaceFilter struct{}
+type replaceFilter struct{}
 
 // Filter the given token so that it will be replaced if in the token replacement list
-func (f *ReplaceFilter) Filter(token, lastToken int, buffer []byte) (int, []byte) {
+func (f *replaceFilter) Filter(token, lastToken int, buffer []byte) (int, []byte) {
 	switch lastToken {
 	case Savepoint:
 		return Filtered, []byte("?")
@@ -86,12 +86,12 @@ func (f *ReplaceFilter) Filter(token, lastToken int, buffer []byte) (int, []byte
 	}
 }
 
-// Reset in a ReplaceFilter is a noop action
-func (f *ReplaceFilter) Reset() {}
+// Reset in a replaceFilter is a noop action
+func (f *replaceFilter) Reset() {}
 
-// GroupingFilter implements the TokenFilter interface so that when
+// groupingFilter implements the tokenFilter interface so that when
 // a common pattern is identified, it's discarded to prevent duplicates
-type GroupingFilter struct {
+type groupingFilter struct {
 	groupFilter int
 	groupMulti  int
 }
@@ -100,7 +100,7 @@ type GroupingFilter struct {
 // has been recognized. A grouping is composed by items like:
 //   * '( ?, ?, ? )'
 //   * '( ?, ? ), ( ?, ? )'
-func (f *GroupingFilter) Filter(token, lastToken int, buffer []byte) (int, []byte) {
+func (f *groupingFilter) Filter(token, lastToken int, buffer []byte) (int, []byte) {
 	// increasing the number of groups means that we're filtering an entire group
 	// because it can be represented with a single '( ? )'
 	if (lastToken == '(' && token == Filtered) || (token == '(' && f.groupMulti > 0) {
@@ -132,26 +132,26 @@ func (f *GroupingFilter) Filter(token, lastToken int, buffer []byte) (int, []byt
 	return token, buffer
 }
 
-// Reset in a GroupingFilter restores variables used to count
+// Reset in a groupingFilter restores variables used to count
 // escaped token that should be filtered
-func (f *GroupingFilter) Reset() {
+func (f *groupingFilter) Reset() {
 	f.groupFilter = 0
 	f.groupMulti = 0
 }
 
-// TokenConsumer is a Tokenizer consumer. It calls the Tokenizer Scan() function until tokens
+// tokenConsumer is a Tokenizer consumer. It calls the Tokenizer Scan() function until tokens
 // are available or if a LEX_ERROR is raised. After retrieving a token, it is sent in the
-// TokenFilter chains so that the token is discarded or replaced.
-type TokenConsumer struct {
+// tokenFilter chains so that the token is discarded or replaced.
+type tokenConsumer struct {
 	tokenizer *Tokenizer
-	filters   []TokenFilter
+	filters   []tokenFilter
 	lastToken int
 }
 
 // Process the given SQL or No-SQL string so that the resulting one is properly altered. This
-// function is generic and the behavior changes according to chosen TokenFilter implementations.
-// The process calls all filters inside the []TokenFilter.
-func (t *TokenConsumer) Process(in string) (string, error) {
+// function is generic and the behavior changes according to chosen tokenFilter implementations.
+// The process calls all filters inside the []tokenFilter.
+func (t *tokenConsumer) Process(in string) (string, error) {
 	out := &bytes.Buffer{}
 	t.tokenizer.InStream.Reset(in)
 
@@ -168,6 +168,7 @@ func (t *TokenConsumer) Process(in string) (string, error) {
 		// apply all registered filters
 		for _, f := range t.filters {
 			if token, buff = f.Filter(token, t.lastToken, buff); token == LexError {
+				t.Reset()
 				return "", errors.New("the tokenizer was unable to process the string")
 			}
 		}
@@ -201,38 +202,32 @@ func (t *TokenConsumer) Process(in string) (string, error) {
 }
 
 // Reset restores the initial states for all components so that memory can be re-used
-func (t *TokenConsumer) Reset() {
+func (t *tokenConsumer) Reset() {
 	t.tokenizer.Reset()
 	for _, f := range t.filters {
 		f.Reset()
 	}
 }
 
-// NewTokenConsumer returns a new TokenConsumer capable to process SQL and No-SQL strings.
-func NewTokenConsumer(filters []TokenFilter) *TokenConsumer {
-	return &TokenConsumer{
+// newTokenConsumer returns a new tokenConsumer capable to process SQL and No-SQL strings.
+func newTokenConsumer() *tokenConsumer {
+	return &tokenConsumer{
 		tokenizer: NewStringTokenizer(""),
-		filters:   filters,
+		filters: []tokenFilter{
+			&discardFilter{},
+			&replaceFilter{},
+			&groupingFilter{},
+		},
 	}
 }
 
-// token consumer that will quantize the query with
-// the given filters; this quantizer is used only
-// for SQL and CQL strings
-var tokenQuantizer = NewTokenConsumer(
-	[]TokenFilter{
-		&DiscardFilter{},
-		&ReplaceFilter{},
-		&GroupingFilter{},
-	})
-
 // QuantizeSQL generates resource and sql.query meta for SQL spans
-func (*Obfuscator) obfuscateSQL(span *model.Span) {
+func (o *Obfuscator) obfuscateSQL(span *model.Span) {
 	if span.Resource == "" {
 		return
 	}
 
-	quantizedString, err := tokenQuantizer.Process(span.Resource)
+	quantizedString, err := o.sql.Process(span.Resource)
 	if err != nil || quantizedString == "" {
 		// if we have an error, the partially parsed SQL is discarded so that we don't pollute
 		// users resources. Here we provide more details to debug the problem.
