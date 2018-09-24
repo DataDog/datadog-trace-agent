@@ -335,6 +335,18 @@ func TestSQLQuantizer(t *testing.T) {
   `,
 			`SELECT t1.userid, t1.fullname, t1.firm_id, t2.firmname, t1.email, t1.location, t1.state, t1.phone, t1.url, DATE_FORMAT ( t1.lastmod, %m/%d/%Y %h:%i:%s ), t1.lastmod, t1.user_status, t1.pw_expire, DATE_FORMAT ( t1.pw_expire, %m/%d/%Y ), t1.addr1, t1.addr2, t1.zipcode, t1.office_id, t1.default_group, t3.firm_status, t1.title FROM userdata LEFT JOIN lawfirm_names ON t1.firm_id = t2.firm_id LEFT JOIN lawfirms ON t1.firm_id = t3.firm_id WHERE t1.userid = ?`,
 		},
+		{
+			`SELECT [b].[BlogId], [b].[Name]
+FROM [Blogs] AS [b]
+ORDER BY [b].[Name]`,
+			`SELECT [ b ] . [ BlogId ], [ b ] . [ Name ] FROM [ Blogs ] ORDER BY [ b ] . [ Name ]`,
+		},
+		{
+			`SELECT [b].[BlogId], [b].[Name]
+FROM [Blogs] AS [b
+ORDER BY [b].[Name]`,
+			`Non-parsable SQL query`,
+		},
 	}
 
 	for _, c := range cases {

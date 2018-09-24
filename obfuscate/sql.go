@@ -31,7 +31,24 @@ type DiscardFilter struct{}
 func (f *DiscardFilter) Filter(token, lastToken int, buffer []byte) (int, []byte) {
 	// filters based on previous token
 	switch lastToken {
+	case FilteredBracketedIdentifier:
+		if token != ']' {
+			// we haven't found the closing bracket yet, keep going
+			if token != ID {
+				// the token between the brackets *must* be an identifier,
+				// otherwise the query is invalid.
+				return LexError, nil
+			}
+			return FilteredBracketedIdentifier, nil
+		}
+		fallthrough
 	case As:
+		if token == '[' {
+			// the identifier followed by AS is an MSSQL bracketed identifier
+			// and will continue to be discarded until we find the corresponding
+			// closing bracket counter-part. See GitHub issue #475.
+			return FilteredBracketedIdentifier, nil
+		}
 		// prevent the next comma from being part of a GroupingFilter
 		return FilteredComma, nil
 	}
@@ -150,7 +167,9 @@ func (t *TokenConsumer) Process(in string) (string, error) {
 
 		// apply all registered filters
 		for _, f := range t.filters {
-			token, buff = f.Filter(token, t.lastToken, buff)
+			if token, buff = f.Filter(token, t.lastToken, buff); token == LexError {
+				return "", errors.New("the tokenizer was unable to process the string")
+			}
 		}
 
 		// write the resulting buffer
