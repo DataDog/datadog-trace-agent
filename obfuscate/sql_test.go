@@ -302,6 +302,39 @@ func TestSQLQuantizer(t *testing.T) {
                     ` + "(@runtot := @runtot + daily_values.value) AS total FROM (SELECT @runtot:=0) AS n, `daily_values`  WHERE `daily_values`.`subject_id` = 12345 AND `daily_values`.`subject_type` = 'Skippity' AND (daily_values.date BETWEEN '2018-05-09' AND '2018-06-19') HAVING value >= 0 ORDER BY date",
 			`SELECT daily_values.*, LEAST ( ( ? - @runtot ), value ), ( @runtot := @runtot + daily_values.value ) FROM ( SELECT @runtot := ? ), daily_values WHERE daily_values . subject_id = ? AND daily_values . subject_type = ? AND ( daily_values.date BETWEEN ? AND ? ) HAVING value >= ? ORDER BY date`,
 		},
+		{
+			`    SELECT
+      t1.userid,
+      t1.fullname,
+      t1.firm_id,
+      t2.firmname,
+      t1.email,
+      t1.location,
+      t1.state,
+      t1.phone,
+      t1.url,
+      DATE_FORMAT( t1.lastmod, "%m/%d/%Y %h:%i:%s" ) AS lastmod,
+      t1.lastmod AS lastmod_raw,
+      t1.user_status,
+      t1.pw_expire,
+      DATE_FORMAT( t1.pw_expire, "%m/%d/%Y" ) AS pw_expire_date,
+      t1.addr1,
+      t1.addr2,
+      t1.zipcode,
+      t1.office_id,
+      t1.default_group,
+      t3.firm_status,
+      t1.title
+    FROM
+           userdata      AS t1
+      LEFT JOIN lawfirm_names AS t2 ON t1.firm_id = t2.firm_id
+      LEFT JOIN lawfirms      AS t3 ON t1.firm_id = t3.firm_id
+    WHERE
+      t1.userid = 'jstein'
+
+  `,
+			`SELECT t1.userid, t1.fullname, t1.firm_id, t2.firmname, t1.email, t1.location, t1.state, t1.phone, t1.url, DATE_FORMAT ( t1.lastmod, %m/%d/%Y %h:%i:%s ), t1.lastmod, t1.user_status, t1.pw_expire, DATE_FORMAT ( t1.pw_expire, %m/%d/%Y ), t1.addr1, t1.addr2, t1.zipcode, t1.office_id, t1.default_group, t3.firm_status, t1.title FROM userdata LEFT JOIN lawfirm_names ON t1.firm_id = t2.firm_id LEFT JOIN lawfirms ON t1.firm_id = t3.firm_id WHERE t1.userid = ?`,
+		},
 	}
 
 	for _, c := range cases {
