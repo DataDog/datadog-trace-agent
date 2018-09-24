@@ -232,7 +232,7 @@ func (w *TraceWriter) flush() {
 
 	// Try to compress payload before sending
 	compressionBuffer := bytes.Buffer{}
-	gz, err := gzip.NewWriterLevel(&compressionBuffer, gzip.BestSpeed)
+	gz, err := gzip.NewWriterLevel(&compressionBuffer, 6)
 	if err != nil {
 		log.Errorf("failed to get compressor, sending uncompressed: %s", err)
 	} else {
