@@ -5,22 +5,20 @@ import (
 	"github.com/DataDog/datadog-trace-agent/model"
 )
 
-var _ Filter = (*tagReplacer)(nil)
-
-// tagReplacer is a filter which replaces tag values based on its
+// Replacer is a filter which replaces tag values based on its
 // settings. It keeps all spans.
-type tagReplacer struct {
-	// replace maps tag keys to one or more sets of replacements
-	replace []*config.ReplaceRule
+type Replacer struct {
+	rules []*config.ReplaceRule
 }
 
-func newTagReplacer(c *config.AgentConfig) *tagReplacer {
-	return &tagReplacer{replace: c.ReplaceTags}
+// NewReplacer returns a new Replacer which will use the given set of rules.
+func NewReplacer(rules []*config.ReplaceRule) *Replacer {
+	return &Replacer{rules: rules}
 }
 
-// Keep implements Filter.
-func (f tagReplacer) Keep(root *model.Span, trace *model.Trace) bool {
-	for _, rule := range f.replace {
+// Replace replaces all tags matching the Replacer's rules.
+func (f Replacer) Replace(trace *model.Trace) {
+	for _, rule := range f.rules {
 		key, str, re := rule.Name, rule.Repl, rule.Re
 		for _, s := range *trace {
 			switch key {
@@ -42,6 +40,4 @@ func (f tagReplacer) Keep(root *model.Span, trace *model.Trace) bool {
 			}
 		}
 	}
-	// always return true as the goal of this filter is only to mutate data
-	return true
 }
