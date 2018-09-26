@@ -44,6 +44,11 @@ const (
 	// FilteredComma specifies that the token is a comma and was discarded by one
 	// of the filters.
 	FilteredComma = 57366
+
+	// FilteredBracketedIdentifier specifies that we are currently discarding
+	// a bracketed identifier (MSSQL).
+	// See issue https://github.com/DataDog/datadog-trace-agent/issues/475.
+	FilteredBracketedIdentifier = 57367
 )
 
 // Tokenizer is the struct used to generate SQL

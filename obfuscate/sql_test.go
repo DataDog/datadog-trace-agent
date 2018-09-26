@@ -335,6 +335,18 @@ func TestSQLQuantizer(t *testing.T) {
   `,
 			`SELECT t1.userid, t1.fullname, t1.firm_id, t2.firmname, t1.email, t1.location, t1.state, t1.phone, t1.url, DATE_FORMAT ( t1.lastmod, %m/%d/%Y %h:%i:%s ), t1.lastmod, t1.user_status, t1.pw_expire, DATE_FORMAT ( t1.pw_expire, %m/%d/%Y ), t1.addr1, t1.addr2, t1.zipcode, t1.office_id, t1.default_group, t3.firm_status, t1.title FROM userdata LEFT JOIN lawfirm_names ON t1.firm_id = t2.firm_id LEFT JOIN lawfirms ON t1.firm_id = t3.firm_id WHERE t1.userid = ?`,
 		},
+		{
+			`SELECT [b].[BlogId], [b].[Name]
+FROM [Blogs] AS [b]
+ORDER BY [b].[Name]`,
+			`SELECT [ b ] . [ BlogId ], [ b ] . [ Name ] FROM [ Blogs ] ORDER BY [ b ] . [ Name ]`,
+		},
+		{
+			`SELECT [b].[BlogId], [b].[Name]
+FROM [Blogs] AS [b
+ORDER BY [b].[Name]`,
+			`Non-parsable SQL query`,
+		},
 	}
 
 	for _, c := range cases {
@@ -361,14 +373,8 @@ func TestMultipleProcess(t *testing.T) {
 		},
 	}
 
-	filters := []TokenFilter{
-		&DiscardFilter{},
-		&ReplaceFilter{},
-		&GroupingFilter{},
-	}
-
 	// The consumer is the same between executions
-	consumer := NewTokenConsumer(filters)
+	consumer := newTokenConsumer()
 
 	for _, tc := range testCases {
 		output, err := consumer.Process(tc.query)
@@ -383,12 +389,7 @@ func TestConsumerError(t *testing.T) {
 	// Malformed SQL is not accepted and the outer component knows
 	// what to do with malformed SQL
 	input := "SELECT * FROM users WHERE users.id = '1 AND users.name = 'dog'"
-	filters := []TokenFilter{
-		&DiscardFilter{},
-		&ReplaceFilter{},
-		&GroupingFilter{},
-	}
-	consumer := NewTokenConsumer(filters)
+	consumer := newTokenConsumer()
 
 	output, err := consumer.Process(input)
 	assert.NotNil(err)
@@ -404,12 +405,7 @@ func BenchmarkTokenizer(b *testing.B) {
 		{"Escaping", `INSERT INTO delayed_jobs (attempts, created_at, failed_at, handler, last_error, locked_at, locked_by, priority, queue, run_at, updated_at) VALUES (0, '2016-12-04 17:09:59', NULL, '--- !ruby/object:Delayed::PerformableMethod\nobject: !ruby/object:Item\n  store:\n  - a simple string\n  - an \'escaped \' string\n  - another \'escaped\' string\n  - 42\n  string: a string with many \\\\\'escapes\\\\\'\nmethod_name: :show_store\nargs: []\n', NULL, NULL, NULL, 0, NULL, '2016-12-04 17:09:59', '2016-12-04 17:09:59')`},
 		{"Grouping", `INSERT INTO delayed_jobs (created_at, failed_at, handler) VALUES (0, '2016-12-04 17:09:59', NULL), (0, '2016-12-04 17:09:59', NULL), (0, '2016-12-04 17:09:59', NULL), (0, '2016-12-04 17:09:59', NULL)`},
 	}
-	filters := []TokenFilter{
-		&DiscardFilter{},
-		&ReplaceFilter{},
-		&GroupingFilter{},
-	}
-	consumer := NewTokenConsumer(filters)
+	consumer := newTokenConsumer()
 
 	for _, bm := range benchmarks {
 		b.Run(bm.name+"/"+strconv.Itoa(len(bm.query)), func(b *testing.B) {
