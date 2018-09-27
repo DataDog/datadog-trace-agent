@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/fixtures"
+	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/obfuscate"
 	"github.com/stretchr/testify/assert"
@@ -105,6 +107,71 @@ func TestFormatTrace(t *testing.T) {
 	assert.NotEqual("Non-parsable SQL query", result.Meta["sql.query"])
 	assert.NotContains(result.Meta["sql.query"], "42")
 	assert.Contains(result.Meta["sql.query"], "SELECT name FROM people WHERE age = ?")
+}
+
+func TestProcess(t *testing.T) {
+	t.Run("Replacer", func(t *testing.T) {
+		// Ensures that for "sql" type spans:
+		// • obfuscator runs before replacer
+		// • obfuscator obfuscates both resource and "sql.query" tag
+		// • resulting resource is obfuscated with replacements applied
+		// • resulting "sql.query" tag is obfuscated with no replacements applied
+		cfg := config.New()
+		cfg.APIKey = "test"
+		cfg.ReplaceTags = []*config.ReplaceRule{{
+			Name: "resource.name",
+			Re:   regexp.MustCompile("AND.*"),
+			Repl: "...",
+		}}
+		ctx, cancel := context.WithCancel(context.Background())
+		agent := NewAgent(ctx, cfg)
+		defer cancel()
+
+		now := time.Now()
+		span := &model.Span{
+			Resource: "SELECT name FROM people WHERE age = 42 AND extra = 55",
+			Type:     "sql",
+			Start:    now.Add(-time.Second).UnixNano(),
+			Duration: (500 * time.Millisecond).Nanoseconds(),
+		}
+		agent.Process(model.Trace{span})
+
+		assert := assert.New(t)
+		assert.Equal("SELECT name FROM people WHERE age = ? ...", span.Resource)
+		assert.Equal("SELECT name FROM people WHERE age = ? AND extra = ?", span.Meta["sql.query"])
+	})
+
+	t.Run("Blacklister", func(t *testing.T) {
+		cfg := config.New()
+		cfg.APIKey = "test"
+		cfg.Ignore["resource"] = []string{"^INSERT.*"}
+		ctx, cancel := context.WithCancel(context.Background())
+		agent := NewAgent(ctx, cfg)
+		defer cancel()
+
+		now := time.Now()
+		spanValid := &model.Span{
+			Resource: "SELECT name FROM people WHERE age = 42 AND extra = 55",
+			Type:     "sql",
+			Start:    now.Add(-time.Second).UnixNano(),
+			Duration: (500 * time.Millisecond).Nanoseconds(),
+		}
+		spanInvalid := &model.Span{
+			Resource: "INSERT INTO db VALUES (1, 2, 3)",
+			Type:     "sql",
+			Start:    now.Add(-time.Second).UnixNano(),
+			Duration: (500 * time.Millisecond).Nanoseconds(),
+		}
+
+		stats := agent.Receiver.stats.GetTagStats(info.Tags{})
+		assert := assert.New(t)
+
+		agent.Process(model.Trace{spanValid})
+		assert.EqualValues(0, stats.TracesFiltered)
+
+		agent.Process(model.Trace{spanInvalid})
+		assert.EqualValues(1, stats.TracesFiltered)
+	})
 }
 
 func BenchmarkAgentTraceProcessing(b *testing.B) {
