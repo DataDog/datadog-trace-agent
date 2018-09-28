@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestTagReplacer(t *testing.T) {
+func TestReplacer(t *testing.T) {
 	assert := assert.New(t)
 	for _, tt := range []struct {
 		rules     [][3]string
@@ -54,12 +54,11 @@ func TestTagReplacer(t *testing.T) {
 		},
 	} {
 		rules := parseRulesFromString(tt.rules)
-		tr := &tagReplacer{replace: rules}
+		tr := NewReplacer(rules)
 		root := replaceFilterTestSpan(tt.got)
 		childSpan := replaceFilterTestSpan(tt.got)
 		trace := model.Trace{root, childSpan}
-		ok := tr.Keep(root, &trace)
-		assert.True(ok)
+		tr.Replace(&trace)
 		for k, v := range tt.want {
 			switch k {
 			case "resource.name":

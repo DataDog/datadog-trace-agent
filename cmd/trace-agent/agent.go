@@ -19,9 +19,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/writer"
 )
 
-const (
-	processStatsInterval = time.Minute
-)
+const processStatsInterval = time.Minute
 
 type processedTrace struct {
 	Trace         model.Trace
@@ -50,7 +48,8 @@ func (pt *processedTrace) getSamplingPriority() (int, bool) {
 type Agent struct {
 	Receiver           *HTTPReceiver
 	Concentrator       *Concentrator
-	Filters            []filters.Filter
+	Blacklister        *filters.Blacklister
+	Replacer           *filters.Replacer
 	ScoreSampler       *Sampler
 	ErrorsScoreSampler *Sampler
 	PrioritySampler    *Sampler
@@ -94,7 +93,6 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 		conf.BucketInterval.Nanoseconds(),
 		statsChan,
 	)
-	f := filters.Setup(conf)
 
 	obf := obfuscate.NewObfuscator(conf.Obfuscation)
 	ss := NewScoreSampler(conf)
@@ -110,7 +108,8 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	return &Agent{
 		Receiver:           r,
 		Concentrator:       c,
-		Filters:            f,
+		Blacklister:        filters.NewBlacklister(conf.Ignore["resource"]),
+		Replacer:           filters.NewReplacer(conf.ReplaceTags),
 		ScoreSampler:       ss,
 		ErrorsScoreSampler: ess,
 		PrioritySampler:    ps,
@@ -179,8 +178,6 @@ func (a *Agent) Run() {
 // passes it downstream.
 func (a *Agent) Process(t model.Trace) {
 	if len(t) == 0 {
-		// XXX Should never happen since we reject empty traces during
-		// normalization.
 		log.Debugf("skipping received empty trace")
 		return
 	}
@@ -230,15 +227,10 @@ func (a *Agent) Process(t model.Trace) {
 		return
 	}
 
-	for _, f := range a.Filters {
-		if f.Keep(root, &t) {
-			continue
-		}
-
-		log.Debugf("rejecting trace by filter: %T  %v", f, *root)
+	if !a.Blacklister.Allows(root) {
+		log.Debugf("trace rejected by blacklister. root: %v", root)
 		atomic.AddInt64(&ts.TracesFiltered, 1)
 		atomic.AddInt64(&ts.SpansFiltered, int64(len(t)))
-
 		return
 	}
 
@@ -263,6 +255,8 @@ func (a *Agent) Process(t model.Trace) {
 		a.obfuscator.Obfuscate(span)
 		span.Truncate()
 	}
+
+	a.Replacer.Replace(&t)
 
 	pt := processedTrace{
 		Trace:         t,
