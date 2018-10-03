@@ -10,6 +10,8 @@ import (
 	log "github.com/cihub/seelog"
 )
 
+// TODO(x): remove deprecated environment variable support in 7.x
+
 const (
 	envAPIKey          = "DD_API_KEY"               // API KEY
 	envAPMEnabled      = "DD_APM_ENABLED"           // APM enabled
