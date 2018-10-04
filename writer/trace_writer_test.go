@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/fixtures"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/testutil"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
@@ -335,7 +335,7 @@ func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expecte
 	}
 }
 
-func testTraceWriter() (*TraceWriter, chan *SampledTrace, *testEndpoint, *fixtures.TestStatsClient) {
+func testTraceWriter() (*TraceWriter, chan *SampledTrace, *testEndpoint, *testutil.TestStatsClient) {
 	payloadChannel := make(chan *SampledTrace)
 	conf := &config.AgentConfig{
 		Hostname:          testHostName,
@@ -345,7 +345,7 @@ func testTraceWriter() (*TraceWriter, chan *SampledTrace, *testEndpoint, *fixtur
 	traceWriter := NewTraceWriter(conf, payloadChannel)
 	testEndpoint := &testEndpoint{}
 	traceWriter.BaseWriter.payloadSender.setEndpoint(testEndpoint)
-	testStatsClient := &fixtures.TestStatsClient{}
+	testStatsClient := &testutil.TestStatsClient{}
 	traceWriter.statsClient = testStatsClient
 
 	return traceWriter, payloadChannel, testEndpoint, testStatsClient
@@ -356,7 +356,7 @@ func randomSampledTrace(numSpans, numTransactions int) *SampledTrace {
 		panic("can't have more transactions than spans in a RandomSampledTrace")
 	}
 
-	trace := fixtures.GetTestTrace(1, numSpans, true)[0]
+	trace := testutil.GetTestTrace(1, numSpans, true)[0]
 
 	return &SampledTrace{
 		Trace:        &trace,
