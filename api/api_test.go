@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"bytes"
@@ -33,7 +33,7 @@ var headerFields = map[string]string{
 	"tracer_version": "Datadog-Meta-Tracer-Version",
 }
 
-func NewTestReceiverFromConfig(conf *config.AgentConfig) *HTTPReceiver {
+func newTestReceiverFromConfig(conf *config.AgentConfig) *HTTPReceiver {
 	dynConf := config.NewDynamicConfig()
 
 	rawTraceChan := make(chan model.Trace, 5000)
@@ -43,7 +43,7 @@ func NewTestReceiverFromConfig(conf *config.AgentConfig) *HTTPReceiver {
 	return receiver
 }
 
-func NewTestReceiverConfig() *config.AgentConfig {
+func newTestReceiverConfig() *config.AgentConfig {
 	conf := config.New()
 	conf.APIKey = "test"
 
@@ -57,8 +57,8 @@ func TestReceiverRequestBodyLength(t *testing.T) {
 	defaultMux := http.DefaultServeMux
 	http.DefaultServeMux = http.NewServeMux()
 
-	conf := NewTestReceiverConfig()
-	receiver := NewTestReceiverFromConfig(conf)
+	conf := newTestReceiverConfig()
+	receiver := newTestReceiverFromConfig(conf)
 	receiver.maxRequestBodyLength = 2
 	go receiver.Run()
 
@@ -105,16 +105,16 @@ func TestReceiverRequestBodyLength(t *testing.T) {
 func TestLegacyReceiver(t *testing.T) {
 	// testing traces without content-type in agent endpoints, it should use JSON decoding
 	assert := assert.New(t)
-	conf := NewTestReceiverConfig()
+	conf := newTestReceiverConfig()
 	testCases := []struct {
 		name        string
 		r           *HTTPReceiver
-		apiVersion  APIVersion
+		apiVersion  Version
 		contentType string
 		traces      model.Trace
 	}{
-		{"v01 with empty content-type", NewTestReceiverFromConfig(conf), v01, "", model.Trace{testutil.GetTestSpan()}},
-		{"v01 with application/json", NewTestReceiverFromConfig(conf), v01, "application/json", model.Trace{testutil.GetTestSpan()}},
+		{"v01 with empty content-type", newTestReceiverFromConfig(conf), v01, "", model.Trace{testutil.GetTestSpan()}},
+		{"v01 with application/json", newTestReceiverFromConfig(conf), v01, "application/json", model.Trace{testutil.GetTestSpan()}},
 	}
 
 	for _, tc := range testCases {
@@ -138,7 +138,7 @@ func TestLegacyReceiver(t *testing.T) {
 
 			// now we should be able to read the trace data
 			select {
-			case rt := <-tc.r.traces:
+			case rt := <-tc.r.Out:
 				assert.Len(rt, 1)
 				span := rt[0]
 				assert.Equal(uint64(42), span.TraceID)
@@ -161,23 +161,23 @@ func TestLegacyReceiver(t *testing.T) {
 func TestReceiverJSONDecoder(t *testing.T) {
 	// testing traces without content-type in agent endpoints, it should use JSON decoding
 	assert := assert.New(t)
-	conf := NewTestReceiverConfig()
+	conf := newTestReceiverConfig()
 	testCases := []struct {
 		name        string
 		r           *HTTPReceiver
-		apiVersion  APIVersion
+		apiVersion  Version
 		contentType string
 		traces      []model.Trace
 	}{
-		{"v02 with empty content-type", NewTestReceiverFromConfig(conf), v02, "", testutil.GetTestTrace(1, 1, false)},
-		{"v03 with empty content-type", NewTestReceiverFromConfig(conf), v03, "", testutil.GetTestTrace(1, 1, false)},
-		{"v04 with empty content-type", NewTestReceiverFromConfig(conf), v04, "", testutil.GetTestTrace(1, 1, false)},
-		{"v02 with application/json", NewTestReceiverFromConfig(conf), v02, "application/json", testutil.GetTestTrace(1, 1, false)},
-		{"v03 with application/json", NewTestReceiverFromConfig(conf), v03, "application/json", testutil.GetTestTrace(1, 1, false)},
-		{"v04 with application/json", NewTestReceiverFromConfig(conf), v04, "application/json", testutil.GetTestTrace(1, 1, false)},
-		{"v02 with text/json", NewTestReceiverFromConfig(conf), v02, "text/json", testutil.GetTestTrace(1, 1, false)},
-		{"v03 with text/json", NewTestReceiverFromConfig(conf), v03, "text/json", testutil.GetTestTrace(1, 1, false)},
-		{"v04 with text/json", NewTestReceiverFromConfig(conf), v04, "text/json", testutil.GetTestTrace(1, 1, false)},
+		{"v02 with empty content-type", newTestReceiverFromConfig(conf), v02, "", testutil.GetTestTrace(1, 1, false)},
+		{"v03 with empty content-type", newTestReceiverFromConfig(conf), v03, "", testutil.GetTestTrace(1, 1, false)},
+		{"v04 with empty content-type", newTestReceiverFromConfig(conf), v04, "", testutil.GetTestTrace(1, 1, false)},
+		{"v02 with application/json", newTestReceiverFromConfig(conf), v02, "application/json", testutil.GetTestTrace(1, 1, false)},
+		{"v03 with application/json", newTestReceiverFromConfig(conf), v03, "application/json", testutil.GetTestTrace(1, 1, false)},
+		{"v04 with application/json", newTestReceiverFromConfig(conf), v04, "application/json", testutil.GetTestTrace(1, 1, false)},
+		{"v02 with text/json", newTestReceiverFromConfig(conf), v02, "text/json", testutil.GetTestTrace(1, 1, false)},
+		{"v03 with text/json", newTestReceiverFromConfig(conf), v03, "text/json", testutil.GetTestTrace(1, 1, false)},
+		{"v04 with text/json", newTestReceiverFromConfig(conf), v04, "text/json", testutil.GetTestTrace(1, 1, false)},
 	}
 
 	for _, tc := range testCases {
@@ -201,7 +201,7 @@ func TestReceiverJSONDecoder(t *testing.T) {
 
 			// now we should be able to read the trace data
 			select {
-			case rt := <-tc.r.traces:
+			case rt := <-tc.r.Out:
 				assert.Len(rt, 1)
 				span := rt[0]
 				assert.Equal(uint64(42), span.TraceID)
@@ -225,18 +225,18 @@ func TestReceiverMsgpackDecoder(t *testing.T) {
 	// testing traces without content-type in agent endpoints, it should use Msgpack decoding
 	// or it should raise a 415 Unsupported media type
 	assert := assert.New(t)
-	conf := NewTestReceiverConfig()
+	conf := newTestReceiverConfig()
 	testCases := []struct {
 		name        string
 		r           *HTTPReceiver
-		apiVersion  APIVersion
+		apiVersion  Version
 		contentType string
 		traces      model.Traces
 	}{
-		{"v01 with application/msgpack", NewTestReceiverFromConfig(conf), v01, "application/msgpack", testutil.GetTestTrace(1, 1, false)},
-		{"v02 with application/msgpack", NewTestReceiverFromConfig(conf), v02, "application/msgpack", testutil.GetTestTrace(1, 1, false)},
-		{"v03 with application/msgpack", NewTestReceiverFromConfig(conf), v03, "application/msgpack", testutil.GetTestTrace(1, 1, false)},
-		{"v04 with application/msgpack", NewTestReceiverFromConfig(conf), v04, "application/msgpack", testutil.GetTestTrace(1, 1, false)},
+		{"v01 with application/msgpack", newTestReceiverFromConfig(conf), v01, "application/msgpack", testutil.GetTestTrace(1, 1, false)},
+		{"v02 with application/msgpack", newTestReceiverFromConfig(conf), v02, "application/msgpack", testutil.GetTestTrace(1, 1, false)},
+		{"v03 with application/msgpack", newTestReceiverFromConfig(conf), v03, "application/msgpack", testutil.GetTestTrace(1, 1, false)},
+		{"v04 with application/msgpack", newTestReceiverFromConfig(conf), v04, "application/msgpack", testutil.GetTestTrace(1, 1, false)},
 	}
 
 	for _, tc := range testCases {
@@ -268,7 +268,7 @@ func TestReceiverMsgpackDecoder(t *testing.T) {
 
 				// now we should be able to read the trace data
 				select {
-				case rt := <-tc.r.traces:
+				case rt := <-tc.r.Out:
 					assert.Len(rt, 1)
 					span := rt[0]
 					assert.Equal(uint64(42), span.TraceID)
@@ -290,7 +290,7 @@ func TestReceiverMsgpackDecoder(t *testing.T) {
 
 				// now we should be able to read the trace data
 				select {
-				case rt := <-tc.r.traces:
+				case rt := <-tc.r.Out:
 					assert.Len(rt, 1)
 					span := rt[0]
 					assert.Equal(uint64(42), span.TraceID)
@@ -320,25 +320,25 @@ func TestReceiverMsgpackDecoder(t *testing.T) {
 func TestReceiverServiceJSONDecoder(t *testing.T) {
 	// testing traces without content-type in agent endpoints, it should use JSON decoding
 	assert := assert.New(t)
-	conf := NewTestReceiverConfig()
+	conf := newTestReceiverConfig()
 	testCases := []struct {
 		name        string
 		r           *HTTPReceiver
-		apiVersion  APIVersion
+		apiVersion  Version
 		contentType string
 	}{
-		{"v01 with empty content-type", NewTestReceiverFromConfig(conf), v01, ""},
-		{"v02 with empty content-type", NewTestReceiverFromConfig(conf), v02, ""},
-		{"v03 with empty content-type", NewTestReceiverFromConfig(conf), v03, ""},
-		{"v04 with empty content-type", NewTestReceiverFromConfig(conf), v04, ""},
-		{"v01 with application/json", NewTestReceiverFromConfig(conf), v01, "application/json"},
-		{"v02 with application/json", NewTestReceiverFromConfig(conf), v02, "application/json"},
-		{"v03 with application/json", NewTestReceiverFromConfig(conf), v03, "application/json"},
-		{"v04 with application/json", NewTestReceiverFromConfig(conf), v04, "application/json"},
-		{"v01 with text/json", NewTestReceiverFromConfig(conf), v01, "text/json"},
-		{"v02 with text/json", NewTestReceiverFromConfig(conf), v02, "text/json"},
-		{"v03 with text/json", NewTestReceiverFromConfig(conf), v03, "text/json"},
-		{"v04 with text/json", NewTestReceiverFromConfig(conf), v04, "text/json"},
+		{"v01 with empty content-type", newTestReceiverFromConfig(conf), v01, ""},
+		{"v02 with empty content-type", newTestReceiverFromConfig(conf), v02, ""},
+		{"v03 with empty content-type", newTestReceiverFromConfig(conf), v03, ""},
+		{"v04 with empty content-type", newTestReceiverFromConfig(conf), v04, ""},
+		{"v01 with application/json", newTestReceiverFromConfig(conf), v01, "application/json"},
+		{"v02 with application/json", newTestReceiverFromConfig(conf), v02, "application/json"},
+		{"v03 with application/json", newTestReceiverFromConfig(conf), v03, "application/json"},
+		{"v04 with application/json", newTestReceiverFromConfig(conf), v04, "application/json"},
+		{"v01 with text/json", newTestReceiverFromConfig(conf), v01, "text/json"},
+		{"v02 with text/json", newTestReceiverFromConfig(conf), v02, "text/json"},
+		{"v03 with text/json", newTestReceiverFromConfig(conf), v03, "text/json"},
+		{"v04 with text/json", newTestReceiverFromConfig(conf), v04, "text/json"},
 	}
 
 	for _, tc := range testCases {
@@ -394,17 +394,17 @@ func TestReceiverServiceMsgpackDecoder(t *testing.T) {
 	// testing traces without content-type in agent endpoints, it should use Msgpack decoding
 	// or it should raise a 415 Unsupported media type
 	assert := assert.New(t)
-	conf := NewTestReceiverConfig()
+	conf := newTestReceiverConfig()
 	testCases := []struct {
 		name        string
 		r           *HTTPReceiver
-		apiVersion  APIVersion
+		apiVersion  Version
 		contentType string
 	}{
-		{"v01 with application/msgpack", NewTestReceiverFromConfig(conf), v01, "application/msgpack"},
-		{"v02 with application/msgpack", NewTestReceiverFromConfig(conf), v02, "application/msgpack"},
-		{"v03 with application/msgpack", NewTestReceiverFromConfig(conf), v03, "application/msgpack"},
-		{"v04 with application/msgpack", NewTestReceiverFromConfig(conf), v04, "application/msgpack"},
+		{"v01 with application/msgpack", newTestReceiverFromConfig(conf), v01, "application/msgpack"},
+		{"v02 with application/msgpack", newTestReceiverFromConfig(conf), v02, "application/msgpack"},
+		{"v03 with application/msgpack", newTestReceiverFromConfig(conf), v03, "application/msgpack"},
+		{"v04 with application/msgpack", newTestReceiverFromConfig(conf), v04, "application/msgpack"},
 	}
 
 	for _, tc := range testCases {
@@ -495,8 +495,8 @@ func TestHandleTraces(t *testing.T) {
 	msgp.Encode(&buf, testutil.GetTestTrace(10, 10, true))
 
 	// prepare the receiver
-	conf := NewTestReceiverConfig()
-	receiver := NewTestReceiverFromConfig(conf)
+	conf := newTestReceiverConfig()
+	receiver := newTestReceiverFromConfig(conf)
 
 	// response recorder
 	handler := http.HandlerFunc(receiver.httpHandleWithVersion(v04, receiver.handleTraces))
@@ -504,7 +504,7 @@ func TestHandleTraces(t *testing.T) {
 	for n := 0; n < 10; n++ {
 		// consume the traces channel without doing anything
 		select {
-		case <-receiver.traces:
+		case <-receiver.Out:
 		default:
 		}
 
@@ -519,7 +519,7 @@ func TestHandleTraces(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 	}
 
-	rs := receiver.stats
+	rs := receiver.Stats
 	assert.Equal(5, len(rs.Stats)) // We have a tagStats struct for each application
 
 	// We test stats for each app
@@ -558,9 +558,9 @@ func TestReceiverPreSamplerCancel(t *testing.T) {
 	n := 100 // Payloads need to be big enough, else bug is not triggered
 	msgp.Encode(&buf, testutil.GetTestTrace(n, n, true))
 
-	conf := NewTestReceiverConfig()
+	conf := newTestReceiverConfig()
 	conf.PreSampleRate = 0.000001 // Make sure we sample aggressively
-	receiver := NewTestReceiverFromConfig(conf)
+	receiver := newTestReceiverFromConfig(conf)
 
 	server := httptest.NewServer(http.HandlerFunc(receiver.httpHandleWithVersion(v04, receiver.handleTraces)))
 
@@ -601,8 +601,8 @@ func BenchmarkHandleTracesFromOneApp(b *testing.B) {
 	msgp.Encode(&buf, testutil.GetTestTrace(1, 1, true))
 
 	// prepare the receiver
-	conf := NewTestReceiverConfig()
-	receiver := NewTestReceiverFromConfig(conf)
+	conf := newTestReceiverConfig()
+	receiver := newTestReceiverFromConfig(conf)
 
 	// response recorder
 	handler := http.HandlerFunc(receiver.httpHandleWithVersion(v04, receiver.handleTraces))
@@ -614,7 +614,7 @@ func BenchmarkHandleTracesFromOneApp(b *testing.B) {
 		b.StopTimer()
 		// consume the traces channel without doing anything
 		select {
-		case <-receiver.traces:
+		case <-receiver.Out:
 		default:
 		}
 
@@ -641,8 +641,8 @@ func BenchmarkHandleTracesFromMultipleApps(b *testing.B) {
 	msgp.Encode(&buf, testutil.GetTestTrace(1, 1, true))
 
 	// prepare the receiver
-	conf := NewTestReceiverConfig()
-	receiver := NewTestReceiverFromConfig(conf)
+	conf := newTestReceiverConfig()
+	receiver := newTestReceiverFromConfig(conf)
 
 	// response recorder
 	handler := http.HandlerFunc(receiver.httpHandleWithVersion(v04, receiver.handleTraces))
@@ -654,7 +654,7 @@ func BenchmarkHandleTracesFromMultipleApps(b *testing.B) {
 		b.StopTimer()
 		// consume the traces channel without doing anything
 		select {
-		case <-receiver.traces:
+		case <-receiver.Out:
 		default:
 		}
 

@@ -7,6 +7,7 @@ import (
 
 	log "github.com/cihub/seelog"
 
+	"github.com/DataDog/datadog-trace-agent/api"
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/filters"
 	"github.com/DataDog/datadog-trace-agent/info"
@@ -46,7 +47,7 @@ func (pt *processedTrace) getSamplingPriority() (int, bool) {
 
 // Agent struct holds all the sub-routines structs and make the data flow between them
 type Agent struct {
-	Receiver           *HTTPReceiver
+	Receiver           *api.HTTPReceiver
 	Concentrator       *Concentrator
 	Blacklister        *filters.Blacklister
 	Replacer           *filters.Replacer
@@ -87,7 +88,7 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	filteredServiceChan := make(chan model.ServicesMetadata, 50)
 
 	// create components
-	r := NewHTTPReceiver(conf, dynConf, rawTraceChan, serviceChan)
+	r := api.NewHTTPReceiver(conf, dynConf, rawTraceChan, serviceChan)
 	c := NewConcentrator(
 		conf.ExtraAggregators,
 		conf.BucketInterval.Nanoseconds(),
@@ -136,7 +137,7 @@ func (a *Agent) Run() {
 	defer watchdogTicker.Stop()
 
 	// update the data served by expvar so that we don't expose a 0 sample rate
-	info.UpdatePreSampler(*a.Receiver.preSampler.Stats())
+	info.UpdatePreSampler(*a.Receiver.PreSampler.Stats())
 
 	// TODO: unify components APIs. Use Start/Stop as non-blocking ways of controlling the blocking Run loop.
 	// Like we do with TraceWriter.
@@ -152,7 +153,7 @@ func (a *Agent) Run() {
 
 	for {
 		select {
-		case t := <-a.Receiver.traces:
+		case t := <-a.Receiver.Out:
 			a.Process(t)
 		case <-watchdogTicker.C:
 			a.watchdog()
@@ -186,7 +187,7 @@ func (a *Agent) Process(t model.Trace) {
 
 	// We get the address of the struct holding the stats associated to no tags
 	// TODO: get the real tagStats related to this trace payload.
-	ts := a.Receiver.stats.GetTagStats(info.Tags{})
+	ts := a.Receiver.Stats.GetTagStats(info.Tags{})
 
 	// All traces should go through either through the normal score sampler or
 	// the one dedicated to errors
@@ -235,7 +236,7 @@ func (a *Agent) Process(t model.Trace) {
 	}
 
 	rate := sampler.GetTraceAppliedSampleRate(root)
-	rate *= a.Receiver.preSampler.Rate()
+	rate *= a.Receiver.PreSampler.Rate()
 	sampler.SetTraceAppliedSampleRate(root, rate)
 
 	// Need to do this computation before entering the concentrator
@@ -332,17 +333,17 @@ func (a *Agent) watchdog() {
 	info.UpdateWatchdogInfo(wi)
 
 	// Adjust pre-sampling dynamically
-	rate, err := sampler.CalcPreSampleRate(a.conf.MaxCPU, wi.CPU.UserAvg, a.Receiver.preSampler.RealRate())
+	rate, err := sampler.CalcPreSampleRate(a.conf.MaxCPU, wi.CPU.UserAvg, a.Receiver.PreSampler.RealRate())
 	if rate > a.conf.PreSampleRate {
 		rate = a.conf.PreSampleRate
 	}
 	if err != nil {
 		log.Warnf("problem computing pre-sample rate: %v", err)
 	}
-	a.Receiver.preSampler.SetRate(rate)
-	a.Receiver.preSampler.SetError(err)
+	a.Receiver.PreSampler.SetRate(rate)
+	a.Receiver.PreSampler.SetError(err)
 
-	preSamplerStats := a.Receiver.preSampler.Stats()
+	preSamplerStats := a.Receiver.PreSampler.Stats()
 	statsd.Client.Gauge("datadog.trace_agent.presampler_rate", preSamplerStats.Rate, nil, 1)
 	info.UpdatePreSampler(*preSamplerStats)
 }
