@@ -1,4 +1,4 @@
-// Package fixtures provides easy ways to generate some random
+// Package testutil provides easy ways to generate some random
 // or deterministic data that can be use for tests or benchmarks.
 //
 // All the publicly shared trace agent model is available.
@@ -8,4 +8,4 @@
 // access to almost all kind of stub data needed.
 // It should NEVER be imported in a program, most likely in one-off
 // projects or fuzz modes or test suites.
-package fixtures
+package testutil

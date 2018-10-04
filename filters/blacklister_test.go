@@ -3,7 +3,8 @@ package filters
 import (
 	"testing"
 
-	"github.com/DataDog/datadog-trace-agent/fixtures"
+	"github.com/DataDog/datadog-trace-agent/testutil"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,7 +31,7 @@ func TestBlacklister(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		span := fixtures.RandomSpan()
+		span := testutil.RandomSpan()
 		span.Resource = test.resource
 		filter := NewBlacklister(test.filter)
 
@@ -41,7 +42,7 @@ func TestBlacklister(t *testing.T) {
 func TestCompileRules(t *testing.T) {
 	filter := NewBlacklister([]string{"[123", "]123", "{6}"})
 	for i := 0; i < 100; i++ {
-		span := fixtures.RandomSpan()
+		span := testutil.RandomSpan()
 		assert.True(t, filter.Allows(span))
 	}
 }
