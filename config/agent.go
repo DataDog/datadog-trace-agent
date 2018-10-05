@@ -52,10 +52,12 @@ type AgentConfig struct {
 	MaxTPS          float64
 
 	// Receiver
-	ReceiverHost    string
-	ReceiverPort    int
-	ConnectionLimit int // for rate-limiting, how many unique connections to allow in a lease period (30s)
-	ReceiverTimeout int
+	ReceiverHost       string
+	ReceiverPort       int
+	ConnectionLimit    int // for rate-limiting, how many unique connections to allow in a lease period (30s)
+	ReceiverTimeout    int
+	ReceiverUDSEnabled bool
+	ReceiverUDSFile    string
 
 	// Writers
 	ServiceWriterConfig writerconfig.ServiceWriterConfig
@@ -119,9 +121,11 @@ func New() *AgentConfig {
 		PreSampleRate:   1.0,
 		MaxTPS:          10,
 
-		ReceiverHost:    "localhost",
-		ReceiverPort:    8126,
-		ConnectionLimit: 2000,
+		ReceiverHost:       "localhost",
+		ReceiverPort:       8126,
+		ReceiverUDSEnabled: false,
+		ReceiverUDSFile:    "/tmp/dd_trace_agent.sock",
+		ConnectionLimit:    2000,
 
 		ServiceWriterConfig: writerconfig.DefaultServiceWriterConfig(),
 		StatsWriterConfig:   writerconfig.DefaultStatsWriterConfig(),
