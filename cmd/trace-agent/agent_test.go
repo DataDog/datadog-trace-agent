@@ -163,7 +163,7 @@ func TestProcess(t *testing.T) {
 			Duration: (500 * time.Millisecond).Nanoseconds(),
 		}
 
-		stats := agent.Receiver.stats.GetTagStats(info.Tags{})
+		stats := agent.Receiver.Stats.GetTagStats(info.Tags{})
 		assert := assert.New(t)
 
 		agent.Process(model.Trace{spanValid})
