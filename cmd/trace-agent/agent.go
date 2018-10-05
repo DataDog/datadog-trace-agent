@@ -183,12 +183,6 @@ func (a *Agent) Process(t model.Trace) {
 		return
 	}
 
-	root := t.GetRoot()
-
-	// We get the address of the struct holding the stats associated to no tags
-	// TODO: get the real tagStats related to this trace payload.
-	ts := a.Receiver.Stats.GetTagStats(info.Tags{})
-
 	// All traces should go through either through the normal score sampler or
 	// the one dedicated to errors
 	samplers := make([]*Sampler, 0, 2)
@@ -198,27 +192,29 @@ func (a *Agent) Process(t model.Trace) {
 		samplers = append(samplers, a.ScoreSampler)
 	}
 
+	// We get the address of the struct holding the stats associated to no tags
+	// TODO: get the real tagStats related to this trace payload.
+	ts := a.Receiver.Stats.GetTagStats(info.Tags{})
+	stat := &ts.TracesPriorityNone
+	root := t.GetRoot()
 	priority, hasPriority := root.Metrics[sampler.SamplingPriorityKey]
 	if hasPriority {
 		// If Priority is defined, send to priority sampling, regardless of priority value.
 		// The sampler will keep or discard the trace, but we send everything so that it
 		// gets the big picture and can set the sampling rates accordingly.
 		samplers = append(samplers, a.PrioritySampler)
-	}
 
-	priorityPtr := &ts.TracesPriorityNone
-	if hasPriority {
 		if priority < 0 {
-			priorityPtr = &ts.TracesPriorityNeg
+			stat = &ts.TracesPriorityNeg
 		} else if priority == 0 {
-			priorityPtr = &ts.TracesPriority0
+			stat = &ts.TracesPriority0
 		} else if priority == 1 {
-			priorityPtr = &ts.TracesPriority1
+			stat = &ts.TracesPriority1
 		} else {
-			priorityPtr = &ts.TracesPriority2
+			stat = &ts.TracesPriority2
 		}
 	}
-	atomic.AddInt64(priorityPtr, 1)
+	atomic.AddInt64(stat, 1)
 
 	if root.End() < model.Now()-2*a.conf.BucketInterval.Nanoseconds() {
 		log.Errorf("skipping trace with root too far in past, root:%v", *root)
@@ -242,7 +238,6 @@ func (a *Agent) Process(t model.Trace) {
 	// Need to do this computation before entering the concentrator
 	// as they access the Metrics map, which is not thread safe.
 	t.ComputeTopLevel()
-	wt := model.NewWeightedTrace(t, root)
 
 	subtraces := t.ExtractTopLevelSubtraces(root)
 	sublayers := make(map[*model.Span][]model.SublayerValue)
@@ -261,7 +256,7 @@ func (a *Agent) Process(t model.Trace) {
 
 	pt := processedTrace{
 		Trace:         t,
-		WeightedTrace: wt,
+		WeightedTrace: model.NewWeightedTrace(t, root),
 		Root:          root,
 		Env:           a.conf.DefaultEnv,
 		Sublayers:     sublayers,
@@ -272,7 +267,7 @@ func (a *Agent) Process(t model.Trace) {
 
 	go func() {
 		defer watchdog.LogOnPanic()
-		a.ServiceExtractor.Process(wt)
+		a.ServiceExtractor.Process(pt.WeightedTrace)
 	}()
 
 	go func() {
