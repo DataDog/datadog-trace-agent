@@ -17,12 +17,16 @@ import (
 	log "github.com/cihub/seelog"
 )
 
+// apiEndpointPrefix is the URL prefix prepended to the default site value from YamlAgentConfig.
+const apiEndpointPrefix = "https://trace.agent."
+
 // YamlAgentConfig is a structure used for marshaling the datadog.yaml configuration
 // available in Agent versions >= 6
 type YamlAgentConfig struct {
 	APIKey            string `yaml:"api_key"`
 	HostName          string `yaml:"hostname"`
 	LogLevel          string `yaml:"log_level"`
+	Site              string `yaml:"site"`
 	Proxy             proxy  `yaml:"proxy"`
 	SkipSSLValidation *bool  `yaml:"skip_ssl_validation"`
 
@@ -197,6 +201,15 @@ func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 	if yc.StatsdPort > 0 {
 		c.StatsdPort = yc.StatsdPort
 	}
+	if yc.Site != "" {
+		c.APIEndpoint = apiEndpointPrefix + yc.Site
+	}
+	if yc.TraceAgent.Endpoint != "" {
+		c.APIEndpoint = yc.TraceAgent.Endpoint
+		if yc.Site != "" {
+			log.Infof("'site' and 'apm_dd_url' are both set, using endpoint: %q", c.APIEndpoint)
+		}
+	}
 	for _, host := range yc.Proxy.NoProxy {
 		if host == c.APIEndpoint {
 			log.Infof("Trace Agent endpoint matches `proxy.no_proxy` list item %q: ignoring proxy", host)
@@ -218,10 +231,6 @@ func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 
 	if yc.TraceAgent.Enabled != nil {
 		c.Enabled = *yc.TraceAgent.Enabled
-	}
-
-	if yc.TraceAgent.Endpoint != "" {
-		c.APIEndpoint = yc.TraceAgent.Endpoint
 	}
 
 	if yc.TraceAgent.LogFilePath != "" {

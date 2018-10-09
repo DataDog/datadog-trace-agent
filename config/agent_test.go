@@ -63,6 +63,24 @@ func TestConfigHostname(t *testing.T) {
 	})
 }
 
+func TestSite(t *testing.T) {
+	for name, tt := range map[string]struct {
+		file string
+		url  string
+	}{
+		"default":  {"./testdata/site_default.yaml", "https://trace.agent.datadoghq.com"},
+		"eu":       {"./testdata/site_eu.yaml", "https://trace.agent.datadoghq.eu"},
+		"url":      {"./testdata/site_url.yaml", "some.other.datadoghq.eu"},
+		"override": {"./testdata/site_override.yaml", "some.other.datadoghq.eu"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg, err := Load(tt.file)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.url, cfg.APIEndpoint)
+		})
+	}
+}
+
 func TestDefaultConfig(t *testing.T) {
 	assert := assert.New(t)
 	c := New()
