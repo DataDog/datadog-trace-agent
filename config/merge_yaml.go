@@ -31,12 +31,9 @@ type YamlAgentConfig struct {
 	TraceAgent traceAgent `yaml:"apm_config"`
 }
 
-// TODO(x): Remove deprecated fields in 7.x
-
 type proxy struct {
-	HTTP    string   `yaml:"http"`  // deprecated; use URL
-	HTTPS   string   `yaml:"https"` // deprecated; use URL
-	URL     string   `yaml:"url"`
+	HTTP    string   `yaml:"http"`
+	HTTPS   string   `yaml:"https"`
 	NoProxy []string `yaml:"no_proxy"`
 }
 
@@ -207,19 +204,12 @@ func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 			break
 		}
 	}
-	for field, rawUrl := range map[string]string{
-		"http":  yc.Proxy.HTTP,
-		"https": yc.Proxy.HTTPS,
-		"url":   yc.Proxy.URL,
-	} {
-		if rawUrl == "" {
-			continue
-		}
-		url, err := url.Parse(rawUrl)
+	if yc.Proxy.HTTPS != "" {
+		url, err := url.Parse(yc.Proxy.HTTPS)
 		if err == nil {
 			c.ProxyURL = url
 		} else {
-			log.Errorf("Failed to parse proxy URL from proxy.%s configuration: %s", field, err)
+			log.Errorf("Failed to parse proxy URL from proxy.https configuration: %s", err)
 		}
 	}
 	if yc.SkipSSLValidation != nil {

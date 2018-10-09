@@ -27,8 +27,7 @@ api_key: 1234
 # 
 # # Proxy settings
 # proxy:
-#   # Use a proxy (http, https or socks5 supported)
-#   url: socks5://my-proxy.com
+#   https: https://my-proxy.com
 #   # Override proxy for this list of entries.
 #   no_proxy:
 #     - https://trace.agent.datadoghq.com
