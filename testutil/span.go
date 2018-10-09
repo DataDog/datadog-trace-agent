@@ -1,10 +1,8 @@
-/*
-In this file we define methods and global variables to:
-* allow generation of arbitrary/random VALID spans
-* pick random attributes for a span
-*/
+// In this file we define methods and global variables to:
+// allow generation of arbitrary/random VALID spans
+// pick random attributes for a span
 
-package fixtures
+package testutil
 
 import (
 	"math/rand"

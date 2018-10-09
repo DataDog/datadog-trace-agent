@@ -4,9 +4,8 @@ import (
 	"math/rand"
 	"sync"
 
+	"github.com/DataDog/datadog-trace-agent/testutil"
 	log "github.com/cihub/seelog"
-
-	"github.com/DataDog/datadog-trace-agent/fixtures"
 )
 
 // payloadConstructedHandlerArgs encodes the arguments passed to a PayloadConstructedHandler call.
@@ -75,7 +74,7 @@ func RandomPayload() *Payload {
 
 // RandomSizedPayload creates a new payload instance using random data with the specified size.
 func RandomSizedPayload(size int) *Payload {
-	return NewPayload(fixtures.RandomSizedBytes(size), fixtures.RandomStringMap())
+	return NewPayload(testutil.RandomSizedBytes(size), testutil.RandomStringMap())
 }
 
 // testPayloadSender is a PayloadSender that is connected to a testEndpoint, used for testing.

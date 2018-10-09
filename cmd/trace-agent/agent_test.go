@@ -13,10 +13,11 @@ import (
 	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/fixtures"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/obfuscate"
+	"github.com/DataDog/datadog-trace-agent/sampler"
+	"github.com/DataDog/datadog-trace-agent/testutil"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -163,14 +164,70 @@ func TestProcess(t *testing.T) {
 			Duration: (500 * time.Millisecond).Nanoseconds(),
 		}
 
-		stats := agent.Receiver.stats.GetTagStats(info.Tags{})
+		stats := agent.Receiver.Stats.GetTagStats(info.Tags{})
 		assert := assert.New(t)
 
 		agent.Process(model.Trace{spanValid})
 		assert.EqualValues(0, stats.TracesFiltered)
+		assert.EqualValues(0, stats.SpansFiltered)
 
-		agent.Process(model.Trace{spanInvalid})
+		agent.Process(model.Trace{spanInvalid, spanInvalid})
 		assert.EqualValues(1, stats.TracesFiltered)
+		assert.EqualValues(2, stats.SpansFiltered)
+	})
+
+	t.Run("Stats/Priority", func(t *testing.T) {
+		cfg := config.New()
+		cfg.APIKey = "test"
+		ctx, cancel := context.WithCancel(context.Background())
+		agent := NewAgent(ctx, cfg)
+		defer cancel()
+
+		now := time.Now()
+		disabled := float64(-99)
+		for _, key := range []float64{
+			disabled, -1, -1, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2,
+		} {
+			span := &model.Span{
+				Resource: "SELECT name FROM people WHERE age = 42 AND extra = 55",
+				Type:     "sql",
+				Start:    now.Add(-time.Second).UnixNano(),
+				Duration: (500 * time.Millisecond).Nanoseconds(),
+				Metrics:  map[string]float64{},
+			}
+			if key != disabled {
+				span.Metrics[sampler.SamplingPriorityKey] = key
+			}
+			agent.Process(model.Trace{span})
+		}
+
+		stats := agent.Receiver.Stats.GetTagStats(info.Tags{})
+		assert.EqualValues(t, 1, stats.TracesPriorityNone)
+		assert.EqualValues(t, 2, stats.TracesPriorityNeg)
+		assert.EqualValues(t, 3, stats.TracesPriority0)
+		assert.EqualValues(t, 4, stats.TracesPriority1)
+		assert.EqualValues(t, 5, stats.TracesPriority2)
+	})
+
+	t.Run("Stats/Dropped", func(t *testing.T) {
+		cfg := config.New()
+		cfg.APIKey = "test"
+		ctx, cancel := context.WithCancel(context.Background())
+		agent := NewAgent(ctx, cfg)
+		defer cancel()
+
+		span := &model.Span{
+			Resource: "SELECT name FROM people WHERE age = 42 AND extra = 55",
+			Type:     "sql",
+			Start:    time.Now().Add(-2 * time.Hour).UnixNano(),
+			Duration: (500 * time.Millisecond).Nanoseconds(),
+			Metrics:  map[string]float64{},
+		}
+		agent.Process(model.Trace{span, span})
+
+		stats := agent.Receiver.Stats.GetTagStats(info.Tags{})
+		assert.EqualValues(t, 1, stats.TracesDropped)
+		assert.EqualValues(t, 2, stats.SpansDropped)
 	})
 }
 
@@ -208,7 +265,7 @@ func runTraceProcessingBenchmark(b *testing.B, c *config.AgentConfig) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		agent.Process(fixtures.RandomTrace(10, 8))
+		agent.Process(testutil.RandomTrace(10, 8))
 	}
 }
 
