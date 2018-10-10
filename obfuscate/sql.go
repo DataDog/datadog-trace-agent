@@ -8,12 +8,9 @@ import (
 	log "github.com/cihub/seelog"
 )
 
-const (
-	sqlQueryTag      = "sql.query"
-	sqlQuantizeError = "agent.parse.error"
-)
+const sqlQueryTag = "sql.query"
 
-// tokenFilter is a generic interface that a tokenConsumer expects. It defines
+// tokenFilter is a generic interface that a sqlObfuscator expects. It defines
 // the Filter() function used to filter or replace given tokens.
 // A filter can be stateful and keep an internal state to apply the filter later;
 // this can be useful to prevent backtracking in some cases.
@@ -139,10 +136,10 @@ func (f *groupingFilter) Reset() {
 	f.groupMulti = 0
 }
 
-// tokenConsumer is a Tokenizer consumer. It calls the Tokenizer Scan() function until tokens
+// sqlObfuscator is a Tokenizer consumer. It calls the Tokenizer Scan() function until tokens
 // are available or if a LEX_ERROR is raised. After retrieving a token, it is sent in the
 // tokenFilter chains so that the token is discarded or replaced.
-type tokenConsumer struct {
+type sqlObfuscator struct {
 	tokenizer *Tokenizer
 	filters   []tokenFilter
 	lastToken int
@@ -151,32 +148,20 @@ type tokenConsumer struct {
 // Process the given SQL or No-SQL string so that the resulting one is properly altered. This
 // function is generic and the behavior changes according to chosen tokenFilter implementations.
 // The process calls all filters inside the []tokenFilter.
-func (t *tokenConsumer) Process(in string) (string, error) {
-	out := &bytes.Buffer{}
-	t.tokenizer.InStream.Reset(in)
-
+func (t *sqlObfuscator) obfuscate(in string) (string, error) {
+	var out bytes.Buffer
+	t.reset(in)
 	token, buff := t.tokenizer.Scan()
 	for ; token != EOFChar; token, buff = t.tokenizer.Scan() {
-		// handle terminal case
 		if token == LexError {
-			// the tokenizer is unable  to process the SQL  string, so the output will be
-			// surely wrong. In this case we return an error and an empty string.
-			t.Reset()
 			return "", errors.New("the tokenizer was unable to process the string")
 		}
-
-		// apply all registered filters
 		for _, f := range t.filters {
 			if token, buff = f.Filter(token, t.lastToken, buff); token == LexError {
-				t.Reset()
 				return "", errors.New("the tokenizer was unable to process the string")
 			}
 		}
-
-		// write the resulting buffer
 		if buff != nil {
-			// ensure that whitespaces properly separate
-			// received tokens
 			if out.Len() != 0 {
 				switch token {
 				case ',':
@@ -189,29 +174,24 @@ func (t *tokenConsumer) Process(in string) (string, error) {
 					out.WriteRune(' ')
 				}
 			}
-
 			out.Write(buff)
 		}
-
 		t.lastToken = token
 	}
-
-	// reset internals to reuse allocated memory
-	t.Reset()
 	return out.String(), nil
 }
 
 // Reset restores the initial states for all components so that memory can be re-used
-func (t *tokenConsumer) Reset() {
-	t.tokenizer.Reset()
+func (t *sqlObfuscator) reset(in string) {
+	t.tokenizer.Reset(in)
 	for _, f := range t.filters {
 		f.Reset()
 	}
 }
 
-// newTokenConsumer returns a new tokenConsumer capable to process SQL and No-SQL strings.
-func newTokenConsumer() *tokenConsumer {
-	return &tokenConsumer{
+// newSQLObfuscator returns a new sqlObfuscator capable to process SQL and No-SQL strings.
+func newSQLObfuscator() *sqlObfuscator {
+	return &sqlObfuscator{
 		tokenizer: NewStringTokenizer(""),
 		filters: []tokenFilter{
 			&discardFilter{},
@@ -226,16 +206,13 @@ func (o *Obfuscator) obfuscateSQL(span *model.Span) {
 	if span.Resource == "" {
 		return
 	}
-
-	quantizedString, err := o.sql.Process(span.Resource)
-	if err != nil || quantizedString == "" {
-		// if we have an error, the partially parsed SQL is discarded so that we don't pollute
-		// users resources. Here we provide more details to debug the problem.
-		log.Debugf("Error parsing the query: `%s`", span.Resource)
+	result, err := o.sql.obfuscate(span.Resource)
+	if err != nil || result == "" {
+		// we have an error, discard the SQL to avoid polluting user resources.
+		log.Debugf("Error parsing SQL query: %q", span.Resource)
 		if span.Meta == nil {
-			span.Meta = make(map[string]string)
+			span.Meta = make(map[string]string, 1)
 		}
-		span.Meta[sqlQuantizeError] = "Query not parsed"
 		if _, ok := span.Meta[sqlQueryTag]; !ok {
 			span.Meta[sqlQueryTag] = span.Resource
 		}
@@ -243,22 +220,14 @@ func (o *Obfuscator) obfuscateSQL(span *model.Span) {
 		return
 	}
 
-	span.Resource = quantizedString
+	span.Resource = result
 
-	// set the sql.query tag if and only if it's not already set by users. If a users set
-	// this value, we send that value AS IS to the backend. If the value is not set, we
-	// try to obfuscate users parameters so that sensitive data are not sent in the backend.
-	// TODO: the current implementation is a rough approximation that assumes
-	// obfuscation == quantization. This is not true in real environments because we're
-	// removing data that could be interesting for users.
 	if span.Meta != nil && span.Meta[sqlQueryTag] != "" {
+		// "sql.query" tag already set by user, do not change it.
 		return
 	}
-
 	if span.Meta == nil {
 		span.Meta = make(map[string]string)
 	}
-
-	span.Meta[sqlQueryTag] = quantizedString
-	return
+	span.Meta[sqlQueryTag] = result
 }
