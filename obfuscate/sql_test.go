@@ -346,8 +346,24 @@ FROM [Blogs] AS [b
 ORDER BY [b].[Name]`,
 			`Non-parsable SQL query`,
 		},
+		{
+			"SELECT * FROM `host` WHERE `id` IN (\"jim@james.com\")",
+			"SELECT * FROM host WHERE id IN ( ? )",
+		},
+		{
+			`
+SELECT p.FirstName, p.LastName  
+FROM Person.Person AS p  
+    JOIN Sales.SalesPerson AS sp  
+    ON p.BusinessEntityID = sp.BusinessEntityID  
+WHERE p.BusinessEntityID IN  
+   (SELECT BusinessEntityID  
+   FROM Sales.SalesPerson IN (SELECT * FROM entity WHERE user = "charlie")
+   WHERE SalesQuota > 250000)
+`,
+			`SELECT p.FirstName, p.LastName FROM Person.Person JOIN Sales.SalesPerson ON p.BusinessEntityID = sp.BusinessEntityID WHERE p.BusinessEntityID IN ( ? )`,
+		},
 	}
-
 	for _, c := range cases {
 		s := SQLSpan(c.query)
 		NewObfuscator(nil).Obfuscate(s)
@@ -434,16 +450,16 @@ func TestCassQuantizer(t *testing.T) {
 		// List compacted and replaced
 		{
 			"select key, status, modified from org_check_run where org_id = %s and check in (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-			"select key, status, modified from org_check_run where org_id = ? and check in ( ? )",
+			"select key, status, modified from org_check_run where org_id = ? and check IN ( ? )",
 		},
 		// Some whitespace-y things
 		{
 			"select key, status, modified from org_check_run where org_id = %s and check in (%s, %s, %s)",
-			"select key, status, modified from org_check_run where org_id = ? and check in ( ? )",
+			"select key, status, modified from org_check_run where org_id = ? and check IN ( ? )",
 		},
 		{
 			"select key, status, modified from org_check_run where org_id = %s and check in (%s , %s , %s )",
-			"select key, status, modified from org_check_run where org_id = ? and check in ( ? )",
+			"select key, status, modified from org_check_run where org_id = ? and check IN ( ? )",
 		},
 		// %s replaced with ? as in sql quantize
 		{

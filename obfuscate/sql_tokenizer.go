@@ -36,19 +36,7 @@ const (
 	GE                = 57362
 	NE                = 57363
 	As                = 57365
-
-	// Filtered specifies that the given token has been discarded by one of the
-	// token filters.
-	Filtered = 57364
-
-	// FilteredComma specifies that the token is a comma and was discarded by one
-	// of the filters.
-	FilteredComma = 57366
-
-	// FilteredBracketedIdentifier specifies that we are currently discarding
-	// a bracketed identifier (MSSQL).
-	// See issue https://github.com/DataDog/datadog-trace-agent/issues/475.
-	FilteredBracketedIdentifier = 57367
+	In                = 57368
 )
 
 // Tokenizer is the struct used to generate SQL
@@ -80,6 +68,7 @@ var keywords = map[string]int{
 	"SAVEPOINT": Savepoint,
 	"LIMIT":     Limit,
 	"AS":        As,
+	"IN":        In,
 }
 
 // Scan scans the tokenizer for the next token and returns
