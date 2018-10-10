@@ -47,11 +47,11 @@ type PreSampler struct {
 }
 
 // NewPreSampler returns an initialized presampler
-func NewPreSampler(rate float64) *PreSampler {
+func NewPreSampler() *PreSampler {
 	decayFactor := 9.0 / 8.0
 	return &PreSampler{
 		stats: PreSamplerStats{
-			Rate: rate,
+			Rate: 1,
 		},
 		decayPeriod: defaultDecayPeriod,
 		decayFactor: decayFactor,

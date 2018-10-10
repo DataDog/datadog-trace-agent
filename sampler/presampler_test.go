@@ -86,7 +86,7 @@ func TestPreSamplerRace(t *testing.T) {
 	var wg sync.WaitGroup
 
 	const N = 1000
-	ps := NewPreSampler(1.0)
+	ps := NewPreSampler()
 	wg.Add(5)
 
 	go func() {
@@ -130,7 +130,7 @@ func TestPreSamplerRace(t *testing.T) {
 func TestPreSamplerSampleWithCount(t *testing.T) {
 	assert := assert.New(t)
 
-	ps := NewPreSampler(1.0)
+	ps := NewPreSampler()
 	ps.SetRate(0.2)
 	assert.Equal(0.2, ps.RealRate(), "by default, RealRate returns wished rate")
 	assert.True(ps.sampleWithCount(100), "always accept first payload")
@@ -162,7 +162,7 @@ func TestPreSamplerSampleWithCount(t *testing.T) {
 func TestPreSamplerError(t *testing.T) {
 	assert := assert.New(t)
 
-	ps := NewPreSampler(1.0)
+	ps := NewPreSampler()
 	assert.Equal("", ps.stats.Error, "fresh pre-sampler should have no error")
 	ps.SetError(fmt.Errorf("bad news"))
 	assert.Equal("bad news", ps.stats.Error, `error should be "bad news"`)
