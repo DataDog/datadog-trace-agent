@@ -346,6 +346,19 @@ FROM [Blogs] AS [b
 ORDER BY [b].[Name]`,
 			`Non-parsable SQL query`,
 		},
+		{
+			`
+SELECT p.FirstName, p.LastName  
+FROM Person.Person AS p  
+    JOIN Sales.SalesPerson AS sp  
+    ON p.BusinessEntityID = sp.BusinessEntityID  
+WHERE p.BusinessEntityID IN  
+   (SELECT BusinessEntityID  
+   FROM Sales.SalesPerson IN (SELECT * FROM entity WHERE user = "charlie")
+   WHERE SalesQuota > 250000)
+`,
+			`SELECT p.FirstName, p.LastName FROM Person.Person JOIN Sales.SalesPerson ON p.BusinessEntityID = sp.BusinessEntityID WHERE p.BusinessEntityID IN ( ? )`,
+		},
 	}
 
 	for _, c := range cases {
