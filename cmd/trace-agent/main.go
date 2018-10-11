@@ -35,9 +35,9 @@ func handleSignal(onSignal func()) {
 			log.Infof("received signal %d (%v)", signo, signo)
 			onSignal()
 			return
-		// By default systemd redirect the stdout to journald. When journald is stopped or crashes we receive a SIGPIPE signal.
-		// Go ignore SIGPIPE signals unless it is when stdout or stdout is closed, in this case the agent is stopped. We don't want that
-		// so we intercept the SIGPIPE signals and just discard them.
+		// By default systemd redirects the stdout to journald. When journald is stopped or crashes we receive a SIGPIPE signal.
+		// Go ignores SIGPIPE signals unless it is when stdout or stdout is closed, in this case the agent is stopped.
+		// We never want the agent to stop upon receiving SIGPIPE, so we intercept the SIGPIPE signals and just discard them.
 		case syscall.SIGPIPE:
 			// do nothing
 		default:
