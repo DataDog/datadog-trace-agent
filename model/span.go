@@ -44,3 +44,11 @@ func (s *Span) Weight() float64 {
 
 	return 1.0 / sampleRate
 }
+
+// SetMetric sets a value in the span Metrics map.
+func (s *Span) SetMetric(key string, val float64) {
+	if s.Metrics == nil {
+		s.Metrics = make(map[string]float64)
+	}
+	s.Metrics[key] = val
+}

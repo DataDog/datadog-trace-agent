@@ -12,8 +12,7 @@ import (
 func createTrace(serviceName string, operationName string, topLevel bool, hasPriority bool, priority int) processedTrace {
 	ws := model.WeightedSpan{TopLevel: topLevel, Span: &model.Span{Service: serviceName, Name: operationName}}
 	if hasPriority {
-		ws.Metrics = make(map[string]float64)
-		ws.Metrics[sampler.SamplingPriorityKey] = float64(priority)
+		ws.SetMetric(sampler.SamplingPriorityKey, float64(priority))
 	}
 	wt := model.WeightedTrace{&ws}
 	return processedTrace{WeightedTrace: wt, Root: ws.Span}

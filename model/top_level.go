@@ -44,17 +44,11 @@ func (s *Span) setTopLevel(topLevel bool) {
 			return
 		}
 		delete(s.Metrics, topLevelKey)
-		if len(s.Metrics) == 0 {
-			s.Metrics = nil
-		}
 		return
-	}
-	if s.Metrics == nil {
-		s.Metrics = make(map[string]float64, 1)
 	}
 	// Setting the metrics value, so that code downstream in the pipeline
 	// can identify this as top-level without recomputing everything.
-	s.Metrics[topLevelKey] = 1
+	s.SetMetric(topLevelKey, 1)
 }
 
 // TopLevel returns true if span is top-level.

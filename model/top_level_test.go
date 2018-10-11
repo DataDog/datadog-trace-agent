@@ -139,7 +139,7 @@ func TestTopLevelGetSetMetrics(t *testing.T) {
 	span.setTopLevel(true)
 	assert.Equal(float64(1), span.Metrics["_top_level"], "should have a _top_level:1 flag")
 	span.setTopLevel(false)
-	assert.Nil(span.Metrics, "no meta at all")
+	assert.Equal(len(span.Metrics), 0, "no meta at all")
 
 	span.Metrics = map[string]float64{"custom": 42}
 
