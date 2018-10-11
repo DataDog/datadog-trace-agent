@@ -329,9 +329,6 @@ func (a *Agent) watchdog() {
 
 	// Adjust pre-sampling dynamically
 	rate, err := sampler.CalcPreSampleRate(a.conf.MaxCPU, wi.CPU.UserAvg, a.Receiver.PreSampler.RealRate())
-	if rate > a.conf.PreSampleRate {
-		rate = a.conf.PreSampleRate
-	}
 	if err != nil {
 		log.Warnf("problem computing pre-sample rate: %v", err)
 	}

@@ -66,8 +66,8 @@ func NewStringTokenizer(sql string) *Tokenizer {
 }
 
 // Reset the underlying buffer and positions
-func (tkn *Tokenizer) Reset() {
-	tkn.InStream.Reset("")
+func (tkn *Tokenizer) Reset(in string) {
+	tkn.InStream.Reset(in)
 	tkn.Position = 0
 	tkn.lastChar = 0
 }
