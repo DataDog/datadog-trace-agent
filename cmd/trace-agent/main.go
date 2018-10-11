@@ -28,13 +28,18 @@ import (
 // handleSignal closes a channel to exit cleanly from routines
 func handleSignal(onSignal func()) {
 	sigChan := make(chan os.Signal, 10)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGPIPE)
 	for signo := range sigChan {
 		switch signo {
 		case syscall.SIGINT, syscall.SIGTERM:
 			log.Infof("received signal %d (%v)", signo, signo)
 			onSignal()
 			return
+		// By default systemd redirect the stdout to journald. When journald is stopped or crashes we receive a SIGPIPE signal.
+		// Go ignore SIGPIPE signals unless it is when stdout or stdout is closed, in this case the agent is stopped. We don't want that
+		// so we intercept the SIGPIPE signals and just discard them.
+		case syscall.SIGPIPE:
+			// do nothing
 		default:
 			log.Warnf("unhandled signal %d (%v)", signo, signo)
 		}
