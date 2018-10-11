@@ -559,8 +559,8 @@ func TestReceiverPreSamplerCancel(t *testing.T) {
 	msgp.Encode(&buf, testutil.GetTestTrace(n, n, true))
 
 	conf := newTestReceiverConfig()
-	conf.PreSampleRate = 0.000001 // Make sure we sample aggressively
 	receiver := newTestReceiverFromConfig(conf)
+	receiver.PreSampler.SetRate(0.000001) // Make sure we sample aggressively
 
 	server := httptest.NewServer(http.HandlerFunc(receiver.httpHandleWithVersion(v04, receiver.handleTraces)))
 
