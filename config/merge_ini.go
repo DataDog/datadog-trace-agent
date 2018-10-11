@@ -174,11 +174,6 @@ func (c *AgentConfig) loadIniConfig(conf *File) {
 	if v, e := conf.GetFloat("trace.sampler", "extra_sample_rate"); e == nil {
 		c.ExtraSampleRate = v
 	}
-	// undocumented
-	// TODO: remove, should stay internal?
-	if v, e := conf.GetFloat("trace.sampler", "pre_sample_rate"); e == nil {
-		c.PreSampleRate = v
-	}
 	if v, e := conf.GetFloat("trace.sampler", "max_traces_per_second"); e == nil {
 		c.MaxTPS = v
 	}

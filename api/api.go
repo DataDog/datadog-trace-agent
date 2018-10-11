@@ -76,7 +76,7 @@ func NewHTTPReceiver(
 	// use buffered channels so that handlers are not waiting on downstream processing
 	return &HTTPReceiver{
 		Stats:      info.NewReceiverStats(),
-		PreSampler: sampler.NewPreSampler(conf.PreSampleRate),
+		PreSampler: sampler.NewPreSampler(),
 		Out:        out,
 
 		conf:     conf,

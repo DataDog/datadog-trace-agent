@@ -48,7 +48,6 @@ type AgentConfig struct {
 
 	// Sampler configuration
 	ExtraSampleRate float64
-	PreSampleRate   float64
 	MaxTPS          float64
 
 	// Receiver
@@ -116,7 +115,6 @@ func New() *AgentConfig {
 		ExtraAggregators: []string{"http.status_code"},
 
 		ExtraSampleRate: 1.0,
-		PreSampleRate:   1.0,
 		MaxTPS:          10,
 
 		ReceiverHost:    "localhost",
@@ -139,7 +137,7 @@ func New() *AgentConfig {
 		MaxConnections:   200, // in practice, rarely goes over 20
 		WatchdogInterval: time.Minute,
 
-		Ignore: make(map[string][]string),
+		Ignore:                      make(map[string][]string),
 		AnalyzedRateByServiceLegacy: make(map[string]float64),
 		AnalyzedSpansByService:      make(map[string]map[string]float64),
 	}

@@ -12,6 +12,7 @@ import (
 
 const (
 	envAPIKey          = "DD_API_KEY"               // API KEY
+	envSite            = "DD_SITE"                  // server site (us, eu)
 	envAPMEnabled      = "DD_APM_ENABLED"           // APM enabled
 	envURL             = "DD_APM_DD_URL"            // APM URL
 	envProxyDeprecated = "HTTPS_PROXY"              // (deprecated) proxy URL
@@ -53,8 +54,15 @@ func (c *AgentConfig) loadEnv() {
 		c.Hostname = v
 	}
 
+	site := os.Getenv(envSite)
+	if site != "" {
+		c.APIEndpoint = apiEndpointPrefix + site
+	}
 	if v := os.Getenv(envURL); v != "" {
 		c.APIEndpoint = v
+		if site != "" {
+			log.Infof("'DD_SITE' and 'DD_APM_DD_URL' are both set, using endpoint: %q", v)
+		}
 	}
 
 	if v := os.Getenv(envAPIKey); v != "" {
