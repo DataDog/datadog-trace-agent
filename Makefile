@@ -35,7 +35,7 @@ binaries:
 ci:
 	# task used by CI
 	GOOS=windows go build ./cmd/trace-agent # ensure windows builds
-	go get -u github.com/golang/lint/golint/...
+	go get -u golang.org/x/lint/golint
 	golint -set_exit_status=1 ./cmd/trace-agent ./filters ./api ./testutil ./info ./quantile ./obfuscate ./sampler ./statsd ./watchdog ./writer ./flags ./osutil
 	go test -v ./...
 
