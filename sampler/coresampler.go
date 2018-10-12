@@ -174,8 +174,5 @@ func GetTraceAppliedSampleRate(root *model.Span) float64 {
 
 // SetTraceAppliedSampleRate sets the currently applied sample rate in the trace data to allow chained up sampling.
 func SetTraceAppliedSampleRate(root *model.Span, sampleRate float64) {
-	if root.Metrics == nil {
-		root.Metrics = make(map[string]float64)
-	}
-	root.Metrics[model.SpanSampleRateMetricKey] = sampleRate
+	root.SetMetric(model.SpanSampleRateMetricKey, sampleRate)
 }
