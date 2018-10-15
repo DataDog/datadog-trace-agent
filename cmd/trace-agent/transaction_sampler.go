@@ -56,15 +56,37 @@ func (s *transactionSampler) Extract(t processedTrace) []*model.Span {
 }
 
 func (s *transactionSampler) shouldAnalyze(span *model.WeightedSpan, hasPriority bool, priority int) bool {
-	if operations, ok := s.analyzedSpansByService[span.Service]; ok {
-		if analyzeRate, ok := operations[span.Name]; ok {
-			// If the trace has been manually sampled, we keep all matching spans
-			highPriority := hasPriority && priority >= 2
-			if highPriority || sampler.SampleByRate(span.TraceID, analyzeRate) {
-				return true
+	var analyzeRate float64
+
+	// Read sample rate from span metrics.
+	if rate, ok := span.Span.Metrics[sampler.EventSampleRateKey]; ok {
+		analyzeRate = rate
+	} else {
+		// If not available, fallback to Agent-configured rates.
+		if operations, ok := s.analyzedSpansByService[span.Service]; ok {
+			if rate, ok := operations[span.Name]; ok {
+				analyzeRate = rate
+				// Update the stored sample rate to unify instrumentation-provided and agent-provided configuration.
+				span.Span.SetMetric(sampler.EventSampleRateKey, analyzeRate)
 			}
 		}
 	}
+
+	if analyzeRate > 0 {
+		// If the trace has been manually sampled, we keep all matching spans. We also update the sample rate stored
+		// to reflect it.
+		highPriority := hasPriority && priority >= 2
+		if highPriority {
+			span.Span.SetMetric(sampler.EventSampleRateKey, 1)
+			return true
+		}
+
+		// The common case is to sample based on the rate.
+		if sampler.SampleByRate(span.TraceID, analyzeRate) {
+			return true
+		}
+	}
+
 	return false
 }
 
