@@ -208,14 +208,6 @@ func (a *Agent) Process(t model.Trace) {
 	}
 	atomic.AddInt64(stat, 1)
 
-	if root.End() < model.Now()-2*a.conf.BucketInterval.Nanoseconds() {
-		log.Errorf("skipping trace with root too far in past, root:%v", *root)
-
-		atomic.AddInt64(&ts.TracesDropped, 1)
-		atomic.AddInt64(&ts.SpansDropped, int64(len(t)))
-		return
-	}
-
 	if !a.Blacklister.Allows(root) {
 		log.Debugf("trace rejected by blacklister. root: %v", root)
 		atomic.AddInt64(&ts.TracesFiltered, 1)
