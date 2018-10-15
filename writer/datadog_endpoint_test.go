@@ -17,25 +17,24 @@ func TestNewClient(t *testing.T) {
 	}
 
 	t.Run("blank", func(t *testing.T) {
-		client := NewClient(&config.AgentConfig{})
+		client := newClient(&config.AgentConfig{}, false)
 		transport := client.Transport.(*http.Transport)
 		assert.False(transport.TLSClientConfig.InsecureSkipVerify)
 		assert.Nil(transport.Proxy)
 	})
 
 	t.Run("no_proxy", func(t *testing.T) {
-		client := NewClient(&config.AgentConfig{
+		client := newClient(&config.AgentConfig{
 			SkipSSLValidation: true,
 			ProxyURL:          url,
-			NoProxy:           true,
-		})
+		}, true)
 		transport := client.Transport.(*http.Transport)
 		assert.True(transport.TLSClientConfig.InsecureSkipVerify)
 		assert.Nil(transport.Proxy)
 	})
 
 	t.Run("proxy", func(t *testing.T) {
-		client := NewClient(&config.AgentConfig{ProxyURL: url})
+		client := newClient(&config.AgentConfig{ProxyURL: url}, false)
 		transport := client.Transport.(*http.Transport)
 		goturl, _ := transport.Proxy(nil)
 		assert.False(transport.TLSClientConfig.InsecureSkipVerify)

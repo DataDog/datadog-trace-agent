@@ -58,9 +58,7 @@ func NewTraceWriter(conf *config.AgentConfig, in <-chan *SampledTrace) *TraceWri
 
 		in: in,
 
-		BaseWriter: *NewBaseWriter(conf, "/api/v0.2/traces", func(endpoint Endpoint) PayloadSender {
-			return NewCustomQueuablePayloadSender(endpoint, writerConf.SenderConfig)
-		}),
+		BaseWriter: *NewBaseWriter(conf, "/api/v0.2/traces", newSenderFactory(writerConf.SenderConfig)),
 	}
 }
 

@@ -34,10 +34,7 @@ func NewServiceWriter(conf *config.AgentConfig, InServices <-chan model.Services
 		conf:          writerConf,
 		InServices:    InServices,
 		serviceBuffer: model.ServicesMetadata{},
-		BaseWriter: *NewBaseWriter(conf, "/api/v0.2/services", func(endpoint Endpoint) PayloadSender {
-			senderConf := writerConf.SenderConfig
-			return NewCustomQueuablePayloadSender(endpoint, senderConf)
-		}),
+		BaseWriter:    *NewBaseWriter(conf, "/api/v0.2/services", newSenderFactory(writerConf.SenderConfig)),
 	}
 }
 

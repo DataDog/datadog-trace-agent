@@ -24,6 +24,13 @@ var (
 	ErrMissingHostname = errors.New("failed to automatically set the hostname, you must specify it via configuration for or the DD_HOSTNAME env var")
 )
 
+// Endpoint specifies an endpoint that the trace agent will write data (traces, stats & services) to.
+type Endpoint struct {
+	APIKey  string `yaml:"api_key"`
+	Host    string `yaml:"url"`
+	NoProxy bool
+}
+
 // AgentConfig handles the interpretation of the configuration (with default
 // behaviors) in one place. It is also a simple structure to share across all
 // the Agent components, with 100% safe and reliable values.
@@ -38,8 +45,10 @@ type AgentConfig struct {
 	ConfigPath string // the source of this config, if any
 
 	// API
-	APIEndpoint string
-	APIKey      string `json:"-"` // never publish this
+	APIEndpoint         string
+	AdditionalEndpoints []*Endpoint
+	APIKey              string `json:"-"` // never publish this
+	APIEnabled          bool
 
 	// Concentrator
 	BucketInterval   time.Duration // the size of our pre-aggregation per bucket

@@ -41,9 +41,7 @@ func NewStatsWriter(conf *config.AgentConfig, InStats <-chan []model.StatsBucket
 	writerConf := conf.StatsWriterConfig
 	log.Infof("Stats writer initializing with config: %+v", writerConf)
 
-	bw := *NewBaseWriter(conf, "/api/v0.2/stats", func(endpoint Endpoint) PayloadSender {
-		return NewCustomQueuablePayloadSender(endpoint, writerConf.SenderConfig)
-	})
+	bw := *NewBaseWriter(conf, "/api/v0.2/stats", newSenderFactory(writerConf.SenderConfig))
 	return &StatsWriter{
 		BaseWriter: bw,
 		InStats:    InStats,
