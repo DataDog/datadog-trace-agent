@@ -291,12 +291,17 @@ func (a *Agent) Process(t model.Trace) {
 		var sampledTrace writer.SampledTrace
 
 		sampled := false
+		var parallelSampleRate, sampleRate float64
+		var samplerSampled bool
 		for _, s := range samplers {
 			// Consider trace as sampled if at least one of the samplers kept it.
-			sampled = s.Add(pt) || sampled
+			samplerSampled, sampleRate = s.Add(pt)
+			sampled = samplerSampled || sampled
+			parallelSampleRate = sampler.MergeParallelSamplingRates(parallelSampleRate, sampleRate)
 		}
 		if sampled {
 			sampledTrace.Trace = &pt.Trace
+			sampler.AddSampleRate(root, parallelSampleRate)
 		}
 
 		sampledTrace.Transactions = a.TransactionSampler.Extract(pt)

@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/model"
 	log "github.com/cihub/seelog"
 	"github.com/stretchr/testify/assert"
 )
@@ -52,4 +53,34 @@ func TestSamplerLoop(t *testing.T) {
 	case <-time.After(time.Second * 1):
 		assert.Fail(t, "Sampler took more than 1 second to close")
 	}
+}
+
+func TestMergeParallelSamplingRates(t *testing.T) {
+	rate1 := 0.1
+	rate2 := 1.0
+	assert.Equal(t, 1.0, MergeParallelSamplingRates(rate1, rate2))
+	assert.Equal(t, 1.0, MergeParallelSamplingRates(rate2, rate1))
+
+	rate1 = 0.3
+	rate2 = 0.2
+	assert.Equal(t, 0.44, MergeParallelSamplingRates(rate1, rate2))
+	assert.Equal(t, 0.44, MergeParallelSamplingRates(rate2, rate1))
+
+	rate1 = 0.0
+	rate2 = 0.5
+	assert.Equal(t, 0.5, MergeParallelSamplingRates(rate1, rate2))
+	assert.Equal(t, 0.5, MergeParallelSamplingRates(rate2, rate1))
+}
+
+func TestAddSampleRate(t *testing.T) {
+	assert := assert.New(t)
+	tID := randomTraceID()
+
+	root := model.Span{TraceID: tID, SpanID: 1, ParentID: 0, Start: 123, Duration: 100000, Service: "mcnulty", Type: "web"}
+
+	AddSampleRate(&root, 0.4)
+	assert.Equal(0.4, root.Metrics["_sample_rate"], "sample rate should be 40%%")
+
+	AddSampleRate(&root, 0.5)
+	assert.Equal(0.2, root.Metrics["_sample_rate"], "sample rate should be 20%% (50%% of 40%%)")
 }

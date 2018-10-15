@@ -59,18 +59,15 @@ func (s *ScoreEngine) Stop() {
 func applySampleRate(root *model.Span, sampleRate float64) bool {
 	initialRate := GetTraceAppliedSampleRate(root)
 	newRate := initialRate * sampleRate
-	SetTraceAppliedSampleRate(root, newRate)
-
 	traceID := root.TraceID
-
 	return SampleByRate(traceID, newRate)
 }
 
 // Sample counts an incoming trace and tells if it is a sample which has to be kept
-func (s *ScoreEngine) Sample(trace model.Trace, root *model.Span, env string) bool {
+func (s *ScoreEngine) Sample(trace model.Trace, root *model.Span, env string) (sampled bool, sampleRate float64) {
 	// Extra safety, just in case one trace is empty
 	if len(trace) == 0 {
-		return false
+		return false, 0
 	}
 
 	signature := computeSignatureWithRootAndEnv(trace, root, env)
@@ -78,9 +75,9 @@ func (s *ScoreEngine) Sample(trace model.Trace, root *model.Span, env string) bo
 	// Update sampler state by counting this trace
 	s.Sampler.Backend.CountSignature(signature)
 
-	sampleRate := s.Sampler.GetSampleRate(trace, root, signature)
+	sampleRate = s.Sampler.GetSampleRate(trace, root, signature)
 
-	sampled := applySampleRate(root, sampleRate)
+	sampled = applySampleRate(root, sampleRate)
 
 	if sampled {
 		// Count the trace to allow us to check for the maxTPS limit.
@@ -95,7 +92,7 @@ func (s *ScoreEngine) Sample(trace model.Trace, root *model.Span, env string) bo
 		}
 	}
 
-	return sampled
+	return sampled, sampleRate
 }
 
 // GetState collects and return internal statistics and coefficients for indication purposes
