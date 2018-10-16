@@ -12,6 +12,8 @@ import (
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
+// defaultBufferLen represents the default buffer length; the number of bucket size
+// units used by the concentrator.
 const defaultBufferLen = 2
 
 // Concentrator produces time bucketed statistics from a stream of raw traces.
@@ -23,8 +25,8 @@ type Concentrator struct {
 	aggregators []string
 	// bucket duration in nanoseconds
 	bsize int64
-	// Timestamp of the oldest time bucket for which we still allow data.
-	// Any ingested stats older than it gets added to that bucket.
+	// Timestamp of the oldest time bucket for which we allow data.
+	// Any ingested stats older than it get added to this bucket.
 	oldestTs int64
 	// bufferLen is the number of 10s stats bucket we keep in memory before flushing them.
 	// It means that we can compute stats only for the last `bufferLen * bsize` and that we
