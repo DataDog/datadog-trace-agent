@@ -76,8 +76,7 @@ func (w *TraceWriter) Start() {
 // Run runs the main loop of the writer goroutine. It sends traces to the payload constructor, flushing it periodically
 // and collects stats which are also reported periodically.
 func (w *TraceWriter) Run() {
-	w.exitWG.Add(1)
-	defer w.exitWG.Done()
+	defer close(w.exit)
 
 	// for now, simply flush every x seconds
 	flushTicker := time.NewTicker(w.conf.FlushPeriod)
@@ -137,8 +136,8 @@ func (w *TraceWriter) Run() {
 
 // Stop stops the main Run loop.
 func (w *TraceWriter) Stop() {
-	close(w.exit)
-	w.exitWG.Wait()
+	w.exit <- struct{}{}
+	<-w.exit
 	w.BaseWriter.Stop()
 }
 

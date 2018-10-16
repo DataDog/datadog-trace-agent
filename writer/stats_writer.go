@@ -71,8 +71,7 @@ func (w *StatsWriter) Start() {
 // Run runs the event loop of the writer's main goroutine. It reads stat buckets
 // from InStats, builds stat payloads and sends them out using the base writer.
 func (w *StatsWriter) Run() {
-	w.exitWG.Add(1)
-	defer w.exitWG.Done()
+	defer close(w.exit)
 
 	log.Debug("starting stats writer")
 
@@ -89,8 +88,8 @@ func (w *StatsWriter) Run() {
 
 // Stop stops the writer
 func (w *StatsWriter) Stop() {
-	close(w.exit)
-	w.exitWG.Wait()
+	w.exit <- struct{}{}
+	<-w.exit
 
 	// Closing the base writer, among other things, will close the
 	// w.payloadSender.Monitor() channel, stoping the monitoring

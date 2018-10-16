@@ -3,7 +3,6 @@ package writer
 import (
 	"container/list"
 	"fmt"
-	"sync"
 	"time"
 
 	log "github.com/cihub/seelog"
@@ -73,8 +72,7 @@ type BasePayloadSender struct {
 	monitor  chan interface{}
 	endpoint Endpoint
 
-	exit   chan struct{}
-	exitWG sync.WaitGroup
+	exit chan struct{}
 }
 
 // NewBasePayloadSender creates a new instance of a BasePayloadSender using the provided endpoint.
@@ -94,8 +92,8 @@ func (s *BasePayloadSender) Send(payload *Payload) {
 
 // Stop asks this sender to stop and waits until it correctly stops.
 func (s *BasePayloadSender) Stop() {
-	close(s.exit)
-	s.exitWG.Wait()
+	s.exit <- struct{}{}
+	<-s.exit
 	close(s.in)
 	close(s.monitor)
 }
@@ -192,8 +190,7 @@ func (s *QueuablePayloadSender) Start() {
 
 // Run executes the QueuablePayloadSender main logic synchronously.
 func (s *QueuablePayloadSender) Run() {
-	s.exitWG.Add(1)
-	defer s.exitWG.Done()
+	defer close(s.exit)
 
 	for {
 		select {
