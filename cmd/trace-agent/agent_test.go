@@ -208,27 +208,6 @@ func TestProcess(t *testing.T) {
 		assert.EqualValues(t, 4, stats.TracesPriority1)
 		assert.EqualValues(t, 5, stats.TracesPriority2)
 	})
-
-	t.Run("Stats/Dropped", func(t *testing.T) {
-		cfg := config.New()
-		cfg.APIKey = "test"
-		ctx, cancel := context.WithCancel(context.Background())
-		agent := NewAgent(ctx, cfg)
-		defer cancel()
-
-		span := &model.Span{
-			Resource: "SELECT name FROM people WHERE age = 42 AND extra = 55",
-			Type:     "sql",
-			Start:    time.Now().Add(-2 * time.Hour).UnixNano(),
-			Duration: (500 * time.Millisecond).Nanoseconds(),
-			Metrics:  map[string]float64{},
-		}
-		agent.Process(model.Trace{span, span})
-
-		stats := agent.Receiver.Stats.GetTagStats(info.Tags{})
-		assert.EqualValues(t, 1, stats.TracesDropped)
-		assert.EqualValues(t, 2, stats.SpansDropped)
-	})
 }
 
 func BenchmarkAgentTraceProcessing(b *testing.B) {
