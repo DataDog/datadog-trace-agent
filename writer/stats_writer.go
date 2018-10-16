@@ -260,14 +260,20 @@ func (w *StatsWriter) monitor() {
 
 			switch e := e.(type) {
 			case SenderSuccessEvent:
-				log.Infof("flushed stat payload to the API, time:%s, size:%d bytes", e.SendStats.SendTime,
+				url := e.SendStats.Host
+				log.Infof("flushed stat payload; url: %s, time:%s, size:%d bytes", url, e.SendStats.SendTime,
 					len(e.Payload.Bytes))
+				tags := []string{
+					"version:" + info.Version,
+					"url:" + url,
+				}
 				w.statsClient.Gauge("datadog.trace_agent.stats_writer.flush_duration",
-					e.SendStats.SendTime.Seconds(), nil, 1)
+					e.SendStats.SendTime.Seconds(), tags, 1)
 				atomic.AddInt64(&w.info.Payloads, 1)
 			case SenderFailureEvent:
-				log.Errorf("failed to flush stat payload, time:%s, size:%d bytes, error: %s",
-					e.SendStats.SendTime, len(e.Payload.Bytes), e.Error)
+				url := e.SendStats.Host
+				log.Errorf("failed to flush stat payload; url:%s, time:%s, size:%d bytes, error: %s",
+					url, e.SendStats.SendTime, len(e.Payload.Bytes), e.Error)
 				atomic.AddInt64(&w.info.Errors, 1)
 			case SenderRetryEvent:
 				log.Errorf("retrying flush stat payload, retryNum: %d, delay:%s, error: %s",

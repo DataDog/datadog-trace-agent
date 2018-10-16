@@ -26,9 +26,8 @@ var userAgent = fmt.Sprintf(
 
 // DatadogEndpoint sends payloads to Datadog API.
 type DatadogEndpoint struct {
-	APIKey  string
-	Host    string
-	NoProxy bool
+	APIKey string
+	Host   string
 
 	client *http.Client
 	path   string
@@ -73,6 +72,8 @@ func NewEndpoints(conf *config.AgentConfig, path string) []Endpoint {
 	}
 	return endpoints
 }
+
+func (e *DatadogEndpoint) BaseURL() string { return e.Host }
 
 // Write will send the serialized traces payload to the Datadog traces endpoint.
 func (e *DatadogEndpoint) Write(payload *Payload) error {

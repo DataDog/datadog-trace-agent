@@ -70,14 +70,20 @@ func (w *ServiceWriter) Run() {
 
 			switch event := event.(type) {
 			case SenderSuccessEvent:
-				log.Infof("flushed service payload to the API, time:%s, size:%d bytes", event.SendStats.SendTime,
+				url := event.SendStats.Host
+				log.Infof("flushed service payload; url:%s, time:%s, size:%d bytes", url, event.SendStats.SendTime,
 					len(event.Payload.Bytes))
+				tags := []string{
+					"version:" + info.Version,
+					"url:" + url,
+				}
 				w.statsClient.Gauge("datadog.trace_agent.service_writer.flush_duration",
-					event.SendStats.SendTime.Seconds(), nil, 1)
+					event.SendStats.SendTime.Seconds(), tags, 1)
 				atomic.AddInt64(&w.stats.Payloads, 1)
 			case SenderFailureEvent:
-				log.Errorf("failed to flush service payload, time:%s, size:%d bytes, error: %s",
-					event.SendStats.SendTime, len(event.Payload.Bytes), event.Error)
+				url := event.SendStats.Host
+				log.Errorf("failed to flush service payload; url:%s, time:%s, size:%d bytes, error: %s",
+					url, event.SendStats.SendTime, len(event.Payload.Bytes), event.Error)
 				atomic.AddInt64(&w.stats.Errors, 1)
 			case SenderRetryEvent:
 				log.Errorf("retrying flush service payload, retryNum: %d, delay:%s, error: %s",

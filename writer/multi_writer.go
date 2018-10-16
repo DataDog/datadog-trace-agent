@@ -13,13 +13,17 @@ var _ PayloadSender = (*multiSender)(nil)
 type multiSender struct {
 	senders []PayloadSender
 	mwg     sync.WaitGroup // monitor consumer waitgroup
+	mch     chan interface{}
 }
 
 // newMultiSender creates a new multiSender which will forward received
 // payloads to all the given senders. When it comes to monitoring, the
 // first sender is considered the main one.
 func newMultiSender(senders []PayloadSender) *multiSender {
-	return &multiSender{senders: senders}
+	return &multiSender{
+		senders: senders,
+		mch:     make(chan interface{}, len(senders)),
+	}
 }
 
 // Start starts all senders.
@@ -27,20 +31,14 @@ func (w *multiSender) Start() {
 	for _, sender := range w.senders {
 		sender.Start()
 	}
-	// TODO(gbbr): improve Monitor() intent. Sender users are currently expected to consume the
-	// channel. This shouldn't be an expectation as it will cause unexpected deadlocks.
-	if len(w.senders) <= 1 {
-		// The first sender monitor is already consumed via the Monitor() call.
-		return
-	}
-	for i := 1; i < len(w.senders); i++ {
+	for _, sender := range w.senders {
 		w.mwg.Add(1)
 		go func(ch <-chan interface{}) {
 			defer w.mwg.Done()
-			for range ch {
-				// dismiss
+			for event := range ch {
+				w.mch <- event
 			}
-		}(w.senders[i].Monitor())
+		}(sender.Monitor())
 	}
 }
 
@@ -50,25 +48,17 @@ func (w *multiSender) Stop() {
 		sender.Stop()
 	}
 	w.mwg.Wait()
+	close(w.mch)
 }
 
 // Send forwards the payload to all registered senders.
 func (w *multiSender) Send(p *Payload) {
 	for _, sender := range w.senders {
-		s.Send(p)
+		sender.Send(p)
 	}
 }
 
-// Monitor returns the monitor for the first sender, which is considered
-// to be targeting the main endpoint.
-func (w *multiSender) Monitor() <-chan interface{} {
-	if len(w.senders) == 0 {
-		ch := make(chan interface{})
-		close(ch)
-		return ch
-	}
-	return w.senders[0].Monitor()
-}
+func (w *multiSender) Monitor() <-chan interface{} { return w.mch }
 
 // Run implements PayloadSender.
 func (w *multiSender) Run() { /* no-op */ }

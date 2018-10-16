@@ -23,6 +23,10 @@ type testEndpoint struct {
 	errorPayloads   []Payload
 }
 
+func (e *testEndpoint) BaseURL() string {
+	return "<testEndpoint>"
+}
+
 // Write mocks the writing of a payload to a remote endpoint, recording it and replying with the configured error (or
 // success in its absence).
 func (e *testEndpoint) Write(payload *Payload) error {
