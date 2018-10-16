@@ -70,7 +70,7 @@ func (s *ScoreEngine) Sample(trace model.Trace, root *model.Span, env string) (s
 		return false, 0
 	}
 
-	signature := computeSignatureWithRootAndEnv(trace, root, env)
+	signature := ComputeSignatureWithRootAndEnv(trace, root, env)
 
 	// Update sampler state by counting this trace
 	s.Sampler.Backend.CountSignature(signature)

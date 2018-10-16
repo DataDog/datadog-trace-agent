@@ -111,7 +111,7 @@ func (s *PriorityEngine) Sample(trace model.Trace, root *model.Span, env string)
 		return sampled, 1
 	}
 
-	signature := computeServiceSignature(root, env)
+	signature := ComputeServiceSignature(root, env)
 	s.catalogMu.Lock()
 	s.catalog.register(root, env, signature)
 	s.catalogMu.Unlock()
@@ -119,17 +119,20 @@ func (s *PriorityEngine) Sample(trace model.Trace, root *model.Span, env string)
 	// Update sampler state by counting this trace
 	s.Sampler.Backend.CountSignature(signature)
 
+	// fetching applied sample rate
+	var ok bool
+	sampleRate, ok = root.Metrics[SamplingPriorityRateKey]
+	if !ok {
+		sampleRate = s.Sampler.GetSignatureSampleRate(signature)
+		root.Metrics[SamplingPriorityRateKey] = sampleRate
+	}
+
 	if sampled {
 		// Count the trace to allow us to check for the maxTPS limit.
 		// It has to happen before the maxTPS sampling.
 		s.Sampler.Backend.CountSample()
 		// Add the applied sampling rate, if it does not exist, apply
 		// next sampling rate
-		var ok bool
-		sampleRate, ok = root.Metrics[SamplingPriorityRateKey]
-		if !ok {
-			sampleRate = s.Sampler.GetSignatureSampleRate(signature)
-		}
 	}
 	return sampled, sampleRate
 }

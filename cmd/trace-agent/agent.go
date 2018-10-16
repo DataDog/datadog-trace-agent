@@ -272,45 +272,51 @@ func (a *Agent) Process(t model.Trace) {
 	go func() {
 		defer watchdog.LogOnPanic()
 
-		// All traces should go through either through the normal score sampler or
-		// the one dedicated to errors.
-		samplers := make([]*Sampler, 0, 2)
-		if traceContainsError(t) {
-			samplers = append(samplers, a.ErrorsScoreSampler)
-		} else {
-			samplers = append(samplers, a.ScoreSampler)
-		}
-		if hasPriority {
-			// If Priority is defined, send to priority sampling, regardless of priority value.
-			// The sampler will keep or discard the trace, but we send everything so that it
-			// gets the big picture and can set the sampling rates accordingly.
-			samplers = append(samplers, a.PrioritySampler)
-		}
-
-		// Trace sampling.
-		var sampledTrace writer.SampledTrace
-
-		sampled := false
-		var parallelSampleRate, sampleRate float64
-		var samplerSampled bool
-		for _, s := range samplers {
-			// Consider trace as sampled if at least one of the samplers kept it.
-			samplerSampled, sampleRate = s.Add(pt)
-			sampled = samplerSampled || sampled
-			parallelSampleRate = sampler.MergeParallelSamplingRates(parallelSampleRate, sampleRate)
-		}
-		if sampled {
-			sampledTrace.Trace = &pt.Trace
-			sampler.AddSampleRate(root, parallelSampleRate)
-		}
-
-		sampledTrace.Transactions = a.TransactionSampler.Extract(pt)
-		// TODO: attach to these transactions the client, pre-sampler and transaction sample rates.
-
+		sampledTrace := a.sample(pt, hasPriority)
 		if !sampledTrace.Empty() {
-			a.sampledTraceChan <- &sampledTrace
+			a.sampledTraceChan <- sampledTrace
 		}
 	}()
+}
+
+func (a *Agent) sample(pt processedTrace, hasPriority bool) *writer.SampledTrace {
+	var sampledTrace writer.SampledTrace
+	samplers := a.loadSamplers(traceContainsError(pt.Trace), hasPriority)
+	sampled := false
+	var parallelSampleRate, sampleRate float64
+	var samplerSampled bool
+	for _, s := range samplers {
+		// Consider trace as sampled if at least one of the samplers kept it.
+		samplerSampled, sampleRate = s.Add(pt)
+		sampled = samplerSampled || sampled
+		parallelSampleRate = sampler.MergeParallelSamplingRates(parallelSampleRate, sampleRate)
+	}
+	if sampled {
+		sampler.AddSampleRate(pt.Root, parallelSampleRate)
+		sampledTrace.Trace = &pt.Trace
+	}
+
+	sampledTrace.Transactions = a.TransactionSampler.Extract(pt)
+	// TODO: attach to these transactions the client, pre-sampler and transaction sample rates.
+	return &sampledTrace
+}
+
+func (a *Agent) loadSamplers(hasError bool, hasPriority bool) []*Sampler {
+	// All traces should go through either through the normal score sampler or
+	// the one dedicated to errors.
+	samplers := make([]*Sampler, 0, 2)
+	if hasError {
+		samplers = append(samplers, a.ErrorsScoreSampler)
+	} else {
+		samplers = append(samplers, a.ScoreSampler)
+	}
+	if hasPriority {
+		// If Priority is defined, send to priority sampling, regardless of priority value.
+		// The sampler will keep or discard the trace, but we send everything so that it
+		// gets the big picture and can set the sampling rates accordingly.
+		samplers = append(samplers, a.PrioritySampler)
+	}
+	return samplers
 }
 
 // dieFunc is used by watchdog to kill the agent; replaced in tests.
