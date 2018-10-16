@@ -238,8 +238,8 @@ func TestSampling(t *testing.T) {
 					span.Metrics[sampler.SamplingPriorityRateKey] = clientPriorityRate
 				}
 			}
-			// totalTraces := i*j + j + 1
 			agent.sample(pt, hasPriority)
+
 			sampleRate := sampler.GetTraceAppliedSampleRate(span)
 			if key == 2 {
 				assert.Equal(t, 1.0, sampleRate, "always sample when priority above 1")
@@ -261,7 +261,7 @@ func TestSampling(t *testing.T) {
 				assert.Equal(t, expectedRate, sampleRate, "score sampler rate in parallel priority rate applied by agent")
 				continue
 			}
-			serviceSignature := sampler.ComputeServiceSignature(root, env)
+			serviceSignature := sampler.ComputeServiceSignature(span, "")
 			prioritySampler := agent.PrioritySampler.engine.(*sampler.PriorityEngine)
 			priorityRate := prioritySampler.Sampler.GetSignatureSampleRate(serviceSignature)
 			expectedRate := sampler.MergeParallelSamplingRates(priorityRate, scoreRate)
@@ -270,6 +270,37 @@ func TestSampling(t *testing.T) {
 	}
 }
 
+func TestSamplingRace(t *testing.T) {
+	cfg := config.New()
+	cfg.APIKey = "test"
+	ctx, cancel := context.WithCancel(context.Background())
+	agent := NewAgent(ctx, cfg)
+	defer cancel()
+
+	disabled := float64(-99)
+	for i := 0; i < 200; i++ {
+		for j, key := range []float64{disabled, -1, 0, 0, 1, 1, 2} {
+			span := &model.Span{
+				Service:  "serv1",
+				Start:    time.Now().UnixNano(),
+				Duration: (100 * time.Millisecond).Nanoseconds(), Metrics: map[string]float64{}}
+			trace := model.Trace{span}
+			pt := processedTrace{
+				Trace: trace,
+				Root:  span}
+			clientPriorityRate := 0.2
+			hasPriority := false
+			if key != disabled {
+				span.Metrics[sampler.SamplingPriorityKey] = key
+				hasPriority = true
+				if j%2 == 0 {
+					span.Metrics[sampler.SamplingPriorityRateKey] = clientPriorityRate
+				}
+			}
+			go agent.sample(pt, hasPriority)
+		}
+	}
+}
 func BenchmarkAgentTraceProcessing(b *testing.B) {
 	c := config.New()
 	c.Endpoints[0].APIKey = "test"
