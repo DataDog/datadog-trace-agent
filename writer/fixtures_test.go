@@ -99,8 +99,7 @@ func (c *testPayloadSender) Start() {
 
 // Run executes the core loop of this sender.
 func (c *testPayloadSender) Run() {
-	c.exitWG.Add(1)
-	defer c.exitWG.Done()
+	defer close(c.exit)
 
 	for {
 		select {
@@ -140,8 +139,7 @@ type testPayloadSenderMonitor struct {
 
 	sender PayloadSender
 
-	exit   chan struct{}
-	exitWG sync.WaitGroup
+	exit chan struct{}
 }
 
 // newTestPayloadSenderMonitor creates a new testPayloadSenderMonitor monitoring the specified sender.
@@ -159,8 +157,7 @@ func (m *testPayloadSenderMonitor) Start() {
 
 // Run executes the core loop of this monitor.
 func (m *testPayloadSenderMonitor) Run() {
-	m.exitWG.Add(1)
-	defer m.exitWG.Done()
+	defer close(m.exit)
 
 	for {
 		select {
@@ -187,8 +184,8 @@ func (m *testPayloadSenderMonitor) Run() {
 
 // Stop stops this payload monitor and waits for it to stop.
 func (m *testPayloadSenderMonitor) Stop() {
-	close(m.exit)
-	m.exitWG.Wait()
+	m.exit <- struct{}{}
+	<-m.exit
 }
 
 // SuccessPayloads returns a slice containing all successful payloads.

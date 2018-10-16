@@ -1,8 +1,6 @@
 package writer
 
 import (
-	"sync"
-
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	log "github.com/cihub/seelog"
 
@@ -15,8 +13,7 @@ type BaseWriter struct {
 
 	statsClient statsd.StatsClient
 
-	exit   chan struct{}
-	exitWG *sync.WaitGroup
+	exit chan struct{}
 }
 
 // NewBaseWriter creates a new instance of a BaseWriter.
@@ -35,7 +32,6 @@ func NewBaseWriter(conf *config.AgentConfig, path string, senderFactory func(End
 		payloadSender: senderFactory(endpoint),
 		statsClient:   statsd.Client,
 		exit:          make(chan struct{}),
-		exitWG:        &sync.WaitGroup{},
 	}
 }
 

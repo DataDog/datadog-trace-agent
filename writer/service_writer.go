@@ -53,8 +53,7 @@ func (w *ServiceWriter) Start() {
 // Run runs the main loop of the writer goroutine. If buffers
 // services read from input chan and flushes them when necessary.
 func (w *ServiceWriter) Run() {
-	w.exitWG.Add(1)
-	defer w.exitWG.Done()
+	defer close(w.exit)
 
 	// for now, simply flush every x seconds
 	flushTicker := time.NewTicker(w.conf.FlushPeriod)
@@ -112,8 +111,8 @@ func (w *ServiceWriter) Run() {
 
 // Stop stops the main Run loop.
 func (w *ServiceWriter) Stop() {
-	close(w.exit)
-	w.exitWG.Wait()
+	w.exit <- struct{}{}
+	<-w.exit
 	w.BaseWriter.Stop()
 }
 
