@@ -3,6 +3,7 @@ package writer
 import (
 	"bytes"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -40,15 +41,16 @@ func NewEndpoints(conf *config.AgentConfig, path string) []Endpoint {
 		log.Info("API interface is disabled, flushing to /dev/null instead")
 		return []Endpoint{&NullEndpoint{}}
 	}
-	apiKey := conf.APIKey
-	url := conf.APIEndpoint
-	if apiKey == "" {
-		panic("No API key")
+	if conf.APIKey == "" {
+		panic(errors.New("missing API key"))
+	}
+	if conf.APIEndpoint == "" {
+		panic(errors.New("missing API endpoint"))
 	}
 	client := newClient(conf, conf.NoProxy)
 	endpoints := []Endpoint{&DatadogEndpoint{
-		APIKey: apiKey,
-		Host:   url,
+		APIKey: conf.APIKey,
+		Host:   conf.APIEndpoint,
 		path:   path,
 		client: client,
 	}}
@@ -64,7 +66,7 @@ func NewEndpoints(conf *config.AgentConfig, path string) []Endpoint {
 			apiKey = conf.APIKey
 		}
 		endpoints = append(endpoints, &DatadogEndpoint{
-			APIKey: e.APIKey,
+			APIKey: apiKey,
 			Host:   e.Host,
 			path:   path,
 			client: c,
@@ -73,6 +75,7 @@ func NewEndpoints(conf *config.AgentConfig, path string) []Endpoint {
 	return endpoints
 }
 
+// BaseURL implements Endpoint.
 func (e *DatadogEndpoint) BaseURL() string { return e.Host }
 
 // Write will send the serialized traces payload to the Datadog traces endpoint.

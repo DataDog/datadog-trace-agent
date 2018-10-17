@@ -168,6 +168,11 @@ func TestFullYamlConfig(t *testing.T) {
 	assert.Equal(0.5, c.ExtraSampleRate)
 	assert.Equal(5.0, c.MaxTPS)
 	assert.Equal("0.0.0.0", c.ReceiverHost)
+	assert.EqualValues([]*Endpoint{
+		{Host: "https://my1.endpoint.com", APIKey: "apikey1"},
+		{Host: "https://my1.endpoint.com", APIKey: "apikey2"},
+		{Host: "https://my2.endpoint.eu", APIKey: "apikey3"},
+	}, c.AdditionalEndpoints)
 
 	assert.EqualValues([]string{"/health", "/500"}, c.Ignore["resource"])
 

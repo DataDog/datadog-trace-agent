@@ -28,6 +28,7 @@ func (ne *NullEndpoint) Write(payload *Payload) error {
 	return nil
 }
 
+// BaseURL implements Endpoint.
 func (ne *NullEndpoint) BaseURL() string { return "<NullEndpoint>" }
 
 // SetExtraHeaders appends a header map to HTTP headers.

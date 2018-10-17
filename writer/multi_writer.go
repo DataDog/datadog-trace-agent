@@ -9,7 +9,8 @@ import (
 var _ PayloadSender = (*multiSender)(nil)
 
 // multiSender is an implementation of PayloadSender which forwards any
-// received payload to multiple PayloadSender.
+// received payload to multiple PayloadSenders, funnelling incoming monitor
+// events.
 type multiSender struct {
 	senders []PayloadSender
 	mwg     sync.WaitGroup   // monitor funnel waitgroup
@@ -20,6 +21,9 @@ type multiSender struct {
 // payloads to multiple endpoints.
 func newMultiSender(cfg config.QueuablePayloadSenderConf) func([]Endpoint) PayloadSender {
 	return func(endpoints []Endpoint) PayloadSender {
+		if len(endpoints) == 1 {
+			return NewCustomQueuablePayloadSender(endpoints[0], cfg)
+		}
 		var senders []PayloadSender
 		for _, e := range endpoints {
 			senders = append(senders, NewCustomQueuablePayloadSender(e, cfg))

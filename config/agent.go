@@ -26,8 +26,8 @@ var (
 
 // Endpoint specifies an endpoint that the trace agent will write data (traces, stats & services) to.
 type Endpoint struct {
-	APIKey  string `yaml:"api_key"`
-	Host    string `yaml:"url"`
+	APIKey  string
+	Host    string
 	NoProxy bool
 }
 

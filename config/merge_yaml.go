@@ -42,18 +42,18 @@ type proxy struct {
 }
 
 type traceAgent struct {
-	Enabled             *bool          `yaml:"enabled"`
-	Endpoint            string         `yaml:"apm_dd_url"`
-	AdditionalEndpoints []*Endpoint    `yaml:"additional_endpoints"`
-	Env                 string         `yaml:"env"`
-	ExtraSampleRate     float64        `yaml:"extra_sample_rate"`
-	MaxTracesPerSecond  float64        `yaml:"max_traces_per_second"`
-	IgnoreResources     []string       `yaml:"ignore_resources"`
-	LogFilePath         string         `yaml:"log_file"`
-	ReplaceTags         []*ReplaceRule `yaml:"replace_tags"`
-	ReceiverPort        int            `yaml:"receiver_port"`
-	ConnectionLimit     int            `yaml:"connection_limit"`
-	APMNonLocalTraffic  *bool          `yaml:"apm_non_local_traffic"`
+	Enabled             *bool               `yaml:"enabled"`
+	Endpoint            string              `yaml:"apm_dd_url"`
+	AdditionalEndpoints map[string][]string `yaml:"additional_endpoints"`
+	Env                 string              `yaml:"env"`
+	ExtraSampleRate     float64             `yaml:"extra_sample_rate"`
+	MaxTracesPerSecond  float64             `yaml:"max_traces_per_second"`
+	IgnoreResources     []string            `yaml:"ignore_resources"`
+	LogFilePath         string              `yaml:"log_file"`
+	ReplaceTags         []*ReplaceRule      `yaml:"replace_tags"`
+	ReceiverPort        int                 `yaml:"receiver_port"`
+	ConnectionLimit     int                 `yaml:"connection_limit"`
+	APMNonLocalTraffic  *bool               `yaml:"apm_non_local_traffic"`
 
 	Obfuscation *ObfuscationConfig `yaml:"obfuscation"`
 
@@ -215,14 +215,14 @@ func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 	for _, host := range yc.Proxy.NoProxy {
 		noProxy[host] = true
 	}
-	for _, e := range yc.TraceAgent.AdditionalEndpoints {
-		if e.Host == "" {
-			log.Warn("'additional_endpoint' members must have 'url' set to be considered")
+	for url, keys := range yc.TraceAgent.AdditionalEndpoints {
+		for _, key := range keys {
+			c.AdditionalEndpoints = append(c.AdditionalEndpoints, &Endpoint{
+				Host:    url,
+				APIKey:  key,
+				NoProxy: noProxy[url],
+			})
 		}
-		if noProxy[e.Host] {
-			e.NoProxy = true
-		}
-		c.AdditionalEndpoints = append(c.AdditionalEndpoints, e)
 	}
 	if host, ok := noProxy[c.APIEndpoint]; ok {
 		log.Infof("Trace Agent main endpoint matches `proxy.no_proxy` list item %q: ignoring proxy", host)
