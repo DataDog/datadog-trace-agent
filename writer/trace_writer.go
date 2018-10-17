@@ -93,10 +93,7 @@ func (w *TraceWriter) Run() {
 			case SenderSuccessEvent:
 				log.Infof("flushed trace payload to the API, time:%s, size:%d bytes", event.SendStats.SendTime,
 					len(event.Payload.Bytes))
-				tags := []string{
-					"version:" + info.Version,
-					"url:" + event.SendStats.Host,
-				}
+				tags := []string{"url:" + event.SendStats.Host}
 				w.statsClient.Gauge("datadog.trace_agent.trace_writer.flush_duration",
 					event.SendStats.SendTime.Seconds(), tags, 1)
 				atomic.AddInt64(&w.stats.Payloads, 1)

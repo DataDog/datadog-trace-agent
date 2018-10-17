@@ -12,8 +12,8 @@ var _ PayloadSender = (*multiSender)(nil)
 // received payload to multiple PayloadSender.
 type multiSender struct {
 	senders []PayloadSender
-	mwg     sync.WaitGroup // monitor consumer waitgroup
-	mch     chan interface{}
+	mwg     sync.WaitGroup   // monitor funnel waitgroup
+	mch     chan interface{} // monitor funneling channel
 }
 
 // newMultiSender creates a new multiSender which will forward received

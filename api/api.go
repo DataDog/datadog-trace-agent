@@ -305,7 +305,7 @@ func (r *HTTPReceiver) logStats() {
 	accStats := info.NewReceiverStats()
 
 	for now := range time.Tick(10 * time.Second) {
-		statsd.Client.Gauge("datadog.trace_agent.heartbeat", 1, []string{"version:" + info.Version}, 1)
+		statsd.Client.Gauge("datadog.trace_agent.heartbeat", 1, nil, 1)
 
 		// We update accStats with the new stats we collected
 		accStats.Acc(r.Stats)

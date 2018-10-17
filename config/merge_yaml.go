@@ -216,6 +216,9 @@ func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 		noProxy[host] = true
 	}
 	for _, e := range yc.TraceAgent.AdditionalEndpoints {
+		if e.Host == "" {
+			log.Warn("'additional_endpoint' members must have 'url' set to be considered")
+		}
 		if noProxy[e.Host] {
 			e.NoProxy = true
 		}

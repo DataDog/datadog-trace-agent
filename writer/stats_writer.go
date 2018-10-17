@@ -263,10 +263,7 @@ func (w *StatsWriter) monitor() {
 				url := e.SendStats.Host
 				log.Infof("flushed stat payload; url: %s, time:%s, size:%d bytes", url, e.SendStats.SendTime,
 					len(e.Payload.Bytes))
-				tags := []string{
-					"version:" + info.Version,
-					"url:" + url,
-				}
+				tags := []string{"url:" + url}
 				w.statsClient.Gauge("datadog.trace_agent.stats_writer.flush_duration",
 					e.SendStats.SendTime.Seconds(), tags, 1)
 				atomic.AddInt64(&w.info.Payloads, 1)

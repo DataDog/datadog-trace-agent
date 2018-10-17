@@ -73,10 +73,7 @@ func (w *ServiceWriter) Run() {
 				url := event.SendStats.Host
 				log.Infof("flushed service payload; url:%s, time:%s, size:%d bytes", url, event.SendStats.SendTime,
 					len(event.Payload.Bytes))
-				tags := []string{
-					"version:" + info.Version,
-					"url:" + url,
-				}
+				tags := []string{"url:" + url}
 				w.statsClient.Gauge("datadog.trace_agent.service_writer.flush_duration",
 					event.SendStats.SendTime.Seconds(), tags, 1)
 				atomic.AddInt64(&w.stats.Payloads, 1)

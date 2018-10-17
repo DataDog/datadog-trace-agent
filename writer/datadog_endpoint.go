@@ -55,7 +55,7 @@ func NewEndpoints(conf *config.AgentConfig, path string) []Endpoint {
 	for _, e := range conf.AdditionalEndpoints {
 		c := client
 		if e.NoProxy != conf.NoProxy {
-			// this client differs, set up a new one
+			// this endpoint needs a different client.
 			c = newClient(conf, e.NoProxy)
 		}
 		apiKey := e.APIKey

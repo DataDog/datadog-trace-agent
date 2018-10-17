@@ -14,9 +14,8 @@ type Endpoint interface {
 	// Write writes the payload to the endpoint.
 	Write(payload *Payload) error
 
-	// BaseURL returns the base URL for this endpoint.
-	// e.g. For URL https://trace.agent.datadoghq.eu/api/v0.2/traces it returns
-	// https://trace.agent.datadoghq.eu.
+	// BaseURL returns the base URL for this endpoint. e.g. For the URL "https://trace.agent.datadoghq.eu/api/v0.2/traces"
+	// it returns "https://trace.agent.datadoghq.eu".
 	BaseURL() string
 }
 
@@ -29,9 +28,7 @@ func (ne *NullEndpoint) Write(payload *Payload) error {
 	return nil
 }
 
-func (ne *NullEndpoint) BaseURL() string {
-	return "<NullEndpoint>"
-}
+func (ne *NullEndpoint) BaseURL() string { return "<NullEndpoint>" }
 
 // SetExtraHeaders appends a header map to HTTP headers.
 func SetExtraHeaders(h http.Header, extras map[string]string) {
