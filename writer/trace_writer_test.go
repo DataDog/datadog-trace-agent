@@ -12,6 +12,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/testutil"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/gogo/protobuf/proto"
@@ -26,7 +27,8 @@ func TestTraceWriter(t *testing.T) {
 		assert := assert.New(t)
 
 		// Create a trace writer, its incoming channel and the endpoint that receives the payloads
-		traceWriter, traceChannel, testEndpoint, _ := testTraceWriter()
+		traceWriter, traceChannel, testEndpoint, _, teardown := testTraceWriter()
+		defer teardown()
 		// Set a maximum of 4 spans per payload
 		traceWriter.conf.MaxSpansPerPayload = 4
 		traceWriter.Start()
@@ -69,7 +71,8 @@ func TestTraceWriter(t *testing.T) {
 		testFlushPeriod := 100 * time.Millisecond
 
 		// Create a trace writer, its incoming channel and the endpoint that receives the payloads
-		traceWriter, traceChannel, testEndpoint, _ := testTraceWriter()
+		traceWriter, traceChannel, testEndpoint, _, teardown := testTraceWriter()
+		defer teardown()
 		// Periodically flushing every 100ms
 		traceWriter.conf.FlushPeriod = testFlushPeriod
 		traceWriter.Start()
@@ -104,7 +107,8 @@ func TestTraceWriter(t *testing.T) {
 		testFlushPeriod := 100 * time.Millisecond
 
 		// Create a trace writer, its incoming channel and the endpoint that receives the payloads
-		traceWriter, traceChannel, testEndpoint, statsClient := testTraceWriter()
+		traceWriter, traceChannel, testEndpoint, statsClient, teardown := testTraceWriter()
+		defer teardown()
 		traceWriter.conf.FlushPeriod = 100 * time.Millisecond
 		traceWriter.conf.UpdateInfoPeriod = 100 * time.Millisecond
 		traceWriter.conf.MaxSpansPerPayload = 10
@@ -335,7 +339,7 @@ func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expecte
 	}
 }
 
-func testTraceWriter() (*TraceWriter, chan *SampledTrace, *testEndpoint, *testutil.TestStatsClient) {
+func testTraceWriter() (*TraceWriter, chan *SampledTrace, *testEndpoint, *testutil.TestStatsClient, func()) {
 	payloadChannel := make(chan *SampledTrace)
 	conf := &config.AgentConfig{
 		Hostname:          testHostName,
@@ -346,9 +350,12 @@ func testTraceWriter() (*TraceWriter, chan *SampledTrace, *testEndpoint, *testut
 	testEndpoint := &testEndpoint{}
 	traceWriter.BaseWriter.payloadSender.setEndpoint(testEndpoint)
 	testStatsClient := &testutil.TestStatsClient{}
-	traceWriter.statsClient = testStatsClient
+	originalClient := statsd.Client
+	statsd.Client = testStatsClient
 
-	return traceWriter, payloadChannel, testEndpoint, testStatsClient
+	return traceWriter, payloadChannel, testEndpoint, testStatsClient, func() {
+		statsd.Client = originalClient
+	}
 }
 
 func randomSampledTrace(numSpans, numTransactions int) *SampledTrace {

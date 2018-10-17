@@ -16,13 +16,18 @@ type multiSender struct {
 	mch     chan interface{} // monitor funneling channel
 }
 
-// newMultiSender creates a new multiSender which will forward received
-// payloads to all the given senders. When it comes to monitoring, the
-// first sender is considered the main one.
-func newMultiSender(senders []PayloadSender) *multiSender {
-	return &multiSender{
-		senders: senders,
-		mch:     make(chan interface{}, len(senders)),
+// newMultiSender returns a new factory to generate PayloadSenders capable of forwarding
+// payloads to multiple endpoints.
+func newMultiSender(cfg config.QueuablePayloadSenderConf) func([]Endpoint) PayloadSender {
+	return func(endpoints []Endpoint) PayloadSender {
+		var senders []PayloadSender
+		for _, e := range endpoints {
+			senders = append(senders, NewCustomQueuablePayloadSender(e, cfg))
+		}
+		return &multiSender{
+			senders: senders,
+			mch:     make(chan interface{}, len(senders)),
+		}
 	}
 }
 
@@ -66,15 +71,5 @@ func (w *multiSender) Run() { /* no-op */ }
 func (w *multiSender) setEndpoint(endpoint Endpoint) {
 	for _, sender := range w.senders {
 		sender.setEndpoint(endpoint)
-	}
-}
-
-func newSenderFactory(cfg config.QueuablePayloadSenderConf) func([]Endpoint) PayloadSender {
-	return func(endpoints []Endpoint) PayloadSender {
-		var senders []PayloadSender
-		for _, e := range endpoints {
-			senders = append(senders, NewCustomQueuablePayloadSender(e, cfg))
-		}
-		return newMultiSender(senders)
 	}
 }

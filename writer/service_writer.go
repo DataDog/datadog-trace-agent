@@ -10,6 +10,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 )
@@ -34,7 +35,7 @@ func NewServiceWriter(conf *config.AgentConfig, InServices <-chan model.Services
 		conf:          writerConf,
 		InServices:    InServices,
 		serviceBuffer: model.ServicesMetadata{},
-		BaseWriter:    *NewBaseWriter(conf, "/api/v0.2/services", newSenderFactory(writerConf.SenderConfig)),
+		BaseWriter:    *NewBaseWriter(conf, "/api/v0.2/services", newMultiSender(writerConf.SenderConfig)),
 	}
 }
 
@@ -74,7 +75,7 @@ func (w *ServiceWriter) Run() {
 				log.Infof("flushed service payload; url:%s, time:%s, size:%d bytes", url, event.SendStats.SendTime,
 					len(event.Payload.Bytes))
 				tags := []string{"url:" + url}
-				w.statsClient.Gauge("datadog.trace_agent.service_writer.flush_duration",
+				statsd.Client.Gauge("datadog.trace_agent.service_writer.flush_duration",
 					event.SendStats.SendTime.Seconds(), tags, 1)
 				atomic.AddInt64(&w.stats.Payloads, 1)
 			case SenderFailureEvent:
@@ -160,11 +161,11 @@ func (w *ServiceWriter) updateInfo() {
 	swInfo.Errors = atomic.SwapInt64(&w.stats.Errors, 0)
 	swInfo.Retries = atomic.SwapInt64(&w.stats.Retries, 0)
 
-	w.statsClient.Count("datadog.trace_agent.service_writer.payloads", int64(swInfo.Payloads), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.service_writer.services", int64(swInfo.Services), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.service_writer.bytes", int64(swInfo.Bytes), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.service_writer.retries", int64(swInfo.Retries), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.service_writer.errors", int64(swInfo.Errors), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.service_writer.payloads", int64(swInfo.Payloads), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.service_writer.services", int64(swInfo.Services), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.service_writer.bytes", int64(swInfo.Bytes), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.service_writer.retries", int64(swInfo.Retries), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.service_writer.errors", int64(swInfo.Errors), nil, 1)
 
 	info.UpdateServiceWriterInfo(swInfo)
 }

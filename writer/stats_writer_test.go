@@ -13,6 +13,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/testutil"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/stretchr/testify/assert"
@@ -22,7 +23,8 @@ func TestStatsWriter_StatHandling(t *testing.T) {
 	assert := assert.New(t)
 
 	// Given a stats writer, its incoming channel and the endpoint that receives the payloads
-	statsWriter, statsChannel, testEndpoint, _ := testStatsWriter()
+	statsWriter, statsChannel, testEndpoint, _, teardown := testStatsWriter()
+	defer teardown()
 
 	statsWriter.Start()
 
@@ -68,7 +70,8 @@ func TestStatsWriter_UpdateInfoHandling(t *testing.T) {
 	assert := assert.New(t)
 
 	// Given a stats writer, its incoming channel and the endpoint that receives the payloads
-	statsWriter, statsChannel, testEndpoint, statsClient := testStatsWriter()
+	statsWriter, statsChannel, testEndpoint, statsClient, teardown := testStatsWriter()
+	defer teardown()
 	statsWriter.conf.UpdateInfoPeriod = 100 * time.Millisecond
 
 	statsWriter.Start()
@@ -174,7 +177,8 @@ func TestStatsWriter_BuildPayloads(t *testing.T) {
 	t.Run("common case, no duplicate entries", func(t *testing.T) {
 		assert := assert.New(t)
 
-		sw, _, _, _ := testStatsWriter()
+		sw, _, _, _, teardown := testStatsWriter()
+		defer teardown()
 
 		// This gives us a total of 45 entries. 3 per span, 5
 		// spans per stat bucket. Each buckets have the same
@@ -216,7 +220,8 @@ func TestStatsWriter_BuildPayloads(t *testing.T) {
 	t.Run("common case, with duplicate entries", func(t *testing.T) {
 		assert := assert.New(t)
 
-		sw, _, _, _ := testStatsWriter()
+		sw, _, _, _, teardown := testStatsWriter()
+		defer teardown()
 
 		// This gives us a total of 45 entries. 3 per span, 5
 		// spans per stat bucket. Each buckets have the same
@@ -279,7 +284,8 @@ func TestStatsWriter_BuildPayloads(t *testing.T) {
 	t.Run("no need for split", func(t *testing.T) {
 		assert := assert.New(t)
 
-		sw, _, _, _ := testStatsWriter()
+		sw, _, _, _, teardown := testStatsWriter()
+		defer teardown()
 		sw.Start()
 
 		// This gives us a tota of 45 entries. 3 per span, 5 spans per
@@ -384,7 +390,7 @@ func assertStatsPayload(assert *assert.Assertions, headers map[string]string, bu
 	assert.Equal(buckets, statsPayload.Stats, "Stat buckets should match expectation")
 }
 
-func testStatsWriter() (*StatsWriter, chan []model.StatsBucket, *testEndpoint, *testutil.TestStatsClient) {
+func testStatsWriter() (*StatsWriter, chan []model.StatsBucket, *testEndpoint, *testutil.TestStatsClient, func()) {
 	statsChannel := make(chan []model.StatsBucket)
 	conf := &config.AgentConfig{
 		Hostname:          testHostName,
@@ -395,7 +401,10 @@ func testStatsWriter() (*StatsWriter, chan []model.StatsBucket, *testEndpoint, *
 	testEndpoint := &testEndpoint{}
 	statsWriter.BaseWriter.payloadSender.setEndpoint(testEndpoint)
 	testStatsClient := &testutil.TestStatsClient{}
-	statsWriter.statsClient = testStatsClient
+	originalClient := statsd.Client
+	statsd.Client = testStatsClient
 
-	return statsWriter, statsChannel, testEndpoint, testStatsClient
+	return statsWriter, statsChannel, testEndpoint, testStatsClient, func() {
+		statsd.Client = originalClient
+	}
 }

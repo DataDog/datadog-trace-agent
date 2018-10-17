@@ -12,6 +12,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/golang/protobuf/proto"
@@ -58,7 +59,7 @@ func NewTraceWriter(conf *config.AgentConfig, in <-chan *SampledTrace) *TraceWri
 
 		in: in,
 
-		BaseWriter: *NewBaseWriter(conf, "/api/v0.2/traces", newSenderFactory(writerConf.SenderConfig)),
+		BaseWriter: *NewBaseWriter(conf, "/api/v0.2/traces", newMultiSender(writerConf.SenderConfig)),
 	}
 }
 
@@ -94,7 +95,7 @@ func (w *TraceWriter) Run() {
 				log.Infof("flushed trace payload to the API, time:%s, size:%d bytes", event.SendStats.SendTime,
 					len(event.Payload.Bytes))
 				tags := []string{"url:" + event.SendStats.Host}
-				w.statsClient.Gauge("datadog.trace_agent.trace_writer.flush_duration",
+				statsd.Client.Gauge("datadog.trace_agent.trace_writer.flush_duration",
 					event.SendStats.SendTime.Seconds(), tags, 1)
 				atomic.AddInt64(&w.stats.Payloads, 1)
 			case SenderFailureEvent:
@@ -280,14 +281,14 @@ func (w *TraceWriter) updateInfo() {
 	twInfo.Errors = atomic.SwapInt64(&w.stats.Errors, 0)
 	twInfo.SingleMaxSpans = atomic.SwapInt64(&w.stats.SingleMaxSpans, 0)
 
-	w.statsClient.Count("datadog.trace_agent.trace_writer.payloads", int64(twInfo.Payloads), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.trace_writer.traces", int64(twInfo.Traces), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.trace_writer.transactions", int64(twInfo.Transactions), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.trace_writer.spans", int64(twInfo.Spans), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.trace_writer.bytes", int64(twInfo.Bytes), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.trace_writer.retries", int64(twInfo.Retries), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.trace_writer.errors", int64(twInfo.Errors), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.trace_writer.single_max_spans", int64(twInfo.SingleMaxSpans), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.trace_writer.payloads", int64(twInfo.Payloads), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.trace_writer.traces", int64(twInfo.Traces), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.trace_writer.transactions", int64(twInfo.Transactions), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.trace_writer.spans", int64(twInfo.Spans), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.trace_writer.bytes", int64(twInfo.Bytes), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.trace_writer.retries", int64(twInfo.Retries), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.trace_writer.errors", int64(twInfo.Errors), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.trace_writer.single_max_spans", int64(twInfo.SingleMaxSpans), nil, 1)
 
 	info.UpdateTraceWriterInfo(twInfo)
 }

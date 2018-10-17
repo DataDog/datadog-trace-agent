@@ -1,18 +1,11 @@
 package writer
 
-import (
-	"github.com/DataDog/datadog-trace-agent/statsd"
-
-	"github.com/DataDog/datadog-trace-agent/config"
-)
+import "github.com/DataDog/datadog-trace-agent/config"
 
 // BaseWriter encodes the base components and behaviour of a typical Writer.
 type BaseWriter struct {
 	payloadSender PayloadSender
-
-	statsClient statsd.StatsClient
-
-	exit chan struct{}
+	exit          chan struct{}
 }
 
 // NewBaseWriter creates a new instance of a BaseWriter.
@@ -20,7 +13,6 @@ func NewBaseWriter(conf *config.AgentConfig, path string, senderFactory func([]E
 	endpoints := NewEndpoints(conf, path)
 	return &BaseWriter{
 		payloadSender: senderFactory(endpoints),
-		statsClient:   statsd.Client,
 		exit:          make(chan struct{}),
 	}
 }
