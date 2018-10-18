@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewMultiSender(t *testing.T) {
+func TestNewMultiSenderFactory(t *testing.T) {
 	cfg := config.DefaultQueuablePayloadSenderConf()
-	fn := newMultiSender(cfg)
+	fn := newMultiSenderFactory(cfg)
 
 	t.Run("one", func(t *testing.T) {
 		endpoint := &DatadogEndpoint{Host: "host1", APIKey: "key1"}

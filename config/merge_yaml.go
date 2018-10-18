@@ -216,6 +216,10 @@ func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 		noProxy[host] = true
 	}
 	for url, keys := range yc.TraceAgent.AdditionalEndpoints {
+		if len(keys) == 0 {
+			log.Errorf("'additional_endpoints' entries must have at least one API key present")
+			continue
+		}
 		for _, key := range keys {
 			c.AdditionalEndpoints = append(c.AdditionalEndpoints, &Endpoint{
 				Host:    url,

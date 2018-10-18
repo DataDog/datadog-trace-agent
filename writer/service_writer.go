@@ -35,7 +35,7 @@ func NewServiceWriter(conf *config.AgentConfig, InServices <-chan model.Services
 		conf:          writerConf,
 		InServices:    InServices,
 		serviceBuffer: model.ServicesMetadata{},
-		BaseWriter:    *NewBaseWriter(conf, "/api/v0.2/services", newMultiSender(writerConf.SenderConfig)),
+		BaseWriter:    *NewBaseWriter(conf, "/api/v0.2/services", newMultiSenderFactory(writerConf.SenderConfig)),
 	}
 }
 
@@ -161,6 +161,7 @@ func (w *ServiceWriter) updateInfo() {
 	swInfo.Errors = atomic.SwapInt64(&w.stats.Errors, 0)
 	swInfo.Retries = atomic.SwapInt64(&w.stats.Retries, 0)
 
+	// TODO(gbbr): Scope these stats per endpoint (see (config.AgentConfig).AdditionalEndpoints))
 	statsd.Client.Count("datadog.trace_agent.service_writer.payloads", int64(swInfo.Payloads), nil, 1)
 	statsd.Client.Count("datadog.trace_agent.service_writer.services", int64(swInfo.Services), nil, 1)
 	statsd.Client.Count("datadog.trace_agent.service_writer.bytes", int64(swInfo.Bytes), nil, 1)

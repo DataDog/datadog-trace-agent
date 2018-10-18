@@ -17,21 +17,26 @@ type multiSender struct {
 	mch     chan interface{} // monitor funneling channel
 }
 
-// newMultiSender returns a new factory to generate PayloadSenders capable of forwarding
-// payloads to multiple endpoints.
-func newMultiSender(cfg config.QueuablePayloadSenderConf) func([]Endpoint) PayloadSender {
+// newMultiSenderFactory returns a new factory to generate multiSender.
+func newMultiSenderFactory(cfg config.QueuablePayloadSenderConf) func([]Endpoint) PayloadSender {
 	return func(endpoints []Endpoint) PayloadSender {
-		if len(endpoints) == 1 {
-			return NewCustomQueuablePayloadSender(endpoints[0], cfg)
-		}
-		var senders []PayloadSender
-		for _, e := range endpoints {
-			senders = append(senders, NewCustomQueuablePayloadSender(e, cfg))
-		}
-		return &multiSender{
-			senders: senders,
-			mch:     make(chan interface{}, len(senders)),
-		}
+		return newMultiSender(endpoints, cfg)
+	}
+}
+
+// newMultiSender returns a new PayloadSender which forwards all sent payloads to all
+// the given endpoints, as well as funnels all monitoring channels.
+func newMultiSender(endpoints []Endpoint, cfg config.QueuablePayloadSenderConf) PayloadSender {
+	if len(endpoints) == 1 {
+		return NewCustomQueuablePayloadSender(endpoints[0], cfg)
+	}
+	senders := make([]PayloadSender, len(endpoints))
+	for i, e := range endpoints {
+		senders[i] = NewCustomQueuablePayloadSender(e, cfg)
+	}
+	return &multiSender{
+		senders: senders,
+		mch:     make(chan interface{}, len(senders)),
 	}
 }
 

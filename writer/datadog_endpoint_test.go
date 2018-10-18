@@ -44,7 +44,7 @@ func TestNewClient(t *testing.T) {
 
 func TestNewEndpoints(t *testing.T) {
 	t.Run("disabled", func(t *testing.T) {
-		e := NewEndpoints(&config.AgentConfig{APIEnabled: false}, "")
+		e := NewEndpoints(&config.AgentConfig{Enabled: false}, "")
 		_, ok := e[0].(*NullEndpoint)
 		assert.True(t, ok)
 	})
@@ -54,9 +54,9 @@ func TestNewEndpoints(t *testing.T) {
 			cfg *config.AgentConfig
 			err string
 		}{
-			"key":      {&config.AgentConfig{APIEnabled: true}, "missing API key"},
-			"key2":     {&config.AgentConfig{APIEnabled: true, APIEndpoint: "123"}, "missing API key"},
-			"endpoint": {&config.AgentConfig{APIEnabled: true, APIKey: "123"}, "missing API endpoint"},
+			"key":      {&config.AgentConfig{Enabled: true}, "missing API key"},
+			"key2":     {&config.AgentConfig{Enabled: true, APIEndpoint: "123"}, "missing API key"},
+			"endpoint": {&config.AgentConfig{Enabled: true, APIKey: "123"}, "missing API endpoint"},
 		} {
 			t.Run(name, func(t *testing.T) {
 				defer func() {
@@ -80,19 +80,19 @@ func TestNewEndpoints(t *testing.T) {
 			exp  []*DatadogEndpoint
 		}{
 			"main": {
-				cfg:  &config.AgentConfig{APIEnabled: true, APIEndpoint: "host1", APIKey: "key1"},
+				cfg:  &config.AgentConfig{Enabled: true, APIEndpoint: "host1", APIKey: "key1"},
 				path: "/api/trace",
 				exp:  []*DatadogEndpoint{{Host: "host1", APIKey: "key1", path: "/api/trace"}},
 			},
 			"additional": {
 				cfg: &config.AgentConfig{
-					APIEnabled:  true,
+					Enabled:     true,
 					APIEndpoint: "host1",
 					APIKey:      "key1",
 					AdditionalEndpoints: []*config.Endpoint{
 						{Host: "host2", APIKey: "key2"},
 						{Host: "host3", APIKey: "key3"},
-						{Host: "host4"},
+						{Host: "host4", APIKey: "key4"},
 					},
 				},
 				path: "/api/trace",
@@ -100,7 +100,7 @@ func TestNewEndpoints(t *testing.T) {
 					{Host: "host1", APIKey: "key1", path: "/api/trace"},
 					{Host: "host2", APIKey: "key2", path: "/api/trace"},
 					{Host: "host3", APIKey: "key3", path: "/api/trace"},
-					{Host: "host4", APIKey: "key1", path: "/api/trace"},
+					{Host: "host4", APIKey: "key4", path: "/api/trace"},
 				},
 			},
 		} {
@@ -124,7 +124,7 @@ func TestNewEndpoints(t *testing.T) {
 			t.Fatal(err)
 		}
 		e := NewEndpoints(&config.AgentConfig{
-			APIEnabled:  true,
+			Enabled:     true,
 			APIEndpoint: "host1",
 			APIKey:      "key1",
 			ProxyURL:    proxyURL,

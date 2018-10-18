@@ -42,7 +42,7 @@ func NewStatsWriter(conf *config.AgentConfig, InStats <-chan []model.StatsBucket
 	writerConf := conf.StatsWriterConfig
 	log.Infof("Stats writer initializing with config: %+v", writerConf)
 
-	bw := *NewBaseWriter(conf, "/api/v0.2/stats", newMultiSender(writerConf.SenderConfig))
+	bw := *NewBaseWriter(conf, "/api/v0.2/stats", newMultiSenderFactory(writerConf.SenderConfig))
 	return &StatsWriter{
 		BaseWriter: bw,
 		InStats:    InStats,
@@ -292,6 +292,7 @@ func (w *StatsWriter) monitor() {
 			swInfo.Splits = atomic.SwapInt64(&w.info.Splits, 0)
 			swInfo.Errors = atomic.SwapInt64(&w.info.Errors, 0)
 
+			// TODO(gbbr): Scope these stats per endpoint (see (config.AgentConfig).AdditionalEndpoints))
 			statsd.Client.Count("datadog.trace_agent.stats_writer.payloads", int64(swInfo.Payloads), nil, 1)
 			statsd.Client.Count("datadog.trace_agent.stats_writer.stats_buckets", int64(swInfo.StatsBuckets), nil, 1)
 			statsd.Client.Count("datadog.trace_agent.stats_writer.bytes", int64(swInfo.Bytes), nil, 1)

@@ -48,7 +48,6 @@ type AgentConfig struct {
 	APIEndpoint         string
 	AdditionalEndpoints []*Endpoint
 	APIKey              string `json:"-"` // never publish this
-	APIEnabled          bool
 
 	// Concentrator
 	BucketInterval   time.Duration // the size of our pre-aggregation per bucket

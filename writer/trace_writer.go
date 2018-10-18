@@ -59,7 +59,7 @@ func NewTraceWriter(conf *config.AgentConfig, in <-chan *SampledTrace) *TraceWri
 
 		in: in,
 
-		BaseWriter: *NewBaseWriter(conf, "/api/v0.2/traces", newMultiSender(writerConf.SenderConfig)),
+		BaseWriter: *NewBaseWriter(conf, "/api/v0.2/traces", newMultiSenderFactory(writerConf.SenderConfig)),
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -37,7 +38,7 @@ type DatadogEndpoint struct {
 // NewEndpoints returns the set of endpoints configured in the AgentConfig, appending the given path.
 // The first endpoint is the main API endpoint, followed by any additional endpoints.
 func NewEndpoints(conf *config.AgentConfig, path string) []Endpoint {
-	if !conf.APIEnabled {
+	if !conf.Enabled {
 		log.Info("API interface is disabled, flushing to /dev/null instead")
 		return []Endpoint{&NullEndpoint{}}
 	}
@@ -60,13 +61,8 @@ func NewEndpoints(conf *config.AgentConfig, path string) []Endpoint {
 			// this endpoint needs a different client.
 			c = newClient(conf, e.NoProxy)
 		}
-		apiKey := e.APIKey
-		if apiKey == "" {
-			// if this endpoint doesn't have its own API key, try the main one.
-			apiKey = conf.APIKey
-		}
 		endpoints = append(endpoints, &DatadogEndpoint{
-			APIKey: apiKey,
+			APIKey: e.APIKey,
 			Host:   e.Host,
 			path:   path,
 			client: c,
@@ -131,7 +127,16 @@ const timeout = 10 * time.Second
 // newClient returns a http.Client configured with the Agent options.
 func newClient(conf *config.AgentConfig, noProxy bool) *http.Client {
 	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: conf.SkipSSLValidation},
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		TLSClientConfig:       &tls.Config{InsecureSkipVerify: conf.SkipSSLValidation},
 	}
 	if conf.ProxyURL != nil && !noProxy {
 		log.Infof("configuring proxy through: %s", conf.ProxyURL.String())
