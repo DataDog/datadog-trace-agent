@@ -16,7 +16,7 @@ import (
 
 func (c *AgentConfig) loadIniConfig(conf *File) {
 	if len(c.Endpoints) == 0 {
-		c.Endpoints = make([]*Endpoint, 1)
+		c.Endpoints = []*Endpoint{{}}
 	}
 
 	// [Main] section

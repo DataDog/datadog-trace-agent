@@ -187,7 +187,7 @@ func NewYaml(configPath string) (*YamlAgentConfig, error) {
 
 func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 	if len(c.Endpoints) == 0 {
-		c.Endpoints = make([]*Endpoint, 1)
+		c.Endpoints = []*Endpoint{{}}
 	}
 
 	if yc.APIKey != "" {

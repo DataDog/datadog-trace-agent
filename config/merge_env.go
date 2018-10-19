@@ -55,7 +55,7 @@ func (c *AgentConfig) loadEnv() {
 	}
 
 	if len(c.Endpoints) == 0 {
-		c.Endpoints = make([]*Endpoint, 1)
+		c.Endpoints = []*Endpoint{{}}
 	}
 	site := os.Getenv(envSite)
 	if site != "" {
