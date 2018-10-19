@@ -40,7 +40,6 @@ type AgentConfig struct {
 	// API
 	APIEndpoint string
 	APIKey      string `json:"-"` // never publish this
-	APIEnabled  bool
 
 	// Concentrator
 	BucketInterval   time.Duration // the size of our pre-aggregation per bucket
@@ -109,7 +108,6 @@ func New() *AgentConfig {
 		DefaultEnv:  "none",
 		APIEndpoint: "https://trace.agent.datadoghq.com",
 		APIKey:      "",
-		APIEnabled:  true,
 
 		BucketInterval:   time.Duration(10) * time.Second,
 		ExtraAggregators: []string{"http.status_code"},
@@ -137,7 +135,7 @@ func New() *AgentConfig {
 		MaxConnections:   200, // in practice, rarely goes over 20
 		WatchdogInterval: time.Minute,
 
-		Ignore:                      make(map[string][]string),
+		Ignore: make(map[string][]string),
 		AnalyzedRateByServiceLegacy: make(map[string]float64),
 		AnalyzedSpansByService:      make(map[string]map[string]float64),
 	}

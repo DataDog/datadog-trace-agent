@@ -20,7 +20,7 @@ type BaseWriter struct {
 func NewBaseWriter(conf *config.AgentConfig, path string, senderFactory func(Endpoint) PayloadSender) *BaseWriter {
 	var endpoint Endpoint
 
-	if conf.APIEnabled {
+	if conf.Enabled {
 		client := NewClient(conf)
 		endpoint = NewDatadogEndpoint(client, conf.APIEndpoint, path, conf.APIKey)
 	} else {
