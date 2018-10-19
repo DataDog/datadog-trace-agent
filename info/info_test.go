@@ -110,6 +110,8 @@ func testServerError(t *testing.T) *httptest.Server {
 func testInit(t *testing.T) *config.AgentConfig {
 	assert := assert.New(t)
 	conf := config.New()
+	conf.Endpoints[0].APIKey = "key1"
+	conf.Endpoints = append(conf.Endpoints, &config.Endpoint{Host: "ABC", APIKey: "key2"})
 	assert.NotNil(conf)
 
 	err := InitInfo(conf)
@@ -145,6 +147,19 @@ func TestInfo(t *testing.T) {
 	expectedInfo, err := ioutil.ReadFile("./testdata/okay.info")
 	assert.NoError(err)
 	assert.Equal(string(expectedInfo), info)
+}
+
+func TestHideAPIKeys(t *testing.T) {
+	assert := assert.New(t)
+	conf := testInit(t)
+
+	js := expvar.Get("config").String()
+	assert.NotEqual("", js)
+	var got config.AgentConfig
+	err := json.Unmarshal([]byte(js), &got)
+	assert.Nil(err)
+	assert.NotEmpty(conf.Endpoints[0].APIKey)
+	assert.Empty(got.Endpoints[0].APIKey)
 }
 
 func TestWarning(t *testing.T) {
@@ -332,7 +347,9 @@ func TestInfoConfig(t *testing.T) {
 	var confCopy config.AgentConfig
 	err := json.Unmarshal([]byte(js), &confCopy)
 	assert.Nil(err)
-	assert.Equal("", confCopy.APIKey, "API Keys should *NEVER* be exported")
-	conf.APIKey = ""              // patch upstream source so that we can use equality testing
+	for i, e := range confCopy.Endpoints {
+		assert.Equal("", e.APIKey, "API Keys should *NEVER* be exported")
+		conf.Endpoints[i].APIKey = "" // make conf equal to confCopy to assert equality of other fields
+	}
 	assert.Equal(*conf, confCopy) // ensure all fields have been exported then parsed correctly
 }

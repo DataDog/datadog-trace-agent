@@ -54,9 +54,9 @@ func TestNewEndpoints(t *testing.T) {
 			cfg *config.AgentConfig
 			err string
 		}{
-			"key":      {&config.AgentConfig{Enabled: true}, "missing API key"},
-			"key2":     {&config.AgentConfig{Enabled: true, APIEndpoint: "123"}, "missing API key"},
-			"endpoint": {&config.AgentConfig{Enabled: true, APIKey: "123"}, "missing API endpoint"},
+			"key":      {&config.AgentConfig{Enabled: true}, "must have at least one endpoint with key"},
+			"key2":     {&config.AgentConfig{Enabled: true, Endpoints: []*config.Endpoint{{Host: "123"}}}, "must have at least one endpoint with key"},
+			"endpoint": {&config.AgentConfig{Enabled: true, Endpoints: []*config.Endpoint{{APIKey: "123"}}}, "must have at least one endpoint with key"},
 		} {
 			t.Run(name, func(t *testing.T) {
 				defer func() {
@@ -80,16 +80,15 @@ func TestNewEndpoints(t *testing.T) {
 			exp  []*DatadogEndpoint
 		}{
 			"main": {
-				cfg:  &config.AgentConfig{Enabled: true, APIEndpoint: "host1", APIKey: "key1"},
+				cfg:  &config.AgentConfig{Enabled: true, Endpoints: []*config.Endpoint{{Host: "host1", APIKey: "key1"}}},
 				path: "/api/trace",
 				exp:  []*DatadogEndpoint{{Host: "host1", APIKey: "key1", path: "/api/trace"}},
 			},
 			"additional": {
 				cfg: &config.AgentConfig{
-					Enabled:     true,
-					APIEndpoint: "host1",
-					APIKey:      "key1",
-					AdditionalEndpoints: []*config.Endpoint{
+					Enabled: true,
+					Endpoints: []*config.Endpoint{
+						{Host: "host1", APIKey: "key1"},
 						{Host: "host2", APIKey: "key2"},
 						{Host: "host3", APIKey: "key3"},
 						{Host: "host4", APIKey: "key4"},
@@ -124,23 +123,24 @@ func TestNewEndpoints(t *testing.T) {
 			t.Fatal(err)
 		}
 		e := NewEndpoints(&config.AgentConfig{
-			Enabled:     true,
-			APIEndpoint: "host1",
-			APIKey:      "key1",
-			ProxyURL:    proxyURL,
-			AdditionalEndpoints: []*config.Endpoint{
+			Enabled:  true,
+			ProxyURL: proxyURL,
+			Endpoints: []*config.Endpoint{
+				{Host: "host1", APIKey: "key1"},
 				{Host: "host2", APIKey: "key2"},
 				{Host: "host3", APIKey: "key3", NoProxy: true},
 			},
 		}, "/api/trace")
 
 		// proxy ok
-		t1 := e[1].(*DatadogEndpoint).client.Transport.(*http.Transport)
-		p, _ := t1.Proxy(nil)
-		assert.Equal("test_url", p.String())
+		for _, i := range []int{0, 1} {
+			tr := e[i].(*DatadogEndpoint).client.Transport.(*http.Transport)
+			p, _ := tr.Proxy(nil)
+			assert.Equal("test_url", p.String())
+		}
 
 		// proxy skipped
-		t2 := e[2].(*DatadogEndpoint).client.Transport.(*http.Transport)
-		assert.Nil(t2.Proxy)
+		tr := e[2].(*DatadogEndpoint).client.Transport.(*http.Transport)
+		assert.Nil(tr.Proxy)
 	})
 }

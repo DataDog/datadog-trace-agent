@@ -42,31 +42,24 @@ func NewEndpoints(conf *config.AgentConfig, path string) []Endpoint {
 		log.Info("API interface is disabled, flushing to /dev/null instead")
 		return []Endpoint{&NullEndpoint{}}
 	}
-	if conf.APIKey == "" {
-		panic(errors.New("missing API key"))
+	if e := conf.Endpoints; len(e) == 0 || e[0].Host == "" || e[0].APIKey == "" {
+		panic(errors.New("must have at least one endpoint with key"))
 	}
-	if conf.APIEndpoint == "" {
-		panic(errors.New("missing API endpoint"))
-	}
-	client := newClient(conf, conf.NoProxy)
-	endpoints := []Endpoint{&DatadogEndpoint{
-		APIKey: conf.APIKey,
-		Host:   conf.APIEndpoint,
-		path:   path,
-		client: client,
-	}}
-	for _, e := range conf.AdditionalEndpoints {
+	endpoints := make([]Endpoint, len(conf.Endpoints))
+	ignoreProxy := true
+	client := newClient(conf, !ignoreProxy)
+	clientIgnoreProxy := newClient(conf, ignoreProxy)
+	for i, e := range conf.Endpoints {
 		c := client
-		if e.NoProxy != conf.NoProxy {
-			// this endpoint needs a different client.
-			c = newClient(conf, e.NoProxy)
+		if e.NoProxy {
+			c = clientIgnoreProxy
 		}
-		endpoints = append(endpoints, &DatadogEndpoint{
+		endpoints[i] = &DatadogEndpoint{
 			APIKey: e.APIKey,
 			Host:   e.Host,
 			path:   path,
 			client: c,
-		})
+		}
 	}
 	return endpoints
 }
@@ -125,7 +118,7 @@ func (e *DatadogEndpoint) String() string {
 const timeout = 10 * time.Second
 
 // newClient returns a http.Client configured with the Agent options.
-func newClient(conf *config.AgentConfig, noProxy bool) *http.Client {
+func newClient(conf *config.AgentConfig, ignoreProxy bool) *http.Client {
 	transport := &http.Transport{
 		DialContext: (&net.Dialer{
 			Timeout:   30 * time.Second,
@@ -138,7 +131,7 @@ func newClient(conf *config.AgentConfig, noProxy bool) *http.Client {
 		ExpectContinueTimeout: 1 * time.Second,
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: conf.SkipSSLValidation},
 	}
-	if conf.ProxyURL != nil && !noProxy {
+	if conf.ProxyURL != nil && !ignoreProxy {
 		log.Infof("configuring proxy through: %s", conf.ProxyURL.String())
 		transport.Proxy = http.ProxyURL(conf.ProxyURL)
 	}

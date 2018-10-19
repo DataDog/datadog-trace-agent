@@ -186,12 +186,12 @@ func NewYaml(configPath string) (*YamlAgentConfig, error) {
 }
 
 func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
-	if yc == nil {
-		return
+	if len(c.Endpoints) == 0 {
+		c.Endpoints = make([]*Endpoint, 1)
 	}
 
 	if yc.APIKey != "" {
-		c.APIKey = yc.APIKey
+		c.Endpoints[0].APIKey = yc.APIKey
 	}
 	if yc.HostName != "" {
 		c.Hostname = yc.HostName
@@ -202,18 +202,15 @@ func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 	if yc.StatsdPort > 0 {
 		c.StatsdPort = yc.StatsdPort
 	}
+
 	if yc.Site != "" {
-		c.APIEndpoint = apiEndpointPrefix + yc.Site
+		c.Endpoints[0].Host = apiEndpointPrefix + yc.Site
 	}
-	if yc.TraceAgent.Endpoint != "" {
-		c.APIEndpoint = yc.TraceAgent.Endpoint
+	if host := yc.TraceAgent.Endpoint; host != "" {
+		c.Endpoints[0].Host = host
 		if yc.Site != "" {
-			log.Infof("'site' and 'apm_dd_url' are both set, using endpoint: %q", c.APIEndpoint)
+			log.Infof("'site' and 'apm_dd_url' are both set, using endpoint: %q", host)
 		}
-	}
-	noProxy := make(map[string]bool, len(yc.Proxy.NoProxy))
-	for _, host := range yc.Proxy.NoProxy {
-		noProxy[host] = true
 	}
 	for url, keys := range yc.TraceAgent.AdditionalEndpoints {
 		if len(keys) == 0 {
@@ -221,17 +218,19 @@ func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 			continue
 		}
 		for _, key := range keys {
-			c.AdditionalEndpoints = append(c.AdditionalEndpoints, &Endpoint{
-				Host:    url,
-				APIKey:  key,
-				NoProxy: noProxy[url],
-			})
+			c.Endpoints = append(c.Endpoints, &Endpoint{Host: url, APIKey: key})
 		}
 	}
-	if host, ok := noProxy[c.APIEndpoint]; ok {
-		log.Infof("Trace Agent main endpoint matches `proxy.no_proxy` list item %q: ignoring proxy", host)
-		c.NoProxy = true
+
+	noProxy := make(map[string]bool, len(yc.Proxy.NoProxy))
+	for _, host := range yc.Proxy.NoProxy {
+		// map of hosts that need to be skipped by proxy
+		noProxy[host] = true
 	}
+	for _, e := range c.Endpoints {
+		e.NoProxy = noProxy[e.Host]
+	}
+
 	if yc.Proxy.HTTPS != "" {
 		url, err := url.Parse(yc.Proxy.HTTPS)
 		if err == nil {

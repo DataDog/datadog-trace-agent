@@ -26,8 +26,11 @@ var (
 
 // Endpoint specifies an endpoint that the trace agent will write data (traces, stats & services) to.
 type Endpoint struct {
-	APIKey  string
-	Host    string
+	APIKey string `json:"-"` // never marshal this
+	Host   string
+
+	// NoProxy will be set to true when the proxy setting for the trace API endpoint
+	// needs to be ignored (e.g. it is part of the "no_proxy" list in the yaml settings).
 	NoProxy bool
 }
 
@@ -44,10 +47,11 @@ type AgentConfig struct {
 	DefaultEnv string // the traces will default to this environment
 	ConfigPath string // the source of this config, if any
 
-	// API
-	APIEndpoint         string
-	AdditionalEndpoints []*Endpoint
-	APIKey              string `json:"-"` // never publish this
+	// Endpoints specifies the set of hosts and API keys where traces and stats
+	// will be uploaded to. The first endpoint is the main configuration endpoint;
+	// any following ones are read from the 'additional_endpoints' parts of the
+	// configuration file, if present.
+	Endpoints []*Endpoint
 
 	// Concentrator
 	BucketInterval   time.Duration // the size of our pre-aggregation per bucket
@@ -87,10 +91,6 @@ type AgentConfig struct {
 	ProxyURL          *url.URL
 	SkipSSLValidation bool
 
-	// NoProxy will be set to true when the proxy setting for the trace API endpoint
-	// needs to be ignored (e.g. it is part of the "no_proxy" list in the yaml settings).
-	NoProxy bool
-
 	// filtering
 	Ignore map[string][]string
 
@@ -112,10 +112,9 @@ type AgentConfig struct {
 // New returns a configuration with the default values.
 func New() *AgentConfig {
 	return &AgentConfig{
-		Enabled:     true,
-		DefaultEnv:  "none",
-		APIEndpoint: "https://trace.agent.datadoghq.com",
-		APIKey:      "",
+		Enabled:    true,
+		DefaultEnv: "none",
+		Endpoints:  []*Endpoint{{Host: "https://trace.agent.datadoghq.com"}},
 
 		BucketInterval:   time.Duration(10) * time.Second,
 		ExtraAggregators: []string{"http.status_code"},
@@ -171,7 +170,7 @@ func (c *AgentConfig) LoadYaml(path string) error {
 
 // Validate validates if the current configuration is good for the agent to start with.
 func (c *AgentConfig) validate() error {
-	if c.APIKey == "" {
+	if len(c.Endpoints) == 0 || c.Endpoints[0].APIKey == "" {
 		return ErrMissingAPIKey
 	}
 	if c.Hostname == "" {
