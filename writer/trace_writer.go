@@ -49,12 +49,13 @@ type TraceWriter struct {
 
 // NewTraceWriter returns a new writer for traces.
 func NewTraceWriter(conf *config.AgentConfig, in <-chan *SampledTrace) *TraceWriter {
-	writerConf := conf.TraceWriterConfig
-	sender := newMultiSenderFactory(writerConf.SenderConfig)(NewEndpoints(conf, pathTraces))
-	log.Infof("Trace writer initializing with config: %+v", writerConf)
+	cfg := conf.TraceWriterConfig
+	endpoints := NewEndpoints(conf, pathTraces)
+	sender := newMultiSender(endpoints, cfg.SenderConfig)
+	log.Infof("Trace writer initializing with config: %+v", cfg)
 
 	return &TraceWriter{
-		conf:     writerConf,
+		conf:     cfg,
 		hostName: conf.Hostname,
 		env:      conf.DefaultEnv,
 

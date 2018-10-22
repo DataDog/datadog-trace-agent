@@ -12,11 +12,10 @@ import (
 
 func TestNewMultiSenderFactory(t *testing.T) {
 	cfg := config.DefaultQueuablePayloadSenderConf()
-	fn := newMultiSenderFactory(cfg)
 
 	t.Run("one", func(t *testing.T) {
 		endpoint := &DatadogEndpoint{Host: "host1", APIKey: "key1"}
-		sender, ok := fn([]Endpoint{endpoint}).(*QueuablePayloadSender)
+		sender, ok := newMultiSender([]Endpoint{endpoint}, cfg).(*QueuablePayloadSender)
 		assert := assert.New(t)
 		assert.True(ok)
 		assert.EqualValues(endpoint, sender.BasePayloadSender.endpoint)
@@ -29,7 +28,7 @@ func TestNewMultiSenderFactory(t *testing.T) {
 			&DatadogEndpoint{Host: "host2", APIKey: "key2"},
 			&DatadogEndpoint{Host: "host3", APIKey: "key3"},
 		}
-		sender, ok := fn(endpoints).(*multiSender)
+		sender, ok := newMultiSender(endpoints, cfg).(*multiSender)
 		assert := assert.New(t)
 		assert.True(ok)
 		assert.Len(sender.senders, 3)

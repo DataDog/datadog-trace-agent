@@ -15,7 +15,7 @@ import (
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 )
 
-const pathService = "/api/v0.2/services"
+const pathServices = "/api/v0.2/services"
 
 // ServiceWriter ingests service metadata and flush them to the API.
 type ServiceWriter struct {
@@ -31,12 +31,13 @@ type ServiceWriter struct {
 
 // NewServiceWriter returns a new writer for services.
 func NewServiceWriter(conf *config.AgentConfig, InServices <-chan model.ServicesMetadata) *ServiceWriter {
-	writerConf := conf.ServiceWriterConfig
-	sender := newMultiSenderFactory(writerConf.SenderConfig)(NewEndpoints(conf, pathTraces))
-	log.Infof("Service writer initializing with config: %+v", writerConf)
+	cfg := conf.ServiceWriterConfig
+	endpoints := NewEndpoints(conf, pathServices)
+	sender := newMultiSender(endpoints, cfg.SenderConfig)
+	log.Infof("Service writer initializing with config: %+v", cfg)
 
 	return &ServiceWriter{
-		conf:          writerConf,
+		conf:          cfg,
 		InServices:    InServices,
 		serviceBuffer: model.ServicesMetadata{},
 		sender:        sender,

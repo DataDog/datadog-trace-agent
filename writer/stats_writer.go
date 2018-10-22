@@ -42,9 +42,10 @@ type StatsWriter struct {
 
 // NewStatsWriter returns a new writer for stats.
 func NewStatsWriter(conf *config.AgentConfig, InStats <-chan []model.StatsBucket) *StatsWriter {
-	writerConf := conf.StatsWriterConfig
-	sender := newMultiSenderFactory(writerConf.SenderConfig)(NewEndpoints(conf, pathStats))
-	log.Infof("Stats writer initializing with config: %+v", writerConf)
+	cfg := conf.StatsWriterConfig
+	endpoints := NewEndpoints(conf, pathStats)
+	sender := newMultiSender(endpoints, cfg.SenderConfig)
+	log.Infof("Stats writer initializing with config: %+v", cfg)
 
 	return &StatsWriter{
 		sender:   sender,
@@ -52,7 +53,7 @@ func NewStatsWriter(conf *config.AgentConfig, InStats <-chan []model.StatsBucket
 		InStats:  InStats,
 		hostName: conf.Hostname,
 		env:      conf.DefaultEnv,
-		conf:     writerConf,
+		conf:     cfg,
 	}
 }
 
