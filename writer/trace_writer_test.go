@@ -348,7 +348,7 @@ func testTraceWriter() (*TraceWriter, chan *SampledTrace, *testEndpoint, *testut
 	}
 	traceWriter := NewTraceWriter(conf, payloadChannel)
 	testEndpoint := &testEndpoint{}
-	traceWriter.BaseWriter.payloadSender.setEndpoint(testEndpoint)
+	traceWriter.sender.setEndpoint(testEndpoint)
 	testStatsClient := &testutil.TestStatsClient{}
 	originalClient := statsd.Client
 	statsd.Client = testStatsClient

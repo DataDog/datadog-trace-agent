@@ -15,6 +15,8 @@ import (
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 )
 
+const pathService = "/api/v0.2/services"
+
 // ServiceWriter ingests service metadata and flush them to the API.
 type ServiceWriter struct {
 	stats      info.ServiceWriterInfo
@@ -23,25 +25,28 @@ type ServiceWriter struct {
 
 	serviceBuffer model.ServicesMetadata
 
-	BaseWriter
+	sender PayloadSender
+	exit   chan struct{}
 }
 
 // NewServiceWriter returns a new writer for services.
 func NewServiceWriter(conf *config.AgentConfig, InServices <-chan model.ServicesMetadata) *ServiceWriter {
 	writerConf := conf.ServiceWriterConfig
+	sender := newMultiSenderFactory(writerConf.SenderConfig)(NewEndpoints(conf, pathTraces))
 	log.Infof("Service writer initializing with config: %+v", writerConf)
 
 	return &ServiceWriter{
 		conf:          writerConf,
 		InServices:    InServices,
 		serviceBuffer: model.ServicesMetadata{},
-		BaseWriter:    *NewBaseWriter(conf, "/api/v0.2/services", newMultiSenderFactory(writerConf.SenderConfig)),
+		sender:        sender,
+		exit:          make(chan struct{}),
 	}
 }
 
 // Start starts the writer.
 func (w *ServiceWriter) Start() {
-	w.BaseWriter.Start()
+	w.sender.Start()
 	go func() {
 		defer watchdog.LogOnPanic()
 		w.Run()
@@ -64,7 +69,7 @@ func (w *ServiceWriter) Run() {
 
 	// Monitor sender for events
 	go func() {
-		for event := range w.payloadSender.Monitor() {
+		for event := range w.sender.Monitor() {
 			if event == nil {
 				continue
 			}
@@ -114,7 +119,7 @@ func (w *ServiceWriter) Run() {
 func (w *ServiceWriter) Stop() {
 	w.exit <- struct{}{}
 	<-w.exit
-	w.BaseWriter.Stop()
+	w.sender.Stop()
 }
 
 func (w *ServiceWriter) handleServiceMetadata(metadata model.ServicesMetadata) {
@@ -146,7 +151,7 @@ func (w *ServiceWriter) flush() {
 	atomic.AddInt64(&w.stats.Bytes, int64(len(data)))
 
 	payload := NewPayload(data, headers)
-	w.payloadSender.Send(payload)
+	w.sender.Send(payload)
 
 	w.serviceBuffer = make(model.ServicesMetadata)
 }

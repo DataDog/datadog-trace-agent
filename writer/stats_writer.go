@@ -15,9 +15,12 @@ import (
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 )
 
+const pathStats = "/api/v0.2/stats"
+
 // StatsWriter ingests stats buckets and flushes them to the API.
 type StatsWriter struct {
-	BaseWriter
+	sender PayloadSender
+	exit   chan struct{}
 
 	// InStats is the stream of stat buckets to send out.
 	InStats <-chan []model.StatsBucket
@@ -40,21 +43,22 @@ type StatsWriter struct {
 // NewStatsWriter returns a new writer for stats.
 func NewStatsWriter(conf *config.AgentConfig, InStats <-chan []model.StatsBucket) *StatsWriter {
 	writerConf := conf.StatsWriterConfig
+	sender := newMultiSenderFactory(writerConf.SenderConfig)(NewEndpoints(conf, pathStats))
 	log.Infof("Stats writer initializing with config: %+v", writerConf)
 
-	bw := *NewBaseWriter(conf, "/api/v0.2/stats", newMultiSenderFactory(writerConf.SenderConfig))
 	return &StatsWriter{
-		BaseWriter: bw,
-		InStats:    InStats,
-		hostName:   conf.Hostname,
-		env:        conf.DefaultEnv,
-		conf:       writerConf,
+		sender:   sender,
+		exit:     make(chan struct{}),
+		InStats:  InStats,
+		hostName: conf.Hostname,
+		env:      conf.DefaultEnv,
+		conf:     writerConf,
 	}
 }
 
 // Start starts the writer, awaiting stat buckets and flushing them.
 func (w *StatsWriter) Start() {
-	w.BaseWriter.Start()
+	w.sender.Start()
 
 	go func() {
 		defer watchdog.LogOnPanic()
@@ -89,11 +93,7 @@ func (w *StatsWriter) Run() {
 func (w *StatsWriter) Stop() {
 	w.exit <- struct{}{}
 	<-w.exit
-
-	// Closing the base writer, among other things, will close the
-	// w.payloadSender.Monitor() channel, stoping the monitoring
-	// goroutine.
-	w.BaseWriter.Stop()
+	w.sender.Stop()
 }
 
 func (w *StatsWriter) handleStats(stats []model.StatsBucket) {
@@ -126,7 +126,7 @@ func (w *StatsWriter) handleStats(stats []model.StatsBucket) {
 		}
 
 		payload := NewPayload(data, headers)
-		w.payloadSender.Send(payload)
+		w.sender.Send(payload)
 
 		atomic.AddInt64(&w.info.Bytes, int64(len(data)))
 	}
@@ -247,7 +247,7 @@ func (w *StatsWriter) buildPayloads(stats []model.StatsBucket, maxEntriesPerPayl
 //   them, send out statsd metrics, and updates the writer info
 // - periodically dumps the writer info
 func (w *StatsWriter) monitor() {
-	monC := w.payloadSender.Monitor()
+	monC := w.sender.Monitor()
 
 	infoTicker := time.NewTicker(w.conf.UpdateInfoPeriod)
 	defer infoTicker.Stop()
