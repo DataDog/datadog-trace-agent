@@ -24,7 +24,7 @@ func TestServiceWriter_SenderMaxPayloads(t *testing.T) {
 	defer teardown()
 
 	// When checking its default sender configuration
-	queuableSender := serviceWriter.BaseWriter.payloadSender.(*QueuablePayloadSender)
+	queuableSender := serviceWriter.sender.(*QueuablePayloadSender)
 
 	// Then the MaxQueuedPayloads setting should be -1 (unlimited)
 	assert.Equal(-1, queuableSender.conf.MaxQueuedPayloads)
@@ -204,7 +204,7 @@ func testServiceWriter() (*ServiceWriter, chan model.ServicesMetadata, *testEndp
 	}
 	serviceWriter := NewServiceWriter(conf, serviceChannel)
 	testEndpoint := &testEndpoint{}
-	serviceWriter.BaseWriter.payloadSender.setEndpoint(testEndpoint)
+	serviceWriter.sender.setEndpoint(testEndpoint)
 	testStatsClient := &testutil.TestStatsClient{}
 	originalClient := statsd.Client
 	statsd.Client = testStatsClient

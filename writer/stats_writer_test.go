@@ -399,7 +399,7 @@ func testStatsWriter() (*StatsWriter, chan []model.StatsBucket, *testEndpoint, *
 	}
 	statsWriter := NewStatsWriter(conf, statsChannel)
 	testEndpoint := &testEndpoint{}
-	statsWriter.BaseWriter.payloadSender.setEndpoint(testEndpoint)
+	statsWriter.sender.setEndpoint(testEndpoint)
 	testStatsClient := &testutil.TestStatsClient{}
 	originalClient := statsd.Client
 	statsd.Client = testStatsClient

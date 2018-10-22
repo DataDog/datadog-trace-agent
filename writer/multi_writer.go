@@ -17,13 +17,6 @@ type multiSender struct {
 	mch     chan interface{} // monitor funneling channel
 }
 
-// newMultiSenderFactory returns a new factory to generate multiSender.
-func newMultiSenderFactory(cfg config.QueuablePayloadSenderConf) func([]Endpoint) PayloadSender {
-	return func(endpoints []Endpoint) PayloadSender {
-		return newMultiSender(endpoints, cfg)
-	}
-}
-
 // newMultiSender returns a new PayloadSender which forwards all sent payloads to all
 // the given endpoints, as well as funnels all monitoring channels.
 func newMultiSender(endpoints []Endpoint, cfg config.QueuablePayloadSenderConf) PayloadSender {

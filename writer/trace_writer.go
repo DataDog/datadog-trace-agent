@@ -18,6 +18,8 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
+const pathTraces = "/api/v0.2/traces"
+
 // SampledTrace represents the result of a trace sample operation.
 type SampledTrace struct {
 	Trace        *model.Trace
@@ -41,16 +43,19 @@ type TraceWriter struct {
 	transactions  []*model.Span
 	spansInBuffer int
 
-	BaseWriter
+	sender PayloadSender
+	exit   chan struct{}
 }
 
 // NewTraceWriter returns a new writer for traces.
 func NewTraceWriter(conf *config.AgentConfig, in <-chan *SampledTrace) *TraceWriter {
-	writerConf := conf.TraceWriterConfig
-	log.Infof("Trace writer initializing with config: %+v", writerConf)
+	cfg := conf.TraceWriterConfig
+	endpoints := NewEndpoints(conf, pathTraces)
+	sender := newMultiSender(endpoints, cfg.SenderConfig)
+	log.Infof("Trace writer initializing with config: %+v", cfg)
 
 	return &TraceWriter{
-		conf:     writerConf,
+		conf:     cfg,
 		hostName: conf.Hostname,
 		env:      conf.DefaultEnv,
 
@@ -59,13 +64,14 @@ func NewTraceWriter(conf *config.AgentConfig, in <-chan *SampledTrace) *TraceWri
 
 		in: in,
 
-		BaseWriter: *NewBaseWriter(conf, "/api/v0.2/traces", newMultiSenderFactory(writerConf.SenderConfig)),
+		sender: sender,
+		exit:   make(chan struct{}),
 	}
 }
 
 // Start starts the writer.
 func (w *TraceWriter) Start() {
-	w.BaseWriter.Start()
+	w.sender.Start()
 	go func() {
 		defer watchdog.LogOnPanic()
 		w.Run()
@@ -86,7 +92,7 @@ func (w *TraceWriter) Run() {
 
 	// Monitor sender for events
 	go func() {
-		for event := range w.payloadSender.Monitor() {
+		for event := range w.sender.Monitor() {
 			if event == nil {
 				continue
 			}
@@ -137,7 +143,7 @@ func (w *TraceWriter) Run() {
 func (w *TraceWriter) Stop() {
 	w.exit <- struct{}{}
 	<-w.exit
-	w.BaseWriter.Stop()
+	w.sender.Stop()
 }
 
 func (w *TraceWriter) handleSampledTrace(sampledTrace *SampledTrace) {
@@ -256,7 +262,7 @@ func (w *TraceWriter) flush() {
 	payload := NewPayload(serialized, headers)
 
 	log.Debugf("flushing traces=%v transactions=%v", len(w.traces), len(w.transactions))
-	w.payloadSender.Send(payload)
+	w.sender.Send(payload)
 	w.resetBuffer()
 }
 
