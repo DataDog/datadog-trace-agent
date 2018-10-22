@@ -11,7 +11,12 @@ const languageHeaderKey = "X-Datadog-Reported-Languages"
 
 // Endpoint is an interface where we send the data from the Agent.
 type Endpoint interface {
+	// Write writes the payload to the endpoint.
 	Write(payload *Payload) error
+
+	// BaseURL returns the base URL for this endpoint. e.g. For the URL "https://trace.agent.datadoghq.eu/api/v0.2/traces"
+	// it returns "https://trace.agent.datadoghq.eu".
+	BaseURL() string
 }
 
 // NullEndpoint is a void endpoint dropping data.
@@ -22,6 +27,9 @@ func (ne *NullEndpoint) Write(payload *Payload) error {
 	log.Debug("null endpoint: dropping payload, size: %d", len(payload.Bytes))
 	return nil
 }
+
+// BaseURL implements Endpoint.
+func (ne *NullEndpoint) BaseURL() string { return "<NullEndpoint>" }
 
 // SetExtraHeaders appends a header map to HTTP headers.
 func SetExtraHeaders(h http.Header, extras map[string]string) {

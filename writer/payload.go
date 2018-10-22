@@ -32,6 +32,7 @@ func NewPayload(bytes []byte, headers map[string]string) *Payload {
 // SendStats represents basic stats related to the sending of a payload.
 type SendStats struct {
 	SendTime time.Duration
+	Host     string
 }
 
 // SenderSuccessEvent encodes information related to the successful sending of a payload.
@@ -118,6 +119,7 @@ func (s *BasePayloadSender) send(payload *Payload) (SendStats, error) {
 
 	sendStats := SendStats{
 		SendTime: time.Since(startFlush),
+		Host:     s.endpoint.BaseURL(),
 	}
 
 	return sendStats, err

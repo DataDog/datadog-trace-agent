@@ -10,6 +10,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/testutil"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/stretchr/testify/assert"
@@ -19,7 +20,8 @@ func TestServiceWriter_SenderMaxPayloads(t *testing.T) {
 	assert := assert.New(t)
 
 	// Given a service writer
-	serviceWriter, _, _, _ := testServiceWriter()
+	serviceWriter, _, _, _, teardown := testServiceWriter()
+	defer teardown()
 
 	// When checking its default sender configuration
 	queuableSender := serviceWriter.BaseWriter.payloadSender.(*QueuablePayloadSender)
@@ -32,7 +34,8 @@ func TestServiceWriter_ServiceHandling(t *testing.T) {
 	assert := assert.New(t)
 
 	// Given a service writer, its incoming channel and the endpoint that receives the payloads
-	serviceWriter, serviceChannel, testEndpoint, _ := testServiceWriter()
+	serviceWriter, serviceChannel, testEndpoint, _, teardown := testServiceWriter()
+	defer teardown()
 	serviceWriter.conf.FlushPeriod = 100 * time.Millisecond
 
 	serviceWriter.Start()
@@ -76,7 +79,8 @@ func TestServiceWriter_UpdateInfoHandling(t *testing.T) {
 	assert := assert.New(t)
 
 	// Given a service writer, its incoming channel and the endpoint that receives the payloads
-	serviceWriter, serviceChannel, testEndpoint, statsClient := testServiceWriter()
+	serviceWriter, serviceChannel, testEndpoint, statsClient, teardown := testServiceWriter()
+	defer teardown()
 	serviceWriter.conf.FlushPeriod = 100 * time.Millisecond
 	serviceWriter.conf.UpdateInfoPeriod = 100 * time.Millisecond
 
@@ -193,7 +197,7 @@ func assertMetadata(assert *assert.Assertions, expectedHeaders map[string]string
 	assert.Equal(expectedMetadata, servicesMetadata, "Service metadata should match expectation")
 }
 
-func testServiceWriter() (*ServiceWriter, chan model.ServicesMetadata, *testEndpoint, *testutil.TestStatsClient) {
+func testServiceWriter() (*ServiceWriter, chan model.ServicesMetadata, *testEndpoint, *testutil.TestStatsClient, func()) {
 	serviceChannel := make(chan model.ServicesMetadata)
 	conf := &config.AgentConfig{
 		ServiceWriterConfig: writerconfig.DefaultServiceWriterConfig(),
@@ -202,7 +206,10 @@ func testServiceWriter() (*ServiceWriter, chan model.ServicesMetadata, *testEndp
 	testEndpoint := &testEndpoint{}
 	serviceWriter.BaseWriter.payloadSender.setEndpoint(testEndpoint)
 	testStatsClient := &testutil.TestStatsClient{}
-	serviceWriter.statsClient = testStatsClient
+	originalClient := statsd.Client
+	statsd.Client = testStatsClient
 
-	return serviceWriter, serviceChannel, testEndpoint, testStatsClient
+	return serviceWriter, serviceChannel, testEndpoint, testStatsClient, func() {
+		statsd.Client = originalClient
+	}
 }

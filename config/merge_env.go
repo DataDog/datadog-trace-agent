@@ -54,23 +54,23 @@ func (c *AgentConfig) loadEnv() {
 		c.Hostname = v
 	}
 
+	if len(c.Endpoints) == 0 {
+		c.Endpoints = []*Endpoint{{}}
+	}
 	site := os.Getenv(envSite)
 	if site != "" {
-		c.APIEndpoint = apiEndpointPrefix + site
+		c.Endpoints[0].Host = apiEndpointPrefix + site
 	}
 	if v := os.Getenv(envURL); v != "" {
-		c.APIEndpoint = v
+		c.Endpoints[0].Host = v
 		if site != "" {
 			log.Infof("'DD_SITE' and 'DD_APM_DD_URL' are both set, using endpoint: %q", v)
 		}
 	}
 
 	if v := os.Getenv(envAPIKey); v != "" {
-		vals := strings.Split(v, ",")
-		for i := range vals {
-			vals[i] = strings.TrimSpace(vals[i])
-		}
-		c.APIKey = vals[0]
+		v := strings.Split(v, ",")[0]
+		c.Endpoints[0].APIKey = strings.TrimSpace(v)
 	}
 
 	if v := os.Getenv(envReceiverPort); v != "" {

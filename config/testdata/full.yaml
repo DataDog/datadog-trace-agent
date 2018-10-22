@@ -10,6 +10,12 @@ log_level: debug
 apm_config:
   enabled: false
   apm_dd_url: https://datadog.unittests
+  additional_endpoints:
+    https://my1.endpoint.com:
+    - apikey1
+    - apikey2
+    https://my2.endpoint.eu:
+    - apikey3
   env: test
   receiver_port: 18126
   apm_non_local_traffic: yes

@@ -2,10 +2,16 @@ package writer
 
 import (
 	"bytes"
+	"crypto/tls"
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"time"
 
+	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
+	log "github.com/cihub/seelog"
 )
 
 const (
@@ -22,38 +28,55 @@ var userAgent = fmt.Sprintf(
 
 // DatadogEndpoint sends payloads to Datadog API.
 type DatadogEndpoint struct {
-	apiKey string
-	url    string
+	APIKey string
+	Host   string
+
 	client *http.Client
-
-	path string
+	path   string
 }
 
-// NewDatadogEndpoint returns an initialized DatadogEndpoint, from a provided http client and remote endpoint path.
-func NewDatadogEndpoint(client *http.Client, url, path, apiKey string) *DatadogEndpoint {
-	if apiKey == "" {
-		panic(fmt.Errorf("No API key"))
+// NewEndpoints returns the set of endpoints configured in the AgentConfig, appending the given path.
+// The first endpoint is the main API endpoint, followed by any additional endpoints.
+func NewEndpoints(conf *config.AgentConfig, path string) []Endpoint {
+	if !conf.Enabled {
+		log.Info("API interface is disabled, flushing to /dev/null instead")
+		return []Endpoint{&NullEndpoint{}}
 	}
-
-	return &DatadogEndpoint{
-		apiKey: apiKey,
-		url:    url,
-		path:   path,
-		client: client,
+	if e := conf.Endpoints; len(e) == 0 || e[0].Host == "" || e[0].APIKey == "" {
+		panic(errors.New("must have at least one endpoint with key"))
 	}
+	endpoints := make([]Endpoint, len(conf.Endpoints))
+	ignoreProxy := true
+	client := newClient(conf, !ignoreProxy)
+	clientIgnoreProxy := newClient(conf, ignoreProxy)
+	for i, e := range conf.Endpoints {
+		c := client
+		if e.NoProxy {
+			c = clientIgnoreProxy
+		}
+		endpoints[i] = &DatadogEndpoint{
+			APIKey: e.APIKey,
+			Host:   e.Host,
+			path:   path,
+			client: c,
+		}
+	}
+	return endpoints
 }
+
+// BaseURL implements Endpoint.
+func (e *DatadogEndpoint) BaseURL() string { return e.Host }
 
 // Write will send the serialized traces payload to the Datadog traces endpoint.
 func (e *DatadogEndpoint) Write(payload *Payload) error {
 	// Create the request to be sent to the API
-	url := e.url + e.path
+	url := e.Host + e.path
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload.Bytes))
-
 	if err != nil {
 		return err
 	}
 
-	req.Header.Set("DD-Api-Key", e.apiKey)
+	req.Header.Set("DD-Api-Key", e.APIKey)
 	req.Header.Set("User-Agent", userAgent)
 	SetExtraHeaders(req.Header, payload.Headers)
 
@@ -88,5 +111,29 @@ func (e *DatadogEndpoint) Write(payload *Payload) error {
 }
 
 func (e *DatadogEndpoint) String() string {
-	return fmt.Sprintf("DD endpoint(url=%s, path=%s)", e.url, e.path)
+	return fmt.Sprintf("DataDogEndpoint(%q)", e.Host+e.path)
+}
+
+// timeout is the HTTP timeout for POST requests to the Datadog backend
+const timeout = 10 * time.Second
+
+// newClient returns a http.Client configured with the Agent options.
+func newClient(conf *config.AgentConfig, ignoreProxy bool) *http.Client {
+	transport := &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		TLSClientConfig:       &tls.Config{InsecureSkipVerify: conf.SkipSSLValidation},
+	}
+	if conf.ProxyURL != nil && !ignoreProxy {
+		log.Infof("configuring proxy through: %s", conf.ProxyURL.String())
+		transport.Proxy = http.ProxyURL(conf.ProxyURL)
+	}
+	return &http.Client{Timeout: timeout, Transport: transport}
 }

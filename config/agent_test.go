@@ -76,7 +76,7 @@ func TestSite(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			cfg, err := Load(tt.file)
 			assert.NoError(t, err)
-			assert.Equal(t, tt.url, cfg.APIEndpoint)
+			assert.Equal(t, tt.url, cfg.Endpoints[0].Host)
 		})
 	}
 }
@@ -103,7 +103,7 @@ func TestOnlyEnvConfig(t *testing.T) {
 
 	c := New()
 	c.loadEnv()
-	assert.Equal(t, "apikey_from_env", c.APIKey)
+	assert.Equal(t, "apikey_from_env", c.Endpoints[0].APIKey)
 
 	os.Setenv("DD_API_KEY", "")
 }
@@ -115,7 +115,7 @@ func TestOnlyDDAgentConfig(t *testing.T) {
 	assert.NoError(err)
 
 	assert.Equal("thing", c.Hostname)
-	assert.Equal("apikey_12", c.APIKey)
+	assert.Equal("apikey_12", c.Endpoints[0].APIKey)
 	assert.Equal("0.0.0.0", c.ReceiverHost)
 	assert.Equal(28125, c.StatsdPort)
 	assert.Equal("DEBUG", c.LogLevel)
@@ -129,7 +129,7 @@ func TestDDAgentMultiAPIKeys(t *testing.T) {
 	c, err := loadFile("./testdata/multi_api_keys.ini")
 	assert.NoError(err)
 
-	assert.Equal("foo", c.APIKey)
+	assert.Equal("foo", c.Endpoints[0].APIKey)
 }
 
 func TestFullIniConfig(t *testing.T) {
@@ -138,10 +138,10 @@ func TestFullIniConfig(t *testing.T) {
 	c, err := loadFile("./testdata/full.ini")
 	assert.NoError(err)
 
-	assert.Equal("api_key_test", c.APIKey)
+	assert.Equal("api_key_test", c.Endpoints[0].APIKey)
 	assert.Equal("mymachine", c.Hostname)
 	assert.Equal("https://user:password@proxy_for_https:1234", c.ProxyURL.String())
-	assert.Equal("https://datadog.unittests", c.APIEndpoint)
+	assert.Equal("https://datadog.unittests", c.Endpoints[0].Host)
 	assert.Equal(false, c.Enabled)
 	assert.Equal("test", c.DefaultEnv)
 	assert.Equal(18126, c.ReceiverPort)
@@ -158,16 +158,20 @@ func TestFullYamlConfig(t *testing.T) {
 	c, err := loadFile("./testdata/full.yaml")
 	assert.NoError(err)
 
-	assert.Equal("api_key_test", c.APIKey)
 	assert.Equal("mymachine", c.Hostname)
 	assert.Equal("https://user:password@proxy_for_https:1234", c.ProxyURL.String())
-	assert.Equal("https://datadog.unittests", c.APIEndpoint)
 	assert.Equal(false, c.Enabled)
 	assert.Equal("test", c.DefaultEnv)
 	assert.Equal(18126, c.ReceiverPort)
 	assert.Equal(0.5, c.ExtraSampleRate)
 	assert.Equal(5.0, c.MaxTPS)
 	assert.Equal("0.0.0.0", c.ReceiverHost)
+	assert.EqualValues([]*Endpoint{
+		{Host: "https://datadog.unittests", APIKey: "api_key_test"},
+		{Host: "https://my1.endpoint.com", APIKey: "apikey1"},
+		{Host: "https://my1.endpoint.com", APIKey: "apikey2"},
+		{Host: "https://my2.endpoint.eu", APIKey: "apikey3"},
+	}, c.Endpoints)
 
 	assert.EqualValues([]string{"/health", "/500"}, c.Ignore["resource"])
 
@@ -191,7 +195,7 @@ func TestUndocumentedYamlConfig(t *testing.T) {
 	assert.NoError(err)
 
 	assert.Equal("thing", c.Hostname)
-	assert.Equal("apikey_12", c.APIKey)
+	assert.Equal("apikey_12", c.Endpoints[0].APIKey)
 	assert.Equal(0.33, c.ExtraSampleRate)
 	assert.Equal(100.0, c.MaxTPS)
 	assert.Equal(25, c.ReceiverPort)

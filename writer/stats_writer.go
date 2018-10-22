@@ -10,6 +10,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 )
@@ -41,9 +42,7 @@ func NewStatsWriter(conf *config.AgentConfig, InStats <-chan []model.StatsBucket
 	writerConf := conf.StatsWriterConfig
 	log.Infof("Stats writer initializing with config: %+v", writerConf)
 
-	bw := *NewBaseWriter(conf, "/api/v0.2/stats", func(endpoint Endpoint) PayloadSender {
-		return NewCustomQueuablePayloadSender(endpoint, writerConf.SenderConfig)
-	})
+	bw := *NewBaseWriter(conf, "/api/v0.2/stats", newMultiSenderFactory(writerConf.SenderConfig))
 	return &StatsWriter{
 		BaseWriter: bw,
 		InStats:    InStats,
@@ -262,14 +261,17 @@ func (w *StatsWriter) monitor() {
 
 			switch e := e.(type) {
 			case SenderSuccessEvent:
-				log.Infof("flushed stat payload to the API, time:%s, size:%d bytes", e.SendStats.SendTime,
+				url := e.SendStats.Host
+				log.Infof("flushed stat payload; url: %s, time:%s, size:%d bytes", url, e.SendStats.SendTime,
 					len(e.Payload.Bytes))
-				w.statsClient.Gauge("datadog.trace_agent.stats_writer.flush_duration",
-					e.SendStats.SendTime.Seconds(), nil, 1)
+				tags := []string{"url:" + url}
+				statsd.Client.Gauge("datadog.trace_agent.stats_writer.flush_duration",
+					e.SendStats.SendTime.Seconds(), tags, 1)
 				atomic.AddInt64(&w.info.Payloads, 1)
 			case SenderFailureEvent:
-				log.Errorf("failed to flush stat payload, time:%s, size:%d bytes, error: %s",
-					e.SendStats.SendTime, len(e.Payload.Bytes), e.Error)
+				url := e.SendStats.Host
+				log.Errorf("failed to flush stat payload; url:%s, time:%s, size:%d bytes, error: %s",
+					url, e.SendStats.SendTime, len(e.Payload.Bytes), e.Error)
 				atomic.AddInt64(&w.info.Errors, 1)
 			case SenderRetryEvent:
 				log.Errorf("retrying flush stat payload, retryNum: %d, delay:%s, error: %s",
@@ -290,12 +292,13 @@ func (w *StatsWriter) monitor() {
 			swInfo.Splits = atomic.SwapInt64(&w.info.Splits, 0)
 			swInfo.Errors = atomic.SwapInt64(&w.info.Errors, 0)
 
-			w.statsClient.Count("datadog.trace_agent.stats_writer.payloads", int64(swInfo.Payloads), nil, 1)
-			w.statsClient.Count("datadog.trace_agent.stats_writer.stats_buckets", int64(swInfo.StatsBuckets), nil, 1)
-			w.statsClient.Count("datadog.trace_agent.stats_writer.bytes", int64(swInfo.Bytes), nil, 1)
-			w.statsClient.Count("datadog.trace_agent.stats_writer.retries", int64(swInfo.Retries), nil, 1)
-			w.statsClient.Count("datadog.trace_agent.stats_writer.splits", int64(swInfo.Splits), nil, 1)
-			w.statsClient.Count("datadog.trace_agent.stats_writer.errors", int64(swInfo.Errors), nil, 1)
+			// TODO(gbbr): Scope these stats per endpoint (see (config.AgentConfig).AdditionalEndpoints))
+			statsd.Client.Count("datadog.trace_agent.stats_writer.payloads", int64(swInfo.Payloads), nil, 1)
+			statsd.Client.Count("datadog.trace_agent.stats_writer.stats_buckets", int64(swInfo.StatsBuckets), nil, 1)
+			statsd.Client.Count("datadog.trace_agent.stats_writer.bytes", int64(swInfo.Bytes), nil, 1)
+			statsd.Client.Count("datadog.trace_agent.stats_writer.retries", int64(swInfo.Retries), nil, 1)
+			statsd.Client.Count("datadog.trace_agent.stats_writer.splits", int64(swInfo.Splits), nil, 1)
+			statsd.Client.Count("datadog.trace_agent.stats_writer.errors", int64(swInfo.Errors), nil, 1)
 
 			info.UpdateStatsWriterInfo(swInfo)
 		}

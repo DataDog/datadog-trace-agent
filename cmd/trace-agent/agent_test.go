@@ -27,7 +27,7 @@ func TestWatchdog(t *testing.T) {
 	}
 
 	conf := config.New()
-	conf.APIKey = "apikey_2"
+	conf.Endpoints[0].APIKey = "apikey_2"
 	conf.MaxMemory = 1e7
 	conf.WatchdogInterval = time.Millisecond
 
@@ -118,7 +118,7 @@ func TestProcess(t *testing.T) {
 		// • resulting resource is obfuscated with replacements applied
 		// • resulting "sql.query" tag is obfuscated with no replacements applied
 		cfg := config.New()
-		cfg.APIKey = "test"
+		cfg.Endpoints[0].APIKey = "test"
 		cfg.ReplaceTags = []*config.ReplaceRule{{
 			Name: "resource.name",
 			Re:   regexp.MustCompile("AND.*"),
@@ -144,7 +144,7 @@ func TestProcess(t *testing.T) {
 
 	t.Run("Blacklister", func(t *testing.T) {
 		cfg := config.New()
-		cfg.APIKey = "test"
+		cfg.Endpoints[0].APIKey = "test"
 		cfg.Ignore["resource"] = []string{"^INSERT.*"}
 		ctx, cancel := context.WithCancel(context.Background())
 		agent := NewAgent(ctx, cfg)
@@ -178,7 +178,7 @@ func TestProcess(t *testing.T) {
 
 	t.Run("Stats/Priority", func(t *testing.T) {
 		cfg := config.New()
-		cfg.APIKey = "test"
+		cfg.Endpoints[0].APIKey = "test"
 		ctx, cancel := context.WithCancel(context.Background())
 		agent := NewAgent(ctx, cfg)
 		defer cancel()
@@ -212,14 +212,14 @@ func TestProcess(t *testing.T) {
 
 func BenchmarkAgentTraceProcessing(b *testing.B) {
 	c := config.New()
-	c.APIKey = "test"
+	c.Endpoints[0].APIKey = "test"
 
 	runTraceProcessingBenchmark(b, c)
 }
 
 func BenchmarkAgentTraceProcessingWithFiltering(b *testing.B) {
 	c := config.New()
-	c.APIKey = "test"
+	c.Endpoints[0].APIKey = "test"
 	c.Ignore["resource"] = []string{"[0-9]{3}", "foobar", "G.T [a-z]+", "[^123]+_baz"}
 
 	runTraceProcessingBenchmark(b, c)
@@ -229,7 +229,7 @@ func BenchmarkAgentTraceProcessingWithFiltering(b *testing.B) {
 // this means we won't compesate the overhead of filtering by dropping traces
 func BenchmarkAgentTraceProcessingWithWorstCaseFiltering(b *testing.B) {
 	c := config.New()
-	c.APIKey = "test"
+	c.Endpoints[0].APIKey = "test"
 	c.Ignore["resource"] = []string{"[0-9]{3}", "foobar", "aaaaa?aaaa", "[^123]+_baz"}
 
 	runTraceProcessingBenchmark(b, c)
@@ -250,7 +250,7 @@ func runTraceProcessingBenchmark(b *testing.B, c *config.AgentConfig) {
 
 func BenchmarkWatchdog(b *testing.B) {
 	conf := config.New()
-	conf.APIKey = "apikey_2"
+	conf.Endpoints[0].APIKey = "apikey_2"
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
 	agent := NewAgent(ctx, conf)

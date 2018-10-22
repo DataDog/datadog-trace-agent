@@ -46,6 +46,17 @@ apm_config:
 #   # Trace intake API. If set, it will override the top level "site" setting.
 #   # Defaults to 'https://trace.agent.<site>'.
 #   apm_dd_url: trace.agent.datadog.com
+#
+#   # The trace agent will also forward traces, stats and services to these endpoints,
+#   # besides the main endpoint.
+#   additional_endpoints:
+#     # Simply specify the list of URLs to forward to along with one or more API keys
+#     # to use for that URL.
+#     https://trace.agent.datadoghq.eu:
+#     - 1234abcd
+#     - 4567efghi
+#     https://trace.agent.other-endpoint.com:
+#     - 890jkl
 # 
 #   # The environment under which traces will be classified in Datadog.
 #   env: pre-prod
