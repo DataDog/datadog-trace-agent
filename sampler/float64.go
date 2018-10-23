@@ -5,12 +5,14 @@ import (
 	"sync/atomic"
 )
 
+// The atomic float64 is copied from: https://github.com/uber-go/atomic/blob/master/atomic.go#L267
+
 // atomicFloat64 is an atomic wrapper around float64.
 type atomicFloat64 struct {
 	v uint64
 }
 
-// NewatomicFloat64 creates a atomicFloat64.
+// newFloat64 creates a atomicFloat64.
 func newFloat64(f float64) *atomicFloat64 {
 	return &atomicFloat64{math.Float64bits(f)}
 }

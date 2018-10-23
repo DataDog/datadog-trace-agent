@@ -107,11 +107,10 @@ func TestMultiSender(t *testing.T) {
 		mock1.monitor <- "ping1"
 		mock2.monitor <- "ping2"
 
-		msg1 := <-multi.mch
-		msg2 := <-multi.mch
-
-		assert.Equal(t, "ping1", msg1.(string))
-		assert.Equal(t, "ping2", msg2.(string))
+		assert.ElementsMatch(t,
+			[]string{"ping1", "ping2"},
+			[]string{(<-multi.mch).(string), (<-multi.mch).(string)},
+		)
 	})
 }
 
