@@ -15,6 +15,7 @@ package sampler
 
 import (
 	"math"
+	"sync"
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/model"
@@ -69,6 +70,8 @@ type Sampler struct {
 	// Maximum limit to the total number of traces per second to sample
 	maxTPS float64
 
+	mu sync.RWMutex // guards below signature* group
+
 	// Sample any signature with a score lower than scoreSamplingOffset
 	// It is basically the number of similar traces per second after which we start sampling
 	signatureScoreOffset float64
@@ -97,6 +100,8 @@ func newSampler(extraRate float64, maxTPS float64) *Sampler {
 
 // SetSignatureCoefficients updates the internal scoring coefficients used by the signature scoring
 func (s *Sampler) SetSignatureCoefficients(offset float64, slope float64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.signatureScoreOffset = offset
 	s.signatureScoreSlope = slope
 	s.signatureScoreFactor = math.Pow(slope, math.Log10(offset))

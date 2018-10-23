@@ -5,7 +5,6 @@ import (
 	"time"
 
 	log "github.com/cihub/seelog"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,6 +17,21 @@ func getTestSampler() *Sampler {
 	maxTPS := 0.0
 
 	return newSampler(extraRate, maxTPS)
+}
+
+func TestSamplerAccessRace(t *testing.T) {
+	// regression test: even though the sampler is channel protected, it
+	// has getters accessing its fields.
+	s := newSampler(1, 2)
+	go func() {
+		for i := 0; i < 10000; i++ {
+			s.SetSignatureCoefficients(float64(i), float64(i)/2)
+		}
+	}()
+	for i := 0; i < 5000; i++ {
+		s.GetState()
+		s.GetAllCountScores()
+	}
 }
 
 func TestSamplerLoop(t *testing.T) {

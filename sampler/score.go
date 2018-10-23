@@ -51,6 +51,8 @@ func (s *Sampler) GetDefaultSampleRate() float64 {
 }
 
 func (s *Sampler) backendScoreToSamplerScore(score float64) float64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return s.signatureScoreFactor / math.Pow(s.signatureScoreSlope, math.Log10(score))
 }
 
