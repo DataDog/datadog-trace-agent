@@ -12,11 +12,9 @@ type InternalState struct {
 
 // GetState collects and return internal statistics and coefficients for indication purposes
 func (s *Sampler) GetState() InternalState {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
 	return InternalState{
-		Offset:      s.signatureScoreOffset,
-		Slope:       s.signatureScoreSlope,
+		Offset:      s.signatureScoreOffset.Load(),
+		Slope:       s.signatureScoreSlope.Load(),
 		Cardinality: s.Backend.GetCardinality(),
 		InTPS:       s.Backend.GetTotalScore(),
 		OutTPS:      s.Backend.GetSampledScore(),

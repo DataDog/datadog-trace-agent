@@ -15,7 +15,6 @@ package sampler
 
 import (
 	"math"
-	"sync"
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/model"
@@ -70,15 +69,13 @@ type Sampler struct {
 	// Maximum limit to the total number of traces per second to sample
 	maxTPS float64
 
-	mu sync.RWMutex // guards below signature* group
-
 	// Sample any signature with a score lower than scoreSamplingOffset
 	// It is basically the number of similar traces per second after which we start sampling
-	signatureScoreOffset float64
+	signatureScoreOffset *atomicFloat64
 	// Logarithm slope for the scoring function
-	signatureScoreSlope float64
+	signatureScoreSlope *atomicFloat64
 	// signatureScoreFactor = math.Pow(signatureScoreSlope, math.Log10(scoreSamplingOffset))
-	signatureScoreFactor float64
+	signatureScoreFactor *atomicFloat64
 
 	exit chan struct{}
 }
@@ -86,9 +83,12 @@ type Sampler struct {
 // newSampler returns an initialized Sampler
 func newSampler(extraRate float64, maxTPS float64) *Sampler {
 	s := &Sampler{
-		Backend:   NewMemoryBackend(defaultDecayPeriod, defaultDecayFactor),
-		extraRate: extraRate,
-		maxTPS:    maxTPS,
+		Backend:              NewMemoryBackend(defaultDecayPeriod, defaultDecayFactor),
+		extraRate:            extraRate,
+		maxTPS:               maxTPS,
+		signatureScoreOffset: newFloat64(0),
+		signatureScoreSlope:  newFloat64(0),
+		signatureScoreFactor: newFloat64(0),
 
 		exit: make(chan struct{}),
 	}
@@ -100,11 +100,9 @@ func newSampler(extraRate float64, maxTPS float64) *Sampler {
 
 // SetSignatureCoefficients updates the internal scoring coefficients used by the signature scoring
 func (s *Sampler) SetSignatureCoefficients(offset float64, slope float64) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.signatureScoreOffset = offset
-	s.signatureScoreSlope = slope
-	s.signatureScoreFactor = math.Pow(slope, math.Log10(offset))
+	s.signatureScoreOffset.Store(offset)
+	s.signatureScoreSlope.Store(slope)
+	s.signatureScoreFactor.Store(math.Pow(slope, math.Log10(offset)))
 }
 
 // UpdateExtraRate updates the extra sample rate
