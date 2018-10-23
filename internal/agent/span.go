@@ -160,3 +160,39 @@ func (s *Span) SetPreSampleRate(rate float64) {
 		delete(s.Metrics, KeySamplingRatePreSampler)
 	}
 }
+
+func (s *Span) GetService() string {
+	return s.Service
+}
+
+func (s *Span) GetName() string {
+	return s.Name
+}
+
+func (s *Span) GetResource() string {
+	return s.Resource
+}
+
+func (s *Span) GetTraceID() uint64 {
+	return s.TraceID
+}
+
+func (s *Span) GetSpanID() uint64 {
+	return s.SpanID
+}
+
+func (s *Span) GetParentID() uint64 {
+	return s.ParentID
+}
+
+func (s *Span) GetStart() int64 {
+	return s.Start
+}
+
+func (s *Span) GetError() bool {
+	return s.Error > 1
+}
+
+func (s *Span) GetDuration() int64 {
+	return s.Duration
+}
