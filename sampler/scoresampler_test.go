@@ -5,9 +5,8 @@ import (
 	"math/rand"
 	"testing"
 
-	log "github.com/cihub/seelog"
-
 	"github.com/DataDog/datadog-trace-agent/model"
+	log "github.com/cihub/seelog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -68,8 +67,8 @@ func TestMaxTPS(t *testing.T) {
 	periodSeconds := defaultDecayPeriod.Seconds()
 	tracesPerPeriod := tps * periodSeconds
 	// Set signature score offset high enough not to kick in during the test.
-	s.Sampler.signatureScoreOffset = 2 * tps
-	s.Sampler.signatureScoreFactor = math.Pow(s.Sampler.signatureScoreSlope, math.Log10(s.Sampler.signatureScoreOffset))
+	s.Sampler.signatureScoreOffset.Store(2 * tps)
+	s.Sampler.signatureScoreFactor.Store(math.Pow(s.Sampler.signatureScoreSlope.Load(), math.Log10(s.Sampler.signatureScoreOffset.Load())))
 
 	sampledCount := 0
 

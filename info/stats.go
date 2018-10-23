@@ -38,7 +38,7 @@ func (rs *ReceiverStats) Acc(recent *ReceiverStats) {
 	recent.Lock()
 	for _, tagStats := range recent.Stats {
 		ts := rs.GetTagStats(tagStats.Tags)
-		ts.update(tagStats.Stats)
+		ts.update(&tagStats.Stats)
 	}
 	recent.Unlock()
 }
@@ -184,21 +184,21 @@ type Stats struct {
 	ServicesBytes int64
 }
 
-func (s *Stats) update(recent Stats) {
-	atomic.AddInt64(&s.TracesReceived, recent.TracesReceived)
-	atomic.AddInt64(&s.TracesDropped, recent.TracesDropped)
-	atomic.AddInt64(&s.TracesFiltered, recent.TracesFiltered)
-	atomic.AddInt64(&s.TracesPriorityNone, recent.TracesPriorityNone)
-	atomic.AddInt64(&s.TracesPriorityNeg, recent.TracesPriorityNeg)
-	atomic.AddInt64(&s.TracesPriority0, recent.TracesPriority0)
-	atomic.AddInt64(&s.TracesPriority1, recent.TracesPriority1)
-	atomic.AddInt64(&s.TracesPriority2, recent.TracesPriority2)
-	atomic.AddInt64(&s.TracesBytes, recent.TracesBytes)
-	atomic.AddInt64(&s.SpansReceived, recent.SpansReceived)
-	atomic.AddInt64(&s.SpansDropped, recent.SpansDropped)
-	atomic.AddInt64(&s.SpansFiltered, recent.SpansFiltered)
-	atomic.AddInt64(&s.ServicesReceived, recent.ServicesReceived)
-	atomic.AddInt64(&s.ServicesBytes, recent.ServicesBytes)
+func (s *Stats) update(recent *Stats) {
+	atomic.AddInt64(&s.TracesReceived, atomic.LoadInt64(&recent.TracesReceived))
+	atomic.AddInt64(&s.TracesDropped, atomic.LoadInt64(&recent.TracesDropped))
+	atomic.AddInt64(&s.TracesFiltered, atomic.LoadInt64(&recent.TracesFiltered))
+	atomic.AddInt64(&s.TracesPriorityNone, atomic.LoadInt64(&recent.TracesPriorityNone))
+	atomic.AddInt64(&s.TracesPriorityNeg, atomic.LoadInt64(&recent.TracesPriorityNeg))
+	atomic.AddInt64(&s.TracesPriority0, atomic.LoadInt64(&recent.TracesPriority0))
+	atomic.AddInt64(&s.TracesPriority1, atomic.LoadInt64(&recent.TracesPriority1))
+	atomic.AddInt64(&s.TracesPriority2, atomic.LoadInt64(&recent.TracesPriority2))
+	atomic.AddInt64(&s.TracesBytes, atomic.LoadInt64(&recent.TracesBytes))
+	atomic.AddInt64(&s.SpansReceived, atomic.LoadInt64(&recent.SpansReceived))
+	atomic.AddInt64(&s.SpansDropped, atomic.LoadInt64(&recent.SpansDropped))
+	atomic.AddInt64(&s.SpansFiltered, atomic.LoadInt64(&recent.SpansFiltered))
+	atomic.AddInt64(&s.ServicesReceived, atomic.LoadInt64(&recent.ServicesReceived))
+	atomic.AddInt64(&s.ServicesBytes, atomic.LoadInt64(&recent.ServicesBytes))
 }
 
 func (s *Stats) reset() {

@@ -8,7 +8,7 @@ import (
 func (s *Sampler) AdjustScoring() {
 	currentTPS := s.Backend.GetSampledScore()
 	totalTPS := s.Backend.GetTotalScore()
-	offset := s.signatureScoreOffset
+	offset := s.signatureScoreOffset.Load()
 	cardinality := float64(s.Backend.GetCardinality())
 
 	newOffset, newSlope := adjustCoefficients(currentTPS, totalTPS, s.maxTPS, offset, cardinality)

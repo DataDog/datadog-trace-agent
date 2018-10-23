@@ -51,7 +51,7 @@ func (s *Sampler) GetDefaultSampleRate() float64 {
 }
 
 func (s *Sampler) backendScoreToSamplerScore(score float64) float64 {
-	return s.signatureScoreFactor / math.Pow(s.signatureScoreSlope, math.Log10(score))
+	return s.signatureScoreFactor.Load() / math.Pow(s.signatureScoreSlope.Load(), math.Log10(score))
 }
 
 // GetCountScore scores any signature based on its recent throughput
