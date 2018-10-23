@@ -1,14 +1,27 @@
 package writer
 
 import (
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/statsd"
+	"github.com/DataDog/datadog-trace-agent/testutil"
 	"github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestMain(m *testing.M) {
+	testStatsClient := &testutil.TestStatsClient{}
+	originalClient := statsd.Client
+	statsd.Client = testStatsClient
+	defer func() {
+		statsd.Client = originalClient
+	}()
+	os.Exit(m.Run())
+}
 
 func TestNewMultiSenderFactory(t *testing.T) {
 	cfg := config.DefaultQueuablePayloadSenderConf()

@@ -521,12 +521,12 @@ func TestQueuablePayloadSender_RetryOfTooOldQueue(t *testing.T) {
 	// Wait for a retry
 	time.Sleep(200 * time.Millisecond)
 
-	// Then we should have no queued payloads
-	assert.Equal(0, queuableSender.NumQueuedPayloads(), "We should have no queued payloads")
-
 	// When we stop the sender
 	queuableSender.Stop()
 	monitor.Stop()
+
+	// Then we should have no queued payloads
+	assert.Equal(0, queuableSender.NumQueuedPayloads(), "We should have no queued payloads")
 
 	// Then endpoint should have received only payload3. Because payload1 and payload2 were too old after the failed
 	// retry (first TriggerTick).

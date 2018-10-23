@@ -27,8 +27,7 @@ func TestTraceWriter(t *testing.T) {
 		assert := assert.New(t)
 
 		// Create a trace writer, its incoming channel and the endpoint that receives the payloads
-		traceWriter, traceChannel, testEndpoint, _, teardown := testTraceWriter()
-		defer teardown()
+		traceWriter, traceChannel, testEndpoint, _ := testTraceWriter()
 		// Set a maximum of 4 spans per payload
 		traceWriter.conf.MaxSpansPerPayload = 4
 		traceWriter.Start()
@@ -71,8 +70,7 @@ func TestTraceWriter(t *testing.T) {
 		testFlushPeriod := 100 * time.Millisecond
 
 		// Create a trace writer, its incoming channel and the endpoint that receives the payloads
-		traceWriter, traceChannel, testEndpoint, _, teardown := testTraceWriter()
-		defer teardown()
+		traceWriter, traceChannel, testEndpoint, _ := testTraceWriter()
 		// Periodically flushing every 100ms
 		traceWriter.conf.FlushPeriod = testFlushPeriod
 		traceWriter.Start()
@@ -107,8 +105,7 @@ func TestTraceWriter(t *testing.T) {
 		testFlushPeriod := 100 * time.Millisecond
 
 		// Create a trace writer, its incoming channel and the endpoint that receives the payloads
-		traceWriter, traceChannel, testEndpoint, statsClient, teardown := testTraceWriter()
-		defer teardown()
+		traceWriter, traceChannel, testEndpoint, statsClient := testTraceWriter()
 		traceWriter.conf.FlushPeriod = 100 * time.Millisecond
 		traceWriter.conf.UpdateInfoPeriod = 100 * time.Millisecond
 		traceWriter.conf.MaxSpansPerPayload = 10
@@ -339,7 +336,7 @@ func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expecte
 	}
 }
 
-func testTraceWriter() (*TraceWriter, chan *SampledTrace, *testEndpoint, *testutil.TestStatsClient, func()) {
+func testTraceWriter() (*TraceWriter, chan *SampledTrace, *testEndpoint, *testutil.TestStatsClient) {
 	payloadChannel := make(chan *SampledTrace)
 	conf := &config.AgentConfig{
 		Hostname:          testHostName,
@@ -349,13 +346,10 @@ func testTraceWriter() (*TraceWriter, chan *SampledTrace, *testEndpoint, *testut
 	traceWriter := NewTraceWriter(conf, payloadChannel)
 	testEndpoint := &testEndpoint{}
 	traceWriter.sender.setEndpoint(testEndpoint)
-	testStatsClient := &testutil.TestStatsClient{}
-	originalClient := statsd.Client
-	statsd.Client = testStatsClient
+	testStatsClient := statsd.Client.(*testutil.TestStatsClient)
+	testStatsClient.Reset()
 
-	return traceWriter, payloadChannel, testEndpoint, testStatsClient, func() {
-		statsd.Client = originalClient
-	}
+	return traceWriter, payloadChannel, testEndpoint, testStatsClient
 }
 
 func randomSampledTrace(numSpans, numTransactions int) *SampledTrace {
