@@ -44,39 +44,48 @@ type GaugeSummary struct {
 
 // TestStatsClient is a mocked StatsClient that records all calls and replies with configurable error return values.
 type TestStatsClient struct {
-	gaugeLock  sync.Mutex
-	GaugeErr   error
-	GaugeCalls []StatsClientGaugeArgs
+	mu sync.RWMutex
 
-	countLock  sync.RWMutex
-	CountErr   error
-	CountCalls []StatsClientCountArgs
-
+	GaugeErr       error
+	GaugeCalls     []StatsClientGaugeArgs
+	CountErr       error
+	CountCalls     []StatsClientCountArgs
 	HistogramErr   error
 	HistogramCalls []StatsClientHistogramArgs
-	histogramLock  sync.Mutex
+}
+
+// Reset resets client's internal records.
+func (c *TestStatsClient) Reset() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.GaugeErr = nil
+	c.GaugeCalls = c.GaugeCalls[:0]
+	c.CountErr = nil
+	c.CountCalls = c.CountCalls[:0]
+	c.HistogramErr = nil
+	c.HistogramCalls = c.HistogramCalls[:0]
 }
 
 // Gauge records a call to a Gauge operation and replies with GaugeErr
 func (c *TestStatsClient) Gauge(name string, value float64, tags []string, rate float64) error {
-	c.gaugeLock.Lock()
-	defer c.gaugeLock.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.GaugeCalls = append(c.GaugeCalls, StatsClientGaugeArgs{Name: name, Value: value, Tags: tags, Rate: rate})
 	return c.GaugeErr
 }
 
 // Count records a call to a Count operation and replies with CountErr
 func (c *TestStatsClient) Count(name string, value int64, tags []string, rate float64) error {
-	c.countLock.Lock()
-	defer c.countLock.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.CountCalls = append(c.CountCalls, StatsClientCountArgs{Name: name, Value: value, Tags: tags, Rate: rate})
 	return c.CountErr
 }
 
 // Histogram records a call to a Histogram operation and replies with HistogramErr
 func (c *TestStatsClient) Histogram(name string, value float64, tags []string, rate float64) error {
-	c.histogramLock.Lock()
-	defer c.histogramLock.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.HistogramCalls = append(c.HistogramCalls, StatsClientHistogramArgs{Name: name, Value: value, Tags: tags, Rate: rate})
 	return c.HistogramErr
 }
@@ -85,8 +94,8 @@ func (c *TestStatsClient) Histogram(name string, value float64, tags []string, r
 func (c *TestStatsClient) GetCountSummaries() map[string]*CountSummary {
 	result := map[string]*CountSummary{}
 
-	c.countLock.RLock()
-	defer c.countLock.RUnlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	for _, countCall := range c.CountCalls {
 		name := countCall.Name
 		summary, ok := result[name]
@@ -107,6 +116,8 @@ func (c *TestStatsClient) GetCountSummaries() map[string]*CountSummary {
 func (c *TestStatsClient) GetGaugeSummaries() map[string]*GaugeSummary {
 	result := map[string]*GaugeSummary{}
 
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	for _, gaugeCall := range c.GaugeCalls {
 		name := gaugeCall.Name
 		summary, ok := result[name]

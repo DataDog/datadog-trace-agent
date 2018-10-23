@@ -23,8 +23,7 @@ func TestStatsWriter_StatHandling(t *testing.T) {
 	assert := assert.New(t)
 
 	// Given a stats writer, its incoming channel and the endpoint that receives the payloads
-	statsWriter, statsChannel, testEndpoint, _, teardown := testStatsWriter()
-	defer teardown()
+	statsWriter, statsChannel, testEndpoint, _ := testStatsWriter()
 
 	statsWriter.Start()
 
@@ -70,8 +69,7 @@ func TestStatsWriter_UpdateInfoHandling(t *testing.T) {
 	assert := assert.New(t)
 
 	// Given a stats writer, its incoming channel and the endpoint that receives the payloads
-	statsWriter, statsChannel, testEndpoint, statsClient, teardown := testStatsWriter()
-	defer teardown()
+	statsWriter, statsChannel, testEndpoint, statsClient := testStatsWriter()
 	statsWriter.conf.UpdateInfoPeriod = 100 * time.Millisecond
 
 	statsWriter.Start()
@@ -177,8 +175,7 @@ func TestStatsWriter_BuildPayloads(t *testing.T) {
 	t.Run("common case, no duplicate entries", func(t *testing.T) {
 		assert := assert.New(t)
 
-		sw, _, _, _, teardown := testStatsWriter()
-		defer teardown()
+		sw, _, _, _ := testStatsWriter()
 
 		// This gives us a total of 45 entries. 3 per span, 5
 		// spans per stat bucket. Each buckets have the same
@@ -220,8 +217,7 @@ func TestStatsWriter_BuildPayloads(t *testing.T) {
 	t.Run("common case, with duplicate entries", func(t *testing.T) {
 		assert := assert.New(t)
 
-		sw, _, _, _, teardown := testStatsWriter()
-		defer teardown()
+		sw, _, _, _ := testStatsWriter()
 
 		// This gives us a total of 45 entries. 3 per span, 5
 		// spans per stat bucket. Each buckets have the same
@@ -284,8 +280,7 @@ func TestStatsWriter_BuildPayloads(t *testing.T) {
 	t.Run("no need for split", func(t *testing.T) {
 		assert := assert.New(t)
 
-		sw, _, _, _, teardown := testStatsWriter()
-		defer teardown()
+		sw, _, _, _ := testStatsWriter()
 		sw.Start()
 
 		// This gives us a tota of 45 entries. 3 per span, 5 spans per
@@ -390,7 +385,7 @@ func assertStatsPayload(assert *assert.Assertions, headers map[string]string, bu
 	assert.Equal(buckets, statsPayload.Stats, "Stat buckets should match expectation")
 }
 
-func testStatsWriter() (*StatsWriter, chan []model.StatsBucket, *testEndpoint, *testutil.TestStatsClient, func()) {
+func testStatsWriter() (*StatsWriter, chan []model.StatsBucket, *testEndpoint, *testutil.TestStatsClient) {
 	statsChannel := make(chan []model.StatsBucket)
 	conf := &config.AgentConfig{
 		Hostname:          testHostName,
@@ -400,11 +395,8 @@ func testStatsWriter() (*StatsWriter, chan []model.StatsBucket, *testEndpoint, *
 	statsWriter := NewStatsWriter(conf, statsChannel)
 	testEndpoint := &testEndpoint{}
 	statsWriter.sender.setEndpoint(testEndpoint)
-	testStatsClient := &testutil.TestStatsClient{}
-	originalClient := statsd.Client
-	statsd.Client = testStatsClient
+	testStatsClient := statsd.Client.(*testutil.TestStatsClient)
+	testStatsClient.Reset()
 
-	return statsWriter, statsChannel, testEndpoint, testStatsClient, func() {
-		statsd.Client = originalClient
-	}
+	return statsWriter, statsChannel, testEndpoint, testStatsClient
 }

@@ -166,7 +166,7 @@ func TestFullYamlConfig(t *testing.T) {
 	assert.Equal(0.5, c.ExtraSampleRate)
 	assert.Equal(5.0, c.MaxTPS)
 	assert.Equal("0.0.0.0", c.ReceiverHost)
-	assert.EqualValues([]*Endpoint{
+	assert.ElementsMatch([]*Endpoint{
 		{Host: "https://datadog.unittests", APIKey: "api_key_test"},
 		{Host: "https://my1.endpoint.com", APIKey: "apikey1"},
 		{Host: "https://my1.endpoint.com", APIKey: "apikey2"},

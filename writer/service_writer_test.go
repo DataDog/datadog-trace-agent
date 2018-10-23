@@ -20,8 +20,7 @@ func TestServiceWriter_SenderMaxPayloads(t *testing.T) {
 	assert := assert.New(t)
 
 	// Given a service writer
-	serviceWriter, _, _, _, teardown := testServiceWriter()
-	defer teardown()
+	serviceWriter, _, _, _ := testServiceWriter()
 
 	// When checking its default sender configuration
 	queuableSender := serviceWriter.sender.(*QueuablePayloadSender)
@@ -34,8 +33,7 @@ func TestServiceWriter_ServiceHandling(t *testing.T) {
 	assert := assert.New(t)
 
 	// Given a service writer, its incoming channel and the endpoint that receives the payloads
-	serviceWriter, serviceChannel, testEndpoint, _, teardown := testServiceWriter()
-	defer teardown()
+	serviceWriter, serviceChannel, testEndpoint, _ := testServiceWriter()
 	serviceWriter.conf.FlushPeriod = 100 * time.Millisecond
 
 	serviceWriter.Start()
@@ -79,8 +77,7 @@ func TestServiceWriter_UpdateInfoHandling(t *testing.T) {
 	assert := assert.New(t)
 
 	// Given a service writer, its incoming channel and the endpoint that receives the payloads
-	serviceWriter, serviceChannel, testEndpoint, statsClient, teardown := testServiceWriter()
-	defer teardown()
+	serviceWriter, serviceChannel, testEndpoint, statsClient := testServiceWriter()
 	serviceWriter.conf.FlushPeriod = 100 * time.Millisecond
 	serviceWriter.conf.UpdateInfoPeriod = 100 * time.Millisecond
 
@@ -197,7 +194,7 @@ func assertMetadata(assert *assert.Assertions, expectedHeaders map[string]string
 	assert.Equal(expectedMetadata, servicesMetadata, "Service metadata should match expectation")
 }
 
-func testServiceWriter() (*ServiceWriter, chan model.ServicesMetadata, *testEndpoint, *testutil.TestStatsClient, func()) {
+func testServiceWriter() (*ServiceWriter, chan model.ServicesMetadata, *testEndpoint, *testutil.TestStatsClient) {
 	serviceChannel := make(chan model.ServicesMetadata)
 	conf := &config.AgentConfig{
 		ServiceWriterConfig: writerconfig.DefaultServiceWriterConfig(),
@@ -205,11 +202,8 @@ func testServiceWriter() (*ServiceWriter, chan model.ServicesMetadata, *testEndp
 	serviceWriter := NewServiceWriter(conf, serviceChannel)
 	testEndpoint := &testEndpoint{}
 	serviceWriter.sender.setEndpoint(testEndpoint)
-	testStatsClient := &testutil.TestStatsClient{}
-	originalClient := statsd.Client
-	statsd.Client = testStatsClient
+	testStatsClient := statsd.Client.(*testutil.TestStatsClient)
+	testStatsClient.Reset()
 
-	return serviceWriter, serviceChannel, testEndpoint, testStatsClient, func() {
-		statsd.Client = originalClient
-	}
+	return serviceWriter, serviceChannel, testEndpoint, testStatsClient
 }
