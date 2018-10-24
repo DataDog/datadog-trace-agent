@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/backoff"
 	"github.com/DataDog/datadog-trace-agent/testutil"
+	"github.com/DataDog/datadog-trace-agent/writer/backoff"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/stretchr/testify/assert"
 )

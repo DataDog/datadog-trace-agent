@@ -3,7 +3,7 @@ package config
 import (
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/backoff"
+	"github.com/DataDog/datadog-trace-agent/writer/backoff"
 )
 
 // QueuablePayloadSenderConf contains the configuration needed by a QueuablePayloadSender to operate.

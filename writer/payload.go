@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	log "github.com/cihub/seelog"
-
-	"github.com/DataDog/datadog-trace-agent/backoff"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
+	"github.com/DataDog/datadog-trace-agent/writer/backoff"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
+	log "github.com/cihub/seelog"
 )
 
 // Payload represents a data payload to be sent to some endpoint
