@@ -70,78 +70,9 @@ type PayloadSender interface {
 	monitor() <-chan monitorEvent
 }
 
-// Send sends a single isolated payload through this sender.
-func (s *QueuablePayloadSender) Send(payload *Payload) {
-	s.in <- payload
-}
-
-// Stop asks this sender to stop and waits until it correctly stops.
-func (s *QueuablePayloadSender) Stop() {
-	s.exit <- struct{}{}
-	<-s.exit
-	close(s.in)
-	close(s.monitorCh)
-}
-
-func (s *QueuablePayloadSender) setEndpoint(endpoint Endpoint) {
-	s.endpoint = endpoint
-}
-
-// Monitor allows an external entity to monitor events of this sender by receiving Sender*Event structs.
-func (s *QueuablePayloadSender) monitor() <-chan monitorEvent {
-	return s.monitorCh
-}
-
-// send will send the provided payload without any checks.
-func (s *QueuablePayloadSender) send(payload *Payload) (sendStats, error) {
-	if payload == nil {
-		return sendStats{}, nil
-	}
-
-	startFlush := time.Now()
-	err := s.endpoint.Write(payload)
-
-	sendStats := sendStats{
-		sendTime: time.Since(startFlush),
-		host:     s.endpoint.BaseURL(),
-	}
-
-	return sendStats, err
-}
-
-func (s *QueuablePayloadSender) notifySuccess(payload *Payload, sendStats sendStats) {
-	s.sendEvent(&monitorEvent{
-		typ:     eventTypeSuccess,
-		payload: payload,
-		stats:   sendStats,
-	})
-}
-
-func (s *QueuablePayloadSender) notifyError(payload *Payload, err error, sendStats sendStats) {
-	s.sendEvent(&monitorEvent{
-		typ:     eventTypeFailure,
-		payload: payload,
-		err:     err,
-	})
-}
-
-func (s *QueuablePayloadSender) notifyRetry(payload *Payload, err error, delay time.Duration, retryNum int) {
-	s.sendEvent(&monitorEvent{
-		typ:        eventTypeRetry,
-		payload:    payload,
-		err:        err,
-		retryDelay: delay,
-		retryNum:   retryNum,
-	})
-}
-
-func (s *QueuablePayloadSender) sendEvent(event *monitorEvent) {
-	s.monitorCh <- *event
-}
-
-// QueuablePayloadSender is a specific implementation of a PayloadSender that will queue new payloads on error and
+// queuableSender is a specific implementation of a PayloadSender that will queue new payloads on error and
 // retry sending them according to some configurable BackoffTimer.
-type QueuablePayloadSender struct {
+type queuableSender struct {
 	conf              writerconfig.QueuablePayloadSenderConf
 	queuedPayloads    *list.List
 	queuing           bool
@@ -159,16 +90,16 @@ type QueuablePayloadSender struct {
 	exit chan struct{}
 }
 
-// NewQueuablePayloadSender constructs a new QueuablePayloadSender with default configuration to send payloads to the
+// newDefaultSender constructs a new queuableSender with default configuration to send payloads to the
 // provided endpoint.
-func NewQueuablePayloadSender(endpoint Endpoint) *QueuablePayloadSender {
-	return NewCustomQueuablePayloadSender(endpoint, writerconfig.DefaultQueuablePayloadSenderConf())
+func newDefaultSender(endpoint Endpoint) *queuableSender {
+	return newSender(endpoint, writerconfig.DefaultQueuablePayloadSenderConf())
 }
 
-// NewCustomQueuablePayloadSender constructs a new QueuablePayloadSender with custom configuration to send payloads to
+// newSender constructs a new QueuablePayloadSender with custom configuration to send payloads to
 // the provided endpoint.
-func NewCustomQueuablePayloadSender(endpoint Endpoint, conf writerconfig.QueuablePayloadSenderConf) *QueuablePayloadSender {
-	return &QueuablePayloadSender{
+func newSender(endpoint Endpoint, conf writerconfig.QueuablePayloadSenderConf) *queuableSender {
+	return &queuableSender{
 		conf:           conf,
 		queuedPayloads: list.New(),
 		backoffTimer:   backoff.NewCustomExponentialTimer(conf.ExponentialBackoff),
@@ -179,16 +110,55 @@ func NewCustomQueuablePayloadSender(endpoint Endpoint, conf writerconfig.Queuabl
 	}
 }
 
+// Send sends a single isolated payload through this sender.
+func (s *queuableSender) Send(payload *Payload) {
+	s.in <- payload
+}
+
+// Stop asks this sender to stop and waits until it correctly stops.
+func (s *queuableSender) Stop() {
+	s.exit <- struct{}{}
+	<-s.exit
+	close(s.in)
+	close(s.monitorCh)
+}
+
+func (s *queuableSender) setEndpoint(endpoint Endpoint) {
+	s.endpoint = endpoint
+}
+
+// Monitor allows an external entity to monitor events of this sender by receiving Sender*Event structs.
+func (s *queuableSender) monitor() <-chan monitorEvent {
+	return s.monitorCh
+}
+
+// send will send the provided payload without any checks.
+func (s *queuableSender) send(payload *Payload) (sendStats, error) {
+	if payload == nil {
+		return sendStats{}, nil
+	}
+
+	startFlush := time.Now()
+	err := s.endpoint.Write(payload)
+
+	sendStats := sendStats{
+		sendTime: time.Since(startFlush),
+		host:     s.endpoint.BaseURL(),
+	}
+
+	return sendStats, err
+}
+
 // Start asynchronously starts this QueueablePayloadSender.
-func (s *QueuablePayloadSender) Start() {
+func (s *queuableSender) Start() {
 	go func() {
 		defer watchdog.LogOnPanic()
 		s.Run()
 	}()
 }
 
-// Run executes the QueuablePayloadSender main logic synchronously.
-func (s *QueuablePayloadSender) Run() {
+// Run executes the queuableSender main logic synchronously.
+func (s *queuableSender) Run() {
 	defer close(s.exit)
 
 	for {
@@ -213,12 +183,12 @@ func (s *QueuablePayloadSender) Run() {
 }
 
 // NumQueuedPayloads returns the number of payloads currently waiting in the queue for a retry
-func (s *QueuablePayloadSender) NumQueuedPayloads() int {
+func (s *queuableSender) NumQueuedPayloads() int {
 	return s.queuedPayloads.Len()
 }
 
 // sendOrQueue sends the provided payload or queues it if this sender is currently queueing payloads.
-func (s *QueuablePayloadSender) sendOrQueue(payload *Payload) (sendStats, error) {
+func (s *queuableSender) sendOrQueue(payload *Payload) (sendStats, error) {
 	var stats sendStats
 
 	if payload == nil {
@@ -248,7 +218,7 @@ func (s *QueuablePayloadSender) sendOrQueue(payload *Payload) (sendStats, error)
 	return stats, err
 }
 
-func (s *QueuablePayloadSender) enqueue(payload *Payload) error {
+func (s *queuableSender) enqueue(payload *Payload) error {
 	if !s.queuing {
 		s.queuing = true
 	}
@@ -285,7 +255,7 @@ func (s *QueuablePayloadSender) enqueue(payload *Payload) error {
 	return nil
 }
 
-func (s *QueuablePayloadSender) flushQueue() error {
+func (s *queuableSender) flushQueue() error {
 	log.Debugf("Attempting to flush queue with %d payloads", s.NumQueuedPayloads())
 
 	// Start by discarding payloads that are too old
@@ -330,7 +300,7 @@ func (s *QueuablePayloadSender) flushQueue() error {
 	return nil
 }
 
-func (s *QueuablePayloadSender) removeQueuedPayload(e *list.Element) *list.Element {
+func (s *queuableSender) removeQueuedPayload(e *list.Element) *list.Element {
 	next := e.Next()
 	payload := e.Value.(*Payload)
 	s.currentQueuedSize -= int64(len(payload.Bytes))
@@ -339,7 +309,7 @@ func (s *QueuablePayloadSender) removeQueuedPayload(e *list.Element) *list.Eleme
 }
 
 // Discard those payloads that are older than max age.
-func (s *QueuablePayloadSender) discardOldPayloads() {
+func (s *queuableSender) discardOldPayloads() {
 	// If MaxAge <= 0 then age limitation is disabled so do nothing
 	if s.conf.MaxAge <= 0 {
 		return
@@ -365,7 +335,7 @@ func (s *QueuablePayloadSender) discardOldPayloads() {
 }
 
 // Payloads are kept in order so dropping the one at the front guarantees we're dropping the oldest
-func (s *QueuablePayloadSender) dropOldestPayload(reason string) (*Payload, error) {
+func (s *queuableSender) dropOldestPayload(reason string) (*Payload, error) {
 	if s.queuedPayloads.Len() == 0 {
 		return nil, fmt.Errorf("no queued payloads")
 	}
@@ -376,4 +346,34 @@ func (s *QueuablePayloadSender) dropOldestPayload(reason string) (*Payload, erro
 	s.notifyError(droppedPayload, err, sendStats{})
 
 	return droppedPayload, nil
+}
+
+func (s *queuableSender) notifySuccess(payload *Payload, sendStats sendStats) {
+	s.sendEvent(&monitorEvent{
+		typ:     eventTypeSuccess,
+		payload: payload,
+		stats:   sendStats,
+	})
+}
+
+func (s *queuableSender) notifyError(payload *Payload, err error, sendStats sendStats) {
+	s.sendEvent(&monitorEvent{
+		typ:     eventTypeFailure,
+		payload: payload,
+		err:     err,
+	})
+}
+
+func (s *queuableSender) notifyRetry(payload *Payload, err error, delay time.Duration, retryNum int) {
+	s.sendEvent(&monitorEvent{
+		typ:        eventTypeRetry,
+		payload:    payload,
+		err:        err,
+		retryDelay: delay,
+		retryNum:   retryNum,
+	})
+}
+
+func (s *queuableSender) sendEvent(event *monitorEvent) {
+	s.monitorCh <- *event
 }

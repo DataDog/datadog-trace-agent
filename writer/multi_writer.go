@@ -21,11 +21,11 @@ type multiSender struct {
 // the given endpoints, as well as funnels all monitoring channels.
 func newMultiSender(endpoints []Endpoint, cfg config.QueuablePayloadSenderConf) PayloadSender {
 	if len(endpoints) == 1 {
-		return NewCustomQueuablePayloadSender(endpoints[0], cfg)
+		return newSender(endpoints[0], cfg)
 	}
 	senders := make([]PayloadSender, len(endpoints))
 	for i, e := range endpoints {
-		senders[i] = NewCustomQueuablePayloadSender(e, cfg)
+		senders[i] = newSender(e, cfg)
 	}
 	return &multiSender{
 		senders: senders,

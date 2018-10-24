@@ -28,7 +28,7 @@ func TestNewMultiSenderFactory(t *testing.T) {
 
 	t.Run("one", func(t *testing.T) {
 		endpoint := &DatadogEndpoint{Host: "host1", APIKey: "key1"}
-		sender, ok := newMultiSender([]Endpoint{endpoint}, cfg).(*QueuablePayloadSender)
+		sender, ok := newMultiSender([]Endpoint{endpoint}, cfg).(*queuableSender)
 		assert := assert.New(t)
 		assert.True(ok)
 		assert.EqualValues(endpoint, sender.endpoint)
@@ -47,7 +47,7 @@ func TestNewMultiSenderFactory(t *testing.T) {
 		assert.Len(sender.senders, 3)
 		assert.Equal(3, cap(sender.mch))
 		for i := range endpoints {
-			s, ok := sender.senders[i].(*QueuablePayloadSender)
+			s, ok := sender.senders[i].(*queuableSender)
 			assert.True(ok)
 			assert.EqualValues(endpoints[i], s.endpoint)
 			assert.EqualValues(cfg, s.conf)

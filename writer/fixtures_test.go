@@ -80,7 +80,7 @@ func RandomSizedPayload(size int) *Payload {
 
 // testPayloadSender is a PayloadSender that is connected to a testEndpoint, used for testing.
 type testPayloadSender struct {
-	*QueuablePayloadSender
+	*queuableSender
 	testEndpoint *testEndpoint
 }
 
@@ -88,8 +88,8 @@ type testPayloadSender struct {
 func newTestPayloadSender() *testPayloadSender {
 	testEndpoint := &testEndpoint{}
 	return &testPayloadSender{
-		testEndpoint:          testEndpoint,
-		QueuablePayloadSender: NewQueuablePayloadSender(testEndpoint),
+		testEndpoint:   testEndpoint,
+		queuableSender: newDefaultSender(testEndpoint),
 	}
 }
 
