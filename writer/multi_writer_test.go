@@ -59,7 +59,7 @@ func TestMultiSender(t *testing.T) {
 	t.Run("Start", func(t *testing.T) {
 		mock1 := newMockSender()
 		mock2 := newMockSender()
-		multi := &multiSender{senders: []PayloadSender{mock1, mock2}, mch: make(chan interface{})}
+		multi := &multiSender{senders: []PayloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
 		multi.Start()
 		defer multi.Stop()
 
@@ -71,7 +71,7 @@ func TestMultiSender(t *testing.T) {
 	t.Run("Stop", func(t *testing.T) {
 		mock1 := newMockSender()
 		mock2 := newMockSender()
-		multi := &multiSender{senders: []PayloadSender{mock1, mock2}, mch: make(chan interface{})}
+		multi := &multiSender{senders: []PayloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
 		multi.Stop()
 
 		assert := assert.New(t)
@@ -89,7 +89,7 @@ func TestMultiSender(t *testing.T) {
 		mock1 := newMockSender()
 		mock2 := newMockSender()
 		p := &Payload{CreationDate: time.Now(), Bytes: []byte{1, 2, 3}}
-		multi := &multiSender{senders: []PayloadSender{mock1, mock2}, mch: make(chan interface{})}
+		multi := &multiSender{senders: []PayloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
 		multi.Send(p)
 
 		assert := assert.New(t)
@@ -100,16 +100,19 @@ func TestMultiSender(t *testing.T) {
 	t.Run("funnel", func(t *testing.T) {
 		mock1 := newMockSender()
 		mock2 := newMockSender()
-		multi := &multiSender{senders: []PayloadSender{mock1, mock2}, mch: make(chan interface{})}
+		multi := &multiSender{senders: []PayloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
 		multi.Start()
 		defer multi.Stop()
 
-		mock1.monitor <- "ping1"
-		mock2.monitor <- "ping2"
+		event1 := monitorEvent{typ: eventTypeSuccess, stats: sendStats{host: "ABC"}}
+		event2 := monitorEvent{typ: eventTypeFailure, stats: sendStats{host: "QWE"}}
+
+		mock1.monitorCh <- event1
+		mock2.monitorCh <- event2
 
 		assert.ElementsMatch(t,
-			[]string{"ping1", "ping2"},
-			[]string{(<-multi.mch).(string), (<-multi.mch).(string)},
+			[]monitorEvent{event1, event2},
+			[]monitorEvent{<-multi.mch, <-multi.mch},
 		)
 	})
 }
@@ -144,11 +147,11 @@ type mockPayloadSender struct {
 
 	mu        sync.Mutex
 	sendCalls []*Payload
-	monitor   chan interface{}
+	monitorCh chan monitorEvent
 }
 
 func newMockSender() *mockPayloadSender {
-	return &mockPayloadSender{monitor: make(chan interface{})}
+	return &mockPayloadSender{monitorCh: make(chan monitorEvent)}
 }
 
 func (m *mockPayloadSender) Reset() {
@@ -156,7 +159,7 @@ func (m *mockPayloadSender) Reset() {
 	atomic.SwapUint64(&m.stopCalls, 0)
 	m.mu.Lock()
 	m.sendCalls = m.sendCalls[:0]
-	m.monitor = make(chan interface{})
+	m.monitorCh = make(chan monitorEvent)
 	m.mu.Unlock()
 }
 
@@ -171,7 +174,7 @@ func (m *mockPayloadSender) StartCalls() int {
 // Stop must be called only once. It closes the monitor channel.
 func (m *mockPayloadSender) Stop() {
 	atomic.AddUint64(&m.stopCalls, 1)
-	close(m.monitor)
+	close(m.monitorCh)
 }
 
 func (m *mockPayloadSender) StopCalls() int {
@@ -190,10 +193,10 @@ func (m *mockPayloadSender) SendCalls() []*Payload {
 	return m.sendCalls
 }
 
-func (m *mockPayloadSender) Monitor() <-chan interface{} {
+func (m *mockPayloadSender) monitor() <-chan monitorEvent {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.monitor
+	return m.monitorCh
 }
 
 func (m *mockPayloadSender) Run()                          {}

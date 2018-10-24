@@ -61,8 +61,8 @@ func TestStatsWriter_StatHandling(t *testing.T) {
 		"Content-Encoding":             "gzip",
 	}
 
-	assertStatsPayload(assert, expectedHeaders, testStats1, &payload1)
-	assertStatsPayload(assert, expectedHeaders, testStats2, &payload2)
+	assertStatsPayload(assert, expectedHeaders, testStats1, payload1)
+	assertStatsPayload(assert, expectedHeaders, testStats2, payload2)
 }
 
 func TestStatsWriter_UpdateInfoHandling(t *testing.T) {

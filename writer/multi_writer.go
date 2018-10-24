@@ -13,8 +13,8 @@ var _ PayloadSender = (*multiSender)(nil)
 // events.
 type multiSender struct {
 	senders []PayloadSender
-	mwg     sync.WaitGroup   // monitor funnel waitgroup
-	mch     chan interface{} // monitor funneling channel
+	mwg     sync.WaitGroup    // monitor funnel waitgroup
+	mch     chan monitorEvent // monitor funneling channel
 }
 
 // newMultiSender returns a new PayloadSender which forwards all sent payloads to all
@@ -29,7 +29,7 @@ func newMultiSender(endpoints []Endpoint, cfg config.QueuablePayloadSenderConf) 
 	}
 	return &multiSender{
 		senders: senders,
-		mch:     make(chan interface{}, len(senders)),
+		mch:     make(chan monitorEvent, len(senders)),
 	}
 }
 
@@ -40,12 +40,12 @@ func (w *multiSender) Start() {
 	}
 	for _, sender := range w.senders {
 		w.mwg.Add(1)
-		go func(ch <-chan interface{}) {
+		go func(ch <-chan monitorEvent) {
 			defer w.mwg.Done()
 			for event := range ch {
 				w.mch <- event
 			}
-		}(sender.Monitor())
+		}(sender.monitor())
 	}
 }
 
@@ -65,7 +65,7 @@ func (w *multiSender) Send(p *Payload) {
 	}
 }
 
-func (w *multiSender) Monitor() <-chan interface{} { return w.mch }
+func (w *multiSender) monitor() <-chan monitorEvent { return w.mch }
 
 // Run implements PayloadSender.
 func (w *multiSender) Run() { /* no-op */ }

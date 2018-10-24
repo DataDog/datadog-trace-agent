@@ -275,7 +275,7 @@ func calculateTracePayloadSize(sampledTraces []*SampledTrace) int64 {
 }
 
 func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expectedHeaders map[string]string,
-	sampledTraces []*SampledTrace, payloads []Payload) {
+	sampledTraces []*SampledTrace, payloads []*Payload) {
 
 	var expectedTraces []*model.Trace
 	var expectedTransactions []*model.Span
