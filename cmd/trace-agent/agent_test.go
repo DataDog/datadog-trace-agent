@@ -211,96 +211,65 @@ func TestProcess(t *testing.T) {
 }
 
 func TestSampling(t *testing.T) {
-	cfg := config.New()
-	cfg.APIKey = "test"
-	ctx, cancel := context.WithCancel(context.Background())
-	agent := NewAgent(ctx, cfg)
-	defer cancel()
+	for name, tt := range map[string]struct {
+		// hasErrors will be true if the input trace should have errors
+		// hasPriority will be true if the input trace should have sampling priority set
+		hasErrors, hasPriority bool
 
-	disabled := float64(-99)
-	for i := 0; i < 200; i++ {
-		for j, key := range []float64{disabled, -1, 0, 0, 1, 1, 2} {
+		// scoreRate, scoreErrorRate, priorityRate are the values used by the mock samplers
+		scoreRate, scoreErrorRate, priorityRate float64
 
-			span := &model.Span{
+		// wantRate is the expected result
+		wantRate float64
+	}{
+		"score and priority": {
+			hasPriority:  true,
+			scoreRate:    0.5,
+			priorityRate: 0.6,
+			wantRate:     sampler.CombineRates(0.5, 0.6),
+		},
+		"score only": {
+			scoreRate:    0.5,
+			priorityRate: 0.1,
+			wantRate:     0.5,
+		},
+		"error and priority": {
+			hasErrors:      true,
+			hasPriority:    true,
+			scoreErrorRate: 0.8,
+			priorityRate:   0.2,
+			wantRate:       sampler.CombineRates(0.8, 0.2),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			a := &Agent{
+				ScoreSampler:       newMockSampler(false, tt.scoreRate),
+				ErrorsScoreSampler: newMockSampler(false, tt.scoreErrorRate),
+				PrioritySampler:    newMockSampler(false, tt.priorityRate),
+			}
+			root := &model.Span{
 				Service:  "serv1",
 				Start:    time.Now().UnixNano(),
-				Duration: (100 * time.Millisecond).Nanoseconds(), Metrics: map[string]float64{}}
-			trace := model.Trace{span}
+				Duration: (100 * time.Millisecond).Nanoseconds(),
+				Metrics:  map[string]float64{}}
+
+			if tt.hasErrors {
+				root.Error = 1
+			}
 			pt := processedTrace{
-				Trace: trace,
-				Root:  span}
-			clientPriorityRate := 0.2
-			hasPriority := false
-			if key != disabled {
-				span.Metrics[sampler.SamplingPriorityKey] = key
-				hasPriority = true
-				if j%2 == 0 {
-					span.Metrics[sampler.SamplingPriorityRateKey] = clientPriorityRate
-				}
-			}
-			agent.sample(pt, hasPriority)
-
-			sampleRate := sampler.GetTraceAppliedSampleRate(span)
-			if key == 2 {
-				assert.Equal(t, 1.0, sampleRate, "always sample when priority above 1")
-				continue
+				Trace: model.Trace{root},
+				Root:  root}
+			if tt.hasPriority {
+				pt.Root.Metrics[sampler.SamplingPriorityKey] = 1
 			}
 
-			scoreSignature := sampler.ComputeSignatureWithRootAndEnv(trace, span, "")
-			scoreSampler := agent.ScoreSampler.engine.(*sampler.ScoreEngine)
-			scoreRate := scoreSampler.Sampler.GetSampleRate(trace, span, scoreSignature)
-
-			if key == disabled || key == -1 {
-				// The applied rate is the score sampler rate
-				assert.Equal(t, scoreRate, sampleRate, "only scoresampler is applied when priority is under 0")
-				continue
-			}
-
-			if j%2 == 0 {
-				expectedRate := sampler.MergeParallelSamplingRates(clientPriorityRate, scoreRate)
-				assert.Equal(t, expectedRate, sampleRate, "score sampler rate in parallel priority rate applied by agent")
-				continue
-			}
-			serviceSignature := sampler.ComputeServiceSignature(span, "")
-			prioritySampler := agent.PrioritySampler.engine.(*sampler.PriorityEngine)
-			priorityRate := prioritySampler.Sampler.GetSignatureSampleRate(serviceSignature)
-			expectedRate := sampler.MergeParallelSamplingRates(priorityRate, scoreRate)
-			assert.Equal(t, expectedRate, sampleRate, "score sampler rate in parallel to next priority rate")
-		}
+			a.sample(pt)
+			gotRate := sampler.GetTraceAppliedSampleRate(root)
+			assert.EqualValues(t, tt.wantRate, gotRate)
+		})
 	}
 }
 
-func TestSamplingRace(t *testing.T) {
-	cfg := config.New()
-	cfg.APIKey = "test"
-	ctx, cancel := context.WithCancel(context.Background())
-	agent := NewAgent(ctx, cfg)
-	defer cancel()
-
-	disabled := float64(-99)
-	for i := 0; i < 200; i++ {
-		for j, key := range []float64{disabled, -1, 0, 0, 1, 1, 2} {
-			span := &model.Span{
-				Service:  "serv1",
-				Start:    time.Now().UnixNano(),
-				Duration: (100 * time.Millisecond).Nanoseconds(), Metrics: map[string]float64{}}
-			trace := model.Trace{span}
-			pt := processedTrace{
-				Trace: trace,
-				Root:  span}
-			clientPriorityRate := 0.2
-			hasPriority := false
-			if key != disabled {
-				span.Metrics[sampler.SamplingPriorityKey] = key
-				hasPriority = true
-				if j%2 == 0 {
-					span.Metrics[sampler.SamplingPriorityRateKey] = clientPriorityRate
-				}
-			}
-			go agent.sample(pt, hasPriority)
-		}
-	}
-}
 func BenchmarkAgentTraceProcessing(b *testing.B) {
 	c := config.New()
 	c.Endpoints[0].APIKey = "test"

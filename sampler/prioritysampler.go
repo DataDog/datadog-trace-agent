@@ -24,7 +24,8 @@ import (
 const (
 	// SamplingPriorityKey is the key of the sampling priority value in the metrics map of the root span
 	SamplingPriorityKey = "_sampling_priority_v1"
-	// SamplingPriorityRateKey is the key to get the sample rate applied to a trace
+	// SamplingPriorityRateKey is the metrics key holding the sampling rate at which this trace
+	// was sampled.
 	SamplingPriorityRateKey = "_sampling_priority_rate_v1"
 	syncPeriod              = 3 * time.Second
 )
@@ -87,7 +88,7 @@ func (s *PriorityEngine) Stop() {
 	close(s.exit)
 }
 
-// Sample counts an incoming trace and tells if it is a sample which has to be kept
+// Sample counts an incoming trace and returns the trace sampling decision and the applied sampling rate
 func (s *PriorityEngine) Sample(trace model.Trace, root *model.Span, env string) (sampled bool, sampleRate float64) {
 	// Extra safety, just in case one trace is empty
 	if len(trace) == 0 {
@@ -111,7 +112,7 @@ func (s *PriorityEngine) Sample(trace model.Trace, root *model.Span, env string)
 		return sampled, 1
 	}
 
-	signature := ComputeServiceSignature(root, env)
+	signature := computeServiceSignature(root, env)
 	s.catalogMu.Lock()
 	s.catalog.register(root, env, signature)
 	s.catalogMu.Unlock()
@@ -131,8 +132,6 @@ func (s *PriorityEngine) Sample(trace model.Trace, root *model.Span, env string)
 		// Count the trace to allow us to check for the maxTPS limit.
 		// It has to happen before the maxTPS sampling.
 		s.Sampler.Backend.CountSample()
-		// Add the applied sampling rate, if it does not exist, apply
-		// next sampling rate
 	}
 	return sampled, sampleRate
 }

@@ -10,7 +10,7 @@ import (
 func testComputeSignature(trace model.Trace) Signature {
 	root := trace.GetRoot()
 	env := trace.GetEnv()
-	return ComputeSignatureWithRootAndEnv(trace, root, env)
+	return computeSignatureWithRootAndEnv(trace, root, env)
 }
 
 func TestSignatureSimilar(t *testing.T) {
@@ -70,7 +70,7 @@ func TestSignatureDifferentRoot(t *testing.T) {
 func testComputeServiceSignature(trace model.Trace) Signature {
 	root := trace.GetRoot()
 	env := trace.GetEnv()
-	return ComputeServiceSignature(root, env)
+	return computeServiceSignature(root, env)
 }
 
 func TestServiceSignatureSimilar(t *testing.T) {

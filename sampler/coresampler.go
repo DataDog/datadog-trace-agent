@@ -180,9 +180,9 @@ func SetTraceAppliedSampleRate(root *model.Span, sampleRate float64) {
 	root.SetMetric(model.SpanSampleRateMetricKey, sampleRate)
 }
 
-// MergeParallelSamplingRates merges two rates from Sampler1, Sampler2. Both samplers law are independant,
+// CombineRates merges two rates from Sampler1, Sampler2. Both samplers law are independant,
 // and {sampled} = {sampled by Sampler1} or {sampled by Sampler2}
-func MergeParallelSamplingRates(rate1 float64, rate2 float64) float64 {
+func CombineRates(rate1 float64, rate2 float64) float64 {
 	if rate1 >= 1 || rate2 >= 1 {
 		return 1
 	}
@@ -195,4 +195,40 @@ func AddSampleRate(root *model.Span, sampleRate float64) {
 	initialRate := GetTraceAppliedSampleRate(root)
 	newRate := initialRate * sampleRate
 	SetTraceAppliedSampleRate(root, newRate)
+}
+
+// MockEngine mocks a sampler engine
+type MockEngine struct {
+	wantSampled bool
+	wantRate    float64
+}
+
+// NewMockEngine returns a MockEngine for tests
+func NewMockEngine(wantSampled bool, wantRate float64) *MockEngine {
+	return &MockEngine{wantSampled: wantSampled, wantRate: wantRate}
+}
+
+// Sample returns a constant rate
+func (e *MockEngine) Sample(_ model.Trace, _ *model.Span, _ string) (bool, float64) {
+	return e.wantSampled, e.wantRate
+}
+
+// Run mocks Engine.Run()
+func (e *MockEngine) Run() {
+	return
+}
+
+// Stop mocks Engine.Stop()
+func (e *MockEngine) Stop() {
+	return
+}
+
+// GetState mocks Engine.GetState()
+func (e *MockEngine) GetState() interface{} {
+	return nil
+}
+
+// GetType mocks Engine.GetType()
+func (e *MockEngine) GetType() EngineType {
+	return EngineType(0)
 }

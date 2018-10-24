@@ -119,3 +119,12 @@ func (s *Sampler) logStats() {
 		}
 	}
 }
+
+type mockSamplerEngine struct {
+	engine sampler.Engine
+}
+
+func newMockSampler(wantSampled bool, wantRate float64) *Sampler {
+	return &Sampler{
+		engine: sampler.NewMockEngine(wantSampled, wantRate)}
+}

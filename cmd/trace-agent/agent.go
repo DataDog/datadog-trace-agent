@@ -272,40 +272,35 @@ func (a *Agent) Process(t model.Trace) {
 	go func() {
 		defer watchdog.LogOnPanic()
 
-		sampledTrace := a.sample(pt, hasPriority)
-		if !sampledTrace.Empty() {
-			a.sampledTraceChan <- sampledTrace
+		sampled := a.sample(pt)
+		if !sampled {
+			return
+		}
+		a.sampledTraceChan <- &writer.SampledTrace{
+			Trace:        &pt.Trace,
+			Transactions: a.TransactionSampler.Extract(pt),
 		}
 	}()
 }
 
-func (a *Agent) sample(pt processedTrace, hasPriority bool) *writer.SampledTrace {
-	var sampledTrace writer.SampledTrace
-	var sampleRate, scoreSampleRate float64
-	var sampled, scoreSampled bool
-	sampled = false
+func (a *Agent) sample(pt processedTrace) (sampled bool) {
+	var sampledPriority, sampledScore bool
+	var ratePriority, rateScore float64
 
+	_, hasPriority := pt.Root.Metrics[sampler.SamplingPriorityKey]
 	if hasPriority {
-		sampled, sampleRate = a.PrioritySampler.Add(pt)
+		sampledPriority, ratePriority = a.PrioritySampler.Add(pt)
 	}
 
 	if traceContainsError(pt.Trace) {
-		scoreSampled, scoreSampleRate = a.ErrorsScoreSampler.Add(pt)
+		sampledScore, rateScore = a.ErrorsScoreSampler.Add(pt)
 	} else {
-		scoreSampled, scoreSampleRate = a.ScoreSampler.Add(pt)
+		sampledScore, rateScore = a.ScoreSampler.Add(pt)
 	}
 
-	sampled = sampled || scoreSampled
-	sampleRate = sampler.MergeParallelSamplingRates(scoreSampleRate, sampleRate)
+	sampleRate := sampler.CombineRates(ratePriority, rateScore)
 	sampler.AddSampleRate(pt.Root, sampleRate)
-
-	if sampled {
-		sampledTrace.Trace = &pt.Trace
-	}
-
-	sampledTrace.Transactions = a.TransactionSampler.Extract(pt)
-	// TODO: attach to these transactions the client, pre-sampler and transaction sample rates.
-	return &sampledTrace
+	return sampledScore || sampledPriority
 }
 
 // dieFunc is used by watchdog to kill the agent; replaced in tests.
