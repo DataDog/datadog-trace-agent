@@ -9,7 +9,7 @@ import (
 
 // payloadConstructedHandlerArgs encodes the arguments passed to a PayloadConstructedHandler call.
 type payloadConstructedHandlerArgs struct {
-	payload *Payload
+	payload *payload
 	stats   interface{}
 }
 
@@ -18,15 +18,15 @@ type payloadConstructedHandlerArgs struct {
 type testEndpoint struct {
 	sync.RWMutex
 	err             error
-	successPayloads []*Payload
-	errorPayloads   []*Payload
+	successPayloads []*payload
+	errorPayloads   []*payload
 }
 
-func (e *testEndpoint) BaseURL() string { return "<testEndpoint>" }
+func (e *testEndpoint) baseURL() string { return "<testEndpoint>" }
 
 // Write mocks the writing of a payload to a remote endpoint, recording it and replying with the configured error (or
 // success in its absence).
-func (e *testEndpoint) Write(payload *Payload) error {
+func (e *testEndpoint) write(payload *payload) error {
 	e.Lock()
 	defer e.Unlock()
 	if e.err != nil {
@@ -44,14 +44,14 @@ func (e *testEndpoint) Error() error {
 }
 
 // ErrorPayloads returns all the error payloads registered with the test endpoint.
-func (e *testEndpoint) ErrorPayloads() []*Payload {
+func (e *testEndpoint) ErrorPayloads() []*payload {
 	e.RLock()
 	defer e.RUnlock()
 	return e.errorPayloads
 }
 
 // SuccessPayloads returns all the success payloads registered with the test endpoint.
-func (e *testEndpoint) SuccessPayloads() []*Payload {
+func (e *testEndpoint) SuccessPayloads() []*payload {
 	e.RLock()
 	defer e.RUnlock()
 	return e.successPayloads
@@ -69,13 +69,13 @@ func (e *testEndpoint) String() string {
 }
 
 // RandomPayload creates a new payload instance using random data and up to 32 bytes.
-func RandomPayload() *Payload {
-	return RandomSizedPayload(rand.Intn(32))
+func randomPayload() *payload {
+	return randomSizedPayload(rand.Intn(32))
 }
 
-// RandomSizedPayload creates a new payload instance using random data with the specified size.
-func RandomSizedPayload(size int) *Payload {
-	return NewPayload(testutil.RandomSizedBytes(size), testutil.RandomStringMap())
+// randomSizedPayload creates a new payload instance using random data with the specified size.
+func randomSizedPayload(size int) *payload {
+	return newPayload(testutil.RandomSizedBytes(size), testutil.RandomStringMap())
 }
 
 // testPayloadSender is a PayloadSender that is connected to a testEndpoint, used for testing.
@@ -105,7 +105,7 @@ func (c *testPayloadSender) Run() {
 	for {
 		select {
 		case payload := <-c.in:
-			stats, err := c.send(payload)
+			stats, err := c.doSend(payload)
 
 			if err != nil {
 				c.notifyError(payload, err, stats)
@@ -119,7 +119,7 @@ func (c *testPayloadSender) Run() {
 }
 
 // Payloads allows access to all payloads recorded as being successfully sent by this sender.
-func (c *testPayloadSender) Payloads() []*Payload {
+func (c *testPayloadSender) Payloads() []*payload {
 	return c.testEndpoint.SuccessPayloads()
 }
 
@@ -128,19 +128,19 @@ func (c *testPayloadSender) Endpoint() *testEndpoint {
 	return c.testEndpoint
 }
 
-func (c *testPayloadSender) setEndpoint(endpoint Endpoint) {
-	c.testEndpoint = endpoint.(*testEndpoint)
+func (c *testPayloadSender) setEndpoint(e endpoint) {
+	c.testEndpoint = e.(*testEndpoint)
 }
 
 // testPayloadSenderMonitor monitors a PayloadSender and stores all events
 type testPayloadSenderMonitor struct {
 	events []monitorEvent
-	sender PayloadSender
+	sender payloadSender
 	exit   chan struct{}
 }
 
 // newTestPayloadSenderMonitor creates a new testPayloadSenderMonitor monitoring the specified sender.
-func newTestPayloadSenderMonitor(sender PayloadSender) *testPayloadSenderMonitor {
+func newTestPayloadSenderMonitor(sender payloadSender) *testPayloadSenderMonitor {
 	return &testPayloadSenderMonitor{
 		sender: sender,
 		exit:   make(chan struct{}),
@@ -176,12 +176,12 @@ func (m *testPayloadSenderMonitor) Stop() {
 }
 
 // SuccessPayloads returns a slice containing all successful payloads.
-func (m *testPayloadSenderMonitor) SuccessPayloads() []*Payload {
+func (m *testPayloadSenderMonitor) SuccessPayloads() []*payload {
 	return m.eventPayloads(eventTypeSuccess)
 }
 
 // FailurePayloads returns a slice containing all failed payloads.
-func (m *testPayloadSenderMonitor) FailurePayloads() []*Payload {
+func (m *testPayloadSenderMonitor) FailurePayloads() []*payload {
 	return m.eventPayloads(eventTypeFailure)
 }
 
@@ -191,12 +191,12 @@ func (m *testPayloadSenderMonitor) FailureEvents() []monitorEvent {
 }
 
 // RetryPayloads returns a slice containing all failed payloads.
-func (m *testPayloadSenderMonitor) RetryPayloads() []*Payload {
+func (m *testPayloadSenderMonitor) RetryPayloads() []*payload {
 	return m.eventPayloads(eventTypeRetry)
 }
 
-func (m *testPayloadSenderMonitor) eventPayloads(t eventType) []*Payload {
-	res := make([]*Payload, 0)
+func (m *testPayloadSenderMonitor) eventPayloads(t eventType) []*payload {
+	res := make([]*payload, 0)
 	for _, e := range m.events {
 		if e.typ != t {
 			continue

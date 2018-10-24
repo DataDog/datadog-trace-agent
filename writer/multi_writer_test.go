@@ -27,19 +27,19 @@ func TestNewMultiSenderFactory(t *testing.T) {
 	cfg := config.DefaultQueuablePayloadSenderConf()
 
 	t.Run("one", func(t *testing.T) {
-		endpoint := &DatadogEndpoint{Host: "host1", APIKey: "key1"}
-		sender, ok := newMultiSender([]Endpoint{endpoint}, cfg).(*queuableSender)
+		e := &datadogEndpoint{host: "host1", apiKey: "key1"}
+		sender, ok := newMultiSender([]endpoint{e}, cfg).(*queuableSender)
 		assert := assert.New(t)
 		assert.True(ok)
-		assert.EqualValues(endpoint, sender.endpoint)
+		assert.EqualValues(e, sender.endpoint)
 		assert.EqualValues(cfg, sender.conf)
 	})
 
 	t.Run("multi", func(t *testing.T) {
-		endpoints := []Endpoint{
-			&DatadogEndpoint{Host: "host1", APIKey: "key1"},
-			&DatadogEndpoint{Host: "host2", APIKey: "key2"},
-			&DatadogEndpoint{Host: "host3", APIKey: "key3"},
+		endpoints := []endpoint{
+			&datadogEndpoint{host: "host1", apiKey: "key1"},
+			&datadogEndpoint{host: "host2", apiKey: "key2"},
+			&datadogEndpoint{host: "host3", apiKey: "key3"},
 		}
 		sender, ok := newMultiSender(endpoints, cfg).(*multiSender)
 		assert := assert.New(t)
@@ -59,9 +59,9 @@ func TestMultiSender(t *testing.T) {
 	t.Run("Start", func(t *testing.T) {
 		mock1 := newMockSender()
 		mock2 := newMockSender()
-		multi := &multiSender{senders: []PayloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
-		multi.Start()
-		defer multi.Stop()
+		multi := &multiSender{senders: []payloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
+		multi.start()
+		defer multi.stop()
 
 		assert := assert.New(t)
 		assert.Equal(1, mock1.StartCalls())
@@ -71,8 +71,8 @@ func TestMultiSender(t *testing.T) {
 	t.Run("Stop", func(t *testing.T) {
 		mock1 := newMockSender()
 		mock2 := newMockSender()
-		multi := &multiSender{senders: []PayloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
-		multi.Stop()
+		multi := &multiSender{senders: []payloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
+		multi.stop()
 
 		assert := assert.New(t)
 		assert.Equal(1, mock1.StopCalls())
@@ -88,9 +88,9 @@ func TestMultiSender(t *testing.T) {
 	t.Run("Send", func(t *testing.T) {
 		mock1 := newMockSender()
 		mock2 := newMockSender()
-		p := &Payload{CreationDate: time.Now(), Bytes: []byte{1, 2, 3}}
-		multi := &multiSender{senders: []PayloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
-		multi.Send(p)
+		p := &payload{creationDate: time.Now(), bytes: []byte{1, 2, 3}}
+		multi := &multiSender{senders: []payloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
+		multi.send(p)
 
 		assert := assert.New(t)
 		assert.Equal(p, mock1.SendCalls()[0])
@@ -100,9 +100,9 @@ func TestMultiSender(t *testing.T) {
 	t.Run("funnel", func(t *testing.T) {
 		mock1 := newMockSender()
 		mock2 := newMockSender()
-		multi := &multiSender{senders: []PayloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
-		multi.Start()
-		defer multi.Stop()
+		multi := &multiSender{senders: []payloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
+		multi.start()
+		defer multi.stop()
 
 		event1 := monitorEvent{typ: eventTypeSuccess, stats: sendStats{host: "ABC"}}
 		event2 := monitorEvent{typ: eventTypeFailure, stats: sendStats{host: "QWE"}}
@@ -118,14 +118,14 @@ func TestMultiSender(t *testing.T) {
 }
 
 func TestMockPayloadSender(t *testing.T) {
-	p := &Payload{CreationDate: time.Now(), Bytes: []byte{1, 2, 3}}
+	p := &payload{creationDate: time.Now(), bytes: []byte{1, 2, 3}}
 	mock := newMockSender()
-	mock.Start()
-	mock.Start()
-	mock.Start()
-	mock.Send(p)
-	mock.Send(p)
-	mock.Stop()
+	mock.start()
+	mock.start()
+	mock.start()
+	mock.send(p)
+	mock.send(p)
+	mock.stop()
 
 	assert := assert.New(t)
 	assert.Equal(3, mock.StartCalls())
@@ -139,14 +139,14 @@ func TestMockPayloadSender(t *testing.T) {
 	assert.Len(mock.SendCalls(), 0)
 }
 
-var _ PayloadSender = (*mockPayloadSender)(nil)
+var _ payloadSender = (*mockPayloadSender)(nil)
 
 type mockPayloadSender struct {
 	startCalls uint64
 	stopCalls  uint64
 
 	mu        sync.Mutex
-	sendCalls []*Payload
+	sendCalls []*payload
 	monitorCh chan monitorEvent
 }
 
@@ -163,7 +163,7 @@ func (m *mockPayloadSender) Reset() {
 	m.mu.Unlock()
 }
 
-func (m *mockPayloadSender) Start() {
+func (m *mockPayloadSender) start() {
 	atomic.AddUint64(&m.startCalls, 1)
 }
 
@@ -172,7 +172,7 @@ func (m *mockPayloadSender) StartCalls() int {
 }
 
 // Stop must be called only once. It closes the monitor channel.
-func (m *mockPayloadSender) Stop() {
+func (m *mockPayloadSender) stop() {
 	atomic.AddUint64(&m.stopCalls, 1)
 	close(m.monitorCh)
 }
@@ -181,13 +181,13 @@ func (m *mockPayloadSender) StopCalls() int {
 	return int(atomic.LoadUint64(&m.stopCalls))
 }
 
-func (m *mockPayloadSender) Send(p *Payload) {
+func (m *mockPayloadSender) send(p *payload) {
 	m.mu.Lock()
 	m.sendCalls = append(m.sendCalls, p)
 	m.mu.Unlock()
 }
 
-func (m *mockPayloadSender) SendCalls() []*Payload {
+func (m *mockPayloadSender) SendCalls() []*payload {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.sendCalls
@@ -199,5 +199,5 @@ func (m *mockPayloadSender) monitor() <-chan monitorEvent {
 	return m.monitorCh
 }
 
-func (m *mockPayloadSender) Run()                          {}
-func (m *mockPayloadSender) setEndpoint(endpoint Endpoint) {}
+func (m *mockPayloadSender) run()                   {}
+func (m *mockPayloadSender) setEndpoint(_ endpoint) {}

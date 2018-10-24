@@ -6,24 +6,24 @@ import (
 	"github.com/DataDog/datadog-trace-agent/writer/config"
 )
 
-var _ PayloadSender = (*multiSender)(nil)
+var _ payloadSender = (*multiSender)(nil)
 
-// multiSender is an implementation of PayloadSender which forwards any
-// received payload to multiple PayloadSenders, funnelling incoming monitor
+// multiSender is an implementation of payloadSender which forwards any
+// received payload to multiple payloadSenders, funnelling incoming monitor
 // events.
 type multiSender struct {
-	senders []PayloadSender
+	senders []payloadSender
 	mwg     sync.WaitGroup    // monitor funnel waitgroup
 	mch     chan monitorEvent // monitor funneling channel
 }
 
-// newMultiSender returns a new PayloadSender which forwards all sent payloads to all
+// newMultiSender returns a new payloadSender which forwards all sent payloads to all
 // the given endpoints, as well as funnels all monitoring channels.
-func newMultiSender(endpoints []Endpoint, cfg config.QueuablePayloadSenderConf) PayloadSender {
+func newMultiSender(endpoints []endpoint, cfg config.QueuablePayloadSenderConf) payloadSender {
 	if len(endpoints) == 1 {
 		return newSender(endpoints[0], cfg)
 	}
-	senders := make([]PayloadSender, len(endpoints))
+	senders := make([]payloadSender, len(endpoints))
 	for i, e := range endpoints {
 		senders[i] = newSender(e, cfg)
 	}
@@ -34,9 +34,9 @@ func newMultiSender(endpoints []Endpoint, cfg config.QueuablePayloadSenderConf) 
 }
 
 // Start starts all senders.
-func (w *multiSender) Start() {
+func (w *multiSender) start() {
 	for _, sender := range w.senders {
-		sender.Start()
+		sender.start()
 	}
 	for _, sender := range w.senders {
 		w.mwg.Add(1)
@@ -50,27 +50,27 @@ func (w *multiSender) Start() {
 }
 
 // Stop stops all senders.
-func (w *multiSender) Stop() {
+func (w *multiSender) stop() {
 	for _, sender := range w.senders {
-		sender.Stop()
+		sender.stop()
 	}
 	w.mwg.Wait()
 	close(w.mch)
 }
 
 // Send forwards the payload to all registered senders.
-func (w *multiSender) Send(p *Payload) {
+func (w *multiSender) send(p *payload) {
 	for _, sender := range w.senders {
-		sender.Send(p)
+		sender.send(p)
 	}
 }
 
 func (w *multiSender) monitor() <-chan monitorEvent { return w.mch }
 
-// Run implements PayloadSender.
-func (w *multiSender) Run() { /* no-op */ }
+// Run implements payloadSender.
+func (w *multiSender) run() { /* no-op */ }
 
-func (w *multiSender) setEndpoint(endpoint Endpoint) {
+func (w *multiSender) setEndpoint(endpoint endpoint) {
 	for _, sender := range w.senders {
 		sender.setEndpoint(endpoint)
 	}

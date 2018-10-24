@@ -42,14 +42,14 @@ type TraceWriter struct {
 	transactions  []*model.Span
 	spansInBuffer int
 
-	sender PayloadSender
+	sender payloadSender
 	exit   chan struct{}
 }
 
 // NewTraceWriter returns a new writer for traces.
 func NewTraceWriter(conf *config.AgentConfig, in <-chan *SampledTrace) *TraceWriter {
 	cfg := conf.TraceWriterConfig
-	endpoints := NewEndpoints(conf, pathTraces)
+	endpoints := newEndpoints(conf, pathTraces)
 	sender := newMultiSender(endpoints, cfg.SenderConfig)
 	log.Infof("Trace writer initializing with config: %+v", cfg)
 
@@ -70,7 +70,7 @@ func NewTraceWriter(conf *config.AgentConfig, in <-chan *SampledTrace) *TraceWri
 
 // Start starts the writer.
 func (w *TraceWriter) Start() {
-	w.sender.Start()
+	w.sender.start()
 	go func() {
 		defer watchdog.LogOnPanic()
 		w.Run()
@@ -95,14 +95,14 @@ func (w *TraceWriter) Run() {
 			switch event.typ {
 			case eventTypeSuccess:
 				log.Infof("flushed trace payload to the API, time:%s, size:%d bytes", event.stats.sendTime,
-					len(event.payload.Bytes))
+					len(event.payload.bytes))
 				tags := []string{"url:" + event.stats.host}
 				statsd.Client.Gauge("datadog.trace_agent.trace_writer.flush_duration",
 					event.stats.sendTime.Seconds(), tags, 1)
 				atomic.AddInt64(&w.stats.Payloads, 1)
 			case eventTypeFailure:
 				log.Errorf("failed to flush trace payload, host:%s, time:%s, size:%d bytes, error: %s",
-					event.stats.host, event.stats.sendTime, len(event.payload.Bytes), event.err)
+					event.stats.host, event.stats.sendTime, len(event.payload.bytes), event.err)
 				atomic.AddInt64(&w.stats.Errors, 1)
 			case eventTypeRetry:
 				log.Errorf("retrying flush trace payload, retryNum: %d, delay:%s, error: %s",
@@ -139,7 +139,7 @@ func (w *TraceWriter) Run() {
 func (w *TraceWriter) Stop() {
 	w.exit <- struct{}{}
 	<-w.exit
-	w.sender.Stop()
+	w.sender.stop()
 }
 
 func (w *TraceWriter) handleSampledTrace(sampledTrace *SampledTrace) {
@@ -255,10 +255,10 @@ func (w *TraceWriter) flush() {
 		"Content-Encoding": encoding,
 	}
 
-	payload := NewPayload(serialized, headers)
+	payload := newPayload(serialized, headers)
 
 	log.Debugf("flushing traces=%v transactions=%v", len(w.traces), len(w.transactions))
-	w.sender.Send(payload)
+	w.sender.send(payload)
 	w.resetBuffer()
 }
 
