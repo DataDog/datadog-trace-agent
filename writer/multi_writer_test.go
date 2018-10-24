@@ -31,7 +31,7 @@ func TestNewMultiSenderFactory(t *testing.T) {
 		sender, ok := newMultiSender([]Endpoint{endpoint}, cfg).(*QueuablePayloadSender)
 		assert := assert.New(t)
 		assert.True(ok)
-		assert.EqualValues(endpoint, sender.BasePayloadSender.endpoint)
+		assert.EqualValues(endpoint, sender.endpoint)
 		assert.EqualValues(cfg, sender.conf)
 	})
 
@@ -49,7 +49,7 @@ func TestNewMultiSenderFactory(t *testing.T) {
 		for i := range endpoints {
 			s, ok := sender.senders[i].(*QueuablePayloadSender)
 			assert.True(ok)
-			assert.EqualValues(endpoints[i], s.BasePayloadSender.endpoint)
+			assert.EqualValues(endpoints[i], s.endpoint)
 			assert.EqualValues(cfg, s.conf)
 		}
 	})

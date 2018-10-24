@@ -70,49 +70,30 @@ type PayloadSender interface {
 	monitor() <-chan monitorEvent
 }
 
-// BasePayloadSender encodes structures and behaviours common to most PayloadSenders.
-type BasePayloadSender struct {
-	in        chan *Payload
-	monitorCh chan monitorEvent
-	endpoint  Endpoint
-
-	exit chan struct{}
-}
-
-// NewBasePayloadSender creates a new instance of a BasePayloadSender using the provided endpoint.
-func NewBasePayloadSender(endpoint Endpoint) *BasePayloadSender {
-	return &BasePayloadSender{
-		in:        make(chan *Payload),
-		monitorCh: make(chan monitorEvent),
-		endpoint:  endpoint,
-		exit:      make(chan struct{}),
-	}
-}
-
 // Send sends a single isolated payload through this sender.
-func (s *BasePayloadSender) Send(payload *Payload) {
+func (s *QueuablePayloadSender) Send(payload *Payload) {
 	s.in <- payload
 }
 
 // Stop asks this sender to stop and waits until it correctly stops.
-func (s *BasePayloadSender) Stop() {
+func (s *QueuablePayloadSender) Stop() {
 	s.exit <- struct{}{}
 	<-s.exit
 	close(s.in)
 	close(s.monitorCh)
 }
 
-func (s *BasePayloadSender) setEndpoint(endpoint Endpoint) {
+func (s *QueuablePayloadSender) setEndpoint(endpoint Endpoint) {
 	s.endpoint = endpoint
 }
 
 // Monitor allows an external entity to monitor events of this sender by receiving Sender*Event structs.
-func (s *BasePayloadSender) monitor() <-chan monitorEvent {
+func (s *QueuablePayloadSender) monitor() <-chan monitorEvent {
 	return s.monitorCh
 }
 
 // send will send the provided payload without any checks.
-func (s *BasePayloadSender) send(payload *Payload) (sendStats, error) {
+func (s *QueuablePayloadSender) send(payload *Payload) (sendStats, error) {
 	if payload == nil {
 		return sendStats{}, nil
 	}
@@ -128,7 +109,7 @@ func (s *BasePayloadSender) send(payload *Payload) (sendStats, error) {
 	return sendStats, err
 }
 
-func (s *BasePayloadSender) notifySuccess(payload *Payload, sendStats sendStats) {
+func (s *QueuablePayloadSender) notifySuccess(payload *Payload, sendStats sendStats) {
 	s.sendEvent(&monitorEvent{
 		typ:     eventTypeSuccess,
 		payload: payload,
@@ -136,7 +117,7 @@ func (s *BasePayloadSender) notifySuccess(payload *Payload, sendStats sendStats)
 	})
 }
 
-func (s *BasePayloadSender) notifyError(payload *Payload, err error, sendStats sendStats) {
+func (s *QueuablePayloadSender) notifyError(payload *Payload, err error, sendStats sendStats) {
 	s.sendEvent(&monitorEvent{
 		typ:     eventTypeFailure,
 		payload: payload,
@@ -144,7 +125,7 @@ func (s *BasePayloadSender) notifyError(payload *Payload, err error, sendStats s
 	})
 }
 
-func (s *BasePayloadSender) notifyRetry(payload *Payload, err error, delay time.Duration, retryNum int) {
+func (s *QueuablePayloadSender) notifyRetry(payload *Payload, err error, delay time.Duration, retryNum int) {
 	s.sendEvent(&monitorEvent{
 		typ:        eventTypeRetry,
 		payload:    payload,
@@ -154,7 +135,7 @@ func (s *BasePayloadSender) notifyRetry(payload *Payload, err error, delay time.
 	})
 }
 
-func (s *BasePayloadSender) sendEvent(event *monitorEvent) {
+func (s *QueuablePayloadSender) sendEvent(event *monitorEvent) {
 	s.monitorCh <- *event
 }
 
@@ -171,7 +152,11 @@ type QueuablePayloadSender struct {
 	// Test helper
 	syncBarrier <-chan interface{}
 
-	BasePayloadSender
+	in        chan *Payload
+	monitorCh chan monitorEvent
+	endpoint  Endpoint
+
+	exit chan struct{}
 }
 
 // NewQueuablePayloadSender constructs a new QueuablePayloadSender with default configuration to send payloads to the
@@ -184,10 +169,13 @@ func NewQueuablePayloadSender(endpoint Endpoint) *QueuablePayloadSender {
 // the provided endpoint.
 func NewCustomQueuablePayloadSender(endpoint Endpoint, conf writerconfig.QueuablePayloadSenderConf) *QueuablePayloadSender {
 	return &QueuablePayloadSender{
-		conf:              conf,
-		queuedPayloads:    list.New(),
-		backoffTimer:      backoff.NewCustomExponentialTimer(conf.ExponentialBackoff),
-		BasePayloadSender: *NewBasePayloadSender(endpoint),
+		conf:           conf,
+		queuedPayloads: list.New(),
+		backoffTimer:   backoff.NewCustomExponentialTimer(conf.ExponentialBackoff),
+		in:             make(chan *Payload),
+		monitorCh:      make(chan monitorEvent),
+		endpoint:       endpoint,
+		exit:           make(chan struct{}),
 	}
 }
 
