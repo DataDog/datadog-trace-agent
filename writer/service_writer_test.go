@@ -185,7 +185,7 @@ func calculateMetadataPayloadSize(metadata model.ServicesMetadata) int64 {
 }
 
 func assertMetadata(assert *assert.Assertions, expectedHeaders map[string]string,
-	expectedMetadata model.ServicesMetadata, payload Payload) {
+	expectedMetadata model.ServicesMetadata, payload *Payload) {
 	servicesMetadata := model.ServicesMetadata{}
 
 	assert.NoError(json.Unmarshal(payload.Bytes, &servicesMetadata), "Stats payload should unmarshal correctly")

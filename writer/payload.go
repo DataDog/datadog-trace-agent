@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	log "github.com/cihub/seelog"
-
-	"github.com/DataDog/datadog-trace-agent/backoff"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
+	"github.com/DataDog/datadog-trace-agent/writer/backoff"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
+	log "github.com/cihub/seelog"
 )
 
 // Payload represents a data payload to be sent to some endpoint
@@ -29,32 +28,36 @@ func NewPayload(bytes []byte, headers map[string]string) *Payload {
 	}
 }
 
-// SendStats represents basic stats related to the sending of a payload.
-type SendStats struct {
-	SendTime time.Duration
-	Host     string
+// eventType is a type of event sent down the monitor channel.
+type eventType int
+
+const (
+	eventTypeSuccess eventType = iota
+	eventTypeFailure
+	eventTypeRetry
+)
+
+var eventTypeStrings = map[eventType]string{
+	eventTypeSuccess: "success",
+	eventTypeFailure: "failure",
+	eventTypeRetry:   "retry",
 }
 
-// SenderSuccessEvent encodes information related to the successful sending of a payload.
-type SenderSuccessEvent struct {
-	Payload   *Payload
-	SendStats SendStats
+func (e eventType) String() string { return eventTypeStrings[e] }
+
+type monitorEvent struct {
+	typ        eventType
+	payload    *Payload
+	stats      sendStats
+	err        error
+	retryDelay time.Duration
+	retryNum   int
 }
 
-// SenderFailureEvent encodes information related to the failed sending of a payload without subsequent retry.
-type SenderFailureEvent struct {
-	Payload   *Payload
-	SendStats SendStats
-	Error     error
-}
-
-// SenderRetryEvent encodes information related to the failed sending of a payload that triggered an automatic retry.
-type SenderRetryEvent struct {
-	Payload    *Payload
-	SendTime   time.Duration
-	Error      error
-	RetryDelay time.Duration
-	RetryNum   int
+// sendStats represents basic stats related to the sending of a payload.
+type sendStats struct {
+	sendTime time.Duration
+	host     string
 }
 
 // PayloadSender represents an object capable of asynchronously sending payloads to some endpoint.
@@ -64,14 +67,14 @@ type PayloadSender interface {
 	Stop()
 	Send(payload *Payload)
 	setEndpoint(endpoint Endpoint)
-	Monitor() <-chan interface{}
+	monitor() <-chan monitorEvent
 }
 
 // BasePayloadSender encodes structures and behaviours common to most PayloadSenders.
 type BasePayloadSender struct {
-	in       chan *Payload
-	monitor  chan interface{}
-	endpoint Endpoint
+	in        chan *Payload
+	monitorCh chan monitorEvent
+	endpoint  Endpoint
 
 	exit chan struct{}
 }
@@ -79,10 +82,10 @@ type BasePayloadSender struct {
 // NewBasePayloadSender creates a new instance of a BasePayloadSender using the provided endpoint.
 func NewBasePayloadSender(endpoint Endpoint) *BasePayloadSender {
 	return &BasePayloadSender{
-		in:       make(chan *Payload),
-		monitor:  make(chan interface{}),
-		endpoint: endpoint,
-		exit:     make(chan struct{}),
+		in:        make(chan *Payload),
+		monitorCh: make(chan monitorEvent),
+		endpoint:  endpoint,
+		exit:      make(chan struct{}),
 	}
 }
 
@@ -96,7 +99,7 @@ func (s *BasePayloadSender) Stop() {
 	s.exit <- struct{}{}
 	<-s.exit
 	close(s.in)
-	close(s.monitor)
+	close(s.monitorCh)
 }
 
 func (s *BasePayloadSender) setEndpoint(endpoint Endpoint) {
@@ -104,49 +107,55 @@ func (s *BasePayloadSender) setEndpoint(endpoint Endpoint) {
 }
 
 // Monitor allows an external entity to monitor events of this sender by receiving Sender*Event structs.
-func (s *BasePayloadSender) Monitor() <-chan interface{} {
-	return s.monitor
+func (s *BasePayloadSender) monitor() <-chan monitorEvent {
+	return s.monitorCh
 }
 
 // send will send the provided payload without any checks.
-func (s *BasePayloadSender) send(payload *Payload) (SendStats, error) {
+func (s *BasePayloadSender) send(payload *Payload) (sendStats, error) {
 	if payload == nil {
-		return SendStats{}, nil
+		return sendStats{}, nil
 	}
 
 	startFlush := time.Now()
 	err := s.endpoint.Write(payload)
 
-	sendStats := SendStats{
-		SendTime: time.Since(startFlush),
-		Host:     s.endpoint.BaseURL(),
+	sendStats := sendStats{
+		sendTime: time.Since(startFlush),
+		host:     s.endpoint.BaseURL(),
 	}
 
 	return sendStats, err
 }
 
-func (s *BasePayloadSender) notifySuccess(payload *Payload, sendStats SendStats) {
-	s.monitor <- SenderSuccessEvent{
-		Payload:   payload,
-		SendStats: sendStats,
-	}
+func (s *BasePayloadSender) notifySuccess(payload *Payload, sendStats sendStats) {
+	s.sendEvent(&monitorEvent{
+		typ:     eventTypeSuccess,
+		payload: payload,
+		stats:   sendStats,
+	})
 }
 
-func (s *BasePayloadSender) notifyError(payload *Payload, err error, sendStats SendStats) {
-	s.monitor <- SenderFailureEvent{
-		Payload:   payload,
-		SendStats: sendStats,
-		Error:     err,
-	}
+func (s *BasePayloadSender) notifyError(payload *Payload, err error, sendStats sendStats) {
+	s.sendEvent(&monitorEvent{
+		typ:     eventTypeFailure,
+		payload: payload,
+		err:     err,
+	})
 }
 
 func (s *BasePayloadSender) notifyRetry(payload *Payload, err error, delay time.Duration, retryNum int) {
-	s.monitor <- SenderRetryEvent{
-		Payload:    payload,
-		Error:      err,
-		RetryDelay: delay,
-		RetryNum:   retryNum,
-	}
+	s.sendEvent(&monitorEvent{
+		typ:        eventTypeRetry,
+		payload:    payload,
+		err:        err,
+		retryDelay: delay,
+		retryNum:   retryNum,
+	})
+}
+
+func (s *BasePayloadSender) sendEvent(event *monitorEvent) {
+	s.monitorCh <- *event
 }
 
 // QueuablePayloadSender is a specific implementation of a PayloadSender that will queue new payloads on error and
@@ -221,8 +230,8 @@ func (s *QueuablePayloadSender) NumQueuedPayloads() int {
 }
 
 // sendOrQueue sends the provided payload or queues it if this sender is currently queueing payloads.
-func (s *QueuablePayloadSender) sendOrQueue(payload *Payload) (SendStats, error) {
-	stats := SendStats{}
+func (s *QueuablePayloadSender) sendOrQueue(payload *Payload) (sendStats, error) {
+	var stats sendStats
 
 	if payload == nil {
 		return stats, nil
@@ -300,7 +309,7 @@ func (s *QueuablePayloadSender) flushQueue() error {
 		payload := e.Value.(*Payload)
 
 		var err error
-		var stats SendStats
+		var stats sendStats
 
 		if stats, err = s.send(payload); err != nil {
 			if _, ok := err.(*RetriableError); ok {
@@ -362,7 +371,7 @@ func (s *QueuablePayloadSender) discardOldPayloads() {
 
 		err := fmt.Errorf("payload is older than max age: age=%v, max age=%v", age, s.conf.MaxAge)
 		log.Tracef("Discarding payload: err=%v, payload=%v", err, payload)
-		s.notifyError(payload, err, SendStats{})
+		s.notifyError(payload, err, sendStats{})
 		next = s.removeQueuedPayload(e)
 	}
 }
@@ -376,7 +385,7 @@ func (s *QueuablePayloadSender) dropOldestPayload(reason string) (*Payload, erro
 	err := fmt.Errorf("payload dropped: %s", reason)
 	droppedPayload := s.queuedPayloads.Front().Value.(*Payload)
 	s.removeQueuedPayload(s.queuedPayloads.Front())
-	s.notifyError(droppedPayload, err, SendStats{})
+	s.notifyError(droppedPayload, err, sendStats{})
 
 	return droppedPayload, nil
 }

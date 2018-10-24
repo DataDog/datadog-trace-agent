@@ -5,14 +5,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	log "github.com/cihub/seelog"
-
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
+	log "github.com/cihub/seelog"
 )
 
 const pathStats = "/api/v0.2/stats"
@@ -248,7 +247,7 @@ func (w *StatsWriter) buildPayloads(stats []model.StatsBucket, maxEntriesPerPayl
 //   them, send out statsd metrics, and updates the writer info
 // - periodically dumps the writer info
 func (w *StatsWriter) monitor() {
-	monC := w.sender.Monitor()
+	monC := w.sender.monitor()
 
 	infoTicker := time.NewTicker(w.conf.UpdateInfoPeriod)
 	defer infoTicker.Stop()
@@ -260,23 +259,23 @@ func (w *StatsWriter) monitor() {
 				break
 			}
 
-			switch e := e.(type) {
-			case SenderSuccessEvent:
-				url := e.SendStats.Host
-				log.Infof("flushed stat payload; url: %s, time:%s, size:%d bytes", url, e.SendStats.SendTime,
-					len(e.Payload.Bytes))
+			switch e.typ {
+			case eventTypeSuccess:
+				url := e.stats.host
+				log.Infof("flushed stat payload; url: %s, time:%s, size:%d bytes", url, e.stats.sendTime,
+					len(e.payload.Bytes))
 				tags := []string{"url:" + url}
 				statsd.Client.Gauge("datadog.trace_agent.stats_writer.flush_duration",
-					e.SendStats.SendTime.Seconds(), tags, 1)
+					e.stats.sendTime.Seconds(), tags, 1)
 				atomic.AddInt64(&w.info.Payloads, 1)
-			case SenderFailureEvent:
-				url := e.SendStats.Host
+			case eventTypeFailure:
+				url := e.stats.host
 				log.Errorf("failed to flush stat payload; url:%s, time:%s, size:%d bytes, error: %s",
-					url, e.SendStats.SendTime, len(e.Payload.Bytes), e.Error)
+					url, e.stats.sendTime, len(e.payload.Bytes), e.err)
 				atomic.AddInt64(&w.info.Errors, 1)
-			case SenderRetryEvent:
+			case eventTypeRetry:
 				log.Errorf("retrying flush stat payload, retryNum: %d, delay:%s, error: %s",
-					e.RetryNum, e.RetryDelay, e.Error)
+					e.retryNum, e.retryDelay, e.err)
 				atomic.AddInt64(&w.info.Retries, 1)
 			default:
 				log.Debugf("don't know how to handle event with type %T", e)

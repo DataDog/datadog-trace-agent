@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/DataDog/datadog-trace-agent/testutil"
-	log "github.com/cihub/seelog"
 )
 
 // payloadConstructedHandlerArgs encodes the arguments passed to a PayloadConstructedHandler call.
@@ -19,8 +18,8 @@ type payloadConstructedHandlerArgs struct {
 type testEndpoint struct {
 	sync.RWMutex
 	err             error
-	successPayloads []Payload
-	errorPayloads   []Payload
+	successPayloads []*Payload
+	errorPayloads   []*Payload
 }
 
 func (e *testEndpoint) BaseURL() string { return "<testEndpoint>" }
@@ -31,9 +30,9 @@ func (e *testEndpoint) Write(payload *Payload) error {
 	e.Lock()
 	defer e.Unlock()
 	if e.err != nil {
-		e.errorPayloads = append(e.errorPayloads, *payload)
+		e.errorPayloads = append(e.errorPayloads, payload)
 	} else {
-		e.successPayloads = append(e.successPayloads, *payload)
+		e.successPayloads = append(e.successPayloads, payload)
 	}
 	return e.err
 }
@@ -45,14 +44,14 @@ func (e *testEndpoint) Error() error {
 }
 
 // ErrorPayloads returns all the error payloads registered with the test endpoint.
-func (e *testEndpoint) ErrorPayloads() []Payload {
+func (e *testEndpoint) ErrorPayloads() []*Payload {
 	e.RLock()
 	defer e.RUnlock()
 	return e.errorPayloads
 }
 
 // SuccessPayloads returns all the success payloads registered with the test endpoint.
-func (e *testEndpoint) SuccessPayloads() []Payload {
+func (e *testEndpoint) SuccessPayloads() []*Payload {
 	e.RLock()
 	defer e.RUnlock()
 	return e.successPayloads
@@ -120,7 +119,7 @@ func (c *testPayloadSender) Run() {
 }
 
 // Payloads allows access to all payloads recorded as being successfully sent by this sender.
-func (c *testPayloadSender) Payloads() []Payload {
+func (c *testPayloadSender) Payloads() []*Payload {
 	return c.testEndpoint.SuccessPayloads()
 }
 
@@ -135,13 +134,9 @@ func (c *testPayloadSender) setEndpoint(endpoint Endpoint) {
 
 // testPayloadSenderMonitor monitors a PayloadSender and stores all events
 type testPayloadSenderMonitor struct {
-	SuccessEvents []SenderSuccessEvent
-	FailureEvents []SenderFailureEvent
-	RetryEvents   []SenderRetryEvent
-
+	events []monitorEvent
 	sender PayloadSender
-
-	exit chan struct{}
+	exit   chan struct{}
 }
 
 // newTestPayloadSenderMonitor creates a new testPayloadSenderMonitor monitoring the specified sender.
@@ -163,21 +158,11 @@ func (m *testPayloadSenderMonitor) Run() {
 
 	for {
 		select {
-		case event := <-m.sender.Monitor():
-			if event == nil {
-				continue
+		case event, ok := <-m.sender.monitor():
+			if !ok {
+				continue // wait for exit
 			}
-
-			switch event := event.(type) {
-			case SenderSuccessEvent:
-				m.SuccessEvents = append(m.SuccessEvents, event)
-			case SenderFailureEvent:
-				m.FailureEvents = append(m.FailureEvents, event)
-			case SenderRetryEvent:
-				m.RetryEvents = append(m.RetryEvents, event)
-			default:
-				log.Errorf("Unknown event of type %T", event)
-			}
+			m.events = append(m.events, event)
 		case <-m.exit:
 			return
 		}
@@ -191,34 +176,43 @@ func (m *testPayloadSenderMonitor) Stop() {
 }
 
 // SuccessPayloads returns a slice containing all successful payloads.
-func (m *testPayloadSenderMonitor) SuccessPayloads() []Payload {
-	result := make([]Payload, len(m.SuccessEvents))
-
-	for i, successEvent := range m.SuccessEvents {
-		result[i] = *successEvent.Payload
-	}
-
-	return result
+func (m *testPayloadSenderMonitor) SuccessPayloads() []*Payload {
+	return m.eventPayloads(eventTypeSuccess)
 }
 
 // FailurePayloads returns a slice containing all failed payloads.
-func (m *testPayloadSenderMonitor) FailurePayloads() []Payload {
-	result := make([]Payload, len(m.FailureEvents))
+func (m *testPayloadSenderMonitor) FailurePayloads() []*Payload {
+	return m.eventPayloads(eventTypeFailure)
+}
 
-	for i, successEvent := range m.FailureEvents {
-		result[i] = *successEvent.Payload
-	}
-
-	return result
+// FailureEvents returns all failure events.
+func (m *testPayloadSenderMonitor) FailureEvents() []monitorEvent {
+	return m.eventsByType(eventTypeFailure)
 }
 
 // RetryPayloads returns a slice containing all failed payloads.
-func (m *testPayloadSenderMonitor) RetryPayloads() []Payload {
-	result := make([]Payload, len(m.RetryEvents))
+func (m *testPayloadSenderMonitor) RetryPayloads() []*Payload {
+	return m.eventPayloads(eventTypeRetry)
+}
 
-	for i, successEvent := range m.RetryEvents {
-		result[i] = *successEvent.Payload
+func (m *testPayloadSenderMonitor) eventPayloads(t eventType) []*Payload {
+	res := make([]*Payload, 0)
+	for _, e := range m.events {
+		if e.typ != t {
+			continue
+		}
+		res = append(res, e.payload)
 	}
+	return res
+}
 
-	return result
+func (m *testPayloadSenderMonitor) eventsByType(t eventType) []monitorEvent {
+	res := make([]monitorEvent, 0)
+	for _, e := range m.events {
+		if e.typ != t {
+			continue
+		}
+		res = append(res, e)
+	}
+	return res
 }

@@ -7,14 +7,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	log "github.com/cihub/seelog"
-
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
+	log "github.com/cihub/seelog"
 	"github.com/golang/protobuf/proto"
 )
 
@@ -92,25 +91,22 @@ func (w *TraceWriter) Run() {
 
 	// Monitor sender for events
 	go func() {
-		for event := range w.sender.Monitor() {
-			if event == nil {
-				continue
-			}
-			switch event := event.(type) {
-			case SenderSuccessEvent:
-				log.Infof("flushed trace payload to the API, time:%s, size:%d bytes", event.SendStats.SendTime,
-					len(event.Payload.Bytes))
-				tags := []string{"url:" + event.SendStats.Host}
+		for event := range w.sender.monitor() {
+			switch event.typ {
+			case eventTypeSuccess:
+				log.Infof("flushed trace payload to the API, time:%s, size:%d bytes", event.stats.sendTime,
+					len(event.payload.Bytes))
+				tags := []string{"url:" + event.stats.host}
 				statsd.Client.Gauge("datadog.trace_agent.trace_writer.flush_duration",
-					event.SendStats.SendTime.Seconds(), tags, 1)
+					event.stats.sendTime.Seconds(), tags, 1)
 				atomic.AddInt64(&w.stats.Payloads, 1)
-			case SenderFailureEvent:
+			case eventTypeFailure:
 				log.Errorf("failed to flush trace payload, host:%s, time:%s, size:%d bytes, error: %s",
-					event.SendStats.Host, event.SendStats.SendTime, len(event.Payload.Bytes), event.Error)
+					event.stats.host, event.stats.sendTime, len(event.payload.Bytes), event.err)
 				atomic.AddInt64(&w.stats.Errors, 1)
-			case SenderRetryEvent:
+			case eventTypeRetry:
 				log.Errorf("retrying flush trace payload, retryNum: %d, delay:%s, error: %s",
-					event.RetryNum, event.RetryDelay, event.Error)
+					event.retryNum, event.retryDelay, event.err)
 				atomic.AddInt64(&w.stats.Retries, 1)
 			default:
 				log.Debugf("don't know how to handle event with type %T", event)
