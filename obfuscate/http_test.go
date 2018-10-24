@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -134,7 +134,7 @@ func TestObfuscateHTTP(t *testing.T) {
 
 	t.Run("wrong-type", func(t *testing.T) {
 		assert := assert.New(t)
-		span := model.Span{Type: "web_server", Meta: map[string]string{"http.url": testURL}}
+		span := agent.Span{Type: "web_server", Meta: map[string]string{"http.url": testURL}}
 		cfg := config.HTTPObfuscationConfig{RemoveQueryString: true, RemovePathDigits: true}
 		NewObfuscator(&config.ObfuscationConfig{HTTP: cfg}).Obfuscate(&span)
 		assert.Equal(testURL, span.Meta["http.url"])
@@ -149,7 +149,7 @@ func testHTTPObfuscation(tt *inOutTest, conf *config.HTTPObfuscationConfig) func
 			cfg = *conf
 		}
 		assert := assert.New(t)
-		span := model.Span{
+		span := agent.Span{
 			Type: "http",
 			Meta: map[string]string{"http.url": tt.in},
 		}

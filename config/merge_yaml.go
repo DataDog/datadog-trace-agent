@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/osutil"
 	"github.com/DataDog/datadog-trace-agent/writer/backoff"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
@@ -251,7 +251,7 @@ func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 	}
 
 	if yc.TraceAgent.Env != "" {
-		c.DefaultEnv = model.NormalizeTag(yc.TraceAgent.Env)
+		c.DefaultEnv = agent.NormalizeTag(yc.TraceAgent.Env)
 	}
 
 	if yc.TraceAgent.ReceiverPort > 0 {

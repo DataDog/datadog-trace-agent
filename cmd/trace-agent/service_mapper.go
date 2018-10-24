@@ -4,28 +4,28 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 	log "github.com/cihub/seelog"
 )
 
-// ServiceMapper provides a cache layer over model.ServicesMetadata pipeline
+// ServiceMapper provides a cache layer over agent.ServicesMetadata pipeline
 // Used in conjunction with ServiceWriter: in-> ServiceMapper out-> ServiceWriter
 type ServiceMapper struct {
-	in    <-chan model.ServicesMetadata
-	out   chan<- model.ServicesMetadata
+	in    <-chan agent.ServicesMetadata
+	out   chan<- agent.ServicesMetadata
 	exit  chan bool
 	done  sync.WaitGroup
-	cache model.ServicesMetadata
+	cache agent.ServicesMetadata
 }
 
 // NewServiceMapper returns an instance of ServiceMapper with the provided channels
-func NewServiceMapper(in <-chan model.ServicesMetadata, out chan<- model.ServicesMetadata) *ServiceMapper {
+func NewServiceMapper(in <-chan agent.ServicesMetadata, out chan<- agent.ServicesMetadata) *ServiceMapper {
 	return &ServiceMapper{
 		in:    in,
 		out:   out,
 		exit:  make(chan bool),
-		cache: make(model.ServicesMetadata),
+		cache: make(agent.ServicesMetadata),
 	}
 }
 
@@ -46,7 +46,7 @@ func (s *ServiceMapper) Stop() {
 	s.done.Wait()
 }
 
-// Run triggers the event-loop that consumes model.ServicesMeta
+// Run triggers the event-loop that consumes agent.ServicesMeta
 func (s *ServiceMapper) Run() {
 	telemetryTicker := time.NewTicker(1 * time.Minute)
 	defer telemetryTicker.Stop()
@@ -63,8 +63,8 @@ func (s *ServiceMapper) Run() {
 	}
 }
 
-func (s *ServiceMapper) update(metadata model.ServicesMetadata) {
-	var changes model.ServicesMetadata
+func (s *ServiceMapper) update(metadata agent.ServicesMetadata) {
+	var changes agent.ServicesMetadata
 
 	for k, v := range metadata {
 		if !s.shouldAdd(k, metadata) {
@@ -74,7 +74,7 @@ func (s *ServiceMapper) update(metadata model.ServicesMetadata) {
 		// We do this inside the for loop to avoid unecessary memory allocations.
 		// After few method executions, the cache will be warmed up and this section be skipped altogether.
 		if changes == nil {
-			changes = make(model.ServicesMetadata)
+			changes = make(agent.ServicesMetadata)
 		}
 
 		changes[k] = v
@@ -88,7 +88,7 @@ func (s *ServiceMapper) update(metadata model.ServicesMetadata) {
 	s.cache.Merge(changes)
 }
 
-func (s *ServiceMapper) shouldAdd(service string, metadata model.ServicesMetadata) bool {
+func (s *ServiceMapper) shouldAdd(service string, metadata agent.ServicesMetadata) bool {
 	cacheEntry, ok := s.cache[service]
 
 	// No cache entry?
@@ -97,12 +97,12 @@ func (s *ServiceMapper) shouldAdd(service string, metadata model.ServicesMetadat
 	}
 
 	// Cache entry came from service API?
-	if _, ok = cacheEntry[model.ServiceApp]; ok {
+	if _, ok = cacheEntry[agent.ServiceApp]; ok {
 		return false
 	}
 
 	// New metadata value came from service API?
-	_, ok = metadata[service][model.ServiceApp]
+	_, ok = metadata[service][agent.ServiceApp]
 
 	return ok
 }

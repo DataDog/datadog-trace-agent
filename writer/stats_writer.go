@@ -5,9 +5,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
@@ -22,7 +22,7 @@ type StatsWriter struct {
 	exit   chan struct{}
 
 	// InStats is the stream of stat buckets to send out.
-	InStats <-chan []model.StatsBucket
+	InStats <-chan []agent.StatsBucket
 
 	// info contains various statistics about the writer, which are
 	// occasionally sent as metrics to Datadog.
@@ -40,7 +40,7 @@ type StatsWriter struct {
 }
 
 // NewStatsWriter returns a new writer for stats.
-func NewStatsWriter(conf *config.AgentConfig, InStats <-chan []model.StatsBucket) *StatsWriter {
+func NewStatsWriter(conf *config.AgentConfig, InStats <-chan []agent.StatsBucket) *StatsWriter {
 	cfg := conf.StatsWriterConfig
 	endpoints := NewEndpoints(conf, pathStats)
 	sender := newMultiSender(endpoints, cfg.SenderConfig)
@@ -96,7 +96,7 @@ func (w *StatsWriter) Stop() {
 	w.sender.Stop()
 }
 
-func (w *StatsWriter) handleStats(stats []model.StatsBucket) {
+func (w *StatsWriter) handleStats(stats []agent.StatsBucket) {
 	payloads, nbStatBuckets, nbEntries := w.buildPayloads(stats, w.conf.MaxEntriesPerPayload)
 	if len(payloads) == 0 {
 		return
@@ -119,7 +119,7 @@ func (w *StatsWriter) handleStats(stats []model.StatsBucket) {
 
 	for _, p := range payloads {
 		// synchronously send the payloads one after the other
-		data, err := model.EncodeStatsPayload(p)
+		data, err := agent.EncodeStatsPayload(p)
 		if err != nil {
 			log.Errorf("encoding issue: %v", err)
 			return
@@ -138,9 +138,9 @@ type timeWindow struct {
 
 // buildPayloads returns a set of payload to send out, each paylods guaranteed
 // to have the number of stats buckets under the given maximum.
-func (w *StatsWriter) buildPayloads(stats []model.StatsBucket, maxEntriesPerPayloads int) ([]*model.StatsPayload, int, int) {
+func (w *StatsWriter) buildPayloads(stats []agent.StatsBucket, maxEntriesPerPayloads int) ([]*agent.StatsPayload, int, int) {
 	if len(stats) == 0 {
-		return []*model.StatsPayload{}, 0, 0
+		return []*agent.StatsPayload{}, 0, 0
 	}
 
 	// 1. Get an estimate of how many payloads we need, based on the total
@@ -159,7 +159,7 @@ func (w *StatsWriter) buildPayloads(stats []model.StatsBucket, maxEntriesPerPayl
 
 	if maxEntriesPerPayloads <= 0 || nbEntries < maxEntriesPerPayloads {
 		// nothing to do, break early
-		return []*model.StatsPayload{&model.StatsPayload{
+		return []*agent.StatsPayload{&agent.StatsPayload{
 			HostName: w.hostName,
 			Env:      w.env,
 			Stats:    stats,
@@ -174,9 +174,9 @@ func (w *StatsWriter) buildPayloads(stats []model.StatsBucket, maxEntriesPerPayl
 	// 2. Create a slice of nbPayloads maps, mapping a time window (stat +
 	//    duration) to a stat bucket. We will build the payloads from these
 	//    maps. This allows is to have one stat bucket per time window.
-	pMaps := make([]map[timeWindow]model.StatsBucket, nbPayloads)
+	pMaps := make([]map[timeWindow]agent.StatsBucket, nbPayloads)
 	for i := 0; i < nbPayloads; i++ {
-		pMaps[i] = make(map[timeWindow]model.StatsBucket, nbPayloads)
+		pMaps[i] = make(map[timeWindow]agent.StatsBucket, nbPayloads)
 	}
 
 	// 3. Iterate over all entries of each stats. Add the entry to one of
@@ -192,7 +192,7 @@ func (w *StatsWriter) buildPayloads(stats []model.StatsBucket, maxEntriesPerPayl
 			pm := pMaps[i%nbPayloads]
 			newsb, ok := pm[tw]
 			if !ok {
-				newsb = model.NewStatsBucket(tw.start, tw.duration)
+				newsb = agent.NewStatsBucket(tw.start, tw.duration)
 			}
 			pm[tw] = newsb
 
@@ -223,14 +223,14 @@ func (w *StatsWriter) buildPayloads(stats []model.StatsBucket, maxEntriesPerPayl
 	// 4. Create the nbPayloads payloads from the maps.
 	nbStats := 0
 	nbEntries = 0
-	payloads := make([]*model.StatsPayload, 0, nbPayloads)
+	payloads := make([]*agent.StatsPayload, 0, nbPayloads)
 	for _, pm := range pMaps {
-		pstats := make([]model.StatsBucket, 0, len(pm))
+		pstats := make([]agent.StatsBucket, 0, len(pm))
 		for _, sb := range pm {
 			pstats = append(pstats, sb)
 			nbEntries += len(sb.Counts)
 		}
-		payloads = append(payloads, &model.StatsPayload{
+		payloads = append(payloads, &agent.StatsPayload{
 			HostName: w.hostName,
 			Env:      w.env,
 			Stats:    pstats,

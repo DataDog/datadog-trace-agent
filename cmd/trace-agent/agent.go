@@ -5,29 +5,28 @@ import (
 	"sync/atomic"
 	"time"
 
-	log "github.com/cihub/seelog"
-
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/api"
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/filters"
 	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/obfuscate"
 	"github.com/DataDog/datadog-trace-agent/osutil"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 	"github.com/DataDog/datadog-trace-agent/writer"
+	log "github.com/cihub/seelog"
 )
 
 const processStatsInterval = time.Minute
 
 type processedTrace struct {
-	Trace         model.Trace
-	WeightedTrace model.WeightedTrace
-	Root          *model.Span
+	Trace         agent.Trace
+	WeightedTrace agent.WeightedTrace
+	Root          *agent.Span
 	Env           string
-	Sublayers     map[*model.Span][]model.SublayerValue
+	Sublayers     map[*agent.Span][]agent.SublayerValue
 }
 
 func (pt *processedTrace) weight() float64 {
@@ -81,11 +80,11 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	dynConf := config.NewDynamicConfig()
 
 	// inter-component channels
-	rawTraceChan := make(chan model.Trace, 5000) // about 1000 traces/sec for 5 sec, TODO: move to *model.Trace
+	rawTraceChan := make(chan agent.Trace, 5000) // about 1000 traces/sec for 5 sec, TODO: move to *agent.Trace
 	sampledTraceChan := make(chan *writer.SampledTrace)
-	statsChan := make(chan []model.StatsBucket)
-	serviceChan := make(chan model.ServicesMetadata, 50)
-	filteredServiceChan := make(chan model.ServicesMetadata, 50)
+	statsChan := make(chan []agent.StatsBucket)
+	serviceChan := make(chan agent.ServicesMetadata, 50)
+	filteredServiceChan := make(chan agent.ServicesMetadata, 50)
 
 	// create components
 	r := api.NewHTTPReceiver(conf, dynConf, rawTraceChan, serviceChan)
@@ -177,7 +176,7 @@ func (a *Agent) Run() {
 
 // Process is the default work unit that receives a trace, transforms it and
 // passes it downstream.
-func (a *Agent) Process(t model.Trace) {
+func (a *Agent) Process(t agent.Trace) {
 	if len(t) == 0 {
 		log.Debugf("skipping received empty trace")
 		return
@@ -234,16 +233,16 @@ func (a *Agent) Process(t model.Trace) {
 	t.ComputeTopLevel()
 
 	subtraces := t.ExtractTopLevelSubtraces(root)
-	sublayers := make(map[*model.Span][]model.SublayerValue)
+	sublayers := make(map[*agent.Span][]agent.SublayerValue)
 	for _, subtrace := range subtraces {
-		subtraceSublayers := model.ComputeSublayers(subtrace.Trace)
+		subtraceSublayers := agent.ComputeSublayers(subtrace.Trace)
 		sublayers[subtrace.Root] = subtraceSublayers
-		model.SetSublayersOnSpan(subtrace.Root, subtraceSublayers)
+		agent.SetSublayersOnSpan(subtrace.Root, subtraceSublayers)
 	}
 
 	pt := processedTrace{
 		Trace:         t,
-		WeightedTrace: model.NewWeightedTrace(t, root),
+		WeightedTrace: agent.NewWeightedTrace(t, root),
 		Root:          root,
 		Env:           a.conf.DefaultEnv,
 		Sublayers:     sublayers,
@@ -341,7 +340,7 @@ func (a *Agent) watchdog() {
 	info.UpdatePreSampler(*preSamplerStats)
 }
 
-func traceContainsError(trace model.Trace) bool {
+func traceContainsError(trace agent.Trace) bool {
 	for _, span := range trace {
 		if span.Error != 0 {
 			return true

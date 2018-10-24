@@ -1,8 +1,8 @@
 package filters
 
 import (
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/model"
 )
 
 // Replacer is a filter which replaces tag values based on its
@@ -17,7 +17,7 @@ func NewReplacer(rules []*config.ReplaceRule) *Replacer {
 }
 
 // Replace replaces all tags matching the Replacer's rules.
-func (f Replacer) Replace(trace *model.Trace) {
+func (f Replacer) Replace(trace *agent.Trace) {
 	for _, rule := range f.rules {
 		key, str, re := rule.Name, rule.Repl, rule.Re
 		for _, s := range *trace {

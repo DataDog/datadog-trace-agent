@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/testutil"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
@@ -243,13 +243,13 @@ func TestTraceWriter(t *testing.T) {
 }
 
 func calculateTracePayloadSize(sampledTraces []*SampledTrace) int64 {
-	apiTraces := make([]*model.APITrace, len(sampledTraces))
+	apiTraces := make([]*agent.APITrace, len(sampledTraces))
 
 	for i, trace := range sampledTraces {
 		apiTraces[i] = trace.Trace.APITrace()
 	}
 
-	tracePayload := model.TracePayload{
+	tracePayload := agent.TracePayload{
 		HostName: testHostName,
 		Env:      testEnv,
 		Traces:   apiTraces,
@@ -277,8 +277,8 @@ func calculateTracePayloadSize(sampledTraces []*SampledTrace) int64 {
 func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expectedHeaders map[string]string,
 	sampledTraces []*SampledTrace, payloads []*Payload) {
 
-	var expectedTraces []*model.Trace
-	var expectedTransactions []*model.Span
+	var expectedTraces []*agent.Trace
+	var expectedTransactions []*agent.Span
 
 	for _, sampledTrace := range sampledTraces {
 		expectedTraces = append(expectedTraces, sampledTrace.Trace)
@@ -291,7 +291,7 @@ func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expecte
 	for _, payload := range payloads {
 		assert.Equal(expectedHeaders, payload.Headers, "Payload headers should match expectation")
 
-		var tracePayload model.TracePayload
+		var tracePayload agent.TracePayload
 		payloadBuffer := bytes.NewBuffer(payload.Bytes)
 		gz, err := gzip.NewReader(payloadBuffer)
 		assert.NoError(err, "Gzip reader should work correctly")

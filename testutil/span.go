@@ -8,7 +8,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 )
 
 // YearNS is the number of nanoseconds in a year
@@ -246,8 +246,8 @@ func RandomSpanType() string {
 }
 
 // RandomSpan generates a wide-variety of spans, useful to test robustness & performance
-func RandomSpan() *model.Span {
-	return &model.Span{
+func RandomSpan() *agent.Span {
+	return &agent.Span{
 		Duration: RandomSpanDuration(),
 		Error:    RandomSpanError(),
 		Resource: RandomSpanResource(),
@@ -264,9 +264,9 @@ func RandomSpan() *model.Span {
 }
 
 // RandomWeightedSpan generates a random weighted span, useful for stats tests
-func RandomWeightedSpan() *model.WeightedSpan {
+func RandomWeightedSpan() *agent.WeightedSpan {
 	s := RandomSpan()
-	return &model.WeightedSpan{
+	return &agent.WeightedSpan{
 		Span:     s,
 		Weight:   1,
 		TopLevel: true,
@@ -274,8 +274,8 @@ func RandomWeightedSpan() *model.WeightedSpan {
 }
 
 // GetTestSpan returns a Span with different fields set
-func GetTestSpan() *model.Span {
-	span := &model.Span{
+func GetTestSpan() *agent.Span {
+	span := &agent.Span{
 		TraceID:  42,
 		SpanID:   52,
 		ParentID: 42,
@@ -288,14 +288,14 @@ func GetTestSpan() *model.Span {
 		Meta:     map[string]string{"http.host": "192.168.0.1"},
 		Metrics:  map[string]float64{"http.monitor": 41.99},
 	}
-	trace := model.Trace{span}
+	trace := agent.Trace{span}
 	trace.ComputeTopLevel()
 	return trace[0]
 }
 
 // TestSpan returns a fix span with hardcoded info, useful for reproducible tests
-func TestSpan() *model.Span {
-	return &model.Span{
+func TestSpan() *agent.Span {
+	return &agent.Span{
 		Duration: 10000000,
 		Error:    0,
 		Resource: "GET /some/raclette",
@@ -317,9 +317,9 @@ func TestSpan() *model.Span {
 }
 
 // TestWeightedSpan returns a static test weighted span for reproductive stats tests
-func TestWeightedSpan() *model.WeightedSpan {
+func TestWeightedSpan() *agent.WeightedSpan {
 	s := TestSpan()
-	return &model.WeightedSpan{
+	return &agent.WeightedSpan{
 		Span:     s,
 		Weight:   1,
 		TopLevel: true,

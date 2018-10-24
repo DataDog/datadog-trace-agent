@@ -1,15 +1,15 @@
 package main
 
 import (
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 )
 
 // TransactionSampler filters and samples interesting spans in a trace based on implementation specific criteria.
 type TransactionSampler interface {
 	// Extract extracts matching spans from the given trace and returns them.
-	Extract(t processedTrace) []*model.Span
+	Extract(t processedTrace) []*agent.Span
 }
 
 // NewTransactionSampler creates a new empty transaction sampler
@@ -25,7 +25,7 @@ func NewTransactionSampler(conf *config.AgentConfig) TransactionSampler {
 
 type disabledTransactionSampler struct{}
 
-func (s *disabledTransactionSampler) Extract(t processedTrace) []*model.Span {
+func (s *disabledTransactionSampler) Extract(t processedTrace) []*agent.Span {
 	return nil
 }
 
@@ -40,8 +40,8 @@ func newTransactionSampler(analyzedSpansByService map[string]map[string]float64)
 }
 
 // Extract extracts analyzed spans and returns them as a slice
-func (s *transactionSampler) Extract(t processedTrace) []*model.Span {
-	var transactions []*model.Span
+func (s *transactionSampler) Extract(t processedTrace) []*agent.Span {
+	var transactions []*agent.Span
 
 	// Get the trace priority
 	priority, hasPriority := t.getSamplingPriority()
@@ -55,7 +55,7 @@ func (s *transactionSampler) Extract(t processedTrace) []*model.Span {
 	return transactions
 }
 
-func (s *transactionSampler) shouldAnalyze(span *model.WeightedSpan, hasPriority bool, priority int) bool {
+func (s *transactionSampler) shouldAnalyze(span *agent.WeightedSpan, hasPriority bool, priority int) bool {
 	if operations, ok := s.analyzedSpansByService[span.Service]; ok {
 		if analyzeRate, ok := operations[span.Name]; ok {
 			// If the trace has been manually sampled, we keep all matching spans
@@ -79,8 +79,8 @@ func newLegacyTransactionSampler(analyzedRateByService map[string]float64) *lega
 }
 
 // Extract extracts analyzed spans and returns them as a slice
-func (s *legacyTransactionSampler) Extract(t processedTrace) []*model.Span {
-	var transactions []*model.Span
+func (s *legacyTransactionSampler) Extract(t processedTrace) []*agent.Span {
+	var transactions []*agent.Span
 
 	// inspect the WeightedTrace so that we can identify top-level spans
 	for _, span := range t.WeightedTrace {
@@ -94,7 +94,7 @@ func (s *legacyTransactionSampler) Extract(t processedTrace) []*model.Span {
 
 // shouldAnalyze tells if a span should be considered as analyzed
 // Only top-level spans are eligible to be analyzed
-func (s *legacyTransactionSampler) shouldAnalyze(span *model.WeightedSpan) bool {
+func (s *legacyTransactionSampler) shouldAnalyze(span *agent.WeightedSpan) bool {
 	if !span.TopLevel {
 		return false
 	}

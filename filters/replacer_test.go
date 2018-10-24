@@ -4,8 +4,8 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -57,7 +57,7 @@ func TestReplacer(t *testing.T) {
 		tr := NewReplacer(rules)
 		root := replaceFilterTestSpan(tt.got)
 		childSpan := replaceFilterTestSpan(tt.got)
-		trace := model.Trace{root, childSpan}
+		trace := agent.Trace{root, childSpan}
 		tr.Replace(&trace)
 		for k, v := range tt.want {
 			switch k {
@@ -89,8 +89,8 @@ func parseRulesFromString(rules [][3]string) []*config.ReplaceRule {
 
 // replaceFilterTestSpan creates a span from a list of tags and uses
 // special tag names (e.g. resource.name) to target attributes.
-func replaceFilterTestSpan(tags map[string]string) *model.Span {
-	span := &model.Span{Meta: make(map[string]string)}
+func replaceFilterTestSpan(tags map[string]string) *agent.Span {
+	span := &agent.Span{Meta: make(map[string]string)}
 	for k, v := range tags {
 		switch k {
 		case "resource.name":
@@ -107,7 +107,7 @@ func replaceFilterTestSpan(tags map[string]string) *model.Span {
 func TestReplaceFilterTestSpan(t *testing.T) {
 	for _, tt := range []struct {
 		tags map[string]string
-		want *model.Span
+		want *agent.Span
 	}{
 		{
 			tags: map[string]string{
@@ -115,7 +115,7 @@ func TestReplaceFilterTestSpan(t *testing.T) {
 				"http.url":      "url",
 				"custom.tag":    "val",
 			},
-			want: &model.Span{
+			want: &agent.Span{
 				Resource: "a",
 				Meta: map[string]string{
 					"http.url":   "url",

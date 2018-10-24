@@ -3,13 +3,13 @@ package testutil
 import (
 	"math/rand"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 )
 
 // genNextLevel generates a new level for the trace tree structure,
 // having maxSpans as the max number of spans for this level
-func genNextLevel(prevLevel []*model.Span, maxSpans int) []*model.Span {
-	var spans []*model.Span
+func genNextLevel(prevLevel []*agent.Span, maxSpans int) []*agent.Span {
+	var spans []*agent.Span
 	numSpans := rand.Intn(maxSpans) + 1
 
 	// the spans have to be "nested" in the previous level
@@ -39,7 +39,7 @@ func genNextLevel(prevLevel []*model.Span, maxSpans int) []*model.Span {
 		timeLeft := prev.Duration
 
 		// create the spans
-		curSpans := make([]*model.Span, 0, childSpans)
+		curSpans := make([]*agent.Span, 0, childSpans)
 		for j := 0; j < childSpans && timeLeft > 0; j++ {
 			news := RandomSpan()
 			news.TraceID = prev.TraceID
@@ -65,8 +65,8 @@ func genNextLevel(prevLevel []*model.Span, maxSpans int) []*model.Span {
 
 // RandomTrace generates a random trace with a depth from 1 to
 // maxLevels of spans. Each level has at most maxSpans items.
-func RandomTrace(maxLevels, maxSpans int) model.Trace {
-	t := model.Trace{RandomSpan()}
+func RandomTrace(maxLevels, maxSpans int) agent.Trace {
+	t := agent.Trace{RandomSpan()}
 
 	prevLevel := t
 	maxDepth := 1 + rand.Intn(maxLevels)
@@ -83,8 +83,8 @@ func RandomTrace(maxLevels, maxSpans int) model.Trace {
 
 // GetTestTrace returns a []Trace that is composed by ``traceN`` number
 // of traces, each one composed by ``size`` number of spans.
-func GetTestTrace(traceN, size int, realisticIDs bool) model.Traces {
-	traces := model.Traces{}
+func GetTestTrace(traceN, size int, realisticIDs bool) agent.Traces {
+	traces := agent.Traces{}
 
 	r := rand.New(rand.NewSource(42))
 
@@ -94,7 +94,7 @@ func GetTestTrace(traceN, size int, realisticIDs bool) model.Traces {
 		// sampling algorithms work in a realistic way.
 		traceID := r.Uint64()
 
-		trace := model.Trace{}
+		trace := agent.Trace{}
 		for j := 0; j < size; j++ {
 			span := GetTestSpan()
 			if realisticIDs {

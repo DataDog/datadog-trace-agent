@@ -10,14 +10,13 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/cihub/seelog"
-
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/obfuscate"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/testutil"
+	log "github.com/cihub/seelog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -91,8 +90,8 @@ func TestFormatTrace(t *testing.T) {
 	resource := "SELECT name FROM people WHERE age = 42"
 	rep := strings.Repeat(" AND age = 42", 5000)
 	resource = resource + rep
-	testTrace := model.Trace{
-		&model.Span{
+	testTrace := agent.Trace{
+		&agent.Span{
 			Resource: resource,
 			Type:     "sql",
 		},
@@ -125,17 +124,17 @@ func TestProcess(t *testing.T) {
 			Repl: "...",
 		}}
 		ctx, cancel := context.WithCancel(context.Background())
-		agent := NewAgent(ctx, cfg)
+		p := NewAgent(ctx, cfg)
 		defer cancel()
 
 		now := time.Now()
-		span := &model.Span{
+		span := &agent.Span{
 			Resource: "SELECT name FROM people WHERE age = 42 AND extra = 55",
 			Type:     "sql",
 			Start:    now.Add(-time.Second).UnixNano(),
 			Duration: (500 * time.Millisecond).Nanoseconds(),
 		}
-		agent.Process(model.Trace{span})
+		p.Process(agent.Trace{span})
 
 		assert := assert.New(t)
 		assert.Equal("SELECT name FROM people WHERE age = ? ...", span.Resource)
@@ -147,31 +146,31 @@ func TestProcess(t *testing.T) {
 		cfg.Endpoints[0].APIKey = "test"
 		cfg.Ignore["resource"] = []string{"^INSERT.*"}
 		ctx, cancel := context.WithCancel(context.Background())
-		agent := NewAgent(ctx, cfg)
+		p := NewAgent(ctx, cfg)
 		defer cancel()
 
 		now := time.Now()
-		spanValid := &model.Span{
+		spanValid := &agent.Span{
 			Resource: "SELECT name FROM people WHERE age = 42 AND extra = 55",
 			Type:     "sql",
 			Start:    now.Add(-time.Second).UnixNano(),
 			Duration: (500 * time.Millisecond).Nanoseconds(),
 		}
-		spanInvalid := &model.Span{
+		spanInvalid := &agent.Span{
 			Resource: "INSERT INTO db VALUES (1, 2, 3)",
 			Type:     "sql",
 			Start:    now.Add(-time.Second).UnixNano(),
 			Duration: (500 * time.Millisecond).Nanoseconds(),
 		}
 
-		stats := agent.Receiver.Stats.GetTagStats(info.Tags{})
+		stats := p.Receiver.Stats.GetTagStats(info.Tags{})
 		assert := assert.New(t)
 
-		agent.Process(model.Trace{spanValid})
+		p.Process(agent.Trace{spanValid})
 		assert.EqualValues(0, stats.TracesFiltered)
 		assert.EqualValues(0, stats.SpansFiltered)
 
-		agent.Process(model.Trace{spanInvalid, spanInvalid})
+		p.Process(agent.Trace{spanInvalid, spanInvalid})
 		assert.EqualValues(1, stats.TracesFiltered)
 		assert.EqualValues(2, stats.SpansFiltered)
 	})
@@ -180,7 +179,7 @@ func TestProcess(t *testing.T) {
 		cfg := config.New()
 		cfg.Endpoints[0].APIKey = "test"
 		ctx, cancel := context.WithCancel(context.Background())
-		agent := NewAgent(ctx, cfg)
+		p := NewAgent(ctx, cfg)
 		defer cancel()
 
 		now := time.Now()
@@ -188,7 +187,7 @@ func TestProcess(t *testing.T) {
 		for _, key := range []float64{
 			disabled, -1, -1, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2,
 		} {
-			span := &model.Span{
+			span := &agent.Span{
 				Resource: "SELECT name FROM people WHERE age = 42 AND extra = 55",
 				Type:     "sql",
 				Start:    now.Add(-time.Second).UnixNano(),
@@ -198,10 +197,10 @@ func TestProcess(t *testing.T) {
 			if key != disabled {
 				span.Metrics[sampler.SamplingPriorityKey] = key
 			}
-			agent.Process(model.Trace{span})
+			p.Process(agent.Trace{span})
 		}
 
-		stats := agent.Receiver.Stats.GetTagStats(info.Tags{})
+		stats := p.Receiver.Stats.GetTagStats(info.Tags{})
 		assert.EqualValues(t, 1, stats.TracesPriorityNone)
 		assert.EqualValues(t, 2, stats.TracesPriorityNeg)
 		assert.EqualValues(t, 3, stats.TracesPriority0)
@@ -263,7 +262,7 @@ func BenchmarkWatchdog(b *testing.B) {
 }
 
 // Mimicks behaviour of agent Process function
-func formatTrace(t model.Trace) model.Trace {
+func formatTrace(t agent.Trace) agent.Trace {
 	for _, span := range t {
 		obfuscate.NewObfuscator(nil).Obfuscate(span)
 		span.Truncate()

@@ -7,9 +7,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
@@ -21,8 +21,8 @@ const pathTraces = "/api/v0.2/traces"
 
 // SampledTrace represents the result of a trace sample operation.
 type SampledTrace struct {
-	Trace        *model.Trace
-	Transactions []*model.Span
+	Trace        *agent.Trace
+	Transactions []*agent.Span
 }
 
 // Empty returns true if this SampledTrace has no data.
@@ -38,8 +38,8 @@ type TraceWriter struct {
 	conf     writerconfig.TraceWriterConfig
 	in       <-chan *SampledTrace
 
-	traces        []*model.APITrace
-	transactions  []*model.Span
+	traces        []*agent.APITrace
+	transactions  []*agent.Span
 	spansInBuffer int
 
 	sender PayloadSender
@@ -58,8 +58,8 @@ func NewTraceWriter(conf *config.AgentConfig, in <-chan *SampledTrace) *TraceWri
 		hostName: conf.Hostname,
 		env:      conf.DefaultEnv,
 
-		traces:       []*model.APITrace{},
-		transactions: []*model.Span{},
+		traces:       []*agent.APITrace{},
+		transactions: []*agent.Span{},
 
 		in: in,
 
@@ -176,7 +176,7 @@ func (w *TraceWriter) handleSampledTrace(sampledTrace *SampledTrace) {
 	}
 }
 
-func (w *TraceWriter) appendTrace(trace *model.Trace) {
+func (w *TraceWriter) appendTrace(trace *agent.Trace) {
 	if trace == nil || len(*trace) == 0 {
 		return
 	}
@@ -187,7 +187,7 @@ func (w *TraceWriter) appendTrace(trace *model.Trace) {
 	w.spansInBuffer += len(*trace)
 }
 
-func (w *TraceWriter) appendTransactions(transactions []*model.Span) {
+func (w *TraceWriter) appendTransactions(transactions []*agent.Span) {
 	for _, transaction := range transactions {
 		log.Tracef("Handling new transaction: %v", transaction)
 		w.transactions = append(w.transactions, transaction)
@@ -214,7 +214,7 @@ func (w *TraceWriter) flush() {
 	atomic.AddInt64(&w.stats.Transactions, int64(numTransactions))
 	atomic.AddInt64(&w.stats.Spans, int64(w.spansInBuffer))
 
-	tracePayload := model.TracePayload{
+	tracePayload := agent.TracePayload{
 		HostName:     w.hostName,
 		Env:          w.env,
 		Traces:       w.traces,

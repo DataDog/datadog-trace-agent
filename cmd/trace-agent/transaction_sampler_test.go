@@ -4,17 +4,17 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/stretchr/testify/assert"
 )
 
 func createTrace(serviceName string, operationName string, topLevel bool, hasPriority bool, priority int) processedTrace {
-	ws := model.WeightedSpan{TopLevel: topLevel, Span: &model.Span{Service: serviceName, Name: operationName}}
+	ws := agent.WeightedSpan{TopLevel: topLevel, Span: &agent.Span{Service: serviceName, Name: operationName}}
 	if hasPriority {
 		ws.SetMetric(sampler.SamplingPriorityKey, float64(priority))
 	}
-	wt := model.WeightedTrace{&ws}
+	wt := agent.WeightedTrace{&ws}
 	return processedTrace{WeightedTrace: wt, Root: ws.Span}
 }
 

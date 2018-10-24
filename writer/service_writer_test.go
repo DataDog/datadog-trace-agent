@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/testutil"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
@@ -167,8 +167,8 @@ func TestServiceWriter_UpdateInfoHandling(t *testing.T) {
 	assert.Equal(expectedNumErrors, errorsSummary.Sum)
 }
 
-func mergeMetadataInOrder(metadatas ...model.ServicesMetadata) model.ServicesMetadata {
-	result := model.ServicesMetadata{}
+func mergeMetadataInOrder(metadatas ...agent.ServicesMetadata) agent.ServicesMetadata {
+	result := agent.ServicesMetadata{}
 
 	for _, metadata := range metadatas {
 		for serviceName, serviceMetadata := range metadata {
@@ -179,14 +179,14 @@ func mergeMetadataInOrder(metadatas ...model.ServicesMetadata) model.ServicesMet
 	return result
 }
 
-func calculateMetadataPayloadSize(metadata model.ServicesMetadata) int64 {
-	data, _ := model.EncodeServicesPayload(metadata)
+func calculateMetadataPayloadSize(metadata agent.ServicesMetadata) int64 {
+	data, _ := agent.EncodeServicesPayload(metadata)
 	return int64(len(data))
 }
 
 func assertMetadata(assert *assert.Assertions, expectedHeaders map[string]string,
-	expectedMetadata model.ServicesMetadata, payload *Payload) {
-	servicesMetadata := model.ServicesMetadata{}
+	expectedMetadata agent.ServicesMetadata, payload *Payload) {
+	servicesMetadata := agent.ServicesMetadata{}
 
 	assert.NoError(json.Unmarshal(payload.Bytes, &servicesMetadata), "Stats payload should unmarshal correctly")
 
@@ -194,8 +194,8 @@ func assertMetadata(assert *assert.Assertions, expectedHeaders map[string]string
 	assert.Equal(expectedMetadata, servicesMetadata, "Service metadata should match expectation")
 }
 
-func testServiceWriter() (*ServiceWriter, chan model.ServicesMetadata, *testEndpoint, *testutil.TestStatsClient) {
-	serviceChannel := make(chan model.ServicesMetadata)
+func testServiceWriter() (*ServiceWriter, chan agent.ServicesMetadata, *testEndpoint, *testutil.TestStatsClient) {
+	serviceChannel := make(chan agent.ServicesMetadata)
 	conf := &config.AgentConfig{
 		ServiceWriterConfig: writerconfig.DefaultServiceWriterConfig(),
 	}
