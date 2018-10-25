@@ -33,7 +33,7 @@ func TestTraceWriter(t *testing.T) {
 		traceWriter.Start()
 
 		// Send a few sampled traces through the writer
-		sampledTraces := []*SampledTrace{
+		sampledTraces := []*TracePackage{
 			// These 2 should be grouped together in a single payload
 			randomSampledTrace(1, 1),
 			randomSampledTrace(1, 1),
@@ -91,7 +91,7 @@ func TestTraceWriter(t *testing.T) {
 			"Content-Encoding":             "gzip",
 		}
 		assert.Len(receivedPayloads, 1, "We expected 1 payload")
-		assertPayloads(assert, traceWriter, expectedHeaders, []*SampledTrace{testSampledTrace},
+		assertPayloads(assert, traceWriter, expectedHeaders, []*TracePackage{testSampledTrace},
 			testEndpoint.SuccessPayloads())
 
 		// Wrap up
@@ -122,7 +122,7 @@ func TestTraceWriter(t *testing.T) {
 		)
 
 		// Send a bunch of sampled traces that should go together in a single payload
-		payload1SampledTraces := []*SampledTrace{
+		payload1SampledTraces := []*TracePackage{
 			randomSampledTrace(2, 0),
 			randomSampledTrace(2, 0),
 			randomSampledTrace(2, 0),
@@ -137,7 +137,7 @@ func TestTraceWriter(t *testing.T) {
 		}
 
 		// Send a single trace that goes over the span limit
-		payload2SampledTraces := []*SampledTrace{
+		payload2SampledTraces := []*TracePackage{
 			randomSampledTrace(20, 0),
 		}
 		expectedNumPayloads++
@@ -155,7 +155,7 @@ func TestTraceWriter(t *testing.T) {
 
 		// Send a third payload with other 3 traces with an errored out endpoint
 		testEndpoint.SetError(fmt.Errorf("non retriable error"))
-		payload3SampledTraces := []*SampledTrace{
+		payload3SampledTraces := []*TracePackage{
 			randomSampledTrace(2, 0),
 			randomSampledTrace(2, 0),
 			randomSampledTrace(2, 0),
@@ -178,7 +178,7 @@ func TestTraceWriter(t *testing.T) {
 			err:      fmt.Errorf("non retriable error"),
 			endpoint: testEndpoint,
 		})
-		payload4SampledTraces := []*SampledTrace{
+		payload4SampledTraces := []*TracePackage{
 			randomSampledTrace(2, 0),
 			randomSampledTrace(2, 0),
 			randomSampledTrace(2, 0),
@@ -242,7 +242,7 @@ func TestTraceWriter(t *testing.T) {
 	})
 }
 
-func calculateTracePayloadSize(sampledTraces []*SampledTrace) int64 {
+func calculateTracePayloadSize(sampledTraces []*TracePackage) int64 {
 	apiTraces := make([]*model.APITrace, len(sampledTraces))
 
 	for i, trace := range sampledTraces {
@@ -275,18 +275,21 @@ func calculateTracePayloadSize(sampledTraces []*SampledTrace) int64 {
 }
 
 func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expectedHeaders map[string]string,
-	sampledTraces []*SampledTrace, payloads []*payload) {
+	sampledTraces []*TracePackage, payloads []*payload) {
 
 	var expectedTraces []*model.Trace
-	var expectedTransactions []*model.Span
+	var expectedEvents []*model.APMEvent
 
 	for _, sampledTrace := range sampledTraces {
 		expectedTraces = append(expectedTraces, sampledTrace.Trace)
-		expectedTransactions = append(expectedTransactions, sampledTrace.Transactions...)
+
+		for _, event := range sampledTrace.Events {
+			expectedEvents = append(expectedEvents, event)
+		}
 	}
 
 	var expectedTraceIdx int
-	var expectedTransactionIdx int
+	var expectedEventIdx int
 
 	for _, payload := range payloads {
 		assert.Equal(expectedHeaders, payload.headers, "Payload headers should match expectation")
@@ -320,12 +323,12 @@ func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expecte
 		for _, seenTransaction := range tracePayload.Transactions {
 			numSpans++
 
-			if !assert.True(proto.Equal(expectedTransactions[expectedTransactionIdx], seenTransaction),
+			if !assert.True(proto.Equal(expectedEvents[expectedEventIdx].Span, seenTransaction),
 				"Unmarshalled transaction should match expectation at index %d", expectedTraceIdx) {
 				return
 			}
 
-			expectedTransactionIdx++
+			expectedEventIdx++
 		}
 
 		// If there's more than 1 trace or transaction in this payload, don't let it go over the limit. Otherwise,
@@ -336,8 +339,8 @@ func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expecte
 	}
 }
 
-func testTraceWriter() (*TraceWriter, chan *SampledTrace, *testEndpoint, *testutil.TestStatsClient) {
-	payloadChannel := make(chan *SampledTrace)
+func testTraceWriter() (*TraceWriter, chan *TracePackage, *testEndpoint, *testutil.TestStatsClient) {
+	payloadChannel := make(chan *TracePackage)
 	conf := &config.AgentConfig{
 		Hostname:          testHostName,
 		DefaultEnv:        testEnv,
@@ -352,15 +355,21 @@ func testTraceWriter() (*TraceWriter, chan *SampledTrace, *testEndpoint, *testut
 	return traceWriter, payloadChannel, testEndpoint, testStatsClient
 }
 
-func randomSampledTrace(numSpans, numTransactions int) *SampledTrace {
-	if numSpans < numTransactions {
-		panic("can't have more transactions than spans in a RandomSampledTrace")
+func randomSampledTrace(numSpans, numEvents int) *TracePackage {
+	if numSpans < numEvents {
+		panic("can't have more events than spans in a RandomSampledTrace")
 	}
 
 	trace := testutil.GetTestTrace(1, numSpans, true)[0]
 
-	return &SampledTrace{
-		Trace:        &trace,
-		Transactions: trace[:numTransactions],
+	events := make([]*model.APMEvent, 0, numEvents)
+
+	for _, span := range trace[:numEvents] {
+		events = append(events, &model.APMEvent{Span: span})
+	}
+
+	return &TracePackage{
+		Trace:  &trace,
+		Events: events,
 	}
 }

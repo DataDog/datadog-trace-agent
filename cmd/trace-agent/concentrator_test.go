@@ -62,7 +62,7 @@ func TestConcentratorOldestTs(t *testing.T) {
 	trace.ComputeTopLevel()
 	wt := model.NewWeightedTrace(trace, trace.GetRoot())
 
-	testTrace := processedTrace{
+	testTrace := model.ProcessedTrace{
 		Env:           "none",
 		Trace:         trace,
 		WeightedTrace: wt,
@@ -173,7 +173,7 @@ func TestConcentratorStatsTotals(t *testing.T) {
 	trace.ComputeTopLevel()
 	wt := model.NewWeightedTrace(trace, trace.GetRoot())
 
-	testTrace := processedTrace{
+	testTrace := model.ProcessedTrace{
 		Env:           "none",
 		Trace:         trace,
 		WeightedTrace: wt,
@@ -279,7 +279,7 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	trace.ComputeTopLevel()
 	wt := model.NewWeightedTrace(trace, trace.GetRoot())
 
-	testTrace := processedTrace{
+	testTrace := model.ProcessedTrace{
 		Env:           "none",
 		Trace:         trace,
 		WeightedTrace: wt,
@@ -358,7 +358,7 @@ func TestConcentratorSublayersStatsCounts(t *testing.T) {
 		sublayers[subtrace.Root] = subtraceSublayers
 	}
 
-	testTrace := processedTrace{
+	testTrace := model.ProcessedTrace{
 		Env:           "none",
 		Trace:         trace,
 		WeightedTrace: wt,

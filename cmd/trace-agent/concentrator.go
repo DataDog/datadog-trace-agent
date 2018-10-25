@@ -103,11 +103,11 @@ func (c *Concentrator) Stop() {
 }
 
 // Add appends to the proper stats bucket this trace's statistics
-func (c *Concentrator) Add(t processedTrace) {
+func (c *Concentrator) Add(t model.ProcessedTrace) {
 	c.addNow(t, model.Now())
 }
 
-func (c *Concentrator) addNow(t processedTrace, now int64) {
+func (c *Concentrator) addNow(t model.ProcessedTrace, now int64) {
 	c.mu.Lock()
 
 	for _, s := range t.WeightedTrace {

@@ -6,11 +6,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	log "github.com/cihub/seelog"
+
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
+	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
-	log "github.com/cihub/seelog"
 )
 
 // Sampler chooses wich spans to write to the API
@@ -62,7 +64,7 @@ func (s *Sampler) Run() {
 }
 
 // Add samples a trace and returns true if trace was sampled (should be kept), false otherwise
-func (s *Sampler) Add(t processedTrace) (sampled bool, rate float64) {
+func (s *Sampler) Add(t model.ProcessedTrace) (sampled bool, rate float64) {
 	atomic.AddUint64(&s.totalTraceCount, 1)
 	sampled, rate = s.engine.Sample(t.Trace, t.Root, t.Env)
 	if sampled {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/DataDog/datadog-trace-agent/api"
 	"github.com/DataDog/datadog-trace-agent/config"
+	"github.com/DataDog/datadog-trace-agent/event"
 	"github.com/DataDog/datadog-trace-agent/filters"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
@@ -22,29 +23,6 @@ import (
 
 const processStatsInterval = time.Minute
 
-type processedTrace struct {
-	Trace         model.Trace
-	WeightedTrace model.WeightedTrace
-	Root          *model.Span
-	Env           string
-	Sublayers     map[*model.Span][]model.SublayerValue
-}
-
-func (pt *processedTrace) weight() float64 {
-	if pt.Root == nil {
-		return 1.0
-	}
-	return pt.Root.Weight()
-}
-
-func (pt *processedTrace) getSamplingPriority() (int, bool) {
-	if pt.Root == nil {
-		return 0, false
-	}
-	p, ok := pt.Root.Metrics[sampler.SamplingPriorityKey]
-	return int(p), ok
-}
-
 // Agent struct holds all the sub-routines structs and make the data flow between them
 type Agent struct {
 	Receiver           *api.HTTPReceiver
@@ -54,7 +32,7 @@ type Agent struct {
 	ScoreSampler       *Sampler
 	ErrorsScoreSampler *Sampler
 	PrioritySampler    *Sampler
-	TransactionSampler TransactionSampler
+	EventExtractor     event.Extractor
 	TraceWriter        *writer.TraceWriter
 	ServiceWriter      *writer.ServiceWriter
 	StatsWriter        *writer.StatsWriter
@@ -65,7 +43,7 @@ type Agent struct {
 	// tags based on their type.
 	obfuscator *obfuscate.Obfuscator
 
-	sampledTraceChan chan *writer.SampledTrace
+	tracePkgChan chan *writer.TracePackage
 
 	// config
 	conf    *config.AgentConfig
@@ -82,7 +60,7 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 
 	// inter-component channels
 	rawTraceChan := make(chan model.Trace, 5000) // about 1000 traces/sec for 5 sec, TODO: move to *model.Trace
-	sampledTraceChan := make(chan *writer.SampledTrace)
+	tracePkgChan := make(chan *writer.TracePackage)
 	statsChan := make(chan []model.StatsBucket)
 	serviceChan := make(chan model.ServicesMetadata, 50)
 	filteredServiceChan := make(chan model.ServicesMetadata, 50)
@@ -99,10 +77,10 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	ss := NewScoreSampler(conf)
 	ess := NewErrorsSampler(conf)
 	ps := NewPrioritySampler(conf, dynConf)
-	ts := NewTransactionSampler(conf)
+	ee := eventExtractorFromConf(conf)
 	se := NewTraceServiceExtractor(serviceChan)
 	sm := NewServiceMapper(serviceChan, filteredServiceChan)
-	tw := writer.NewTraceWriter(conf, sampledTraceChan)
+	tw := writer.NewTraceWriter(conf, tracePkgChan)
 	sw := writer.NewStatsWriter(conf, statsChan)
 	svcW := writer.NewServiceWriter(conf, filteredServiceChan)
 
@@ -114,14 +92,14 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 		ScoreSampler:       ss,
 		ErrorsScoreSampler: ess,
 		PrioritySampler:    ps,
-		TransactionSampler: ts,
+		EventExtractor:     ee,
 		TraceWriter:        tw,
 		StatsWriter:        sw,
 		ServiceWriter:      svcW,
 		ServiceExtractor:   se,
 		ServiceMapper:      sm,
 		obfuscator:         obf,
-		sampledTraceChan:   sampledTraceChan,
+		tracePkgChan:       tracePkgChan,
 		conf:               conf,
 		dynConf:            dynConf,
 		ctx:                ctx,
@@ -191,7 +169,7 @@ func (a *Agent) Process(t model.Trace) {
 	ts := a.Receiver.Stats.GetTagStats(info.Tags{})
 
 	// Extract priority early, as later goroutines might manipulate the Metrics map in parallel which isn't safe.
-	priority, hasPriority := root.Metrics[sampler.SamplingPriorityKey]
+	priority, hasPriority := root.GetSamplingPriority()
 
 	// Depending on the sampling priority, count that trace differently.
 	stat := &ts.TracesPriorityNone
@@ -241,7 +219,7 @@ func (a *Agent) Process(t model.Trace) {
 		model.SetSublayersOnSpan(subtrace.Root, subtraceSublayers)
 	}
 
-	pt := processedTrace{
+	pt := model.ProcessedTrace{
 		Trace:         t,
 		WeightedTrace: model.NewWeightedTrace(t, root),
 		Root:          root,
@@ -258,38 +236,44 @@ func (a *Agent) Process(t model.Trace) {
 		a.ServiceExtractor.Process(pt.WeightedTrace)
 	}()
 
-	go func() {
+	go func(pt model.ProcessedTrace) {
 		defer watchdog.LogOnPanic()
 		// Everything is sent to concentrator for stats, regardless of sampling.
 		a.Concentrator.Add(pt)
-	}()
+	}(pt)
 
 	// Don't go through sampling for < 0 priority traces
 	if priority < 0 {
 		return
 	}
 	// Run both full trace sampling and transaction extraction in another goroutine.
-	go func() {
+	go func(pt model.ProcessedTrace) {
 		defer watchdog.LogOnPanic()
 
-		sampled, rate := a.sample(pt)
-		if !sampled {
-			return
-		}
-		sampler.AddSampleRate(pt.Root, rate)
+		tracePkg := writer.TracePackage{}
 
-		a.sampledTraceChan <- &writer.SampledTrace{
-			Trace:        &pt.Trace,
-			Transactions: a.TransactionSampler.Extract(pt),
+		sampled, rate := a.sample(pt)
+
+		if sampled {
+			pt.Sampled = sampled
+			sampler.AddSampleRate(pt.Root, rate)
+			tracePkg.Trace = &pt.Trace
 		}
-	}()
+
+		// NOTE: Events can be extracted from non-sampled traces.
+		tracePkg.Events = a.EventExtractor.Extract(pt)
+
+		if !tracePkg.Empty() {
+			a.tracePkgChan <- &tracePkg
+		}
+	}(pt)
 }
 
-func (a *Agent) sample(pt processedTrace) (sampled bool, rate float64) {
+func (a *Agent) sample(pt model.ProcessedTrace) (sampled bool, rate float64) {
 	var sampledPriority, sampledScore bool
 	var ratePriority, rateScore float64
 
-	if _, ok := pt.Root.Metrics[sampler.SamplingPriorityKey]; ok {
+	if _, ok := pt.GetSamplingPriority(); ok {
 		sampledPriority, ratePriority = a.PrioritySampler.Add(pt)
 	}
 
@@ -342,4 +326,16 @@ func traceContainsError(trace model.Trace) bool {
 		}
 	}
 	return false
+}
+
+func eventExtractorFromConf(conf *config.AgentConfig) event.Extractor {
+	if len(conf.AnalyzedSpansByService) > 0 {
+		return event.NewFixedRateExtractor(conf.AnalyzedSpansByService)
+	}
+	if len(conf.AnalyzedRateByServiceLegacy) > 0 {
+		return event.NewLegacyExtractor(conf.AnalyzedRateByServiceLegacy)
+	}
+
+	// TODO: Replace disabled extractor with TaggedExtractor
+	return event.NewNoopExtractor()
 }

@@ -4,7 +4,7 @@ package info
 type TraceWriterInfo struct {
 	Payloads       int64
 	Traces         int64
-	Transactions   int64
+	Events         int64
 	Spans          int64
 	Errors         int64
 	Retries        int64
