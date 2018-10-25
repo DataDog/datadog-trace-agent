@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"math"
+	"math/rand"
 	"net/http"
 	"regexp"
 	"runtime"
@@ -10,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/event"
 	log "github.com/cihub/seelog"
 	"github.com/stretchr/testify/assert"
 
@@ -349,6 +352,79 @@ func TestSampling(t *testing.T) {
 			assert.EqualValues(t, tt.wantSampled, sampled)
 		})
 	}
+}
+
+func TestEventSamplingFromConf(t *testing.T) {
+	// These are not short tests
+	if testing.Short() {
+		return
+	}
+
+	type testCase struct {
+		maxEPS          float64
+		intakeEPS       float64
+		pctTraceSampled float64
+		expectedEPS     float64
+		deltaPct        float64
+	}
+
+	testCases := map[string]testCase{
+		"below max eps": {maxEPS: 100, intakeEPS: 50, pctTraceSampled: 0.5, expectedEPS: 50, deltaPct: 0.05},
+		"at max eps":    {maxEPS: 100, intakeEPS: 100, pctTraceSampled: 0.5, expectedEPS: 100, deltaPct: 0.05},
+		// TODO: Attempt to reduce softness of this (high delta)
+		"above max eps":                     {maxEPS: 100, intakeEPS: 500, pctTraceSampled: 0.0, expectedEPS: 100, deltaPct: 0.5},
+		"above max eps - all trace sampled": {maxEPS: 100, intakeEPS: 150, pctTraceSampled: 1, expectedEPS: 150, deltaPct: 0.05},
+	}
+
+	testCaseDuration := 60 * time.Second
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			sampler := eventSamplerFromConf(&config.AgentConfig{MaxEPS: testCase.maxEPS})
+
+			actualEPS := generateTraffic(sampler, testCaseDuration, testCase.intakeEPS, testCase.pctTraceSampled)
+
+			assert.InDelta(t, testCase.expectedEPS, actualEPS, testCase.expectedEPS*testCase.deltaPct)
+		})
+	}
+}
+
+func generateTraffic(sampler *event.BatchSampler, duration time.Duration, intakeEPS float64, pctTraceSampled float64) float64 {
+	tickerInterval := 100 * time.Millisecond
+	totalSampled := 0
+	timer := time.NewTimer(duration)
+	eventTicker := time.NewTicker(tickerInterval)
+	numTicksInSecond := float64(time.Second) / float64(tickerInterval)
+	eventsPerTick := int(math.Round(float64(intakeEPS) / numTicksInSecond))
+
+Loop:
+	for {
+		events := make([]*model.APMEvent, eventsPerTick)
+
+		for i := range events {
+			event := &model.APMEvent{Span: testutil.RandomSpan()}
+			if float64(rand.Int31())/float64(math.MaxInt32) <= pctTraceSampled {
+				event.TraceSampled = true
+			}
+
+			events[i] = event
+		}
+
+		totalSampled += len(sampler.Sample(events))
+
+		<-eventTicker.C
+
+		select {
+		case <-timer.C:
+			// If timer ran out, break out of loop and stop generation
+			break Loop
+		default:
+			// Otherwise, lets generate another
+		}
+
+	}
+
+	return float64(totalSampled) / duration.Seconds()
 }
 
 func BenchmarkAgentTraceProcessing(b *testing.B) {

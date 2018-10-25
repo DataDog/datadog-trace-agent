@@ -33,6 +33,7 @@ type Agent struct {
 	ErrorsScoreSampler *Sampler
 	PrioritySampler    *Sampler
 	EventExtractor     event.Extractor
+	EventSampler       *event.BatchSampler
 	TraceWriter        *writer.TraceWriter
 	ServiceWriter      *writer.ServiceWriter
 	StatsWriter        *writer.StatsWriter
@@ -78,6 +79,7 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	ess := NewErrorsSampler(conf)
 	ps := NewPrioritySampler(conf, dynConf)
 	ee := eventExtractorFromConf(conf)
+	es := eventSamplerFromConf(conf)
 	se := NewTraceServiceExtractor(serviceChan)
 	sm := NewServiceMapper(serviceChan, filteredServiceChan)
 	tw := writer.NewTraceWriter(conf, tracePkgChan)
@@ -93,6 +95,7 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 		ErrorsScoreSampler: ess,
 		PrioritySampler:    ps,
 		EventExtractor:     ee,
+		EventSampler:       es,
 		TraceWriter:        tw,
 		StatsWriter:        sw,
 		ServiceWriter:      svcW,
@@ -262,6 +265,9 @@ func (a *Agent) Process(t model.Trace) {
 
 		// NOTE: Events can be extracted from non-sampled traces.
 		tracePkg.Events = a.EventExtractor.Extract(pt)
+		statsd.Client.Count("datadog.trace_agent.events.extracted", int64(len(tracePkg.Events)), nil, 1)
+		tracePkg.Events = a.EventSampler.Sample(tracePkg.Events)
+		statsd.Client.Count("datadog.trace_agent.events.sampled", int64(len(tracePkg.Events)), nil, 1)
 
 		if !tracePkg.Empty() {
 			a.tracePkgChan <- &tracePkg
@@ -338,4 +344,22 @@ func eventExtractorFromConf(conf *config.AgentConfig) event.Extractor {
 
 	// TODO: Replace disabled extractor with TaggedExtractor
 	return event.NewNoopExtractor()
+}
+
+func eventSamplerFromConf(conf *config.AgentConfig) *event.BatchSampler {
+	rateCounter := event.NewSamplerBackendRateCounter()
+	// Start and leave running until the end
+	rateCounter.Start()
+
+	return event.NewBatchSampler(
+		event.NewSamplerChain(
+			[]event.Sampler{
+				// Sample all events for which their respective traces were sampled
+				event.NewSampledTraceSampler(),
+				// For those events that did not have its trace sampled, sample as many as possible respecting MaxEPS.
+				event.NewMaxEPSSampler(conf.MaxEPS, event.NewReadOnlyRateCounter(rateCounter)),
+			}, func(decision event.SamplingDecision) {
+				rateCounter.Count()
+			}),
+	)
 }
