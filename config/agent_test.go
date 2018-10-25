@@ -147,6 +147,7 @@ func TestFullIniConfig(t *testing.T) {
 	assert.Equal(18126, c.ReceiverPort)
 	assert.Equal(0.5, c.ExtraSampleRate)
 	assert.Equal(5.0, c.MaxTPS)
+	assert.Equal(50.0, c.MaxEPS)
 	assert.Equal("0.0.0.0", c.ReceiverHost)
 
 	assert.EqualValues([]string{"/health", "/500"}, c.Ignore["resource"])
@@ -165,6 +166,7 @@ func TestFullYamlConfig(t *testing.T) {
 	assert.Equal(18126, c.ReceiverPort)
 	assert.Equal(0.5, c.ExtraSampleRate)
 	assert.Equal(5.0, c.MaxTPS)
+	assert.Equal(50.0, c.MaxEPS)
 	assert.Equal("0.0.0.0", c.ReceiverHost)
 	assert.ElementsMatch([]*Endpoint{
 		{Host: "https://datadog.unittests", APIKey: "api_key_test"},
@@ -198,6 +200,7 @@ func TestUndocumentedYamlConfig(t *testing.T) {
 	assert.Equal("apikey_12", c.Endpoints[0].APIKey)
 	assert.Equal(0.33, c.ExtraSampleRate)
 	assert.Equal(100.0, c.MaxTPS)
+	assert.Equal(1000.0, c.MaxEPS)
 	assert.Equal(25, c.ReceiverPort)
 	// watchdog
 	assert.Equal(0.07, c.MaxCPU)
