@@ -34,9 +34,9 @@ func newMultiSender(endpoints []endpoint, cfg config.QueuablePayloadSenderConf) 
 }
 
 // Start starts all senders.
-func (w *multiSender) start() {
+func (w *multiSender) Start() {
 	for _, sender := range w.senders {
-		sender.start()
+		sender.Start()
 	}
 	for _, sender := range w.senders {
 		w.mwg.Add(1)
@@ -45,30 +45,30 @@ func (w *multiSender) start() {
 			for event := range ch {
 				w.mch <- event
 			}
-		}(sender.monitor())
+		}(sender.Monitor())
 	}
 }
 
 // Stop stops all senders.
-func (w *multiSender) stop() {
+func (w *multiSender) Stop() {
 	for _, sender := range w.senders {
-		sender.stop()
+		sender.Stop()
 	}
 	w.mwg.Wait()
 	close(w.mch)
 }
 
 // Send forwards the payload to all registered senders.
-func (w *multiSender) send(p *payload) {
+func (w *multiSender) Send(p *payload) {
 	for _, sender := range w.senders {
-		sender.send(p)
+		sender.Send(p)
 	}
 }
 
-func (w *multiSender) monitor() <-chan monitorEvent { return w.mch }
+func (w *multiSender) Monitor() <-chan monitorEvent { return w.mch }
 
 // Run implements payloadSender.
-func (w *multiSender) run() { /* no-op */ }
+func (w *multiSender) Run() { /* no-op */ }
 
 func (w *multiSender) setEndpoint(endpoint endpoint) {
 	for _, sender := range w.senders {

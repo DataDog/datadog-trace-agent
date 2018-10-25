@@ -158,7 +158,7 @@ func (m *testPayloadSenderMonitor) Run() {
 
 	for {
 		select {
-		case event, ok := <-m.sender.monitor():
+		case event, ok := <-m.sender.Monitor():
 			if !ok {
 				continue // wait for exit
 			}

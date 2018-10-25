@@ -60,8 +60,8 @@ func TestMultiSender(t *testing.T) {
 		mock1 := newMockSender()
 		mock2 := newMockSender()
 		multi := &multiSender{senders: []payloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
-		multi.start()
-		defer multi.stop()
+		multi.Start()
+		defer multi.Stop()
 
 		assert := assert.New(t)
 		assert.Equal(1, mock1.StartCalls())
@@ -72,7 +72,7 @@ func TestMultiSender(t *testing.T) {
 		mock1 := newMockSender()
 		mock2 := newMockSender()
 		multi := &multiSender{senders: []payloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
-		multi.stop()
+		multi.Stop()
 
 		assert := assert.New(t)
 		assert.Equal(1, mock1.StopCalls())
@@ -90,7 +90,7 @@ func TestMultiSender(t *testing.T) {
 		mock2 := newMockSender()
 		p := &payload{creationDate: time.Now(), bytes: []byte{1, 2, 3}}
 		multi := &multiSender{senders: []payloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
-		multi.send(p)
+		multi.Send(p)
 
 		assert := assert.New(t)
 		assert.Equal(p, mock1.SendCalls()[0])
@@ -101,8 +101,8 @@ func TestMultiSender(t *testing.T) {
 		mock1 := newMockSender()
 		mock2 := newMockSender()
 		multi := &multiSender{senders: []payloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
-		multi.start()
-		defer multi.stop()
+		multi.Start()
+		defer multi.Stop()
 
 		event1 := monitorEvent{typ: eventTypeSuccess, stats: sendStats{host: "ABC"}}
 		event2 := monitorEvent{typ: eventTypeFailure, stats: sendStats{host: "QWE"}}
@@ -120,12 +120,12 @@ func TestMultiSender(t *testing.T) {
 func TestMockPayloadSender(t *testing.T) {
 	p := &payload{creationDate: time.Now(), bytes: []byte{1, 2, 3}}
 	mock := newMockSender()
-	mock.start()
-	mock.start()
-	mock.start()
-	mock.send(p)
-	mock.send(p)
-	mock.stop()
+	mock.Start()
+	mock.Start()
+	mock.Start()
+	mock.Send(p)
+	mock.Send(p)
+	mock.Stop()
 
 	assert := assert.New(t)
 	assert.Equal(3, mock.StartCalls())
@@ -163,7 +163,7 @@ func (m *mockPayloadSender) Reset() {
 	m.mu.Unlock()
 }
 
-func (m *mockPayloadSender) start() {
+func (m *mockPayloadSender) Start() {
 	atomic.AddUint64(&m.startCalls, 1)
 }
 
@@ -172,7 +172,7 @@ func (m *mockPayloadSender) StartCalls() int {
 }
 
 // Stop must be called only once. It closes the monitor channel.
-func (m *mockPayloadSender) stop() {
+func (m *mockPayloadSender) Stop() {
 	atomic.AddUint64(&m.stopCalls, 1)
 	close(m.monitorCh)
 }
@@ -181,7 +181,7 @@ func (m *mockPayloadSender) StopCalls() int {
 	return int(atomic.LoadUint64(&m.stopCalls))
 }
 
-func (m *mockPayloadSender) send(p *payload) {
+func (m *mockPayloadSender) Send(p *payload) {
 	m.mu.Lock()
 	m.sendCalls = append(m.sendCalls, p)
 	m.mu.Unlock()
@@ -193,11 +193,11 @@ func (m *mockPayloadSender) SendCalls() []*payload {
 	return m.sendCalls
 }
 
-func (m *mockPayloadSender) monitor() <-chan monitorEvent {
+func (m *mockPayloadSender) Monitor() <-chan monitorEvent {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.monitorCh
 }
 
-func (m *mockPayloadSender) run()                   {}
+func (m *mockPayloadSender) Run()                   {}
 func (m *mockPayloadSender) setEndpoint(_ endpoint) {}

@@ -58,7 +58,7 @@ func NewStatsWriter(conf *config.AgentConfig, InStats <-chan []model.StatsBucket
 
 // Start starts the writer, awaiting stat buckets and flushing them.
 func (w *StatsWriter) Start() {
-	w.sender.start()
+	w.sender.Start()
 
 	go func() {
 		defer watchdog.LogOnPanic()
@@ -93,7 +93,7 @@ func (w *StatsWriter) Run() {
 func (w *StatsWriter) Stop() {
 	w.exit <- struct{}{}
 	<-w.exit
-	w.sender.stop()
+	w.sender.Stop()
 }
 
 func (w *StatsWriter) handleStats(stats []model.StatsBucket) {
@@ -126,7 +126,7 @@ func (w *StatsWriter) handleStats(stats []model.StatsBucket) {
 		}
 
 		payload := newPayload(data, headers)
-		w.sender.send(payload)
+		w.sender.Send(payload)
 
 		atomic.AddInt64(&w.info.Bytes, int64(len(data)))
 	}
@@ -247,7 +247,7 @@ func (w *StatsWriter) buildPayloads(stats []model.StatsBucket, maxEntriesPerPayl
 //   them, send out statsd metrics, and updates the writer info
 // - periodically dumps the writer info
 func (w *StatsWriter) monitor() {
-	monC := w.sender.monitor()
+	monC := w.sender.Monitor()
 
 	infoTicker := time.NewTicker(w.conf.UpdateInfoPeriod)
 	defer infoTicker.Stop()

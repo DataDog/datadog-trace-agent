@@ -46,7 +46,7 @@ func NewServiceWriter(conf *config.AgentConfig, InServices <-chan model.Services
 
 // Start starts the writer.
 func (w *ServiceWriter) Start() {
-	w.sender.start()
+	w.sender.Start()
 	go func() {
 		defer watchdog.LogOnPanic()
 		w.Run()
@@ -69,7 +69,7 @@ func (w *ServiceWriter) Run() {
 
 	// Monitor sender for events
 	go func() {
-		for event := range w.sender.monitor() {
+		for event := range w.sender.Monitor() {
 			switch event.typ {
 			case eventTypeSuccess:
 				url := event.stats.host
@@ -115,7 +115,7 @@ func (w *ServiceWriter) Run() {
 func (w *ServiceWriter) Stop() {
 	w.exit <- struct{}{}
 	<-w.exit
-	w.sender.stop()
+	w.sender.Stop()
 }
 
 func (w *ServiceWriter) handleServiceMetadata(metadata model.ServicesMetadata) {
@@ -147,7 +147,7 @@ func (w *ServiceWriter) flush() {
 	atomic.AddInt64(&w.stats.Bytes, int64(len(data)))
 
 	payload := newPayload(data, headers)
-	w.sender.send(payload)
+	w.sender.Send(payload)
 
 	w.serviceBuffer = make(model.ServicesMetadata)
 }

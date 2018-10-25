@@ -62,12 +62,13 @@ type sendStats struct {
 
 // payloadSender represents an object capable of asynchronously sending payloads to some endpoint.
 type payloadSender interface {
-	start()
-	run()
-	stop()
-	send(payload *payload)
+	Start()
+	Run()
+	Stop()
+	Send(payload *payload)
+	Monitor() <-chan monitorEvent
+
 	setEndpoint(endpoint)
-	monitor() <-chan monitorEvent
 }
 
 // queuableSender is a specific implementation of a payloadSender that will queue new payloads on error and
@@ -111,12 +112,12 @@ func newSender(e endpoint, conf writerconfig.QueuablePayloadSenderConf) *queuabl
 }
 
 // Send sends a single isolated payload through this sender.
-func (s *queuableSender) send(payload *payload) {
+func (s *queuableSender) Send(payload *payload) {
 	s.in <- payload
 }
 
 // Stop asks this sender to stop and waits until it correctly stops.
-func (s *queuableSender) stop() {
+func (s *queuableSender) Stop() {
 	s.exit <- struct{}{}
 	<-s.exit
 	close(s.in)
@@ -128,7 +129,7 @@ func (s *queuableSender) setEndpoint(e endpoint) {
 }
 
 // Monitor allows an external entity to monitor events of this sender by receiving Sender*Event structs.
-func (s *queuableSender) monitor() <-chan monitorEvent {
+func (s *queuableSender) Monitor() <-chan monitorEvent {
 	return s.monitorCh
 }
 
@@ -150,15 +151,15 @@ func (s *queuableSender) doSend(payload *payload) (sendStats, error) {
 }
 
 // Start asynchronously starts this QueueablePayloadSender.
-func (s *queuableSender) start() {
+func (s *queuableSender) Start() {
 	go func() {
 		defer watchdog.LogOnPanic()
-		s.run()
+		s.Run()
 	}()
 }
 
 // Run executes the queuableSender main logic synchronously.
-func (s *queuableSender) run() {
+func (s *queuableSender) Run() {
 	defer close(s.exit)
 
 	for {

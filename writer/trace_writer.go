@@ -70,7 +70,7 @@ func NewTraceWriter(conf *config.AgentConfig, in <-chan *SampledTrace) *TraceWri
 
 // Start starts the writer.
 func (w *TraceWriter) Start() {
-	w.sender.start()
+	w.sender.Start()
 	go func() {
 		defer watchdog.LogOnPanic()
 		w.Run()
@@ -91,7 +91,7 @@ func (w *TraceWriter) Run() {
 
 	// Monitor sender for events
 	go func() {
-		for event := range w.sender.monitor() {
+		for event := range w.sender.Monitor() {
 			switch event.typ {
 			case eventTypeSuccess:
 				log.Infof("flushed trace payload to the API, time:%s, size:%d bytes", event.stats.sendTime,
@@ -139,7 +139,7 @@ func (w *TraceWriter) Run() {
 func (w *TraceWriter) Stop() {
 	w.exit <- struct{}{}
 	<-w.exit
-	w.sender.stop()
+	w.sender.Stop()
 }
 
 func (w *TraceWriter) handleSampledTrace(sampledTrace *SampledTrace) {
@@ -258,7 +258,7 @@ func (w *TraceWriter) flush() {
 	payload := newPayload(serialized, headers)
 
 	log.Debugf("flushing traces=%v transactions=%v", len(w.traces), len(w.transactions))
-	w.sender.send(payload)
+	w.sender.Send(payload)
 	w.resetBuffer()
 }
 

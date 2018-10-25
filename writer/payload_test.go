@@ -33,22 +33,22 @@ func TestQueuablePayloadSender_WorkingEndpoint(t *testing.T) {
 
 	// When we start the sender
 	monitor.Start()
-	queuableSender.start()
+	queuableSender.Start()
 
 	// And send some payloads
 	payload1 := randomPayload()
-	queuableSender.send(payload1)
+	queuableSender.Send(payload1)
 	payload2 := randomPayload()
-	queuableSender.send(payload2)
+	queuableSender.Send(payload2)
 	payload3 := randomPayload()
-	queuableSender.send(payload3)
+	queuableSender.Send(payload3)
 	payload4 := randomPayload()
-	queuableSender.send(payload4)
+	queuableSender.Send(payload4)
 	payload5 := randomPayload()
-	queuableSender.send(payload5)
+	queuableSender.Send(payload5)
 
 	// And stop the sender
-	queuableSender.stop()
+	queuableSender.Stop()
 	monitor.Stop()
 
 	// Then we expect all sent payloads to have been successfully sent
@@ -81,14 +81,14 @@ func TestQueuablePayloadSender_FlakyEndpoint(t *testing.T) {
 	monitor := newTestPayloadSenderMonitor(queuableSender)
 
 	monitor.Start()
-	queuableSender.start()
+	queuableSender.Start()
 
 	// With a working endpoint
 	// We send some payloads
 	payload1 := randomPayload()
-	queuableSender.send(payload1)
+	queuableSender.Send(payload1)
 	payload2 := randomPayload()
-	queuableSender.send(payload2)
+	queuableSender.Send(payload2)
 
 	// Make sure sender processed both payloads
 	syncBarrier <- nil
@@ -99,9 +99,9 @@ func TestQueuablePayloadSender_FlakyEndpoint(t *testing.T) {
 	flakyEndpoint.SetError(&retriableError{err: fmt.Errorf("bleh"), endpoint: flakyEndpoint})
 	// We send some payloads
 	payload3 := randomPayload()
-	queuableSender.send(payload3)
+	queuableSender.Send(payload3)
 	payload4 := randomPayload()
-	queuableSender.send(payload4)
+	queuableSender.Send(payload4)
 	// And retry once
 	testBackoffTimer.TriggerTick()
 	// And retry twice
@@ -126,9 +126,9 @@ func TestQueuablePayloadSender_FlakyEndpoint(t *testing.T) {
 	flakyEndpoint.SetError(fmt.Errorf("non retriable bleh"))
 	// We send some payloads
 	payload5 := randomPayload()
-	queuableSender.send(payload5)
+	queuableSender.Send(payload5)
 	payload6 := randomPayload()
-	queuableSender.send(payload6)
+	queuableSender.Send(payload6)
 
 	// Make sure sender processed previous payloads
 	syncBarrier <- nil
@@ -141,7 +141,7 @@ func TestQueuablePayloadSender_FlakyEndpoint(t *testing.T) {
 	testBackoffTimer.TriggerTick()
 
 	// And stop the sender
-	queuableSender.stop()
+	queuableSender.Stop()
 	monitor.Stop()
 
 	// Then we expect payloads sent during working endpoint or those that were retried due to retriable errors to have
@@ -181,19 +181,19 @@ func TestQueuablePayloadSender_MaxQueuedPayloads(t *testing.T) {
 	monitor := newTestPayloadSenderMonitor(queuableSender)
 
 	monitor.Start()
-	queuableSender.start()
+	queuableSender.Start()
 
 	// When sending a first payload
 	payload1 := randomPayload()
-	queuableSender.send(payload1)
+	queuableSender.Send(payload1)
 
 	// Followed by another one
 	payload2 := randomPayload()
-	queuableSender.send(payload2)
+	queuableSender.Send(payload2)
 
 	// Followed by a third
 	payload3 := randomPayload()
-	queuableSender.send(payload3)
+	queuableSender.Send(payload3)
 
 	// Ensure previous payloads were processed
 	syncBarrier <- nil
@@ -211,7 +211,7 @@ func TestQueuablePayloadSender_MaxQueuedPayloads(t *testing.T) {
 	assert.Equal(0, queuableSender.NumQueuedPayloads(), "We should have no queued payloads")
 
 	// When we stop the sender
-	queuableSender.stop()
+	queuableSender.Stop()
 	monitor.Stop()
 
 	// Then endpoint should have received only payload3. Other should have been discarded because max queued payloads
@@ -251,19 +251,19 @@ func TestQueuablePayloadSender_MaxQueuedBytes(t *testing.T) {
 	monitor := newTestPayloadSenderMonitor(queuableSender)
 
 	monitor.Start()
-	queuableSender.start()
+	queuableSender.Start()
 
 	// When sending a first payload of 4 bytes
 	payload1 := randomSizedPayload(4)
-	queuableSender.send(payload1)
+	queuableSender.Send(payload1)
 
 	// Followed by another one of 2 bytes
 	payload2 := randomSizedPayload(2)
-	queuableSender.send(payload2)
+	queuableSender.Send(payload2)
 
 	// Followed by a third of 8 bytes
 	payload3 := randomSizedPayload(8)
-	queuableSender.send(payload3)
+	queuableSender.Send(payload3)
 
 	// Ensure previous payloads were processed
 	syncBarrier <- nil
@@ -281,7 +281,7 @@ func TestQueuablePayloadSender_MaxQueuedBytes(t *testing.T) {
 	assert.Equal(0, queuableSender.NumQueuedPayloads(), "We should have no queued payloads")
 
 	// When we stop the sender
-	queuableSender.stop()
+	queuableSender.Stop()
 	monitor.Stop()
 
 	// Then endpoint should have received payload2 and payload3. Payload1 should have been discarded because keeping all
@@ -320,11 +320,11 @@ func TestQueuablePayloadSender_DropBigPayloadsOnRetry(t *testing.T) {
 	monitor := newTestPayloadSenderMonitor(queuableSender)
 
 	monitor.Start()
-	queuableSender.start()
+	queuableSender.Start()
 
 	// When sending a payload of 12 bytes
 	payload1 := randomSizedPayload(12)
-	queuableSender.send(payload1)
+	queuableSender.Send(payload1)
 
 	// Ensure previous payloads were processed
 	syncBarrier <- nil
@@ -342,7 +342,7 @@ func TestQueuablePayloadSender_DropBigPayloadsOnRetry(t *testing.T) {
 	assert.Equal(0, queuableSender.NumQueuedPayloads(), "We should have no queued payloads")
 
 	// When we stop the sender
-	queuableSender.stop()
+	queuableSender.Stop()
 	monitor.Stop()
 
 	// Then endpoint should have received no payloads because payload1 was too big to store in queue.
@@ -376,11 +376,11 @@ func TestQueuablePayloadSender_SendBigPayloadsIfNoRetry(t *testing.T) {
 	monitor := newTestPayloadSenderMonitor(queuableSender)
 
 	monitor.Start()
-	queuableSender.start()
+	queuableSender.Start()
 
 	// When sending a payload of 12 bytes
 	payload1 := randomSizedPayload(12)
-	queuableSender.send(payload1)
+	queuableSender.Send(payload1)
 
 	// Ensure previous payloads were processed
 	syncBarrier <- nil
@@ -389,7 +389,7 @@ func TestQueuablePayloadSender_SendBigPayloadsIfNoRetry(t *testing.T) {
 	assert.Equal(0, queuableSender.NumQueuedPayloads(), "We should have no queued payloads")
 
 	// When we stop the sender
-	queuableSender.stop()
+	queuableSender.Stop()
 	monitor.Stop()
 
 	// Then endpoint should have received payload1 because although it was big, it didn't get queued.
@@ -422,20 +422,20 @@ func TestQueuablePayloadSender_MaxAge(t *testing.T) {
 	monitor := newTestPayloadSenderMonitor(queuableSender)
 
 	monitor.Start()
-	queuableSender.start()
+	queuableSender.Start()
 
 	// When sending two payloads one after the other
 	payload1 := randomPayload()
-	queuableSender.send(payload1)
+	queuableSender.Send(payload1)
 	payload2 := randomPayload()
-	queuableSender.send(payload2)
+	queuableSender.Send(payload2)
 
 	// And then sleeping for 500ms
 	time.Sleep(500 * time.Millisecond)
 
 	// And then sending a third payload
 	payload3 := randomPayload()
-	queuableSender.send(payload3)
+	queuableSender.Send(payload3)
 
 	// And then triggering a retry
 	testBackoffTimer.TriggerTick()
@@ -456,7 +456,7 @@ func TestQueuablePayloadSender_MaxAge(t *testing.T) {
 	assert.Equal(0, queuableSender.NumQueuedPayloads(), "We should have no queued payloads")
 
 	// When we stop the sender
-	queuableSender.stop()
+	queuableSender.Stop()
 	monitor.Stop()
 
 	// Then endpoint should have received only payload3. Because payload1 and payload2 were too old after the failed
@@ -494,13 +494,13 @@ func TestQueuablePayloadSender_RetryOfTooOldQueue(t *testing.T) {
 	monitor := newTestPayloadSenderMonitor(queuableSender)
 
 	monitor.Start()
-	queuableSender.start()
+	queuableSender.Start()
 
 	// When sending two payloads one after the other
 	payload1 := randomPayload()
-	queuableSender.send(payload1)
+	queuableSender.Send(payload1)
 	payload2 := randomPayload()
-	queuableSender.send(payload2)
+	queuableSender.Send(payload2)
 
 	// And then sleeping for 500ms
 	time.Sleep(600 * time.Millisecond)
@@ -510,7 +510,7 @@ func TestQueuablePayloadSender_RetryOfTooOldQueue(t *testing.T) {
 
 	// Then send a third payload
 	payload3 := randomPayload()
-	queuableSender.send(payload3)
+	queuableSender.Send(payload3)
 
 	// Wait for payload to be queued
 	syncBarrier <- nil
@@ -522,7 +522,7 @@ func TestQueuablePayloadSender_RetryOfTooOldQueue(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// When we stop the sender
-	queuableSender.stop()
+	queuableSender.Stop()
 	monitor.Stop()
 
 	// Then we should have no queued payloads
