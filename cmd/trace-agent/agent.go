@@ -345,7 +345,9 @@ func eventProcessorFromConf(conf *config.AgentConfig) *event.Processor {
 		extractors = append(extractors, event.NewLegacyExtractor(conf.AnalyzedRateByServiceLegacy))
 	}
 
-	var samplers []event.Sampler
+	samplers := []event.Sampler{
+		event.NewMaxEPSSampler(conf.MaxEPS),
+	}
 
 	return event.NewProcessor(extractors, samplers)
 }

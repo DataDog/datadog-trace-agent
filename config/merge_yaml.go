@@ -47,6 +47,7 @@ type traceAgent struct {
 	Env                 string              `yaml:"env"`
 	ExtraSampleRate     float64             `yaml:"extra_sample_rate"`
 	MaxTracesPerSecond  float64             `yaml:"max_traces_per_second"`
+	MaxEventsPerSecond  float64             `yaml:"max_events_per_second"`
 	IgnoreResources     []string            `yaml:"ignore_resources"`
 	LogFilePath         string              `yaml:"log_file"`
 	ReplaceTags         []*ReplaceRule      `yaml:"replace_tags"`
@@ -267,6 +268,9 @@ func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 	}
 	if yc.TraceAgent.MaxTracesPerSecond > 0 {
 		c.MaxTPS = yc.TraceAgent.MaxTracesPerSecond
+	}
+	if yc.TraceAgent.MaxEventsPerSecond > 0 {
+		c.MaxEPS = yc.TraceAgent.MaxEventsPerSecond
 	}
 
 	if len(yc.TraceAgent.IgnoreResources) > 0 {

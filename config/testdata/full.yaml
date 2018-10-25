@@ -21,6 +21,7 @@ apm_config:
   apm_non_local_traffic: yes
   extra_sample_rate: 0.5
   max_traces_per_second: 5
+  max_events_per_second: 50
   ignore_resources:
     - /health
     - /500

@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"math"
+	"math/rand"
 	"net/http"
 	"regexp"
 	"runtime"
@@ -10,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/event"
 	log "github.com/cihub/seelog"
 	"github.com/stretchr/testify/assert"
 
@@ -349,6 +352,121 @@ func TestSampling(t *testing.T) {
 			assert.EqualValues(t, tt.wantSampled, sampled)
 		})
 	}
+}
+
+func TestEventProcessorFromConf(t *testing.T) {
+	// These are not short tests
+	if testing.Short() {
+		return
+	}
+
+	rateByServiceAndName := map[string]map[string]float64{
+		"serviceA": {
+			"opA": 0,
+			"opC": 1,
+		},
+		"serviceB": {
+			"opB": 0.5,
+		},
+	}
+
+	rateByService := map[string]float64{
+		"serviceA": 1,
+		"serviceC": 0.5,
+		"serviceD": 1,
+	}
+
+	for name, testCase := range map[string]struct {
+		maxEPS          float64
+		intakeSPS       float64
+		serviceName     string
+		opName          string
+		extractionRate  float64
+		pctTraceSampled float64
+		expectedEPS     float64
+		deltaPct        float64
+		duration        time.Duration
+	}{
+		"no match":              {maxEPS: 100, intakeSPS: 100, serviceName: "serviceE", opName: "opA", pctTraceSampled: 0.5, expectedEPS: 0, deltaPct: 0, duration: 10 * time.Second},
+		"agent - below max eps": {maxEPS: 100, intakeSPS: 100, serviceName: "serviceB", opName: "opB", pctTraceSampled: 0.5, expectedEPS: 50, deltaPct: 0.1, duration: 10 * time.Second},
+		// TODO: Attempt to reduce softness of this (high delta)
+		"agent - above max eps":  {maxEPS: 100, intakeSPS: 200, serviceName: "serviceA", opName: "opC", pctTraceSampled: 0, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
+		"legacy - below max eps": {maxEPS: 100, intakeSPS: 100, serviceName: "serviceC", opName: "opB", pctTraceSampled: 0.5, expectedEPS: 50, deltaPct: 0.1, duration: 10 * time.Second},
+		// TODO: Attempt to reduce softness of this (high delta)
+		"legacy - above max eps": {maxEPS: 100, intakeSPS: 200, serviceName: "serviceD", opName: "opC", pctTraceSampled: 0, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
+
+		// Overrides / Fallbacks
+		"agent - overrides legacy": {maxEPS: 100, intakeSPS: 100, serviceName: "serviceA", opName: "opA", pctTraceSampled: 0.5, expectedEPS: 0, deltaPct: 0, duration: 10 * time.Second},
+		"legacy as fallback":       {maxEPS: 100, intakeSPS: 100, serviceName: "serviceA", opName: "opD", pctTraceSampled: 0.5, expectedEPS: 100, deltaPct: 0.1, duration: 10 * time.Second},
+
+		// High number of sampled traces allows overflow of EPS
+		"agent - above max eps - all trace sampled":  {maxEPS: 100, intakeSPS: 200, serviceName: "serviceA", opName: "opC", pctTraceSampled: 1, expectedEPS: 200, deltaPct: 0.1, duration: 10 * time.Second},
+		"legacy - above max eps - all trace sampled": {maxEPS: 100, intakeSPS: 200, serviceName: "serviceD", opName: "opC", pctTraceSampled: 1, expectedEPS: 200, deltaPct: 0.1, duration: 10 * time.Second},
+	} {
+		t.Run(name, func(t *testing.T) {
+			processor := eventProcessorFromConf(&config.AgentConfig{
+				MaxEPS:                      testCase.maxEPS,
+				AnalyzedRateByServiceLegacy: rateByService,
+				AnalyzedSpansByService:      rateByServiceAndName,
+			})
+			processor.Start()
+
+			actualEPS := generateTraffic(processor, testCase.serviceName, testCase.opName, testCase.duration,
+				testCase.intakeSPS, testCase.pctTraceSampled)
+
+			processor.Stop()
+
+			assert.InDelta(t, testCase.expectedEPS, actualEPS, testCase.expectedEPS*testCase.deltaPct)
+		})
+	}
+}
+
+func generateTraffic(processor *event.Processor, serviceName string, operationName string, duration time.Duration,
+	intakeEPS float64, pctTraceSampled float64) float64 {
+	tickerInterval := 100 * time.Millisecond
+	totalSampled := 0
+	timer := time.NewTimer(duration)
+	eventTicker := time.NewTicker(tickerInterval)
+	numTicksInSecond := float64(time.Second) / float64(tickerInterval)
+	spansPerTick := int(math.Round(float64(intakeEPS) / numTicksInSecond))
+
+Loop:
+	for {
+		spans := make([]*model.WeightedSpan, spansPerTick)
+
+		for i := range spans {
+			span := testutil.RandomSpan()
+			span.Service = serviceName
+			span.Name = operationName
+			spans[i] = &model.WeightedSpan{
+				Span: span,
+				// Make all spans top level for simpler testing of legacy extractor
+				TopLevel: true,
+			}
+		}
+
+		trace := model.ProcessedTrace{
+			WeightedTrace: model.WeightedTrace(spans),
+			Sampled:       rand.Float64() < pctTraceSampled,
+		}
+
+		events, _ := processor.Process(trace)
+
+		totalSampled += len(events)
+
+		<-eventTicker.C
+
+		select {
+		case <-timer.C:
+			// If timer ran out, break out of loop and stop generation
+			break Loop
+		default:
+			// Otherwise, lets generate another
+		}
+
+	}
+
+	return float64(totalSampled) / duration.Seconds()
 }
 
 func BenchmarkAgentTraceProcessing(b *testing.B) {
