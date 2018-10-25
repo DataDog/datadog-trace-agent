@@ -2,73 +2,96 @@
 
 
 [[projects]]
+  digest = "1:2d9a66c13006787fa03583eca722540725586383bc9c3631787e46d9a1cb8afc"
   name = "github.com/DataDog/datadog-agent"
   packages = ["pkg/pidfile"]
+  pruneopts = ""
   revision = "92733ff01547103d5286afc9e272d501cb18f761"
 
 [[projects]]
+  digest = "1:7a91a175c283b21c6e99edc1b2fb82fe11eb5b42e7a28a2a67b17d9c28ad1855"
   name = "github.com/DataDog/datadog-go"
   packages = ["statsd"]
+  pruneopts = ""
   revision = "a9c7a9896c1847c9cc2b068a2ae68e9d74540a5d"
 
 [[projects]]
+  digest = "1:52af3410147ff40243fa028083c10b0efcc5b06a60b6e20ce65be581d9ded452"
   name = "github.com/StackExchange/wmi"
   packages = ["."]
+  pruneopts = ""
   revision = "ea383cf3ba6ec950874b8486cd72356d007c768f"
 
 [[projects]]
+  digest = "1:9897221091d9b3ca7d1a8d350bd8ce709118b5134d68f6315b2010736d3e9378"
   name = "github.com/cihub/seelog"
   packages = ["."]
+  pruneopts = ""
   revision = "d2c6e5aa9fbfdd1c624e140287063c7730654115"
   version = "v2.6"
 
 [[projects]]
+  digest = "1:56c130d885a4aacae1dd9c7b71cfe39912c7ebc1ff7d2b46083c8812996dc43b"
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
+  pruneopts = ""
   revision = "346938d642f2ec3594ed81d874461961cd0faa76"
   version = "v1.1.0"
 
 [[projects]]
+  digest = "1:3298191a16359d87e30f98657b0b2ac3e4ac40cece761cf2385a9d070e584ca7"
   name = "github.com/go-ini/ini"
   packages = ["."]
+  pruneopts = ""
   revision = "74bdc99692c3408cb103221e38675ce8fda0a718"
   version = "v1.25.2"
 
 [[projects]]
+  digest = "1:bcb2dc2d1ab73773a6102ee8f8ef2f4216aaf1dfc517750a2522427b0b6caca0"
   name = "github.com/go-ole/go-ole"
   packages = [
     ".",
-    "oleutil"
+    "oleutil",
   ]
+  pruneopts = ""
   revision = "de8695c8edbf8236f30d6e1376e20b198a028d42"
 
 [[projects]]
+  digest = "1:66d1acfc23d239e491877b36617c85cd929a71feb604ed11868bc24f5a70879c"
   name = "github.com/gogo/protobuf"
   packages = [
     "gogoproto",
     "proto",
-    "protoc-gen-gogo/descriptor"
+    "protoc-gen-gogo/descriptor",
   ]
+  pruneopts = ""
   revision = "d76fbc1373015ced59b43ac267f28d546b955683"
 
 [[projects]]
+  digest = "1:3b760d3b93f994df8eb1d9ebfad17d3e9e37edcb7f7efaa15b427c0d7a64f4e4"
   name = "github.com/golang/protobuf"
   packages = ["proto"]
+  pruneopts = ""
   revision = "1e59b77b52bf8e4b449a57e6f79f21226d571845"
 
 [[projects]]
+  digest = "1:210286d0cb60ffe28f1ca00b664029e8943009f95d06d8f8c336301b28e1aee5"
   name = "github.com/philhofer/fwd"
   packages = ["."]
+  pruneopts = ""
   revision = "bb6d471dc95d4fe11e432687f8b70ff496cf3136"
   version = "v1.0.0"
 
 [[projects]]
+  digest = "1:256484dbbcd271f9ecebc6795b2df8cad4c458dd0f5fd82a8c2fa0c29f233411"
   name = "github.com/pmezard/go-difflib"
   packages = ["difflib"]
+  pruneopts = ""
   revision = "792786c7400a136282c1664665ae0a8db921c6c2"
   version = "v1.0.0"
 
 [[projects]]
+  digest = "1:d60026d29b055f07be809cf07afeb11bef78b71ebc8b51ef7498bb8cd80321e6"
   name = "github.com/shirou/gopsutil"
   packages = [
     "cpu",
@@ -76,32 +99,40 @@
     "internal/common",
     "mem",
     "net",
-    "process"
+    "process",
   ]
+  pruneopts = ""
   revision = "70a1b78fe69202d93d6718fc9e3a4d6f81edfd58"
   version = "v2.17.01"
 
 [[projects]]
   branch = "master"
+  digest = "1:99c6a6dab47067c9b898e8c8b13d130c6ab4ffbcc4b7cc6236c2cd0b1e344f5b"
   name = "github.com/shirou/w32"
   packages = ["."]
+  pruneopts = ""
   revision = "bb4de0191aa41b5507caa14b0650cdbddcd9280b"
 
 [[projects]]
+  digest = "1:a30066593578732a356dc7e5d7f78d69184ca65aeeff5939241a3ab10559bb06"
   name = "github.com/stretchr/testify"
   packages = [
     "assert",
-    "require"
+    "require",
   ]
+  pruneopts = ""
   revision = "12b6f73e6084dad08a7c6e575284b177ecafbc71"
   version = "v1.2.1"
 
 [[projects]]
+  digest = "1:86d12a1d52ed9cba260ea20d338e68c3dbc6a025826dd75341f663285ed3c147"
   name = "github.com/tinylib/msgp"
   packages = ["msgp"]
+  pruneopts = ""
   revision = "362bfb3384d53ae4d5dd745983a4d70b6d23628c"
 
 [[projects]]
+  digest = "1:b6e4bf8197b5de25f2ed05c603d39d619f4c41bb4a573ef5274c3446df44d6e4"
   name = "golang.org/x/sys"
   packages = [
     "windows",
@@ -109,18 +140,39 @@
     "windows/svc",
     "windows/svc/debug",
     "windows/svc/eventlog",
-    "windows/svc/mgr"
+    "windows/svc/mgr",
   ]
+  pruneopts = ""
   revision = "8f0908ab3b2457e2e15403d3697c9ef5cb4b57a9"
 
 [[projects]]
+  digest = "1:a3a9e86d4cd7b56a405875f475a6bb29f4614692fddf33e10eca5c839250b49e"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
+  pruneopts = ""
   revision = "cd8b52f8269e0feb286dfeef29f8fe4d5b397e0b"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "b5835767ec41c879ca5cf6a446e52ccc4ea1bb23f3ae4101356e86a4c092f137"
+  input-imports = [
+    "github.com/DataDog/datadog-agent/pkg/pidfile",
+    "github.com/DataDog/datadog-go/statsd",
+    "github.com/cihub/seelog",
+    "github.com/go-ini/ini",
+    "github.com/gogo/protobuf/gogoproto",
+    "github.com/gogo/protobuf/proto",
+    "github.com/golang/protobuf/proto",
+    "github.com/shirou/gopsutil/net",
+    "github.com/shirou/gopsutil/process",
+    "github.com/stretchr/testify/assert",
+    "github.com/stretchr/testify/require",
+    "github.com/tinylib/msgp/msgp",
+    "golang.org/x/sys/windows/svc",
+    "golang.org/x/sys/windows/svc/debug",
+    "golang.org/x/sys/windows/svc/eventlog",
+    "golang.org/x/sys/windows/svc/mgr",
+    "gopkg.in/yaml.v2",
+  ]
   solver-name = "gps-cdcl"
   solver-version = 1
