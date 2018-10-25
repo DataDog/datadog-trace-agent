@@ -27,19 +27,19 @@ func TestNewMultiSenderFactory(t *testing.T) {
 	cfg := config.DefaultQueuablePayloadSenderConf()
 
 	t.Run("one", func(t *testing.T) {
-		endpoint := &DatadogEndpoint{Host: "host1", APIKey: "key1"}
-		sender, ok := newMultiSender([]Endpoint{endpoint}, cfg).(*QueuablePayloadSender)
+		e := &datadogEndpoint{host: "host1", apiKey: "key1"}
+		sender, ok := newMultiSender([]endpoint{e}, cfg).(*queuableSender)
 		assert := assert.New(t)
 		assert.True(ok)
-		assert.EqualValues(endpoint, sender.BasePayloadSender.endpoint)
+		assert.EqualValues(e, sender.endpoint)
 		assert.EqualValues(cfg, sender.conf)
 	})
 
 	t.Run("multi", func(t *testing.T) {
-		endpoints := []Endpoint{
-			&DatadogEndpoint{Host: "host1", APIKey: "key1"},
-			&DatadogEndpoint{Host: "host2", APIKey: "key2"},
-			&DatadogEndpoint{Host: "host3", APIKey: "key3"},
+		endpoints := []endpoint{
+			&datadogEndpoint{host: "host1", apiKey: "key1"},
+			&datadogEndpoint{host: "host2", apiKey: "key2"},
+			&datadogEndpoint{host: "host3", apiKey: "key3"},
 		}
 		sender, ok := newMultiSender(endpoints, cfg).(*multiSender)
 		assert := assert.New(t)
@@ -47,9 +47,9 @@ func TestNewMultiSenderFactory(t *testing.T) {
 		assert.Len(sender.senders, 3)
 		assert.Equal(3, cap(sender.mch))
 		for i := range endpoints {
-			s, ok := sender.senders[i].(*QueuablePayloadSender)
+			s, ok := sender.senders[i].(*queuableSender)
 			assert.True(ok)
-			assert.EqualValues(endpoints[i], s.BasePayloadSender.endpoint)
+			assert.EqualValues(endpoints[i], s.endpoint)
 			assert.EqualValues(cfg, s.conf)
 		}
 	})
@@ -59,7 +59,7 @@ func TestMultiSender(t *testing.T) {
 	t.Run("Start", func(t *testing.T) {
 		mock1 := newMockSender()
 		mock2 := newMockSender()
-		multi := &multiSender{senders: []PayloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
+		multi := &multiSender{senders: []payloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
 		multi.Start()
 		defer multi.Stop()
 
@@ -71,7 +71,7 @@ func TestMultiSender(t *testing.T) {
 	t.Run("Stop", func(t *testing.T) {
 		mock1 := newMockSender()
 		mock2 := newMockSender()
-		multi := &multiSender{senders: []PayloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
+		multi := &multiSender{senders: []payloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
 		multi.Stop()
 
 		assert := assert.New(t)
@@ -88,8 +88,8 @@ func TestMultiSender(t *testing.T) {
 	t.Run("Send", func(t *testing.T) {
 		mock1 := newMockSender()
 		mock2 := newMockSender()
-		p := &Payload{CreationDate: time.Now(), Bytes: []byte{1, 2, 3}}
-		multi := &multiSender{senders: []PayloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
+		p := &payload{creationDate: time.Now(), bytes: []byte{1, 2, 3}}
+		multi := &multiSender{senders: []payloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
 		multi.Send(p)
 
 		assert := assert.New(t)
@@ -100,7 +100,7 @@ func TestMultiSender(t *testing.T) {
 	t.Run("funnel", func(t *testing.T) {
 		mock1 := newMockSender()
 		mock2 := newMockSender()
-		multi := &multiSender{senders: []PayloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
+		multi := &multiSender{senders: []payloadSender{mock1, mock2}, mch: make(chan monitorEvent)}
 		multi.Start()
 		defer multi.Stop()
 
@@ -118,7 +118,7 @@ func TestMultiSender(t *testing.T) {
 }
 
 func TestMockPayloadSender(t *testing.T) {
-	p := &Payload{CreationDate: time.Now(), Bytes: []byte{1, 2, 3}}
+	p := &payload{creationDate: time.Now(), bytes: []byte{1, 2, 3}}
 	mock := newMockSender()
 	mock.Start()
 	mock.Start()
@@ -139,14 +139,14 @@ func TestMockPayloadSender(t *testing.T) {
 	assert.Len(mock.SendCalls(), 0)
 }
 
-var _ PayloadSender = (*mockPayloadSender)(nil)
+var _ payloadSender = (*mockPayloadSender)(nil)
 
 type mockPayloadSender struct {
 	startCalls uint64
 	stopCalls  uint64
 
 	mu        sync.Mutex
-	sendCalls []*Payload
+	sendCalls []*payload
 	monitorCh chan monitorEvent
 }
 
@@ -181,23 +181,23 @@ func (m *mockPayloadSender) StopCalls() int {
 	return int(atomic.LoadUint64(&m.stopCalls))
 }
 
-func (m *mockPayloadSender) Send(p *Payload) {
+func (m *mockPayloadSender) Send(p *payload) {
 	m.mu.Lock()
 	m.sendCalls = append(m.sendCalls, p)
 	m.mu.Unlock()
 }
 
-func (m *mockPayloadSender) SendCalls() []*Payload {
+func (m *mockPayloadSender) SendCalls() []*payload {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.sendCalls
 }
 
-func (m *mockPayloadSender) monitor() <-chan monitorEvent {
+func (m *mockPayloadSender) Monitor() <-chan monitorEvent {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.monitorCh
 }
 
-func (m *mockPayloadSender) Run()                          {}
-func (m *mockPayloadSender) setEndpoint(endpoint Endpoint) {}
+func (m *mockPayloadSender) Run()                   {}
+func (m *mockPayloadSender) setEndpoint(_ endpoint) {}

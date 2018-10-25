@@ -44,8 +44,8 @@ func TestNewClient(t *testing.T) {
 
 func TestNewEndpoints(t *testing.T) {
 	t.Run("disabled", func(t *testing.T) {
-		e := NewEndpoints(&config.AgentConfig{Enabled: false}, "")
-		_, ok := e[0].(*NullEndpoint)
+		e := newEndpoints(&config.AgentConfig{Enabled: false}, "")
+		_, ok := e[0].(*nullEndpoint)
 		assert.True(t, ok)
 	})
 
@@ -68,7 +68,7 @@ func TestNewEndpoints(t *testing.T) {
 						}
 					}
 				}()
-				NewEndpoints(tt.cfg, "")
+				newEndpoints(tt.cfg, "")
 			})
 		}
 	})
@@ -77,12 +77,12 @@ func TestNewEndpoints(t *testing.T) {
 		for name, tt := range map[string]struct {
 			cfg  *config.AgentConfig
 			path string
-			exp  []*DatadogEndpoint
+			exp  []*datadogEndpoint
 		}{
 			"main": {
 				cfg:  &config.AgentConfig{Enabled: true, Endpoints: []*config.Endpoint{{Host: "host1", APIKey: "key1"}}},
 				path: "/api/trace",
-				exp:  []*DatadogEndpoint{{Host: "host1", APIKey: "key1", path: "/api/trace"}},
+				exp:  []*datadogEndpoint{{host: "host1", apiKey: "key1", path: "/api/trace"}},
 			},
 			"additional": {
 				cfg: &config.AgentConfig{
@@ -95,21 +95,21 @@ func TestNewEndpoints(t *testing.T) {
 					},
 				},
 				path: "/api/trace",
-				exp: []*DatadogEndpoint{
-					{Host: "host1", APIKey: "key1", path: "/api/trace"},
-					{Host: "host2", APIKey: "key2", path: "/api/trace"},
-					{Host: "host3", APIKey: "key3", path: "/api/trace"},
-					{Host: "host4", APIKey: "key4", path: "/api/trace"},
+				exp: []*datadogEndpoint{
+					{host: "host1", apiKey: "key1", path: "/api/trace"},
+					{host: "host2", apiKey: "key2", path: "/api/trace"},
+					{host: "host3", apiKey: "key3", path: "/api/trace"},
+					{host: "host4", apiKey: "key4", path: "/api/trace"},
 				},
 			},
 		} {
 			t.Run(name, func(t *testing.T) {
 				assert := assert.New(t)
-				e := NewEndpoints(tt.cfg, tt.path)
+				e := newEndpoints(tt.cfg, tt.path)
 				for i, want := range tt.exp {
-					got := e[i].(*DatadogEndpoint)
-					assert.Equal(want.Host, got.Host)
-					assert.Equal(want.APIKey, got.APIKey)
+					got := e[i].(*datadogEndpoint)
+					assert.Equal(want.host, got.host)
+					assert.Equal(want.apiKey, got.apiKey)
 					assert.Equal(want.path, got.path)
 				}
 			})
@@ -122,7 +122,7 @@ func TestNewEndpoints(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		e := NewEndpoints(&config.AgentConfig{
+		e := newEndpoints(&config.AgentConfig{
 			Enabled:  true,
 			ProxyURL: proxyURL,
 			Endpoints: []*config.Endpoint{
@@ -134,13 +134,13 @@ func TestNewEndpoints(t *testing.T) {
 
 		// proxy ok
 		for _, i := range []int{0, 1} {
-			tr := e[i].(*DatadogEndpoint).client.Transport.(*http.Transport)
+			tr := e[i].(*datadogEndpoint).client.Transport.(*http.Transport)
 			p, _ := tr.Proxy(nil)
 			assert.Equal("test_url", p.String())
 		}
 
 		// proxy skipped
-		tr := e[2].(*DatadogEndpoint).client.Transport.(*http.Transport)
+		tr := e[2].(*datadogEndpoint).client.Transport.(*http.Transport)
 		assert.Nil(tr.Proxy)
 	})
 }

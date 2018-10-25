@@ -121,7 +121,7 @@ func TestStatsWriter_UpdateInfoHandling(t *testing.T) {
 	time.Sleep(2 * statsWriter.conf.UpdateInfoPeriod)
 
 	// And then sending a third payload with other 3 traces with an errored out endpoint with retry
-	testEndpoint.SetError(&RetriableError{
+	testEndpoint.SetError(&retriableError{
 		err:      fmt.Errorf("non retriable error"),
 		endpoint: testEndpoint,
 	})
@@ -366,11 +366,10 @@ func calculateStatPayloadSize(buckets []model.StatsBucket) int64 {
 	return int64(len(data))
 }
 
-func assertStatsPayload(assert *assert.Assertions, headers map[string]string, buckets []model.StatsBucket,
-	payload *Payload) {
+func assertStatsPayload(assert *assert.Assertions, headers map[string]string, buckets []model.StatsBucket, p *payload) {
 	statsPayload := model.StatsPayload{}
 
-	reader := bytes.NewBuffer(payload.Bytes)
+	reader := bytes.NewBuffer(p.bytes)
 	gzipReader, err := gzip.NewReader(reader)
 
 	assert.NoError(err, "Gzip reader should work correctly")
@@ -379,7 +378,7 @@ func assertStatsPayload(assert *assert.Assertions, headers map[string]string, bu
 
 	assert.NoError(jsonDecoder.Decode(&statsPayload), "Stats payload should unmarshal correctly")
 
-	assert.Equal(headers, payload.Headers, "Headers should match expectation")
+	assert.Equal(headers, p.headers, "Headers should match expectation")
 	assert.Equal(testHostName, statsPayload.HostName, "Hostname should match expectation")
 	assert.Equal(testEnv, statsPayload.Env, "Env should match expectation")
 	assert.Equal(buckets, statsPayload.Stats, "Stat buckets should match expectation")

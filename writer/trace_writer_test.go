@@ -174,7 +174,7 @@ func TestTraceWriter(t *testing.T) {
 		time.Sleep(2 * testFlushPeriod)
 
 		// And then send a fourth payload with other 3 traces with an errored out endpoint but retriable
-		testEndpoint.SetError(&RetriableError{
+		testEndpoint.SetError(&retriableError{
 			err:      fmt.Errorf("non retriable error"),
 			endpoint: testEndpoint,
 		})
@@ -275,7 +275,7 @@ func calculateTracePayloadSize(sampledTraces []*SampledTrace) int64 {
 }
 
 func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expectedHeaders map[string]string,
-	sampledTraces []*SampledTrace, payloads []*Payload) {
+	sampledTraces []*SampledTrace, payloads []*payload) {
 
 	var expectedTraces []*model.Trace
 	var expectedTransactions []*model.Span
@@ -289,10 +289,10 @@ func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expecte
 	var expectedTransactionIdx int
 
 	for _, payload := range payloads {
-		assert.Equal(expectedHeaders, payload.Headers, "Payload headers should match expectation")
+		assert.Equal(expectedHeaders, payload.headers, "Payload headers should match expectation")
 
 		var tracePayload model.TracePayload
-		payloadBuffer := bytes.NewBuffer(payload.Bytes)
+		payloadBuffer := bytes.NewBuffer(payload.bytes)
 		gz, err := gzip.NewReader(payloadBuffer)
 		assert.NoError(err, "Gzip reader should work correctly")
 		uncompressedBuffer := bytes.Buffer{}

@@ -26,26 +26,25 @@ var userAgent = fmt.Sprintf(
 	userAgentPrefix, info.Version, info.GitCommit, userAgentSupportURL,
 )
 
-// DatadogEndpoint sends payloads to Datadog API.
-type DatadogEndpoint struct {
-	APIKey string
-	Host   string
-
+// datadogEndpoint sends payloads to Datadog API.
+type datadogEndpoint struct {
+	apiKey string
+	host   string
 	client *http.Client
 	path   string
 }
 
 // NewEndpoints returns the set of endpoints configured in the AgentConfig, appending the given path.
 // The first endpoint is the main API endpoint, followed by any additional endpoints.
-func NewEndpoints(conf *config.AgentConfig, path string) []Endpoint {
+func newEndpoints(conf *config.AgentConfig, path string) []endpoint {
 	if !conf.Enabled {
 		log.Info("API interface is disabled, flushing to /dev/null instead")
-		return []Endpoint{&NullEndpoint{}}
+		return []endpoint{&nullEndpoint{}}
 	}
 	if e := conf.Endpoints; len(e) == 0 || e[0].Host == "" || e[0].APIKey == "" {
 		panic(errors.New("must have at least one endpoint with key"))
 	}
-	endpoints := make([]Endpoint, len(conf.Endpoints))
+	endpoints := make([]endpoint, len(conf.Endpoints))
 	ignoreProxy := true
 	client := newClient(conf, !ignoreProxy)
 	clientIgnoreProxy := newClient(conf, ignoreProxy)
@@ -54,9 +53,9 @@ func NewEndpoints(conf *config.AgentConfig, path string) []Endpoint {
 		if e.NoProxy {
 			c = clientIgnoreProxy
 		}
-		endpoints[i] = &DatadogEndpoint{
-			APIKey: e.APIKey,
-			Host:   e.Host,
+		endpoints[i] = &datadogEndpoint{
+			apiKey: e.APIKey,
+			host:   e.Host,
 			path:   path,
 			client: c,
 		}
@@ -64,26 +63,28 @@ func NewEndpoints(conf *config.AgentConfig, path string) []Endpoint {
 	return endpoints
 }
 
-// BaseURL implements Endpoint.
-func (e *DatadogEndpoint) BaseURL() string { return e.Host }
+// baseURL implements Endpoint.
+func (e *datadogEndpoint) baseURL() string { return e.host }
 
-// Write will send the serialized traces payload to the Datadog traces endpoint.
-func (e *DatadogEndpoint) Write(payload *Payload) error {
+// write will send the serialized traces payload to the Datadog traces endpoint.
+func (e *datadogEndpoint) write(payload *payload) error {
 	// Create the request to be sent to the API
-	url := e.Host + e.path
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload.Bytes))
+	url := e.host + e.path
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload.bytes))
 	if err != nil {
 		return err
 	}
 
-	req.Header.Set("DD-Api-Key", e.APIKey)
+	req.Header.Set("DD-Api-Key", e.apiKey)
 	req.Header.Set("User-Agent", userAgent)
-	SetExtraHeaders(req.Header, payload.Headers)
+	for key, value := range payload.headers {
+		req.Header.Set(key, value)
+	}
 
 	resp, err := e.client.Do(req)
 
 	if err != nil {
-		return &RetriableError{
+		return &retriableError{
 			err:      err,
 			endpoint: e,
 		}
@@ -96,7 +97,7 @@ func (e *DatadogEndpoint) Write(payload *Payload) error {
 		err := fmt.Errorf("request to %s responded with %s", url, resp.Status)
 		if resp.StatusCode/100 == 5 {
 			// 5xx errors are retriable
-			return &RetriableError{
+			return &retriableError{
 				err:      err,
 				endpoint: e,
 			}
@@ -110,8 +111,8 @@ func (e *DatadogEndpoint) Write(payload *Payload) error {
 	return nil
 }
 
-func (e *DatadogEndpoint) String() string {
-	return fmt.Sprintf("DataDogEndpoint(%q)", e.Host+e.path)
+func (e *datadogEndpoint) String() string {
+	return fmt.Sprintf("DataDogEndpoint(%q)", e.host+e.path)
 }
 
 // timeout is the HTTP timeout for POST requests to the Datadog backend

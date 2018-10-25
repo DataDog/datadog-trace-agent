@@ -24,14 +24,14 @@ type ServiceWriter struct {
 
 	serviceBuffer model.ServicesMetadata
 
-	sender PayloadSender
+	sender payloadSender
 	exit   chan struct{}
 }
 
 // NewServiceWriter returns a new writer for services.
 func NewServiceWriter(conf *config.AgentConfig, InServices <-chan model.ServicesMetadata) *ServiceWriter {
 	cfg := conf.ServiceWriterConfig
-	endpoints := NewEndpoints(conf, pathServices)
+	endpoints := newEndpoints(conf, pathServices)
 	sender := newMultiSender(endpoints, cfg.SenderConfig)
 	log.Infof("Service writer initializing with config: %+v", cfg)
 
@@ -69,12 +69,12 @@ func (w *ServiceWriter) Run() {
 
 	// Monitor sender for events
 	go func() {
-		for event := range w.sender.monitor() {
+		for event := range w.sender.Monitor() {
 			switch event.typ {
 			case eventTypeSuccess:
 				url := event.stats.host
 				log.Infof("flushed service payload; url:%s, time:%s, size:%d bytes", url, event.stats.sendTime,
-					len(event.payload.Bytes))
+					len(event.payload.bytes))
 				tags := []string{"url:" + url}
 				statsd.Client.Gauge("datadog.trace_agent.service_writer.flush_duration",
 					event.stats.sendTime.Seconds(), tags, 1)
@@ -82,7 +82,7 @@ func (w *ServiceWriter) Run() {
 			case eventTypeFailure:
 				url := event.stats.host
 				log.Errorf("failed to flush service payload; url:%s, time:%s, size:%d bytes, error: %s",
-					url, event.stats.sendTime, len(event.payload.Bytes), event.err)
+					url, event.stats.sendTime, len(event.payload.bytes), event.err)
 				atomic.AddInt64(&w.stats.Errors, 1)
 			case eventTypeRetry:
 				log.Errorf("retrying flush service payload, retryNum: %d, delay:%s, error: %s",
@@ -146,7 +146,7 @@ func (w *ServiceWriter) flush() {
 
 	atomic.AddInt64(&w.stats.Bytes, int64(len(data)))
 
-	payload := NewPayload(data, headers)
+	payload := newPayload(data, headers)
 	w.sender.Send(payload)
 
 	w.serviceBuffer = make(model.ServicesMetadata)

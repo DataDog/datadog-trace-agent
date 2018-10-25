@@ -23,7 +23,7 @@ func TestServiceWriter_SenderMaxPayloads(t *testing.T) {
 	serviceWriter, _, _, _ := testServiceWriter()
 
 	// When checking its default sender configuration
-	queuableSender := serviceWriter.sender.(*QueuablePayloadSender)
+	queuableSender := serviceWriter.sender.(*queuableSender)
 
 	// Then the MaxQueuedPayloads setting should be -1 (unlimited)
 	assert.Equal(-1, queuableSender.conf.MaxQueuedPayloads)
@@ -121,7 +121,7 @@ func TestServiceWriter_UpdateInfoHandling(t *testing.T) {
 	time.Sleep(2 * serviceWriter.conf.FlushPeriod)
 
 	// And then sending a third payload with other 3 traces with an errored out endpoint with retry
-	testEndpoint.SetError(&RetriableError{
+	testEndpoint.SetError(&retriableError{
 		err:      fmt.Errorf("retriable error"),
 		endpoint: testEndpoint,
 	})
@@ -185,12 +185,12 @@ func calculateMetadataPayloadSize(metadata model.ServicesMetadata) int64 {
 }
 
 func assertMetadata(assert *assert.Assertions, expectedHeaders map[string]string,
-	expectedMetadata model.ServicesMetadata, payload *Payload) {
+	expectedMetadata model.ServicesMetadata, p *payload) {
 	servicesMetadata := model.ServicesMetadata{}
 
-	assert.NoError(json.Unmarshal(payload.Bytes, &servicesMetadata), "Stats payload should unmarshal correctly")
+	assert.NoError(json.Unmarshal(p.bytes, &servicesMetadata), "Stats payload should unmarshal correctly")
 
-	assert.Equal(expectedHeaders, payload.Headers, "Headers should match expectation")
+	assert.Equal(expectedHeaders, p.headers, "Headers should match expectation")
 	assert.Equal(expectedMetadata, servicesMetadata, "Service metadata should match expectation")
 }
 

@@ -18,7 +18,7 @@ const pathStats = "/api/v0.2/stats"
 
 // StatsWriter ingests stats buckets and flushes them to the API.
 type StatsWriter struct {
-	sender PayloadSender
+	sender payloadSender
 	exit   chan struct{}
 
 	// InStats is the stream of stat buckets to send out.
@@ -42,7 +42,7 @@ type StatsWriter struct {
 // NewStatsWriter returns a new writer for stats.
 func NewStatsWriter(conf *config.AgentConfig, InStats <-chan []model.StatsBucket) *StatsWriter {
 	cfg := conf.StatsWriterConfig
-	endpoints := NewEndpoints(conf, pathStats)
+	endpoints := newEndpoints(conf, pathStats)
 	sender := newMultiSender(endpoints, cfg.SenderConfig)
 	log.Infof("Stats writer initializing with config: %+v", cfg)
 
@@ -125,7 +125,7 @@ func (w *StatsWriter) handleStats(stats []model.StatsBucket) {
 			return
 		}
 
-		payload := NewPayload(data, headers)
+		payload := newPayload(data, headers)
 		w.sender.Send(payload)
 
 		atomic.AddInt64(&w.info.Bytes, int64(len(data)))
@@ -247,7 +247,7 @@ func (w *StatsWriter) buildPayloads(stats []model.StatsBucket, maxEntriesPerPayl
 //   them, send out statsd metrics, and updates the writer info
 // - periodically dumps the writer info
 func (w *StatsWriter) monitor() {
-	monC := w.sender.monitor()
+	monC := w.sender.Monitor()
 
 	infoTicker := time.NewTicker(w.conf.UpdateInfoPeriod)
 	defer infoTicker.Stop()
@@ -263,7 +263,7 @@ func (w *StatsWriter) monitor() {
 			case eventTypeSuccess:
 				url := e.stats.host
 				log.Infof("flushed stat payload; url: %s, time:%s, size:%d bytes", url, e.stats.sendTime,
-					len(e.payload.Bytes))
+					len(e.payload.bytes))
 				tags := []string{"url:" + url}
 				statsd.Client.Gauge("datadog.trace_agent.stats_writer.flush_duration",
 					e.stats.sendTime.Seconds(), tags, 1)
@@ -271,7 +271,7 @@ func (w *StatsWriter) monitor() {
 			case eventTypeFailure:
 				url := e.stats.host
 				log.Errorf("failed to flush stat payload; url:%s, time:%s, size:%d bytes, error: %s",
-					url, e.stats.sendTime, len(e.payload.Bytes), e.err)
+					url, e.stats.sendTime, len(e.payload.bytes), e.err)
 				atomic.AddInt64(&w.info.Errors, 1)
 			case eventTypeRetry:
 				log.Errorf("retrying flush stat payload, retryNum: %d, delay:%s, error: %s",

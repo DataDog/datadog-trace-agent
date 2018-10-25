@@ -2,49 +2,41 @@ package writer
 
 import (
 	"fmt"
-	"net/http"
 
 	log "github.com/cihub/seelog"
 )
 
 const languageHeaderKey = "X-Datadog-Reported-Languages"
 
-// Endpoint is an interface where we send the data from the Agent.
-type Endpoint interface {
+// endpoint is an interface where we send the data from the Agent.
+type endpoint interface {
 	// Write writes the payload to the endpoint.
-	Write(payload *Payload) error
+	write(payload *payload) error
 
-	// BaseURL returns the base URL for this endpoint. e.g. For the URL "https://trace.agent.datadoghq.eu/api/v0.2/traces"
+	// baseURL returns the base URL for this endpoint. e.g. For the URL "https://trace.agent.datadoghq.eu/api/v0.2/traces"
 	// it returns "https://trace.agent.datadoghq.eu".
-	BaseURL() string
+	baseURL() string
 }
 
-// NullEndpoint is a void endpoint dropping data.
-type NullEndpoint struct{}
+// nullEndpoint is a void endpoint dropping data.
+type nullEndpoint struct{}
 
-// Write of NullEndpoint just drops the payload and log its size.
-func (ne *NullEndpoint) Write(payload *Payload) error {
-	log.Debug("null endpoint: dropping payload, size: %d", len(payload.Bytes))
+// Write of nullEndpoint just drops the payload and log its size.
+func (ne *nullEndpoint) write(payload *payload) error {
+	log.Debug("null endpoint: dropping payload, size: %d", len(payload.bytes))
 	return nil
 }
 
 // BaseURL implements Endpoint.
-func (ne *NullEndpoint) BaseURL() string { return "<NullEndpoint>" }
+func (ne *nullEndpoint) baseURL() string { return "<nullEndpoint>" }
 
-// SetExtraHeaders appends a header map to HTTP headers.
-func SetExtraHeaders(h http.Header, extras map[string]string) {
-	for key, value := range extras {
-		h.Set(key, value)
-	}
-}
-
-// RetriableError is an endpoint error that signifies that the associated operation can be retried at a later point.
-type RetriableError struct {
+// retriableError is an endpoint error that signifies that the associated operation can be retried at a later point.
+type retriableError struct {
 	err      error
-	endpoint Endpoint
+	endpoint endpoint
 }
 
 // Error returns the error string.
-func (re *RetriableError) Error() string {
+func (re *retriableError) Error() string {
 	return fmt.Sprintf("%s: %v", re.endpoint, re.err)
 }
