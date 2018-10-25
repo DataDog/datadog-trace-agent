@@ -62,15 +62,13 @@ func (s *Sampler) Run() {
 }
 
 // Add samples a trace and returns true if trace was sampled (should be kept), false otherwise
-func (s *Sampler) Add(t processedTrace) bool {
+func (s *Sampler) Add(t processedTrace) (sampled bool, rate float64) {
 	atomic.AddUint64(&s.totalTraceCount, 1)
-
-	if s.engine.Sample(t.Trace, t.Root, t.Env) {
+	sampled, rate = s.engine.Sample(t.Trace, t.Root, t.Env)
+	if sampled {
 		atomic.AddUint64(&s.keptTraceCount, 1)
-		return true
 	}
-
-	return false
+	return sampled, rate
 }
 
 // Stop stops the sampler

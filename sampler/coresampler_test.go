@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/model"
 	log "github.com/cihub/seelog"
 	"github.com/stretchr/testify/assert"
 )
@@ -52,4 +53,32 @@ func TestSamplerLoop(t *testing.T) {
 	case <-time.After(time.Second * 1):
 		assert.Fail(t, "Sampler took more than 1 second to close")
 	}
+}
+
+func TestCombineRates(t *testing.T) {
+	var combineRatesTests = []struct {
+		rate1, rate2 float64
+		expected     float64
+	}{
+		{0.1, 1.0, 1.0},
+		{0.3, 0.2, 0.44},
+		{0.0, 0.5, 0.5},
+	}
+	for _, tt := range combineRatesTests {
+		assert.Equal(t, tt.expected, CombineRates(tt.rate1, tt.rate2))
+		assert.Equal(t, tt.expected, CombineRates(tt.rate2, tt.rate1))
+	}
+}
+
+func TestAddSampleRate(t *testing.T) {
+	assert := assert.New(t)
+	tID := randomTraceID()
+
+	root := model.Span{TraceID: tID, SpanID: 1, ParentID: 0, Start: 123, Duration: 100000, Service: "mcnulty", Type: "web"}
+
+	AddSampleRate(&root, 0.4)
+	assert.Equal(0.4, root.Metrics["_sample_rate"], "sample rate should be 40%%")
+
+	AddSampleRate(&root, 0.5)
+	assert.Equal(0.2, root.Metrics["_sample_rate"], "sample rate should be 20%% (50%% of 40%%)")
 }

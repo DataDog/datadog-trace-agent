@@ -76,7 +76,7 @@ func TestMaxTPS(t *testing.T) {
 		s.Sampler.Backend.(*MemoryBackend).decayScore()
 		for i := 0; i < int(tracesPerPeriod); i++ {
 			trace, root := getTestTrace()
-			sampled := s.Sample(trace, root, defaultEnv)
+			sampled, _ := s.Sample(trace, root, defaultEnv)
 			// Once we got into the "supposed-to-be" stable "regime", count the samples
 			if period > initPeriods && sampled {
 				sampledCount++
@@ -95,41 +95,6 @@ func TestMaxTPS(t *testing.T) {
 	// Combine error rates with L1-norm instead of L2-norm by laziness, still good enough for tests.
 	assert.InEpsilon(s.Sampler.maxTPS, float64(sampledCount)/(float64(periods)*periodSeconds),
 		0.01+defaultDecayFactor-1)
-}
-
-func TestSamplerChainedSampling(t *testing.T) {
-	assert := assert.New(t)
-	s := getTestScoreEngine()
-
-	trace, _ := getTestTrace()
-
-	root := trace.GetRoot()
-
-	// Received trace already got sampled
-	SetTraceAppliedSampleRate(root, 0.8)
-	assert.Equal(0.8, GetTraceAppliedSampleRate(root))
-
-	// Sample again with an ensured rate, rates should be combined
-	s.Sampler.extraRate = 0.5
-	s.Sample(trace, root, defaultEnv)
-	assert.Equal(0.4, GetTraceAppliedSampleRate(root))
-
-	// Check the sample rate isn't lost by reference
-	rootAgain := trace.GetRoot()
-	assert.Equal(0.4, GetTraceAppliedSampleRate(rootAgain))
-}
-
-func TestApplySampleRate(t *testing.T) {
-	assert := assert.New(t)
-	tID := randomTraceID()
-
-	root := model.Span{TraceID: tID, SpanID: 1, ParentID: 0, Start: 123, Duration: 100000, Service: "mcnulty", Type: "web"}
-
-	applySampleRate(&root, 0.4)
-	assert.Equal(0.4, root.Metrics["_sample_rate"], "sample rate should be 40%%")
-
-	applySampleRate(&root, 0.5)
-	assert.Equal(0.2, root.Metrics["_sample_rate"], "sample rate should be 20%% (50%% of 40%%)")
 }
 
 func BenchmarkSampler(b *testing.B) {

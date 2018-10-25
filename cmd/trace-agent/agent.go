@@ -272,40 +272,34 @@ func (a *Agent) Process(t model.Trace) {
 	go func() {
 		defer watchdog.LogOnPanic()
 
-		// All traces should go through either through the normal score sampler or
-		// the one dedicated to errors.
-		samplers := make([]*Sampler, 0, 2)
-		if traceContainsError(t) {
-			samplers = append(samplers, a.ErrorsScoreSampler)
-		} else {
-			samplers = append(samplers, a.ScoreSampler)
+		sampled, rate := a.sample(pt)
+		if !sampled {
+			return
 		}
-		if hasPriority {
-			// If Priority is defined, send to priority sampling, regardless of priority value.
-			// The sampler will keep or discard the trace, but we send everything so that it
-			// gets the big picture and can set the sampling rates accordingly.
-			samplers = append(samplers, a.PrioritySampler)
-		}
+		sampler.AddSampleRate(pt.Root, rate)
 
-		// Trace sampling.
-		var sampledTrace writer.SampledTrace
-
-		sampled := false
-		for _, s := range samplers {
-			// Consider trace as sampled if at least one of the samplers kept it.
-			sampled = s.Add(pt) || sampled
-		}
-		if sampled {
-			sampledTrace.Trace = &pt.Trace
-		}
-
-		sampledTrace.Transactions = a.TransactionSampler.Extract(pt)
-		// TODO: attach to these transactions the client, pre-sampler and transaction sample rates.
-
-		if !sampledTrace.Empty() {
-			a.sampledTraceChan <- &sampledTrace
+		a.sampledTraceChan <- &writer.SampledTrace{
+			Trace:        &pt.Trace,
+			Transactions: a.TransactionSampler.Extract(pt),
 		}
 	}()
+}
+
+func (a *Agent) sample(pt processedTrace) (sampled bool, rate float64) {
+	var sampledPriority, sampledScore bool
+	var ratePriority, rateScore float64
+
+	if _, ok := pt.Root.Metrics[sampler.SamplingPriorityKey]; ok {
+		sampledPriority, ratePriority = a.PrioritySampler.Add(pt)
+	}
+
+	if traceContainsError(pt.Trace) {
+		sampledScore, rateScore = a.ErrorsScoreSampler.Add(pt)
+	} else {
+		sampledScore, rateScore = a.ScoreSampler.Add(pt)
+	}
+
+	return sampledScore || sampledPriority, sampler.CombineRates(ratePriority, rateScore)
 }
 
 // dieFunc is used by watchdog to kill the agent; replaced in tests.

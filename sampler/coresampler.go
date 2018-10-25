@@ -52,7 +52,7 @@ type Engine interface {
 	// Stop the sampler.
 	Stop()
 	// Sample a trace.
-	Sample(trace model.Trace, root *model.Span, env string) bool
+	Sample(trace model.Trace, root *model.Span, env string) (sampled bool, samplingRate float64)
 	// GetState returns information about the sampler.
 	GetState() interface{}
 	// GetType returns the type of the sampler.
@@ -147,9 +147,9 @@ func (s *Sampler) RunAdjustScoring() {
 
 // GetSampleRate returns the sample rate to apply to a trace.
 func (s *Sampler) GetSampleRate(trace model.Trace, root *model.Span, signature Signature) float64 {
-	sampleRate := s.GetSignatureSampleRate(signature) * s.extraRate
+	rate := s.GetSignatureSampleRate(signature) * s.extraRate
 
-	return sampleRate
+	return rate
 }
 
 // GetMaxTPSSampleRate returns an extra sample rate to apply if we are above maxTPS.
@@ -176,6 +176,23 @@ func GetTraceAppliedSampleRate(root *model.Span) float64 {
 }
 
 // SetTraceAppliedSampleRate sets the currently applied sample rate in the trace data to allow chained up sampling.
-func SetTraceAppliedSampleRate(root *model.Span, sampleRate float64) {
-	root.SetMetric(model.SpanSampleRateMetricKey, sampleRate)
+func SetTraceAppliedSampleRate(root *model.Span, rate float64) {
+	root.SetMetric(model.SpanSampleRateMetricKey, rate)
+}
+
+// CombineRates merges two rates from Sampler1, Sampler2. Both samplers law are independant,
+// and {sampled} = {sampled by Sampler1} or {sampled by Sampler2}
+func CombineRates(rate1 float64, rate2 float64) float64 {
+	if rate1 >= 1 || rate2 >= 1 {
+		return 1
+	}
+	return rate1 + rate2 - rate1*rate2
+}
+
+// AddSampleRate adds a new sampling rate to the trace sampling rate. Previous and new sampling rate must be independant
+// and the sampling decisions sequential.
+func AddSampleRate(root *model.Span, rate float64) {
+	initialRate := GetTraceAppliedSampleRate(root)
+	newRate := initialRate * rate
+	SetTraceAppliedSampleRate(root, newRate)
 }

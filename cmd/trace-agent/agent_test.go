@@ -11,6 +11,7 @@ import (
 	"time"
 
 	log "github.com/cihub/seelog"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
@@ -18,8 +19,15 @@ import (
 	"github.com/DataDog/datadog-trace-agent/obfuscate"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/testutil"
-	"github.com/stretchr/testify/assert"
 )
+
+type mockSamplerEngine struct {
+	engine sampler.Engine
+}
+
+func newMockSampler(wantSampled bool, wantRate float64) *Sampler {
+	return &Sampler{engine: testutil.NewMockEngine(wantSampled, wantRate)}
+}
 
 func TestWatchdog(t *testing.T) {
 	if testing.Short() {
@@ -208,6 +216,139 @@ func TestProcess(t *testing.T) {
 		assert.EqualValues(t, 4, stats.TracesPriority1)
 		assert.EqualValues(t, 5, stats.TracesPriority2)
 	})
+}
+
+func TestSampling(t *testing.T) {
+	for name, tt := range map[string]struct {
+		// hasErrors will be true if the input trace should have errors
+		// hasPriority will be true if the input trace should have sampling priority set
+		hasErrors, hasPriority bool
+
+		// scoreRate, scoreErrorRate, priorityRate are the rates used by the mock samplers
+		scoreRate, scoreErrorRate, priorityRate float64
+
+		// scoreSampled, scoreErrorSampled, prioritySampled are the sample decisions of the mock samplers
+		scoreSampled, scoreErrorSampled, prioritySampled bool
+
+		// wantRate and wantSampled are the expected result
+		wantRate    float64
+		wantSampled bool
+	}{
+		"score and priority rate": {
+			hasPriority:  true,
+			scoreRate:    0.5,
+			priorityRate: 0.6,
+			wantRate:     sampler.CombineRates(0.5, 0.6),
+		},
+		"score only rate": {
+			scoreRate:    0.5,
+			priorityRate: 0.1,
+			wantRate:     0.5,
+		},
+		"error and priority rate": {
+			hasErrors:      true,
+			hasPriority:    true,
+			scoreErrorRate: 0.8,
+			priorityRate:   0.2,
+			wantRate:       sampler.CombineRates(0.8, 0.2),
+		},
+		"score not sampled decision": {
+			scoreSampled: false,
+			wantSampled:  false,
+		},
+		"score sampled decision": {
+			scoreSampled: true,
+			wantSampled:  true,
+		},
+		"score sampled priority not sampled": {
+			hasPriority:     true,
+			scoreSampled:    true,
+			prioritySampled: false,
+			wantSampled:     true,
+		},
+		"score not sampled priority sampled": {
+			hasPriority:     true,
+			scoreSampled:    false,
+			prioritySampled: true,
+			wantSampled:     true,
+		},
+		"score sampled priority sampled": {
+			hasPriority:     true,
+			scoreSampled:    true,
+			prioritySampled: true,
+			wantSampled:     true,
+		},
+		"score and priority not sampled": {
+			hasPriority:     true,
+			scoreSampled:    false,
+			prioritySampled: false,
+			wantSampled:     false,
+		},
+		"error not sampled decision": {
+			hasErrors:         true,
+			scoreErrorSampled: false,
+			wantSampled:       false,
+		},
+		"error sampled decision": {
+			hasErrors:         true,
+			scoreErrorSampled: true,
+			wantSampled:       true,
+		},
+		"error sampled priority not sampled": {
+			hasErrors:         true,
+			hasPriority:       true,
+			scoreErrorSampled: true,
+			prioritySampled:   false,
+			wantSampled:       true,
+		},
+		"error not sampled priority sampled": {
+			hasErrors:         true,
+			hasPriority:       true,
+			scoreErrorSampled: false,
+			prioritySampled:   true,
+			wantSampled:       true,
+		},
+		"error sampled priority sampled": {
+			hasErrors:         true,
+			hasPriority:       true,
+			scoreErrorSampled: true,
+			prioritySampled:   true,
+			wantSampled:       true,
+		},
+		"error and priority not sampled": {
+			hasErrors:         true,
+			hasPriority:       true,
+			scoreErrorSampled: false,
+			prioritySampled:   false,
+			wantSampled:       false,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			a := &Agent{
+				ScoreSampler:       newMockSampler(tt.scoreSampled, tt.scoreRate),
+				ErrorsScoreSampler: newMockSampler(tt.scoreErrorSampled, tt.scoreErrorRate),
+				PrioritySampler:    newMockSampler(tt.prioritySampled, tt.priorityRate),
+			}
+			root := &model.Span{
+				Service:  "serv1",
+				Start:    time.Now().UnixNano(),
+				Duration: (100 * time.Millisecond).Nanoseconds(),
+				Metrics:  map[string]float64{},
+			}
+
+			if tt.hasErrors {
+				root.Error = 1
+			}
+			pt := processedTrace{Trace: model.Trace{root}, Root: root}
+			if tt.hasPriority {
+				pt.Root.Metrics[sampler.SamplingPriorityKey] = 1
+			}
+
+			sampled, rate := a.sample(pt)
+			assert.EqualValues(t, tt.wantRate, rate)
+			assert.EqualValues(t, tt.wantSampled, sampled)
+		})
+	}
 }
 
 func BenchmarkAgentTraceProcessing(b *testing.B) {

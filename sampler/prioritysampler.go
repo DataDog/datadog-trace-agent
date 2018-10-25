@@ -24,7 +24,10 @@ import (
 const (
 	// SamplingPriorityKey is the key of the sampling priority value in the metrics map of the root span
 	SamplingPriorityKey = "_sampling_priority_v1"
-	syncPeriod          = 3 * time.Second
+	// SamplingPriorityRateKey is the metrics key holding the sampling rate at which this trace
+	// was sampled.
+	SamplingPriorityRateKey = "_sampling_priority_rate_v1"
+	syncPeriod              = 3 * time.Second
 )
 
 // PriorityEngine is the main component of the sampling logic
@@ -85,11 +88,11 @@ func (s *PriorityEngine) Stop() {
 	close(s.exit)
 }
 
-// Sample counts an incoming trace and tells if it is a sample which has to be kept
-func (s *PriorityEngine) Sample(trace model.Trace, root *model.Span, env string) bool {
+// Sample counts an incoming trace and returns the trace sampling decision and the applied sampling rate
+func (s *PriorityEngine) Sample(trace model.Trace, root *model.Span, env string) (sampled bool, rate float64) {
 	// Extra safety, just in case one trace is empty
 	if len(trace) == 0 {
-		return false
+		return false, 0
 	}
 
 	samplingPriority := root.Metrics[SamplingPriorityKey]
@@ -97,13 +100,16 @@ func (s *PriorityEngine) Sample(trace model.Trace, root *model.Span, env string)
 	// Regardless of rates, sampling here is based on the metadata set
 	// by the client library. Which, is turn, is based on agent hints,
 	// but the rule of thumb is: respect client choice.
-	sampled := samplingPriority > 0
+	sampled = samplingPriority > 0
 
-	if samplingPriority < 0 || samplingPriority > 1 {
-		// Short-circuit and return without counting the trace in the sampling rate logic
-		// if its value has not been set automaticallt by the client lib.
-		// The feedback loop should be scoped to the values it can act upon.
-		return sampled
+	// Short-circuit and return without counting the trace in the sampling rate logic
+	// if its value has not been set automaticallt by the client lib.
+	// The feedback loop should be scoped to the values it can act upon.
+	if samplingPriority < 0 {
+		return sampled, 0
+	}
+	if samplingPriority > 1 {
+		return sampled, 1
 	}
 
 	signature := computeServiceSignature(root, env)
@@ -114,13 +120,20 @@ func (s *PriorityEngine) Sample(trace model.Trace, root *model.Span, env string)
 	// Update sampler state by counting this trace
 	s.Sampler.Backend.CountSignature(signature)
 
+	// fetching applied sample rate
+	var ok bool
+	rate, ok = root.Metrics[SamplingPriorityRateKey]
+	if !ok {
+		rate = s.Sampler.GetSignatureSampleRate(signature)
+		root.Metrics[SamplingPriorityRateKey] = rate
+	}
+
 	if sampled {
 		// Count the trace to allow us to check for the maxTPS limit.
 		// It has to happen before the maxTPS sampling.
 		s.Sampler.Backend.CountSample()
 	}
-
-	return sampled
+	return sampled, rate
 }
 
 // GetState collects and return internal statistics and coefficients for indication purposes
