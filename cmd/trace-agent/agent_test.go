@@ -11,6 +11,7 @@ import (
 	"time"
 
 	log "github.com/cihub/seelog"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
@@ -18,7 +19,6 @@ import (
 	"github.com/DataDog/datadog-trace-agent/obfuscate"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/testutil"
-	"github.com/stretchr/testify/assert"
 )
 
 type mockSamplerEngine struct {
@@ -26,7 +26,7 @@ type mockSamplerEngine struct {
 }
 
 func newMockSampler(wantSampled bool, wantRate float64) *Sampler {
-	return &Sampler{engine: sampler.NewMockEngine(wantSampled, wantRate)}
+	return &Sampler{engine: testutil.NewMockEngine(wantSampled, wantRate)}
 }
 
 func TestWatchdog(t *testing.T) {
