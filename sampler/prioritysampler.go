@@ -89,7 +89,7 @@ func (s *PriorityEngine) Stop() {
 }
 
 // Sample counts an incoming trace and returns the trace sampling decision and the applied sampling rate
-func (s *PriorityEngine) Sample(trace model.Trace, root *model.Span, env string) (sampled bool, sampleRate float64) {
+func (s *PriorityEngine) Sample(trace model.Trace, root *model.Span, env string) (sampled bool, rate float64) {
 	// Extra safety, just in case one trace is empty
 	if len(trace) == 0 {
 		return false, 0
@@ -122,10 +122,10 @@ func (s *PriorityEngine) Sample(trace model.Trace, root *model.Span, env string)
 
 	// fetching applied sample rate
 	var ok bool
-	sampleRate, ok = root.Metrics[SamplingPriorityRateKey]
+	rate, ok = root.Metrics[SamplingPriorityRateKey]
 	if !ok {
-		sampleRate = s.Sampler.GetSignatureSampleRate(signature)
-		root.Metrics[SamplingPriorityRateKey] = sampleRate
+		rate = s.Sampler.GetSignatureSampleRate(signature)
+		root.Metrics[SamplingPriorityRateKey] = rate
 	}
 
 	if sampled {
@@ -133,7 +133,7 @@ func (s *PriorityEngine) Sample(trace model.Trace, root *model.Span, env string)
 		// It has to happen before the maxTPS sampling.
 		s.Sampler.Backend.CountSample()
 	}
-	return sampled, sampleRate
+	return sampled, rate
 }
 
 // GetState collects and return internal statistics and coefficients for indication purposes

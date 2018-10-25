@@ -272,10 +272,12 @@ func (a *Agent) Process(t model.Trace) {
 	go func() {
 		defer watchdog.LogOnPanic()
 
-		sampled := a.sample(pt)
+		sampled, rate := a.sample(pt)
 		if !sampled {
 			return
 		}
+		sampler.AddSampleRate(pt.Root, rate)
+
 		a.sampledTraceChan <- &writer.SampledTrace{
 			Trace:        &pt.Trace,
 			Transactions: a.TransactionSampler.Extract(pt),
@@ -283,12 +285,11 @@ func (a *Agent) Process(t model.Trace) {
 	}()
 }
 
-func (a *Agent) sample(pt processedTrace) (sampled bool) {
+func (a *Agent) sample(pt processedTrace) (sampled bool, rate float64) {
 	var sampledPriority, sampledScore bool
 	var ratePriority, rateScore float64
 
-	_, hasPriority := pt.Root.Metrics[sampler.SamplingPriorityKey]
-	if hasPriority {
+	if _, ok := pt.Root.Metrics[sampler.SamplingPriorityKey]; ok {
 		sampledPriority, ratePriority = a.PrioritySampler.Add(pt)
 	}
 
@@ -298,9 +299,7 @@ func (a *Agent) sample(pt processedTrace) (sampled bool) {
 		sampledScore, rateScore = a.ScoreSampler.Add(pt)
 	}
 
-	sampleRate := sampler.CombineRates(ratePriority, rateScore)
-	sampler.AddSampleRate(pt.Root, sampleRate)
-	return sampledScore || sampledPriority
+	return sampledScore || sampledPriority, sampler.CombineRates(ratePriority, rateScore)
 }
 
 // dieFunc is used by watchdog to kill the agent; replaced in tests.

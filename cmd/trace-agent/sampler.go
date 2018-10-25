@@ -62,16 +62,16 @@ func (s *Sampler) Run() {
 }
 
 // Add samples a trace and returns true if trace was sampled (should be kept), false otherwise
-func (s *Sampler) Add(t processedTrace) (sampled bool, sampleRate float64) {
+func (s *Sampler) Add(t processedTrace) (sampled bool, rate float64) {
 	atomic.AddUint64(&s.totalTraceCount, 1)
 
-	sampled, sampleRate = s.engine.Sample(t.Trace, t.Root, t.Env)
+	sampled, rate = s.engine.Sample(t.Trace, t.Root, t.Env)
 	if sampled {
 		atomic.AddUint64(&s.keptTraceCount, 1)
-		return true, sampleRate
+		return true, rate
 	}
 
-	return false, sampleRate
+	return false, rate
 }
 
 // Stop stops the sampler
@@ -118,13 +118,4 @@ func (s *Sampler) logStats() {
 			log.Debugf("unhandled sampler engine, can't log state")
 		}
 	}
-}
-
-type mockSamplerEngine struct {
-	engine sampler.Engine
-}
-
-func newMockSampler(wantSampled bool, wantRate float64) *Sampler {
-	return &Sampler{
-		engine: sampler.NewMockEngine(wantSampled, wantRate)}
 }

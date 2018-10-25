@@ -147,9 +147,9 @@ func (s *Sampler) RunAdjustScoring() {
 
 // GetSampleRate returns the sample rate to apply to a trace.
 func (s *Sampler) GetSampleRate(trace model.Trace, root *model.Span, signature Signature) float64 {
-	sampleRate := s.GetSignatureSampleRate(signature) * s.extraRate
+	rate := s.GetSignatureSampleRate(signature) * s.extraRate
 
-	return sampleRate
+	return rate
 }
 
 // GetMaxTPSSampleRate returns an extra sample rate to apply if we are above maxTPS.
@@ -176,8 +176,8 @@ func GetTraceAppliedSampleRate(root *model.Span) float64 {
 }
 
 // SetTraceAppliedSampleRate sets the currently applied sample rate in the trace data to allow chained up sampling.
-func SetTraceAppliedSampleRate(root *model.Span, sampleRate float64) {
-	root.SetMetric(model.SpanSampleRateMetricKey, sampleRate)
+func SetTraceAppliedSampleRate(root *model.Span, rate float64) {
+	root.SetMetric(model.SpanSampleRateMetricKey, rate)
 }
 
 // CombineRates merges two rates from Sampler1, Sampler2. Both samplers law are independant,
@@ -191,44 +191,8 @@ func CombineRates(rate1 float64, rate2 float64) float64 {
 
 // AddSampleRate adds a new sampling rate to the trace sampling rate. Previous and new sampling rate must be independant
 // and the sampling decisions sequential.
-func AddSampleRate(root *model.Span, sampleRate float64) {
+func AddSampleRate(root *model.Span, rate float64) {
 	initialRate := GetTraceAppliedSampleRate(root)
-	newRate := initialRate * sampleRate
+	newRate := initialRate * rate
 	SetTraceAppliedSampleRate(root, newRate)
-}
-
-// MockEngine mocks a sampler engine
-type MockEngine struct {
-	wantSampled bool
-	wantRate    float64
-}
-
-// NewMockEngine returns a MockEngine for tests
-func NewMockEngine(wantSampled bool, wantRate float64) *MockEngine {
-	return &MockEngine{wantSampled: wantSampled, wantRate: wantRate}
-}
-
-// Sample returns a constant rate
-func (e *MockEngine) Sample(_ model.Trace, _ *model.Span, _ string) (bool, float64) {
-	return e.wantSampled, e.wantRate
-}
-
-// Run mocks Engine.Run()
-func (e *MockEngine) Run() {
-	return
-}
-
-// Stop mocks Engine.Stop()
-func (e *MockEngine) Stop() {
-	return
-}
-
-// GetState mocks Engine.GetState()
-func (e *MockEngine) GetState() interface{} {
-	return nil
-}
-
-// GetType mocks Engine.GetType()
-func (e *MockEngine) GetType() EngineType {
-	return EngineType(0)
 }

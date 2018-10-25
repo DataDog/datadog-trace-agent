@@ -14,9 +14,9 @@ const (
 
 // SampleByRate tells if a trace (from its ID) with a given rate should be sampled
 // Use Knuth multiplicative hashing to leverage imbalanced traceID generators
-func SampleByRate(traceID uint64, sampleRate float64) bool {
-	if sampleRate < 1 {
-		return traceID*samplerHasher < uint64(sampleRate*maxTraceIDFloat)
+func SampleByRate(traceID uint64, rate float64) bool {
+	if rate < 1 {
+		return traceID*samplerHasher < uint64(rate*maxTraceIDFloat)
 	}
 	return true
 }
