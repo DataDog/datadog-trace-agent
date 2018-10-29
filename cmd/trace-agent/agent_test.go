@@ -192,8 +192,8 @@ func TestProcess(t *testing.T) {
 		defer cancel()
 
 		now := time.Now()
-		disabled := float64(-99)
-		for _, key := range []float64{
+		disabled := int(-99)
+		for _, key := range []int{
 			disabled, -1, -1, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2,
 		} {
 			span := &model.Span{
@@ -204,7 +204,7 @@ func TestProcess(t *testing.T) {
 				Metrics:  map[string]float64{},
 			}
 			if key != disabled {
-				span.Metrics[sampler.SamplingPriorityKey] = key
+				span.SetSamplingPriority(key)
 			}
 			agent.Process(model.Trace{span})
 		}
@@ -339,9 +339,9 @@ func TestSampling(t *testing.T) {
 			if tt.hasErrors {
 				root.Error = 1
 			}
-			pt := processedTrace{Trace: model.Trace{root}, Root: root}
+			pt := model.ProcessedTrace{Trace: model.Trace{root}, Root: root}
 			if tt.hasPriority {
-				pt.Root.Metrics[sampler.SamplingPriorityKey] = 1
+				pt.Root.SetSamplingPriority(1)
 			}
 
 			sampled, rate := a.sample(pt)

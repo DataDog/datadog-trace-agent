@@ -22,8 +22,6 @@ import (
 )
 
 const (
-	// SamplingPriorityKey is the key of the sampling priority value in the metrics map of the root span
-	SamplingPriorityKey = "_sampling_priority_v1"
 	// SamplingPriorityRateKey is the metrics key holding the sampling rate at which this trace
 	// was sampled.
 	SamplingPriorityRateKey = "_sampling_priority_rate_v1"
@@ -95,7 +93,7 @@ func (s *PriorityEngine) Sample(trace model.Trace, root *model.Span, env string)
 		return false, 0
 	}
 
-	samplingPriority := root.Metrics[SamplingPriorityKey]
+	samplingPriority, _ := root.GetSamplingPriority()
 
 	// Regardless of rates, sampling here is based on the metadata set
 	// by the client library. Which, is turn, is based on agent hints,
