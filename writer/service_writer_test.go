@@ -158,7 +158,7 @@ func TestServiceWriter_UpdateInfoHandling(t *testing.T) {
 
 	// Retry counts
 	retriesSummary := countSummaries["datadog.trace_agent.service_writer.retries"]
-	assert.True(len(retriesSummary.Calls) >= 3, "There should have been multiple retries count calls")
+	assert.True(len(retriesSummary.Calls) >= 2, "There should have been multiple retries count calls")
 	assert.True(retriesSummary.Sum >= expectedMinNumRetries)
 
 	// Error counts
