@@ -20,7 +20,7 @@ import (
 const pathTraces = "/api/v0.2/traces"
 
 // TracePackage represents the result of a trace sampling operation.
-
+//
 // NOTE: A TracePackage can be valid even if any of its fields is nil/empty. In particular, a common case is that of
 // empty Trace but non-empty Events. This happens when events are extracted from a trace that wasn't sampled.
 type TracePackage struct {
