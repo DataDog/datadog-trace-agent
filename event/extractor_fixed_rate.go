@@ -27,7 +27,7 @@ func (s *fixedRateExtractor) Extract(t model.ProcessedTrace) []*model.APMEvent {
 	priority, hasPriority := t.GetSamplingPriority()
 
 	for _, span := range t.WeightedTrace {
-		if s.shouldAnalyze(span, hasPriority, priority) {
+		if s.shouldExtractEvent(span, hasPriority, priority) {
 			events = append(events, &model.APMEvent{
 				Span:         span.Span,
 				TraceSampled: t.Sampled,
@@ -38,7 +38,7 @@ func (s *fixedRateExtractor) Extract(t model.ProcessedTrace) []*model.APMEvent {
 	return events
 }
 
-func (s *fixedRateExtractor) shouldAnalyze(span *model.WeightedSpan, hasPriority bool, priority int) bool {
+func (s *fixedRateExtractor) shouldExtractEvent(span *model.WeightedSpan, hasPriority bool, priority int) bool {
 	if operations, ok := s.rateByServiceAndName[span.Service]; ok {
 		if analyzeRate, ok := operations[span.Name]; ok {
 			// If the trace has been manually sampled, we keep all matching spans

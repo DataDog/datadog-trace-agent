@@ -35,14 +35,14 @@ func TestTraceWriter(t *testing.T) {
 		// Send a few sampled traces through the writer
 		sampledTraces := []*TracePackage{
 			// These 2 should be grouped together in a single payload
-			randomSampledTrace(1, 1),
-			randomSampledTrace(1, 1),
+			randomTracePackage(1, 1),
+			randomTracePackage(1, 1),
 			// This one should be on its own in a single payload
-			randomSampledTrace(3, 1),
+			randomTracePackage(3, 1),
 			// This one should be on its own in a single payload
-			randomSampledTrace(5, 1),
+			randomTracePackage(5, 1),
 			// This one should be on its own in a single payload
-			randomSampledTrace(1, 1),
+			randomTracePackage(1, 1),
 		}
 		for _, sampledTrace := range sampledTraces {
 			traceChannel <- sampledTrace
@@ -76,7 +76,7 @@ func TestTraceWriter(t *testing.T) {
 		traceWriter.Start()
 
 		// Send a single trace that does not go over the span limit
-		testSampledTrace := randomSampledTrace(2, 2)
+		testSampledTrace := randomTracePackage(2, 2)
 		traceChannel <- testSampledTrace
 
 		// Wait for twice the flush period
@@ -123,9 +123,9 @@ func TestTraceWriter(t *testing.T) {
 
 		// Send a bunch of sampled traces that should go together in a single payload
 		payload1SampledTraces := []*TracePackage{
-			randomSampledTrace(2, 0),
-			randomSampledTrace(2, 0),
-			randomSampledTrace(2, 0),
+			randomTracePackage(2, 0),
+			randomTracePackage(2, 0),
+			randomTracePackage(2, 0),
 		}
 		expectedNumPayloads++
 		expectedNumSpans += 6
@@ -138,7 +138,7 @@ func TestTraceWriter(t *testing.T) {
 
 		// Send a single trace that goes over the span limit
 		payload2SampledTraces := []*TracePackage{
-			randomSampledTrace(20, 0),
+			randomTracePackage(20, 0),
 		}
 		expectedNumPayloads++
 		expectedNumSpans += 20
@@ -156,9 +156,9 @@ func TestTraceWriter(t *testing.T) {
 		// Send a third payload with other 3 traces with an errored out endpoint
 		testEndpoint.SetError(fmt.Errorf("non retriable error"))
 		payload3SampledTraces := []*TracePackage{
-			randomSampledTrace(2, 0),
-			randomSampledTrace(2, 0),
-			randomSampledTrace(2, 0),
+			randomTracePackage(2, 0),
+			randomTracePackage(2, 0),
+			randomTracePackage(2, 0),
 		}
 
 		expectedNumErrors++
@@ -179,9 +179,9 @@ func TestTraceWriter(t *testing.T) {
 			endpoint: testEndpoint,
 		})
 		payload4SampledTraces := []*TracePackage{
-			randomSampledTrace(2, 0),
-			randomSampledTrace(2, 0),
-			randomSampledTrace(2, 0),
+			randomTracePackage(2, 0),
+			randomTracePackage(2, 0),
+			randomTracePackage(2, 0),
 		}
 
 		expectedMinNumRetries++
@@ -277,7 +277,7 @@ func calculateTracePayloadSize(sampledTraces []*TracePackage) int64 {
 func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expectedHeaders map[string]string,
 	sampledTraces []*TracePackage, payloads []*payload) {
 
-	var expectedTraces []*model.Trace
+	var expectedTraces []model.Trace
 	var expectedEvents []*model.APMEvent
 
 	for _, sampledTrace := range sampledTraces {
@@ -355,7 +355,7 @@ func testTraceWriter() (*TraceWriter, chan *TracePackage, *testEndpoint, *testut
 	return traceWriter, payloadChannel, testEndpoint, testStatsClient
 }
 
-func randomSampledTrace(numSpans, numEvents int) *TracePackage {
+func randomTracePackage(numSpans, numEvents int) *TracePackage {
 	if numSpans < numEvents {
 		panic("can't have more events than spans in a RandomSampledTrace")
 	}
@@ -369,7 +369,7 @@ func randomSampledTrace(numSpans, numEvents int) *TracePackage {
 	}
 
 	return &TracePackage{
-		Trace:  &trace,
+		Trace:  trace,
 		Events: events,
 	}
 }

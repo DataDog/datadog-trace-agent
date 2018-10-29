@@ -20,17 +20,19 @@ import (
 const pathTraces = "/api/v0.2/traces"
 
 // TracePackage represents the result of a trace sampling operation.
-//
-// If a trace was sampled, then Trace will be set to that trace. Otherwise, it will be nil.
-// If events were extracted from a trace, then Events will be populated from these events. Otherwise, it will be empty.
+
+// NOTE: A TracePackage can be valid even if any of its fields is nil/empty. In particular, a common case is that of
+// empty Trace but non-empty Events. This happens when events are extracted from a trace that wasn't sampled.
 type TracePackage struct {
-	Trace  *model.Trace
+	// Trace will contain a trace if it was sampled or be empty if it wasn't.
+	Trace model.Trace
+	// Events contains all APMEvents extracted from a trace. If no events were extracted, it will be empty.
 	Events []*model.APMEvent
 }
 
 // Empty returns true if this TracePackage has no data.
 func (s *TracePackage) Empty() bool {
-	return s.Trace == nil && len(s.Events) == 0
+	return len(s.Trace) == 0 && len(s.Events) == 0
 }
 
 // TraceWriter ingests sampled traces and flushes them to the API.
@@ -154,15 +156,7 @@ func (w *TraceWriter) handleSampledTrace(sampledTrace *TracePackage) {
 	trace := sampledTrace.Trace
 	events := sampledTrace.Events
 
-	var n int
-
-	if trace != nil {
-		n += len(*trace)
-	}
-
-	if events != nil {
-		n += len(events)
-	}
+	n := len(trace) + len(events)
 
 	if w.spansInBuffer > 0 && w.spansInBuffer+n > w.conf.MaxSpansPerPayload {
 		// If we have data pending and adding the new data would overflow max spans per payload, force a flush
@@ -179,15 +173,17 @@ func (w *TraceWriter) handleSampledTrace(sampledTrace *TracePackage) {
 	}
 }
 
-func (w *TraceWriter) appendTrace(trace *model.Trace) {
-	if trace == nil || len(*trace) == 0 {
+func (w *TraceWriter) appendTrace(trace model.Trace) {
+	numSpans := len(trace)
+
+	if numSpans == 0 {
 		return
 	}
 
-	log.Tracef("Handling new trace with %d spans: %v", len(*trace), trace)
+	log.Tracef("Handling new trace with %d spans: %v", numSpans, trace)
 
 	w.traces = append(w.traces, trace.APITrace())
-	w.spansInBuffer += len(*trace)
+	w.spansInBuffer += numSpans
 }
 
 func (w *TraceWriter) appendEvents(events []*model.APMEvent) {

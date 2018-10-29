@@ -257,7 +257,7 @@ func (a *Agent) Process(t model.Trace) {
 		if sampled {
 			pt.Sampled = sampled
 			sampler.AddSampleRate(pt.Root, rate)
-			tracePkg.Trace = &pt.Trace
+			tracePkg.Trace = pt.Trace
 		}
 
 		// NOTE: Events can be extracted from non-sampled traces.
