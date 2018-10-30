@@ -381,8 +381,11 @@ func TestEventSamplingFromConf(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			sampler := eventSamplerFromConf(&config.AgentConfig{MaxEPS: testCase.maxEPS})
+			sampler.Start()
 
 			actualEPS := generateTraffic(sampler, testCaseDuration, testCase.intakeEPS, testCase.pctTraceSampled)
+
+			sampler.Stop()
 
 			assert.InDelta(t, testCase.expectedEPS, actualEPS, testCase.expectedEPS*testCase.deltaPct)
 		})

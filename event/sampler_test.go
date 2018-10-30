@@ -10,6 +10,9 @@ import (
 
 func TestBatchSampler(t *testing.T) {
 	testDecider := func(event *model.APMEvent) SamplingDecision {
+		if event == nil {
+			return DecisionNone
+		}
 		return SamplingDecision(event.Span.TraceID % 3)
 	}
 
@@ -27,6 +30,7 @@ func TestBatchSampler(t *testing.T) {
 
 	testCases := map[string]testCase{
 		"no events":       {nil, nil},
+		"nil events":      {make([]*model.APMEvent, 100), nil},
 		"single event":    {testEventsSingleton, sampledFilter(testEventsSingleton, testDecider)},
 		"multiple events": {testEvents, sampledFilter(testEvents, testDecider)},
 	}
@@ -43,9 +47,21 @@ func TestBatchSampler(t *testing.T) {
 
 			batch := NewBatchSampler(sampler)
 
+			batch.Start()
+
 			assert.ElementsMatch(t, testCase.expectedEvents, batch.Sample(testCase.events))
 
-			assert.EqualValues(t, len(testCase.events), sampler.SampleCalls)
+			batch.Stop()
+
+			nonNilEvents := 0
+
+			for _, e := range testCase.events {
+				if e != nil {
+					nonNilEvents++
+				}
+			}
+
+			assert.EqualValues(t, nonNilEvents, sampler.SampleCalls)
 		})
 	}
 }
@@ -67,6 +83,8 @@ type MockSampler struct {
 	SampleResult map[*model.APMEvent]SamplingDecision
 }
 
+func (ms *MockSampler) Start() {}
+func (ms *MockSampler) Stop()  {}
 func (ms *MockSampler) Sample(event *model.APMEvent) SamplingDecision {
 	ms.SampleCalls++
 

@@ -18,8 +18,12 @@ const (
 
 // Sampler samples APM events according to implementation-defined techniques.
 type Sampler interface {
+	// Start tells this sampler to bootstrap whatever it needs to answer `Sample` requests.
+	Start()
 	// Sample decides whether to sample the provided event or not.
 	Sample(event *model.APMEvent) SamplingDecision
+	// Stop tells this sampler to stop anything that was bootstrapped in `Start`.
+	Stop()
 }
 
 // BatchSampler allows sampling a collection of APM events, returning only those that survived sampling.
@@ -34,12 +38,25 @@ func NewBatchSampler(sampler Sampler) *BatchSampler {
 	}
 }
 
+// Start starts the underlying sampler.
+func (bs *BatchSampler) Start() {
+	bs.sampler.Start()
+}
+
+// Stop stops the underlying sampler.
+func (bs *BatchSampler) Stop() {
+	bs.sampler.Start()
+}
+
 // Sample takes a collection of events, makes a sampling decision for each event and returns a collection containing
 // only those events that were sampled.
 func (bs *BatchSampler) Sample(events []*model.APMEvent) []*model.APMEvent {
 	result := make([]*model.APMEvent, 0, len(events))
 
 	for _, event := range events {
+		if event == nil {
+			continue
+		}
 		if bs.sampler.Sample(event) == DecisionSample {
 			result = append(result, event)
 		}

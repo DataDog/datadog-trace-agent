@@ -131,6 +131,7 @@ func (a *Agent) Run() {
 	a.ScoreSampler.Run()
 	a.ErrorsScoreSampler.Run()
 	a.PrioritySampler.Run()
+	a.EventSampler.Start()
 
 	for {
 		select {
@@ -151,6 +152,7 @@ func (a *Agent) Run() {
 			a.ScoreSampler.Stop()
 			a.ErrorsScoreSampler.Stop()
 			a.PrioritySampler.Stop()
+			a.EventSampler.Stop()
 			return
 		}
 	}
@@ -347,19 +349,5 @@ func eventExtractorFromConf(conf *config.AgentConfig) event.Extractor {
 }
 
 func eventSamplerFromConf(conf *config.AgentConfig) *event.BatchSampler {
-	rateCounter := event.NewSamplerBackendRateCounter()
-	// Start and leave running until the end
-	rateCounter.Start()
-
-	return event.NewBatchSampler(
-		event.NewSamplerChain(
-			[]event.Sampler{
-				// Sample all events for which their respective traces were sampled
-				event.NewSampledTraceSampler(),
-				// For those events that did not have its trace sampled, sample as many as possible respecting MaxEPS.
-				event.NewMaxEPSSampler(conf.MaxEPS, event.NewReadOnlyRateCounter(rateCounter)),
-			}, func(decision event.SamplingDecision) {
-				rateCounter.Count()
-			}),
-	)
+	return event.NewBatchSampler(event.NewMaxEPSSampler(conf.MaxEPS))
 }
