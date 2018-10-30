@@ -7,7 +7,7 @@
 			<Tag>elasticsearch.body</Tag>
 			<KeepValues></KeepValues>
 			<In> { "query": { "multi_match" : { "query" : "guide", "fields" : ["_all", { "key": "value", "other": ["1", "2", {"k": "v"}] }, "2"] } } } </In>
-			<Out> { "query": { "multi_match": { "query": "?", "fields" : ["?", { "key": "?", "other": ["?", "?", {"k": "?"}] }, "?"] } } } </Out>
+			<Out> { "query": { "multi_match": { "query": "?", "fields" : ["?", { "key": "?", "other": ["?", {"k": "?"}] }, "?"] } } } </Out>
 		</Test>
 
 		<!-- ******************************************************************** -->
@@ -61,7 +61,7 @@
 			<Tag>elasticsearch.body</Tag>
 			<KeepValues><key>k</key></KeepValues>
 			<In> {"fields" : ["_all", { "key": "value", "other": ["1", "2", {"k": "v"}] }, "2"]}</In>
-			<Out>{"fields" : ["?", { "key": "?", "other": ["?", "?", {"k": "v"}] }, "?"]}</Out>
+			<Out>{"fields" : ["?", { "key": "?", "other": ["?", {"k": "v"}] }, "?"]}</Out>
 		</Test>
 
 		<!-- ******************************************************************** -->
@@ -103,7 +103,7 @@
     },
     "size": "?",
     "from": "?",
-    "_source": [ "?", "?", "?" ],
+    "_source": [ "?" ],
     "highlight": {
 	   "fields" : {
 		  "title" : {}
@@ -185,7 +185,7 @@
     },
     "size": "?",
     "from": "?",
-    "_source": [ "?", "?", "?" ],
+    "_source": [ "?" ],
     "highlight": {
 	   "fields" : {
 		  "title" : {}
@@ -226,7 +226,7 @@
     },
     "size": "?",
     "from": "?",
-    "_source": [ "?", "?", "?" ],
+    "_source": [ "?" ],
     "highlight": {
 	   "fields" : {
 		  "title" : {}

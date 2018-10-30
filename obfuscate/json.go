@@ -44,20 +44,41 @@ func newJSONObfuscator(cfg *config.JSONObfuscationConfig) *jsonObfuscator {
 	}
 }
 
-// setKey verifies if we are currently scanning a key based on the current state
-// and updates the state accordingly. It must be called only after a closure or a
-// value scan has ended.
-func (p *jsonObfuscator) setKey() {
+// inArray returns true if we are in an array closure.
+func (p *jsonObfuscator) inArray() bool {
 	n := len(p.closures)
-	p.key = n == 0 || p.closures[n-1] // true if we are at top level or in an object
-	p.wiped = false
+	return n > 0 && !p.closures[n-1]
+}
+
+// setKey verifies if we are currently scanning a key based on the current state.
+// It must be called only after a token or closure has been scanned in its entirety.
+func (p *jsonObfuscator) setKey() {
+	// if we are not in an array closure, the next token will be a key:
+	p.key = !p.inArray()
+
+	// if we are in an array and the previous element was already wiped,
+	// simply ignore coming elements.
+	p.wiped = p.wiped && p.inArray()
+}
+
+func (p *jsonObfuscator) hasMore(data []byte) bool {
+	for _, c := range data {
+		switch c {
+		case ' ', '\t', '\r', '\n':
+			// white space character
+			continue
+		}
+		// ref: go/src/encoding/json/stream.go.(*Decoder).More
+		return c != ']' && c != '}'
+	}
+	return false
 }
 
 func (p *jsonObfuscator) obfuscate(data []byte) (string, error) {
 	var out strings.Builder
 	buf := make([]byte, 0, 10) // recording key token
 	p.scan.reset()
-	for _, c := range data {
+	for i, c := range data {
 		p.scan.bytes++
 		op := p.scan.step(p.scan, c)
 		depth := len(p.closures)
@@ -120,6 +141,14 @@ func (p *jsonObfuscator) obfuscate(data []byte) (string, error) {
 			// thus far.
 			out.Write([]byte("..."))
 			return out.String(), p.scan.err
+		}
+		if p.wiped && c == ',' && p.inArray() {
+			// a comma follows a wiped item in an array; we should only place
+			// this comma once, if needed.
+			if !p.hasMore(data[i:]) {
+				out.WriteByte(',')
+			}
+			continue
 		}
 		out.WriteByte(c)
 	}
