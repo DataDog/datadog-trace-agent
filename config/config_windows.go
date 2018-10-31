@@ -1,6 +1,13 @@
 package config
 
-const (
+import (
+	"path/filepath"
+
+	"github.com/DataDog/datadog-agent/pkg/util/executable"
+	"github.com/DataDog/datadog-agent/pkg/util/winutil"
+)
+
+var (
 	// DefaultLogFilePath is where the agent will write logs if not overriden in the conf
 	DefaultLogFilePath = "c:\\programdata\\datadog\\logs\\trace-agent.log"
 
@@ -16,3 +23,15 @@ const (
 // agent5Config points to the default agent 5 configuration path. It is used
 // as a fallback when no configuration is set and the new default is missing.
 const agent5Config = "c:\\programdata\\datadog\\datadog.conf"
+
+func init() {
+	pd, err := winutil.GetProgramDataDir()
+	if err == nil {
+		DefaultLogFilePath = filepath.Join(pd, "Datadog", "logs", "trace-agent.log")
+	}
+	_here, err := executable.Folder()
+	if err == nil {
+		defaultDDAgentBin = filepath.Join(_here, "..", "..", "embedded", "agent.exe")
+	}
+
+}
