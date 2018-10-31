@@ -27,26 +27,33 @@ func (s *fixedRateExtractor) Extract(t model.ProcessedTrace) []*model.APMEvent {
 	priority, hasPriority := t.GetSamplingPriority()
 
 	for _, span := range t.WeightedTrace {
-		if s.shouldExtractEvent(span, hasPriority, priority) {
-			events = append(events, &model.APMEvent{
+		if extract, rate := s.shouldExtractEvent(span, hasPriority, priority); extract {
+			event := &model.APMEvent{
 				Span:         span.Span,
 				TraceSampled: t.Sampled,
-			})
+			}
+			event.SetExtractionSampleRate(rate)
+
+			events = append(events, event)
 		}
 	}
 
 	return events
 }
 
-func (s *fixedRateExtractor) shouldExtractEvent(span *model.WeightedSpan, hasPriority bool, priority int) bool {
+func (s *fixedRateExtractor) shouldExtractEvent(span *model.WeightedSpan, hasPriority bool, priority int) (extract bool, rate float64) {
 	if operations, ok := s.rateByServiceAndName[span.Service]; ok {
-		if analyzeRate, ok := operations[span.Name]; ok {
+		if extractionRate, ok := operations[span.Name]; ok {
 			// If the trace has been manually sampled, we keep all matching spans
-			highPriority := hasPriority && priority >= 2
-			if highPriority || sampler.SampleByRate(span.TraceID, analyzeRate) {
-				return true
+			if hasPriority && priority >= 2 {
+				return true, 1
 			}
+
+			// Else we apply whatever rate was configured
+			sampled := sampler.SampleByRate(span.TraceID, extractionRate)
+
+			return sampled, extractionRate
 		}
 	}
-	return false
+	return false, 0
 }

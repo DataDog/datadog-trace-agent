@@ -42,6 +42,7 @@ func TestMaxEPSSampler(t *testing.T) {
 
 			for _, event := range testCase.events {
 				if sampler.Sample(event) {
+					assert.EqualValues(testCase.expectedSampledPct, event.GetEventSamplerSampleRate())
 					sampled++
 				}
 			}
@@ -74,7 +75,7 @@ func generateTestEvents(numEvents int, pctWithSampledTrace int32) []*model.APMEv
 	for i, _ := range testEvents {
 		testEvents[i] = &model.APMEvent{
 			Span:         testutil.RandomSpan(),
-			TraceSampled: rand.Int31n(100) <= pctWithSampledTrace,
+			TraceSampled: rand.Int31n(100) < pctWithSampledTrace,
 		}
 	}
 

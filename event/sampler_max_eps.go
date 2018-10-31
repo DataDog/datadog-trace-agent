@@ -48,6 +48,7 @@ func (s *maxEPSSampler) Sample(event *model.APMEvent) bool {
 
 	// Events with sampled traces are always kept even if that means going a bit above max eps.
 	if event.TraceSampled {
+		event.SetEventSamplerSampleRate(1)
 		return true
 	}
 
@@ -60,7 +61,9 @@ func (s *maxEPSSampler) Sample(event *model.APMEvent) bool {
 
 	sampled := sampler.SampleByRate(event.Span.TraceID, maxEPSRate)
 
-	// TODO: Set maxEPSRate on the event
+	if sampled {
+		event.SetEventSamplerSampleRate(maxEPSRate)
+	}
 
 	return sampled
 }

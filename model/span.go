@@ -48,6 +48,26 @@ func (s *Span) Weight() float64 {
 	return 1.0 / sampleRate
 }
 
+// GetMetric gets a value in the span Metrics map.
+func (s *Span) GetMetric(k string) (float64, bool) {
+	if s == nil || s.Metrics == nil {
+		return 0, false
+	}
+
+	val, ok := s.Metrics[k]
+
+	return val, ok
+}
+
+// GetMetricDefault gets a value in the span Metrics map or default if no value is stored there.
+func (s *Span) GetMetricDefault(k string, def float64) float64 {
+	if val, ok := s.GetMetric(k); ok {
+		return val
+	}
+
+	return def
+}
+
 // SetMetric sets a value in the span Metrics map.
 func (s *Span) SetMetric(key string, val float64) {
 	if s.Metrics == nil {
@@ -59,10 +79,7 @@ func (s *Span) SetMetric(key string, val float64) {
 // GetSamplingPriority returns the value of the sampling priority metric set on this span and a boolean indicating if
 // such a metric was actually found or not.
 func (s *Span) GetSamplingPriority() (int, bool) {
-	if s == nil {
-		return 0, false
-	}
-	p, ok := s.Metrics[SamplingPriorityKey]
+	p, ok := s.GetMetric(SamplingPriorityKey)
 	return int(p), ok
 }
 

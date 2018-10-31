@@ -1,7 +1,6 @@
 package event
 
 import (
-	"fmt"
 	"math/rand"
 	"testing"
 
@@ -9,54 +8,68 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func createTrace(serviceName string, operationName string, topLevel bool, hasPriority bool, priority int) model.ProcessedTrace {
-	ws := model.WeightedSpan{TopLevel: topLevel, Span: &model.Span{Service: serviceName, Name: operationName}}
-	if hasPriority {
-		ws.SetSamplingPriority(priority)
+func createTraces(serviceName string, operationName string, topLevel bool, hasPriority bool, priority int) []model.ProcessedTrace {
+	traces := make([]model.ProcessedTrace, 0, 2000)
+
+	for i := 0; i < 1000; i++ {
+		ws := model.WeightedSpan{TopLevel: topLevel, Span: &model.Span{TraceID: rand.Uint64(), Service: serviceName, Name: operationName}}
+		if hasPriority {
+			ws.SetSamplingPriority(priority)
+		}
+		wt := model.WeightedTrace{&ws}
+		trace := model.ProcessedTrace{WeightedTrace: wt, Root: ws.Span}
+		trace.Sampled = rand.Int()%2 == 0
+		traces = append(traces, trace)
 	}
-	wt := model.WeightedTrace{&ws}
-	return model.ProcessedTrace{WeightedTrace: wt, Root: ws.Span}
+
+	return traces
 }
 
 func TestAnalyzedExtractor(t *testing.T) {
-	assert := assert.New(t)
-
 	config := make(map[string]map[string]float64)
 	config["myService"] = make(map[string]float64)
-	config["myService"]["myOperation"] = 1
+	config["myService"]["myOperation"] = 0.5
 
 	config["mySampledService"] = make(map[string]float64)
 	config["mySampledService"]["myOperation"] = 0
 
 	tests := []struct {
-		name             string
-		trace            model.ProcessedTrace
-		expectedSampling bool
+		name                   string
+		traces                 []model.ProcessedTrace
+		expectedExtractionRate float64
 	}{
-		{"Top-level service and span name match", createTrace("myService", "myOperation", true, false, 0), true},
-		{"Top-level service name doesn't match", createTrace("otherService", "myOperation", true, false, 0), false},
-		{"Top-level span name doesn't match", createTrace("myService", "otherOperation", true, false, 0), false},
-		{"Top-level service and span name don't match", createTrace("otherService", "otherOperation", true, false, 0), false},
-		{"Non top-level service and span name match", createTrace("myService", "myOperation", false, false, 0), true},
-		{"Non top-level service name doesn't match", createTrace("otherService", "myOperation", false, false, 0), false},
-		{"Non top-level span name doesn't match", createTrace("myService", "otherOperation", false, false, 0), false},
-		{"Non top-level service and span name don't match", createTrace("otherService", "otherOperation", false, false, 0), false},
-		{"Match, sampling rate 0, no priority", createTrace("mySampledService", "myOperation", true, false, 0), false},
-		{"Match, sampling rate 0, priority 1", createTrace("mySampledService", "myOperation", true, true, 1), false},
-		{"Match, sampling rate 0, priority 2", createTrace("mySampledService", "myOperation", true, true, 2), true},
+		{"Top-level service and span name match", createTraces("myService", "myOperation", true, false, 0), 0.5},
+		{"Top-level service name doesn't match", createTraces("otherService", "myOperation", true, false, 0), 0},
+		{"Top-level span name doesn't match", createTraces("myService", "otherOperation", true, false, 0), 0},
+		{"Top-level service and span name don't match", createTraces("otherService", "otherOperation", true, false, 0), 0},
+		{"Non top-level service and span name match", createTraces("myService", "myOperation", false, false, 0), 0.5},
+		{"Non top-level service name doesn't match", createTraces("otherService", "myOperation", false, false, 0), 0},
+		{"Non top-level span name doesn't match", createTraces("myService", "otherOperation", false, false, 0), 0},
+		{"Non top-level service and span name don't match", createTraces("otherService", "otherOperation", false, false, 0), 0},
+		{"Match, sampling rate 0, no priority", createTraces("mySampledService", "myOperation", true, false, 0), 0},
+		{"Match, sampling rate 0, priority 1", createTraces("mySampledService", "myOperation", true, true, 1), 0},
+		{"Match, sampling rate 0, priority 2", createTraces("mySampledService", "myOperation", true, true, 2), 1},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ae := NewFixedRateExtractor(config)
-			test.trace.Sampled = rand.Int() > 0
-			analyzedSpans := ae.Extract(test.trace)
+			assert := assert.New(t)
 
-			if test.expectedSampling {
-				assert.Len(analyzedSpans, 1, fmt.Sprintf("Trace %v should have been sampled", test.trace))
-			} else {
-				assert.Len(analyzedSpans, 0, fmt.Sprintf("Trace %v should not have been sampled", test.trace))
+			ae := NewFixedRateExtractor(config)
+
+			sampled := 0
+
+			for _, trace := range test.traces {
+				extractedEvents := ae.Extract(trace)
+
+				for _, event := range extractedEvents {
+					assert.EqualValues(test.expectedExtractionRate, event.GetExtractionSampleRate())
+					sampled++
+				}
 			}
+
+			// Assert extraction rate with 10% delta
+			assert.InDelta(test.expectedExtractionRate, float64(sampled)/float64(len(test.traces)), test.expectedExtractionRate*0.1)
 		})
 	}
 }

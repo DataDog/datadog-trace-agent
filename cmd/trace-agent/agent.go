@@ -266,10 +266,19 @@ func (a *Agent) Process(t model.Trace) {
 		}
 
 		// NOTE: Events can be extracted from non-sampled traces.
-		tracePkg.Events = a.EventExtractor.Extract(pt)
-		statsd.Client.Count("datadog.trace_agent.events.extracted", int64(len(tracePkg.Events)), nil, 1)
-		tracePkg.Events = a.EventSampler.Sample(tracePkg.Events)
-		statsd.Client.Count("datadog.trace_agent.events.sampled", int64(len(tracePkg.Events)), nil, 1)
+		events := a.EventExtractor.Extract(pt)
+		statsd.Client.Count("datadog.trace_agent.events.extracted", int64(len(events)), nil, 1)
+		events = a.EventSampler.Sample(events)
+		statsd.Client.Count("datadog.trace_agent.events.sampled", int64(len(events)), nil, 1)
+
+		// Tag sampled events with the source trace rates
+		for _, e := range events {
+			e.SetClientTraceSampleRate(clientSampleRate)
+			e.SetPreSamplerSampleRate(preSamplerRate)
+		}
+
+		// Add sampled events to the trace package
+		tracePkg.Events = events
 
 		if !tracePkg.Empty() {
 			a.tracePkgChan <- &tracePkg

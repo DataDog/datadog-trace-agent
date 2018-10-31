@@ -24,27 +24,30 @@ func (s *legacyExtractor) Extract(t model.ProcessedTrace) []*model.APMEvent {
 	var events []*model.APMEvent
 
 	for _, span := range t.WeightedTrace {
-		if s.shouldExtractEvent(span) {
-			events = append(events, &model.APMEvent{
+		if extracted, rate := s.shouldExtractEvent(span); extracted {
+			event := &model.APMEvent{
 				Span:         span.Span,
 				TraceSampled: t.Sampled,
-			})
+			}
+			event.SetExtractionSampleRate(rate)
+
+			events = append(events, event)
 		}
 	}
 
 	return events
 }
 
-func (s *legacyExtractor) shouldExtractEvent(span *model.WeightedSpan) bool {
+func (s *legacyExtractor) shouldExtractEvent(span *model.WeightedSpan) (bool, float64) {
 	if !span.TopLevel {
-		return false
+		return false, 0
 	}
 
-	if analyzeRate, ok := s.rateByService[span.Service]; ok {
-		if sampler.SampleByRate(span.TraceID, analyzeRate) {
-			return true
+	if extractionRate, ok := s.rateByService[span.Service]; ok {
+		if sampler.SampleByRate(span.TraceID, extractionRate) {
+			return true, extractionRate
 		}
 	}
 
-	return false
+	return false, 0
 }
