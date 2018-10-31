@@ -1,6 +1,7 @@
 package event
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/DataDog/datadog-trace-agent/model"
@@ -9,25 +10,16 @@ import (
 )
 
 func TestMaxEPSSampler(t *testing.T) {
-	type testCase struct {
+	testEvents := generateTestEvents(1000, 0)
+	testEventsSampledTraces := generateTestEvents(1000, 100)
+
+	for name, testCase := range map[string]struct {
 		events             []*model.APMEvent
 		maxEPS             float64
 		pastEPS            float64
 		expectedSampledPct float64
 		deltaPct           float64
-	}
-
-	testEvents := make([]*model.APMEvent, 1000)
-	for i, _ := range testEvents {
-		testEvents[i] = &model.APMEvent{Span: testutil.RandomSpan()}
-	}
-
-	testEventsSampledTraces := make([]*model.APMEvent, 1000)
-	for i, _ := range testEventsSampledTraces {
-		testEventsSampledTraces[i] = &model.APMEvent{Span: testutil.RandomSpan(), TraceSampled: true}
-	}
-
-	testCases := map[string]testCase{
+	}{
 		"low EPS":      {testEvents, 100, 50, 1., 0},
 		"limit EPS":    {testEvents, 100, 100, 1., 0},
 		"overload EPS": {testEvents, 100, 150, 100. / 150., 0.05},
@@ -35,9 +27,7 @@ func TestMaxEPSSampler(t *testing.T) {
 		"overload EPS - sampled": {testEventsSampledTraces, 100, 500, 1., 0},
 		// We should always keep events for sampled traces even if we are above maxEPS
 		"nil events": {make([]*model.APMEvent, 5), 100, 0, 0, 0},
-	}
-
-	for name, testCase := range testCases {
+	} {
 		t.Run(name, func(t *testing.T) {
 			assert := assert.New(t)
 
@@ -51,12 +41,7 @@ func TestMaxEPSSampler(t *testing.T) {
 			sampled := 0
 
 			for _, event := range testCase.events {
-				decision := sampler.Sample(event)
-
-				// This sampler doesn't doubt
-				assert.NotEqual(DecisionNone, decision)
-
-				if decision == DecisionSample {
+				if sampler.Sample(event) {
 					sampled++
 				}
 			}
@@ -82,6 +67,18 @@ func TestMaxEPSSampler(t *testing.T) {
 			assert.EqualValues(nonTraceSampledEvents, counter.GetRateCalls)
 		})
 	}
+}
+
+func generateTestEvents(numEvents int, pctWithSampledTrace int32) []*model.APMEvent {
+	testEvents := make([]*model.APMEvent, numEvents)
+	for i, _ := range testEvents {
+		testEvents[i] = &model.APMEvent{
+			Span:         testutil.RandomSpan(),
+			TraceSampled: rand.Int31n(100) <= pctWithSampledTrace,
+		}
+	}
+
+	return testEvents
 }
 
 type MockRateCounter struct {

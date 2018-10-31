@@ -7,21 +7,12 @@ import (
 // SamplingDecision contains the result of a sampling step.
 type SamplingDecision int8
 
-const (
-	// DecisionNone represents the result of a sampling step where no decision was made.
-	DecisionNone SamplingDecision = iota
-	// DecisionSimple represents the result of a sampling step where it was decided to sample an event.
-	DecisionSample
-	// DecisionDontSample represents the result of a sampling step where it was decided not to sample an event.
-	DecisionDontSample
-)
-
 // Sampler samples APM events according to implementation-defined techniques.
 type Sampler interface {
 	// Start tells this sampler to bootstrap whatever it needs to answer `Sample` requests.
 	Start()
 	// Sample decides whether to sample the provided event or not.
-	Sample(event *model.APMEvent) SamplingDecision
+	Sample(event *model.APMEvent) bool
 	// Stop tells this sampler to stop anything that was bootstrapped in `Start`.
 	Stop()
 }
@@ -31,7 +22,8 @@ type BatchSampler struct {
 	sampler Sampler
 }
 
-// NewBatchSampler creates a new BatchSampler using the provided underlying sampler.
+// NewBatchSampler creates a new BatchSampler using the provided underlying sampler and sampling the event
+// slice in place.
 func NewBatchSampler(sampler Sampler) *BatchSampler {
 	return &BatchSampler{
 		sampler: sampler,
@@ -48,19 +40,23 @@ func (bs *BatchSampler) Stop() {
 	bs.sampler.Start()
 }
 
-// Sample takes a collection of events, makes a sampling decision for each event and returns a collection containing
-// only those events that were sampled.
+// Sample takes a slice of events, makes a sampling decision for each event and modifies the passed slice in place,
+// keeping only those events that were sampled. The returned slice uses the same underlying array as the one passed
+// as an argument but is scoped to the number of sampled events.
+// WARNING: The slice passed as argument is invalidated and should not be used again.
 func (bs *BatchSampler) Sample(events []*model.APMEvent) []*model.APMEvent {
-	result := make([]*model.APMEvent, 0, len(events))
+	writeIndex := 0
 
 	for _, event := range events {
 		if event == nil {
 			continue
 		}
-		if bs.sampler.Sample(event) == DecisionSample {
-			result = append(result, event)
+
+		if bs.sampler.Sample(event) {
+			events[writeIndex] = event
+			writeIndex++
 		}
 	}
 
-	return result
+	return events[:writeIndex]
 }

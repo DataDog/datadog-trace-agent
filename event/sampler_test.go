@@ -4,40 +4,31 @@ import (
 	"testing"
 
 	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/DataDog/datadog-trace-agent/testutil"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBatchSampler(t *testing.T) {
-	testDecider := func(event *model.APMEvent) SamplingDecision {
+	testDecider := func(event *model.APMEvent) bool {
 		if event == nil {
-			return DecisionNone
+			return false
 		}
-		return SamplingDecision(event.Span.TraceID % 3)
+		return event.Span.TraceID%2 == 0
 	}
 
-	testEvents := make([]*model.APMEvent, 100)
-	for i, _ := range testEvents {
-		testEvents[i] = &model.APMEvent{Span: testutil.RandomSpan()}
-	}
+	testEvents := generateTestEvents(100, 50)
+	testEventsSingleton := generateTestEvents(1, 50)
 
-	testEventsSingleton := []*model.APMEvent{testEvents[0]}
-
-	type testCase struct {
+	for name, testCase := range map[string]struct {
 		events         []*model.APMEvent
 		expectedEvents []*model.APMEvent
-	}
-
-	testCases := map[string]testCase{
+	}{
 		"no events":       {nil, nil},
 		"nil events":      {make([]*model.APMEvent, 100), nil},
 		"single event":    {testEventsSingleton, sampledFilter(testEventsSingleton, testDecider)},
 		"multiple events": {testEvents, sampledFilter(testEvents, testDecider)},
-	}
-
-	for name, testCase := range testCases {
+	} {
 		t.Run(name, func(t *testing.T) {
-			samplerDecisions := make(map[*model.APMEvent]SamplingDecision)
+			samplerDecisions := make(map[*model.APMEvent]bool)
 
 			for _, event := range testCase.events {
 				samplerDecisions[event] = testDecider(event)
@@ -66,11 +57,11 @@ func TestBatchSampler(t *testing.T) {
 	}
 }
 
-func sampledFilter(events []*model.APMEvent, decider func(event *model.APMEvent) SamplingDecision) []*model.APMEvent {
+func sampledFilter(events []*model.APMEvent, decider func(event *model.APMEvent) bool) []*model.APMEvent {
 	result := make([]*model.APMEvent, 0, len(events))
 
 	for _, event := range events {
-		if decider(event) == DecisionSample {
+		if decider(event) {
 			result = append(result, event)
 		}
 	}
@@ -80,12 +71,12 @@ func sampledFilter(events []*model.APMEvent, decider func(event *model.APMEvent)
 
 type MockSampler struct {
 	SampleCalls  int
-	SampleResult map[*model.APMEvent]SamplingDecision
+	SampleResult map[*model.APMEvent]bool
 }
 
 func (ms *MockSampler) Start() {}
 func (ms *MockSampler) Stop()  {}
-func (ms *MockSampler) Sample(event *model.APMEvent) SamplingDecision {
+func (ms *MockSampler) Sample(event *model.APMEvent) bool {
 	ms.SampleCalls++
 
 	return ms.SampleResult[event]

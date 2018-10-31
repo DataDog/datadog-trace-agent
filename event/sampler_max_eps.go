@@ -38,9 +38,9 @@ func (s *maxEPSSampler) Stop() {
 
 // Sample determines whether or not we should sample the provided event in order to ensure no more than maxEPS events
 // are sampled every second.
-func (s *maxEPSSampler) Sample(event *model.APMEvent) SamplingDecision {
+func (s *maxEPSSampler) Sample(event *model.APMEvent) bool {
 	if event == nil {
-		return DecisionDontSample
+		return false
 	}
 
 	// Count that we saw a new event
@@ -48,7 +48,7 @@ func (s *maxEPSSampler) Sample(event *model.APMEvent) SamplingDecision {
 
 	// Events with sampled traces are always kept even if that means going a bit above max eps.
 	if event.TraceSampled {
-		return DecisionSample
+		return true
 	}
 
 	maxEPSRate := 1.0
@@ -59,13 +59,10 @@ func (s *maxEPSSampler) Sample(event *model.APMEvent) SamplingDecision {
 	}
 
 	sampled := sampler.SampleByRate(event.Span.TraceID, maxEPSRate)
+
 	// TODO: Set maxEPSRate on the event
 
-	if sampled {
-		return DecisionSample
-	}
-
-	return DecisionDontSample
+	return sampled
 }
 
 // rateCounter keeps track of different event rates.

@@ -360,25 +360,21 @@ func TestEventSamplingFromConf(t *testing.T) {
 		return
 	}
 
-	type testCase struct {
+	testCaseDuration := 60 * time.Second
+
+	for name, testCase := range map[string]struct {
 		maxEPS          float64
 		intakeEPS       float64
 		pctTraceSampled float64
 		expectedEPS     float64
 		deltaPct        float64
-	}
-
-	testCases := map[string]testCase{
+	}{
 		"below max eps": {maxEPS: 100, intakeEPS: 50, pctTraceSampled: 0.5, expectedEPS: 50, deltaPct: 0.05},
 		"at max eps":    {maxEPS: 100, intakeEPS: 100, pctTraceSampled: 0.5, expectedEPS: 100, deltaPct: 0.05},
 		// TODO: Attempt to reduce softness of this (high delta)
 		"above max eps":                     {maxEPS: 100, intakeEPS: 500, pctTraceSampled: 0.0, expectedEPS: 100, deltaPct: 0.5},
 		"above max eps - all trace sampled": {maxEPS: 100, intakeEPS: 150, pctTraceSampled: 1, expectedEPS: 150, deltaPct: 0.05},
-	}
-
-	testCaseDuration := 60 * time.Second
-
-	for name, testCase := range testCases {
+	} {
 		t.Run(name, func(t *testing.T) {
 			sampler := eventSamplerFromConf(&config.AgentConfig{MaxEPS: testCase.maxEPS})
 			sampler.Start()
