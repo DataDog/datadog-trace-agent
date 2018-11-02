@@ -3,15 +3,23 @@ package event
 import (
 	"time"
 
+	log "github.com/cihub/seelog"
+
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/sampler"
+	"github.com/DataDog/datadog-trace-agent/statsd"
 )
+
+const maxEPSReportFrequency = 30 * time.Second
 
 // maxEPSSampler (Max Events Per Second Sampler) is an event sampler that samples provided events so as to try to ensure
 // no more than a certain amount of events is sampled per second.
 type maxEPSSampler struct {
 	maxEPS      float64
 	rateCounter rateCounter
+
+	reportFrequency time.Duration
+	reportDone      chan bool
 }
 
 // NewMaxEPSSampler creates a new instance of a maxEPSSampler with the provided maximum amount of events per second.
@@ -23,47 +31,92 @@ func newMaxEPSSampler(maxEPS float64, rateCounter rateCounter) Sampler {
 	return &maxEPSSampler{
 		maxEPS:      maxEPS,
 		rateCounter: rateCounter,
+
+		reportDone: make(chan bool),
 	}
 }
 
 // Start starts the underlying rate counter.
 func (s *maxEPSSampler) Start() {
 	s.rateCounter.Start()
+
+	go func() {
+		ticker := time.NewTicker(maxEPSReportFrequency)
+		defer close(s.reportDone)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-s.reportDone:
+				return
+			case <-ticker.C:
+				s.report()
+			}
+		}
+	}()
 }
 
 // Stop stops the underlying rate counter.
 func (s *maxEPSSampler) Stop() {
+	s.reportDone <- true
+	<-s.reportDone
+
 	s.rateCounter.Stop()
 }
 
 // Sample determines whether or not we should sample the provided event in order to ensure no more than maxEPS events
 // are sampled every second.
+// This method is thread-safe.
 func (s *maxEPSSampler) Sample(event *model.APMEvent) (sampled bool, rate float64) {
 	// Count that we saw a new event
 	s.rateCounter.Count()
-
 	// Events with sampled traces are always kept even if that means going a bit above max eps.
 	if event.TraceSampled {
 		return true, 1
 	}
-
-	rate = 1.0
-	currentEPS := s.rateCounter.GetRate()
-
-	if currentEPS > s.maxEPS {
-		rate = s.maxEPS / currentEPS
+	sampled = true
+	rate = s.getSampleRate()
+	if rate < 1 {
+		sampled = sampler.SampleByRate(event.Span.TraceID, rate)
+		if sampled {
+			event.SetMaxEPSSampleRate(rate)
+		}
 	}
-
-	sampled = sampler.SampleByRate(event.Span.TraceID, rate)
-
-	if sampled {
-		event.SetMaxEPSSampleRate(rate)
-	}
-
 	return
 }
 
-// rateCounter keeps track of different event rates.
+// getSampleRate returns the applied sample rate based on this sampler's current state.
+// This method is thread-safe.
+func (s *maxEPSSampler) getSampleRate() float64 {
+	rate := 1.0
+	currentEPS := s.rateCounter.GetRate()
+	if currentEPS > s.maxEPS {
+		rate = s.maxEPS / currentEPS
+	}
+	return rate
+}
+
+func (s *maxEPSSampler) report() {
+	maxRate := s.maxEPS
+	statsd.Client.Gauge("datadog.trace_agent.events.max_eps.max_rate", maxRate, nil, 1)
+
+	currentRate := s.rateCounter.GetRate()
+	statsd.Client.Gauge("datadog.trace_agent.events.max_eps.current_rate", currentRate, nil, 1)
+
+	sampleRate := s.getSampleRate()
+	statsd.Client.Gauge("datadog.trace_agent.events.max_eps.sample_rate", sampleRate, nil, 1)
+
+	reachedMaxGaugeV := 0.
+	if sampleRate < 1 {
+		reachedMaxGaugeV = 1.
+		log.Warnf("Max events per second reached (current=%.2f/s, max=%.2f/s). "+
+			"Some events are now being dropped (sample rate=%.2f). Consider increasing MaxEPS setting.",
+			currentRate, maxRate, sampleRate)
+	}
+	statsd.Client.Gauge("datadog.trace_agent.events.max_eps.reached_max", reachedMaxGaugeV, nil, 1)
+}
+
+// rateCounter keeps track of different event rates. Implementations of rateCounter must be thread-safe.
 type rateCounter interface {
 	Start()
 	Count()
