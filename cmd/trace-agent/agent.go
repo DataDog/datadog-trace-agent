@@ -32,7 +32,7 @@ type Agent struct {
 	ScoreSampler       *Sampler
 	ErrorsScoreSampler *Sampler
 	PrioritySampler    *Sampler
-	EventExtractor     event.Extractor
+	EventProcessor     *event.Processor
 	TraceWriter        *writer.TraceWriter
 	ServiceWriter      *writer.ServiceWriter
 	StatsWriter        *writer.StatsWriter
@@ -77,7 +77,7 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	ss := NewScoreSampler(conf)
 	ess := NewErrorsSampler(conf)
 	ps := NewPrioritySampler(conf, dynConf)
-	ee := eventExtractorFromConf(conf)
+	ep := eventProcessorFromConf(conf)
 	se := NewTraceServiceExtractor(serviceChan)
 	sm := NewServiceMapper(serviceChan, filteredServiceChan)
 	tw := writer.NewTraceWriter(conf, tracePkgChan)
@@ -92,7 +92,7 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 		ScoreSampler:       ss,
 		ErrorsScoreSampler: ess,
 		PrioritySampler:    ps,
-		EventExtractor:     ee,
+		EventProcessor:     ep,
 		TraceWriter:        tw,
 		StatsWriter:        sw,
 		ServiceWriter:      svcW,
@@ -128,6 +128,7 @@ func (a *Agent) Run() {
 	a.ScoreSampler.Run()
 	a.ErrorsScoreSampler.Run()
 	a.PrioritySampler.Run()
+	a.EventProcessor.Start()
 
 	for {
 		select {
@@ -148,6 +149,7 @@ func (a *Agent) Run() {
 			a.ScoreSampler.Stop()
 			a.ErrorsScoreSampler.Stop()
 			a.PrioritySampler.Stop()
+			a.EventProcessor.Stop()
 			return
 		}
 	}
@@ -260,8 +262,13 @@ func (a *Agent) Process(t model.Trace) {
 			tracePkg.Trace = pt.Trace
 		}
 
-		// NOTE: Events can be extracted from non-sampled traces.
-		tracePkg.Events = a.EventExtractor.Extract(pt)
+		// NOTE: Events can be processed on non-sampled traces.
+		events, numExtracted := a.EventProcessor.Process(pt)
+		statsd.Client.Count("datadog.trace_agent.events.extracted", int64(numExtracted), nil, 1)
+		statsd.Client.Count("datadog.trace_agent.events.sampled", int64(len(events)), nil, 1)
+
+		// Add sampled events to the trace package
+		tracePkg.Events = events
 
 		if !tracePkg.Empty() {
 			a.tracePkgChan <- &tracePkg
@@ -328,14 +335,17 @@ func traceContainsError(trace model.Trace) bool {
 	return false
 }
 
-func eventExtractorFromConf(conf *config.AgentConfig) event.Extractor {
+func eventProcessorFromConf(conf *config.AgentConfig) *event.Processor {
+	var extractors []event.Extractor
+
 	if len(conf.AnalyzedSpansByService) > 0 {
-		return event.NewFixedRateExtractor(conf.AnalyzedSpansByService)
+		extractors = append(extractors, event.NewFixedRateExtractor(conf.AnalyzedSpansByService))
 	}
 	if len(conf.AnalyzedRateByServiceLegacy) > 0 {
-		return event.NewLegacyExtractor(conf.AnalyzedRateByServiceLegacy)
+		extractors = append(extractors, event.NewLegacyExtractor(conf.AnalyzedRateByServiceLegacy))
 	}
 
-	// TODO: Replace disabled extractor with TaggedExtractor
-	return event.NewNoopExtractor()
+	var samplers []event.Sampler
+
+	return event.NewProcessor(extractors, samplers)
 }

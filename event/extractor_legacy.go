@@ -5,46 +5,33 @@ import (
 	"github.com/DataDog/datadog-trace-agent/sampler"
 )
 
-// legacyExtractor is an event extractor that extracts APM events from traces based on `serviceName => sampling
-// ratio` mappings.
+// legacyExtractor is an event extractor that decides whether to extract APM events from spans based on
+// `serviceName => sampling rate` mappings.
 type legacyExtractor struct {
 	rateByService map[string]float64
 }
 
-// NewLegacyExtractor returns an APM event extractor that extracts APM events from a trace following the specified
-// extraction rates for any spans matching a specific service.
+// NewLegacyExtractor returns an APM event extractor that decides whether to extract APM events from spans following the
+// specified extraction rates for a span's service.
 func NewLegacyExtractor(rateByService map[string]float64) Extractor {
 	return &legacyExtractor{
 		rateByService: rateByService,
 	}
 }
 
-// Extract extracts apm events from the trace and returns them as a slice.
-func (s *legacyExtractor) Extract(t model.ProcessedTrace) []*model.APMEvent {
-	var events []*model.APMEvent
+// Extract decides whether to extract an apm event from the provided span based on a sampling rate on that span's
+// service. If this rate doesn't exist or the provided span is not a top level one, then no decision is done and
+// UnknownRate is returned.
+func (e *legacyExtractor) Extract(s *model.WeightedSpan, priority int) (extract bool, rate float64) {
+	if !s.TopLevel {
+		return false, UnknownRate
+	}
 
-	for _, span := range t.WeightedTrace {
-		if s.shouldExtractEvent(span) {
-			events = append(events, &model.APMEvent{
-				Span:         span.Span,
-				TraceSampled: t.Sampled,
-			})
+	if extractionRate, ok := e.rateByService[s.Service]; ok {
+		if sampler.SampleByRate(s.TraceID, extractionRate) {
+			return true, extractionRate
 		}
 	}
 
-	return events
-}
-
-func (s *legacyExtractor) shouldExtractEvent(span *model.WeightedSpan) bool {
-	if !span.TopLevel {
-		return false
-	}
-
-	if analyzeRate, ok := s.rateByService[span.Service]; ok {
-		if sampler.SampleByRate(span.TraceID, analyzeRate) {
-			return true
-		}
-	}
-
-	return false
+	return false, UnknownRate
 }
