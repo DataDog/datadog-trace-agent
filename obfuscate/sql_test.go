@@ -341,6 +341,14 @@ ORDER BY [b].[Name]`,
 			`SELECT [ b ] . [ BlogId ], [ b ] . [ Name ] FROM [ Blogs ] ORDER BY [ b ] . [ Name ]`,
 		},
 		{
+			`SELECT * FROM users WHERE firstname=''`,
+			`SELECT * FROM users WHERE firstname = ?`,
+		},
+		{
+			`SELECT * FROM users WHERE lastname=" "`,
+			`SELECT * FROM users WHERE lastname = ?`,
+		},
+		{
 			`SELECT [b].[BlogId], [b].[Name]
 FROM [Blogs] AS [b
 ORDER BY [b].[Name]`,
