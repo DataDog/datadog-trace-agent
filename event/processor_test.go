@@ -65,6 +65,11 @@ func TestProcessor(t *testing.T) {
 
 			expectedReturned := expectedExtracted * test.expectedSampledPct
 			assert.InDelta(expectedReturned, returned, expectedReturned*test.deltaPct)
+
+			for _, event := range events {
+				assert.EqualValues(test.expectedExtractedPct, event.GetExtractionSampleRate())
+				assert.EqualValues(test.expectedSampledPct, event.GetEventSamplerSampleRate())
+			}
 		})
 	}
 }

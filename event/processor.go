@@ -67,6 +67,7 @@ func (p *Processor) Process(t model.ProcessedTrace) (events []*model.APMEvent, n
 
 			if extract {
 				extractedEvent = &model.APMEvent{Span: span.Span, TraceSampled: t.Sampled}
+				extractedEvent.SetExtractionSampleRate(rate)
 			}
 
 			// If this extractor applied a valid sampling rate then that means it processed this span so don't try the
@@ -105,6 +106,8 @@ func (p *Processor) Process(t model.ProcessedTrace) (events []*model.APMEvent, n
 
 		// If the event survived global sampling then add it to the results.
 		if sampleDecision {
+			// And add the total sample rate to it
+			extractedEvent.SetEventSamplerSampleRate(sampleRate)
 			events = append(events, extractedEvent)
 		}
 	}

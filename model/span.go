@@ -59,6 +59,15 @@ func (s *Span) GetMetric(k string) (float64, bool) {
 	return val, ok
 }
 
+// GetMetricDefault gets a value in the span Metrics map or default if no value is stored there.
+func (s *Span) GetMetricDefault(k string, def float64) float64 {
+	if val, ok := s.GetMetric(k); ok {
+		return val
+	}
+
+	return def
+}
+
 // SetMetric sets a value in the span Metrics map.
 func (s *Span) SetMetric(key string, val float64) {
 	if s.Metrics == nil {
