@@ -387,21 +387,26 @@ func TestEventProcessorFromConf(t *testing.T) {
 		deltaPct        float64
 		duration        time.Duration
 	}{
-		"no match":              {maxEPS: 100, intakeSPS: 100, serviceName: "serviceE", opName: "opA", pctTraceSampled: 0.5, expectedEPS: 0, deltaPct: 0, duration: 10 * time.Second},
-		"agent - below max eps": {maxEPS: 100, intakeSPS: 100, serviceName: "serviceB", opName: "opB", pctTraceSampled: 0.5, expectedEPS: 50, deltaPct: 0.1, duration: 10 * time.Second},
+		"no match":               {maxEPS: 100, intakeSPS: 100, serviceName: "serviceE", opName: "opA", extractionRate: -1, pctTraceSampled: 0.5, expectedEPS: 0, deltaPct: 0, duration: 10 * time.Second},
+		"metric - below max eps": {maxEPS: 100, intakeSPS: 100, serviceName: "serviceD", opName: "opA", extractionRate: 0.5, pctTraceSampled: 0.5, expectedEPS: 50, deltaPct: 0.1, duration: 10 * time.Second},
 		// TODO: Attempt to reduce softness of this (high delta)
-		"agent - above max eps":  {maxEPS: 100, intakeSPS: 200, serviceName: "serviceA", opName: "opC", pctTraceSampled: 0, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
-		"legacy - below max eps": {maxEPS: 100, intakeSPS: 100, serviceName: "serviceC", opName: "opB", pctTraceSampled: 0.5, expectedEPS: 50, deltaPct: 0.1, duration: 10 * time.Second},
+		"metric - above max eps": {maxEPS: 100, intakeSPS: 200, serviceName: "serviceD", opName: "opA", extractionRate: 1, pctTraceSampled: 0, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
+		"agent - below max eps":  {maxEPS: 100, intakeSPS: 100, serviceName: "serviceB", opName: "opB", extractionRate: -1, pctTraceSampled: 0.5, expectedEPS: 50, deltaPct: 0.1, duration: 10 * time.Second},
 		// TODO: Attempt to reduce softness of this (high delta)
-		"legacy - above max eps": {maxEPS: 100, intakeSPS: 200, serviceName: "serviceD", opName: "opC", pctTraceSampled: 0, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
+		"agent - above max eps":  {maxEPS: 100, intakeSPS: 200, serviceName: "serviceA", opName: "opC", extractionRate: -1, pctTraceSampled: 0, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
+		"legacy - below max eps": {maxEPS: 100, intakeSPS: 100, serviceName: "serviceC", opName: "opB", extractionRate: -1, pctTraceSampled: 0.5, expectedEPS: 50, deltaPct: 0.1, duration: 10 * time.Second},
+		// TODO: Attempt to reduce softness of this (high delta)
+		"legacy - above max eps": {maxEPS: 100, intakeSPS: 200, serviceName: "serviceD", opName: "opC", extractionRate: -1, pctTraceSampled: 0, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
 
 		// Overrides / Fallbacks
-		"agent - overrides legacy": {maxEPS: 100, intakeSPS: 100, serviceName: "serviceA", opName: "opA", pctTraceSampled: 0.5, expectedEPS: 0, deltaPct: 0, duration: 10 * time.Second},
-		"legacy as fallback":       {maxEPS: 100, intakeSPS: 100, serviceName: "serviceA", opName: "opD", pctTraceSampled: 0.5, expectedEPS: 100, deltaPct: 0.1, duration: 10 * time.Second},
+		"metric - overrides agent": {maxEPS: 100, intakeSPS: 100, serviceName: "serviceA", opName: "opA", extractionRate: 1, pctTraceSampled: 0.5, expectedEPS: 100, deltaPct: 0.1, duration: 10 * time.Second},
+		"agent - overrides legacy": {maxEPS: 100, intakeSPS: 100, serviceName: "serviceA", opName: "opA", extractionRate: -1, pctTraceSampled: 0.5, expectedEPS: 0, deltaPct: 0, duration: 10 * time.Second},
+		"legacy as fallback":       {maxEPS: 100, intakeSPS: 100, serviceName: "serviceA", opName: "opD", extractionRate: -1, pctTraceSampled: 0.5, expectedEPS: 100, deltaPct: 0.1, duration: 10 * time.Second},
 
 		// High number of sampled traces allows overflow of EPS
-		"agent - above max eps - all trace sampled":  {maxEPS: 100, intakeSPS: 200, serviceName: "serviceA", opName: "opC", pctTraceSampled: 1, expectedEPS: 200, deltaPct: 0.1, duration: 10 * time.Second},
-		"legacy - above max eps - all trace sampled": {maxEPS: 100, intakeSPS: 200, serviceName: "serviceD", opName: "opC", pctTraceSampled: 1, expectedEPS: 200, deltaPct: 0.1, duration: 10 * time.Second},
+		"metric - above max eps - all trace sampled": {maxEPS: 100, intakeSPS: 200, serviceName: "serviceD", opName: "opA", extractionRate: 1, pctTraceSampled: 1, expectedEPS: 200, deltaPct: 0.1, duration: 10 * time.Second},
+		"agent - above max eps - all trace sampled":  {maxEPS: 100, intakeSPS: 200, serviceName: "serviceA", opName: "opC", extractionRate: -1, pctTraceSampled: 1, expectedEPS: 200, deltaPct: 0.1, duration: 10 * time.Second},
+		"legacy - above max eps - all trace sampled": {maxEPS: 100, intakeSPS: 200, serviceName: "serviceD", opName: "opC", extractionRate: -1, pctTraceSampled: 1, expectedEPS: 200, deltaPct: 0.1, duration: 10 * time.Second},
 	} {
 		t.Run(name, func(t *testing.T) {
 			processor := eventProcessorFromConf(&config.AgentConfig{
@@ -411,8 +416,8 @@ func TestEventProcessorFromConf(t *testing.T) {
 			})
 			processor.Start()
 
-			actualEPS := generateTraffic(processor, testCase.serviceName, testCase.opName, testCase.duration,
-				testCase.intakeSPS, testCase.pctTraceSampled)
+			actualEPS := generateTraffic(processor, testCase.serviceName, testCase.opName, testCase.extractionRate,
+				testCase.duration, testCase.intakeSPS, testCase.pctTraceSampled)
 
 			processor.Stop()
 
@@ -421,8 +426,8 @@ func TestEventProcessorFromConf(t *testing.T) {
 	}
 }
 
-func generateTraffic(processor *event.Processor, serviceName string, operationName string, duration time.Duration,
-	intakeEPS float64, pctTraceSampled float64) float64 {
+func generateTraffic(processor *event.Processor, serviceName string, operationName string, extractionRate float64,
+	duration time.Duration, intakeEPS float64, pctTraceSampled float64) float64 {
 	tickerInterval := 100 * time.Millisecond
 	totalSampled := 0
 	timer := time.NewTimer(duration)
@@ -438,6 +443,9 @@ Loop:
 			span := testutil.RandomSpan()
 			span.Service = serviceName
 			span.Name = operationName
+			if extractionRate >= 0 {
+				span.SetMetric(model.KeySamplingRateEventExtraction, extractionRate)
+			}
 			spans[i] = &model.WeightedSpan{
 				Span: span,
 				// Make all spans top level for simpler testing of legacy extractor

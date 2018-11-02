@@ -336,8 +336,9 @@ func traceContainsError(trace model.Trace) bool {
 }
 
 func eventProcessorFromConf(conf *config.AgentConfig) *event.Processor {
-	var extractors []event.Extractor
-
+	extractors := []event.Extractor{
+		event.NewMetricBasedExtractor(),
+	}
 	if len(conf.AnalyzedSpansByService) > 0 {
 		extractors = append(extractors, event.NewFixedRateExtractor(conf.AnalyzedSpansByService))
 	}
