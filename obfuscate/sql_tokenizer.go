@@ -3,6 +3,7 @@ package obfuscate
 import (
 	"bytes"
 	"strings"
+	"unicode"
 )
 
 // tokenizer.go implemenents a lexer-like iterator that tokenizes SQL and CQL
@@ -409,7 +410,7 @@ func (tkn *Tokenizer) scanString(delim uint16, typ int) (int, []byte) {
 		buffer.WriteByte(byte(ch))
 	}
 	buf := buffer.Bytes()
-	if typ == ID && len(buf) == 0 || len(bytes.TrimSpace(buf)) == 0 {
+	if typ == ID && len(buf) == 0 || bytes.IndexFunc(buf, func(r rune) bool { return !unicode.IsSpace(r) }) == -1 {
 		// This string is an empty or white-space only identifier.
 		// We should keep the start and end delimiters in order to
 		// avoid creating invalid queries.
