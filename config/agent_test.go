@@ -297,5 +297,15 @@ func TestAnalyzedSpansEnvConfig(t *testing.T) {
 	assert.Equal(0.5, c.AnalyzedSpansByService["service1"]["operation1"], 0.5)
 	assert.Equal(float64(0), c.AnalyzedSpansByService["service1"]["operation3"])
 	assert.Equal(float64(1), c.AnalyzedSpansByService["service2"]["operation2"])
+}
 
+func TestMaxEPSEnvConfig(t *testing.T) {
+	assert := assert.New(t)
+	os.Setenv("DD_MAX_EPS", "500.5")
+	defer os.Unsetenv("DD_MAX_EPS")
+
+	c := New()
+	c.loadEnv()
+
+	assert.EqualValues(500.5, c.MaxEPS)
 }
