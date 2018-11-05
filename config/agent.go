@@ -122,7 +122,7 @@ func New() *AgentConfig {
 
 		ExtraSampleRate: 1.0,
 		MaxTPS:          10,
-		MaxEPS:          100,
+		MaxEPS:          200,
 
 		ReceiverHost:    "localhost",
 		ReceiverPort:    8126,
