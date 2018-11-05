@@ -408,7 +408,15 @@ func (tkn *Tokenizer) scanString(delim uint16, typ int) (int, []byte) {
 		}
 		buffer.WriteByte(byte(ch))
 	}
-	return typ, buffer.Bytes()
+	buf := buffer.Bytes()
+	if typ == ID && len(buf) == 0 || len(bytes.TrimSpace(buf)) == 0 {
+		// This string is an empty or white-space only identifier.
+		// We should keep the start and end delimiters in order to
+		// avoid creating invalid queries.
+		// See: https://github.com/DataDog/datadog-trace-agent/issues/316
+		return typ, []byte{byte(delim), byte(delim)}
+	}
+	return typ, buf
 }
 
 func (tkn *Tokenizer) scanCommentType1(prefix string) (int, []byte) {

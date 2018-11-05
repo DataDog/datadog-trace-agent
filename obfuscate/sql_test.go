@@ -343,12 +343,20 @@ ORDER BY [b].[Name]`,
 			`SELECT * FROM users WHERE firstname = ?`,
 		},
 		{
-			`SELECT * FROM users WHERE firstname=""`,
+			`SELECT * FROM users WHERE firstname=' '`,
 			`SELECT * FROM users WHERE firstname = ?`,
 		},
 		{
+			`SELECT * FROM users WHERE firstname=""`,
+			`SELECT * FROM users WHERE firstname = ""`,
+		},
+		{
 			`SELECT * FROM users WHERE lastname=" "`,
-			`SELECT * FROM users WHERE lastname = ?`,
+			`SELECT * FROM users WHERE lastname = ""`,
+		},
+		{
+			`SELECT * FROM users WHERE lastname="	 "`,
+			`SELECT * FROM users WHERE lastname = ""`,
 		},
 		{
 			`SELECT [b].[BlogId], [b].[Name]
