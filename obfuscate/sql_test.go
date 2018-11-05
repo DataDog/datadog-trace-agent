@@ -86,8 +86,6 @@ func TestSQLResourceWithError(t *testing.T) {
 }
 
 func TestSQLQuantizer(t *testing.T) {
-	assert := assert.New(t)
-
 	cases := []sqlTestCase{
 		{
 			"select * from users where id = 42",
@@ -341,6 +339,26 @@ ORDER BY [b].[Name]`,
 			`SELECT [ b ] . [ BlogId ], [ b ] . [ Name ] FROM [ Blogs ] ORDER BY [ b ] . [ Name ]`,
 		},
 		{
+			`SELECT * FROM users WHERE firstname=''`,
+			`SELECT * FROM users WHERE firstname = ?`,
+		},
+		{
+			`SELECT * FROM users WHERE firstname=' '`,
+			`SELECT * FROM users WHERE firstname = ?`,
+		},
+		{
+			`SELECT * FROM users WHERE firstname=""`,
+			`SELECT * FROM users WHERE firstname = ""`,
+		},
+		{
+			`SELECT * FROM users WHERE lastname=" "`,
+			`SELECT * FROM users WHERE lastname = ""`,
+		},
+		{
+			`SELECT * FROM users WHERE lastname="	 "`,
+			`SELECT * FROM users WHERE lastname = ""`,
+		},
+		{
 			`SELECT [b].[BlogId], [b].[Name]
 FROM [Blogs] AS [b
 ORDER BY [b].[Name]`,
@@ -348,10 +366,12 @@ ORDER BY [b].[Name]`,
 		},
 	}
 
-	for _, c := range cases {
-		s := SQLSpan(c.query)
-		NewObfuscator(nil).Obfuscate(s)
-		assert.Equal(c.expected, s.Resource)
+	for i, c := range cases {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			s := SQLSpan(c.query)
+			NewObfuscator(nil).Obfuscate(s)
+			assert.Equal(t, c.expected, s.Resource)
+		})
 	}
 }
 
