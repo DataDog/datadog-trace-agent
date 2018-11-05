@@ -20,22 +20,25 @@ func TestProcessor(t *testing.T) {
 		{"No extractors", nil, nil, 0, 0, 0},
 
 		// Test Extractors
-		{"Extractor(0) - No samplers", []float64{0.}, nil, 0, 0, 0},
+		{"Extractor(0) - No samplers", []float64{0}, nil, 0, 0, 0},
 		{"Extractor(0.5) - No samplers", []float64{0.5}, nil, 0.5, 1, 0.1},
 		{"Extractor(1) - No samplers", []float64{1}, nil, 1, 1, 0},
-		{"Extractor(-1, 0.8) - No samplers", []float64{UnknownRate, 0.8}, nil, 0.8, 1, 0.1},
-		{"Extractor(-1, -1, 0.8) - No samplers", []float64{UnknownRate, UnknownRate, 0.8}, nil, 0.8, 1, 0.1},
+		{"Extractor(-1, 0.8) - No samplers", []float64{RateNone, 0.8}, nil, 0.8, 1, 0.1},
+		{"Extractor(-1, -1, 0.8) - No samplers", []float64{RateNone, RateNone, 0.8}, nil, 0.8, 1, 0.1},
 
 		// Test Samplers
 		{"Extractor(1) - Sampler(0)", []float64{1}, []float64{0}, 1, 0, 0},
 		{"Extractor(1) - Sampler(0.5)", []float64{1}, []float64{0.5}, 1, 0.5, 0.1},
 		{"Extractor(1) - Sampler(1)", []float64{1}, []float64{1}, 1, 1, 0},
 		{"Extractor(1) - Sampler(0.5, 0.5)", []float64{1}, []float64{0.5, 0.5}, 1, 0.5 * 0.5, 0.1},
-		{"Extractor(1) - Sampler(-1, 0.5)", []float64{1}, []float64{UnknownRate, 0.5}, 1, 0.5, 0.1},
+		{"Extractor(1) - Sampler(-1, 0.5)", []float64{1}, []float64{RateNone, 0.5}, 1, 0.5, 0.1},
 
 		// Test Extractor and Sampler combinations
 		{"Extractor(-1, 0.8) - Sampler(0.8, 0.5)", []float64{-1, 0.8}, []float64{0.8, 0.5}, 0.8, 0.8 * 0.5, 0.1},
 	}
+
+	testClientSampleRate := 0.3
+	testPreSampleRate := 0.5
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -56,7 +59,10 @@ func TestProcessor(t *testing.T) {
 			testSpans := createTestSpans("test", "test")
 			testTrace := model.ProcessedTrace{WeightedTrace: testSpans}
 
-			events, extracted := p.Process(testTrace)
+			events, extracted := p.Process(testTrace, ProcessorParams{
+				ClientSampleRate: testClientSampleRate,
+				PreSampleRate:    testPreSampleRate,
+			})
 			total := len(testSpans)
 			returned := len(events)
 
@@ -68,7 +74,9 @@ func TestProcessor(t *testing.T) {
 
 			for _, event := range events {
 				assert.EqualValues(test.expectedExtractedPct, event.GetExtractionSampleRate())
-				assert.EqualValues(test.expectedSampledPct, event.GetEventSamplerSampleRate())
+				assert.EqualValues(test.expectedSampledPct, event.GetEventSampleRate())
+				assert.EqualValues(testClientSampleRate, event.GetClientTraceSampleRate())
+				assert.EqualValues(testPreSampleRate, event.GetPreSampleRate())
 			}
 		})
 	}
@@ -78,12 +86,12 @@ type MockExtractor struct {
 	rate float64
 }
 
-func (e *MockExtractor) Extract(s *model.WeightedSpan, priority int) (bool, float64) {
+func (e *MockExtractor) Extract(s *model.WeightedSpan, priority model.SamplingPriority) (bool, float64) {
 	if e.rate >= 0 {
 		return rand.Float64() < e.rate, e.rate
 	}
 
-	return false, UnknownRate
+	return false, RateNone
 }
 
 type MockSampler struct {
@@ -98,5 +106,5 @@ func (e *MockSampler) Sample(event *model.APMEvent) (bool, float64) {
 		return rand.Float64() < e.rate, e.rate
 	}
 
-	return false, UnknownRate
+	return false, RateNone
 }

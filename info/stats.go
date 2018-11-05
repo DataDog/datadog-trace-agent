@@ -130,6 +130,8 @@ func (ts *TagStats) publish() {
 	spansFiltered := atomic.LoadInt64(&ts.SpansFiltered)
 	servicesReceived := atomic.LoadInt64(&ts.ServicesReceived)
 	servicesBytes := atomic.LoadInt64(&ts.ServicesBytes)
+	eventsExtracted := atomic.LoadInt64(&ts.EventsExtracted)
+	eventsSampled := atomic.LoadInt64(&ts.EventsSampled)
 
 	// Publish the stats
 	tags := ts.Tags.toArray()
@@ -149,6 +151,8 @@ func (ts *TagStats) publish() {
 	statsd.Client.Count("datadog.trace_agent.receiver.spans_filtered", spansFiltered, tags, 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.services_received", servicesReceived, tags, 1)
 	statsd.Client.Count("datadog.trace_agent.receiver.services_bytes", servicesBytes, tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.events_extracted", eventsExtracted, tags, 1)
+	statsd.Client.Count("datadog.trace_agent.receiver.events_sampled", eventsSampled, tags, 1)
 }
 
 // Stats holds the metrics that will be reported every 10s by the agent.
@@ -182,6 +186,10 @@ type Stats struct {
 	ServicesReceived int64
 	// ServicesBytes is the amount of data received on the services endpoint (raw data, encoded, compressed).
 	ServicesBytes int64
+	// EventsExtracted is the total number of APM events extracted from traces.
+	EventsExtracted int64
+	// EventsSampled is the total number of APM events sampled.
+	EventsSampled int64
 }
 
 func (s *Stats) update(recent *Stats) {
@@ -199,6 +207,8 @@ func (s *Stats) update(recent *Stats) {
 	atomic.AddInt64(&s.SpansFiltered, atomic.LoadInt64(&recent.SpansFiltered))
 	atomic.AddInt64(&s.ServicesReceived, atomic.LoadInt64(&recent.ServicesReceived))
 	atomic.AddInt64(&s.ServicesBytes, atomic.LoadInt64(&recent.ServicesBytes))
+	atomic.AddInt64(&s.EventsExtracted, atomic.LoadInt64(&recent.EventsExtracted))
+	atomic.AddInt64(&s.EventsSampled, atomic.LoadInt64(&recent.EventsSampled))
 }
 
 func (s *Stats) reset() {
@@ -216,6 +226,8 @@ func (s *Stats) reset() {
 	atomic.StoreInt64(&s.SpansFiltered, 0)
 	atomic.StoreInt64(&s.ServicesReceived, 0)
 	atomic.StoreInt64(&s.ServicesBytes, 0)
+	atomic.StoreInt64(&s.EventsExtracted, 0)
+	atomic.StoreInt64(&s.EventsSampled, 0)
 }
 
 func (s *Stats) isEmpty() bool {
@@ -234,11 +246,15 @@ func (s *Stats) String() string {
 	tracesBytes := atomic.LoadInt64(&s.TracesBytes)
 	servicesReceived := atomic.LoadInt64(&s.ServicesReceived)
 	servicesBytes := atomic.LoadInt64(&s.ServicesBytes)
+	eventsExtracted := atomic.LoadInt64(&s.EventsExtracted)
+	eventsSampled := atomic.LoadInt64(&s.EventsSampled)
 
 	return fmt.Sprintf("traces received: %d, traces dropped: %d, traces filtered: %d, "+
-		"traces amount: %d bytes, services received: %d, services amount: %d bytes",
+		"traces amount: %d bytes, services received: %d, services amount: %d bytes, "+
+		"events extracted: %d, events sampled: %d",
 		tracesReceived, tracesDropped, tracesFiltered,
-		tracesBytes, servicesReceived, servicesBytes)
+		tracesBytes, servicesReceived, servicesBytes,
+		eventsExtracted, eventsSampled)
 }
 
 // Tags holds the tags we parse when we handle the header of the payload.

@@ -8,6 +8,12 @@ type Processor struct {
 	samplers   []Sampler
 }
 
+// ProcessorParams is a struct containing extra parameters for event processing.
+type ProcessorParams struct {
+	ClientSampleRate float64
+	PreSampleRate    float64
+}
+
 // NewProcessor returns a new instance of Processor configured with the provided extractors and samplers.
 //
 // Extractors will look at each span in the trace and decide whether it should be converted to an APM event or not. They
@@ -24,14 +30,14 @@ func NewProcessor(extractors []Extractor, samplers []Sampler) *Processor {
 	}
 }
 
-// Start starts all underlying samplers.
+// Start starts the processor.
 func (p *Processor) Start() {
 	for _, sampler := range p.samplers {
 		sampler.Start()
 	}
 }
 
-// Stop stops all underlying samplers.
+// Stop stops the processor.
 func (p *Processor) Stop() {
 	for _, sampler := range p.samplers {
 		sampler.Stop()
@@ -39,35 +45,34 @@ func (p *Processor) Stop() {
 }
 
 // Process takes a processed trace, extracts events from it, submits them to the samplers and returns a collection of
-// sampled events along with the total count of extracted events.
-func (p *Processor) Process(t model.ProcessedTrace) (events []*model.APMEvent, numExtracted int) {
-	// Short-circuit if there are no extractors configured
+// sampled events along with the total count of extracted events. Process also takes a ProcessorParams struct from
+// which trace rates are extracted and set on every sampled event. An extraction callback can also be set which will
+// be called for every extracted event.
+func (p *Processor) Process(t model.ProcessedTrace, params ProcessorParams) (events []*model.APMEvent, numExtracted int64) {
 	if len(p.extractors) == 0 {
-		return nil, 0
+		return
 	}
 
 	priority, hasPriority := t.GetSamplingPriority()
 
-	// If priority is not set on a trace, assume priority 0
 	if !hasPriority {
-		priority = 0
+		priority = model.PriorityNone
 	}
 
 	for _, span := range t.WeightedTrace {
-		var extractedEvent *model.APMEvent
+		var event *model.APMEvent
 
-		// Loop through extractors until we find one that attempted to extract an event.
 		for _, extractor := range p.extractors {
 			extract, rate := extractor.Extract(span, priority)
 
-			// If the extractor didn't know what to do with this span, try the next one
-			if rate == UnknownRate {
+			if rate == RateNone {
+				// If the extractor did not make any extraction decision, try the next one
 				continue
 			}
 
 			if extract {
-				extractedEvent = &model.APMEvent{Span: span.Span, TraceSampled: t.Sampled}
-				extractedEvent.SetExtractionSampleRate(rate)
+				event = &model.APMEvent{Span: span.Span, TraceSampled: t.Sampled}
+				event.SetExtractionSampleRate(rate)
 			}
 
 			// If this extractor applied a valid sampling rate then that means it processed this span so don't try the
@@ -75,28 +80,28 @@ func (p *Processor) Process(t model.ProcessedTrace) (events []*model.APMEvent, n
 			break
 		}
 
-		// If we didn't find any event in this span, try the next span
-		if extractedEvent == nil {
+		if event == nil {
+			// If we didn't find any event in this span, try the next span
 			continue
 		}
 
 		numExtracted++
 
 		// Otherwise, apply event samplers to the extracted event
-		sampleDecision := true
+		eventSampled := true
 		sampleRate := 1.0
 
 		for _, sampler := range p.samplers {
-			sampled, rate := sampler.Sample(extractedEvent)
+			sampled, rate := sampler.Sample(event)
 
-			// If the sampler didn't know what do do with the event, try the next one.
-			if rate == UnknownRate {
+			if rate == RateNone {
+				// If the sampler didn't know what do do with the event, try the next one.
 				continue
 			}
 
-			// If one of the samplers didn't sample this event, don't sample it.
 			if !sampled {
-				sampleDecision = false
+				// If one of the samplers didn't sample this event, don't sample it.
+				eventSampled = false
 				break
 			}
 
@@ -104,11 +109,14 @@ func (p *Processor) Process(t model.ProcessedTrace) (events []*model.APMEvent, n
 			sampleRate *= rate
 		}
 
-		// If the event survived global sampling then add it to the results.
-		if sampleDecision {
-			// And add the total sample rate to it
-			extractedEvent.SetEventSamplerSampleRate(sampleRate)
-			events = append(events, extractedEvent)
+		if eventSampled {
+			events = append(events, event)
+
+			// Add the total sample rate to it
+			event.SetEventSampleRate(sampleRate)
+			// Also add any trace sample rates to sampled events
+			event.SetClientTraceSampleRate(params.ClientSampleRate)
+			event.SetPreSampleRate(params.PreSampleRate)
 		}
 	}
 

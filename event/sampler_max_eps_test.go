@@ -32,19 +32,15 @@ func TestMaxEPSSampler(t *testing.T) {
 			counter := &MockRateCounter{
 				GetRateResult: testCase.pastEPS,
 			}
-
 			sampler := newMaxEPSSampler(testCase.maxEPS, counter)
 			sampler.Start()
 
 			sampled := 0
-
 			for _, event := range testCase.events {
 				sample, rate := sampler.Sample(event)
-
 				if sample {
 					sampled++
 				}
-
 				assert.EqualValues(testCase.expectedSampleRate, rate)
 			}
 
@@ -53,7 +49,6 @@ func TestMaxEPSSampler(t *testing.T) {
 			assert.InDelta(testCase.expectedSampleRate, float64(sampled)/float64(len(testEvents)), testCase.expectedSampleRate*testCase.deltaPct)
 
 			nonTraceSampledEvents := 0
-
 			for _, e := range testCase.events {
 				if !e.TraceSampled {
 					nonTraceSampledEvents++

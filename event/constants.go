@@ -1,4 +1,4 @@
 package event
 
-// UnknownRate represents an invalid rate associated with a no-op extraction/sampler.
-const UnknownRate = -1
+// RateNone represents an invalid rate associated with a no-op extraction/sampler.
+const RateNone = -1

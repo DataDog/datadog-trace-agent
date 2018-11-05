@@ -263,18 +263,14 @@ func (a *Agent) Process(t model.Trace) {
 		}
 
 		// NOTE: Events can be processed on non-sampled traces.
-		events, numExtracted := a.EventProcessor.Process(pt)
-		statsd.Client.Count("datadog.trace_agent.events.extracted", int64(numExtracted), nil, 1)
-		statsd.Client.Count("datadog.trace_agent.events.sampled", int64(len(events)), nil, 1)
-
-		// Tag sampled events with the source trace rates
-		for _, e := range events {
-			e.SetClientTraceSampleRate(clientSampleRate)
-			e.SetPreSamplerSampleRate(preSamplerRate)
-		}
-
-		// Add sampled events to the trace package
+		events, numExtracted := a.EventProcessor.Process(pt, event.ProcessorParams{
+			ClientSampleRate: clientSampleRate,
+			PreSampleRate:    preSamplerRate,
+		})
 		tracePkg.Events = events
+
+		atomic.AddInt64(&ts.EventsExtracted, int64(numExtracted))
+		atomic.AddInt64(&ts.EventsSampled, int64(len(tracePkg.Events)))
 
 		if !tracePkg.Empty() {
 			a.tracePkgChan <- &tracePkg
@@ -347,8 +343,7 @@ func eventProcessorFromConf(conf *config.AgentConfig) *event.Processor {
 	}
 	if len(conf.AnalyzedSpansByService) > 0 {
 		extractors = append(extractors, event.NewFixedRateExtractor(conf.AnalyzedSpansByService))
-	}
-	if len(conf.AnalyzedRateByServiceLegacy) > 0 {
+	} else if len(conf.AnalyzedRateByServiceLegacy) > 0 {
 		extractors = append(extractors, event.NewLegacyExtractor(conf.AnalyzedRateByServiceLegacy))
 	}
 

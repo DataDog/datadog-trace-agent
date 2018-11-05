@@ -16,6 +16,6 @@ func (pt *ProcessedTrace) Weight() float64 {
 	return pt.Root.Weight()
 }
 
-func (pt *ProcessedTrace) GetSamplingPriority() (int, bool) {
+func (pt *ProcessedTrace) GetSamplingPriority() (SamplingPriority, bool) {
 	return pt.Root.GetSamplingPriority()
 }

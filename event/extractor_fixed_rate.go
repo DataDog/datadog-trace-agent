@@ -20,23 +20,26 @@ func NewFixedRateExtractor(rateByServiceAndName map[string]map[string]float64) E
 }
 
 // Extract decides to extract an apm event from a span if its service and name have a corresponding extraction rate
-// and the span's trace id is chosen based on said rate. The extraction decision is returned as a bool and the
-// respective rate as a float64.
+// and the span's trace id is chosen based on said rate.
 //
 // If no rate is set for the service and name pair in the span, the returned rate is UnknownRate.
-func (e *fixedRateExtractor) Extract(s *model.WeightedSpan, priority int) (extract bool, rate float64) {
-	if operations, ok := e.rateByServiceAndName[s.Service]; ok {
-		if extractionRate, ok := operations[s.Name]; ok {
-			// If the span has been manually sampled, we always want to extract events.
-			if extractionRate > 0 && priority >= 2 {
-				return true, 1
-			}
+func (e *fixedRateExtractor) Extract(s *model.WeightedSpan, priority model.SamplingPriority) (extract bool, rate float64) {
+	operations, ok := e.rateByServiceAndName[s.Service]
 
-			// Else we apply whatever rate was configured
-			sampled := sampler.SampleByRate(s.TraceID, extractionRate)
-
-			return sampled, extractionRate
-		}
+	if !ok {
+		return false, RateNone
 	}
-	return false, UnknownRate
+
+	extractionRate, ok := operations[s.Name]
+
+	if !ok {
+		return false, RateNone
+	}
+
+	if extractionRate > 0 && priority >= model.PriorityUserKeep {
+		// If the span has been manually sampled, we always want to extract events.
+		return true, 1
+	}
+
+	return sampler.SampleByRate(s.TraceID, extractionRate), extractionRate
 }
