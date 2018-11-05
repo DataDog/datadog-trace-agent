@@ -28,6 +28,7 @@ func (e *APMEvent) SetClientTraceSampleRate(rate float64) {
 	if rate < 1 {
 		e.Span.SetMetric(KeySamplingRateClientTrace, rate)
 	} else {
+		// We assume missing value is 1 to save bandwidth (check getter).
 		delete(e.Span.Metrics, KeySamplingRateClientTrace)
 	}
 }
@@ -43,6 +44,7 @@ func (e *APMEvent) SetExtractionSampleRate(rate float64) {
 	if rate < 1 {
 		e.Span.SetMetric(KeySamplingRateEventExtraction, rate)
 	} else {
+		// We assume missing value is 1 to save bandwidth (check getter).
 		delete(e.Span.Metrics, KeySamplingRateEventExtraction)
 	}
 }
@@ -60,6 +62,7 @@ func (e *APMEvent) SetPreSampleRate(rate float64) {
 	if rate < 1 {
 		e.Span.SetMetric(KeySamplingRatePreSampler, rate)
 	} else {
+		// We assume missing value is 1 to save bandwidth (check getter).
 		delete(e.Span.Metrics, KeySamplingRatePreSampler)
 	}
 }
@@ -74,6 +77,7 @@ func (e *APMEvent) SetEventSampleRate(rate float64) {
 	if rate < 1 {
 		e.Span.SetMetric(KeySamplingRateEventSampler, rate)
 	} else {
+		// We assume missing value is 1 to save bandwidth (check getter).
 		delete(e.Span.Metrics, KeySamplingRateEventSampler)
 	}
 }
