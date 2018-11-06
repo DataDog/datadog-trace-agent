@@ -203,13 +203,13 @@ func (a *Agent) Process(t model.Trace) {
 	a.Replacer.Replace(&t)
 
 	// Extract the client sampling rate.
-	clientSampleRate := sampler.GetTraceAppliedSampleRate(root)
+	clientSampleRate := root.GetSampleRate()
 	root.SetClientTraceSampleRate(clientSampleRate)
 	// Combine it with the pre-sampling rate.
 	preSamplerRate := a.Receiver.PreSampler.Rate()
 	root.SetPreSampleRate(preSamplerRate)
-	// Combine them and attach it to the root to be used for weighing.
-	sampler.SetTraceAppliedSampleRate(root, clientSampleRate*preSamplerRate)
+	// Update root's global sample rate to include the presampler rate as well
+	root.UpdateSampleRate(preSamplerRate)
 
 	// Figure out the top-level spans and sublayers now as it involves modifying the Metrics map
 	// which is not thread-safe while samplers and Concentrator might modify it too.
@@ -260,7 +260,7 @@ func (a *Agent) Process(t model.Trace) {
 
 		if sampled {
 			pt.Sampled = sampled
-			sampler.AddSampleRate(pt.Root, rate)
+			pt.Root.UpdateSampleRate(rate)
 			tracePkg.Trace = pt.Trace
 		}
 

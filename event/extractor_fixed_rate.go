@@ -25,21 +25,16 @@ func NewFixedRateExtractor(rateByServiceAndName map[string]map[string]float64) E
 // If no rate is set for the service and name pair in the span, the returned rate is UnknownRate.
 func (e *fixedRateExtractor) Extract(s *model.WeightedSpan, priority model.SamplingPriority) (extract bool, rate float64) {
 	operations, ok := e.rateByServiceAndName[s.Service]
-
 	if !ok {
 		return false, RateNone
 	}
-
 	extractionRate, ok := operations[s.Name]
-
 	if !ok {
 		return false, RateNone
 	}
-
 	if extractionRate > 0 && priority >= model.PriorityUserKeep {
 		// If the span has been manually sampled, we always want to extract events.
 		return true, 1
 	}
-
 	return sampler.SampleByRate(s.TraceID, extractionRate), extractionRate
 }

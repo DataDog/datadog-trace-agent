@@ -26,12 +26,9 @@ func (e *legacyExtractor) Extract(s *model.WeightedSpan, priority model.Sampling
 	if !s.TopLevel {
 		return false, RateNone
 	}
-
 	extractionRate, ok := e.rateByService[s.Service]
-
 	if !ok {
 		return false, RateNone
 	}
-
 	return sampler.SampleByRate(s.TraceID, extractionRate), extractionRate
 }

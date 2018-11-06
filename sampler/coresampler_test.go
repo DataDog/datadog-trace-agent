@@ -76,9 +76,9 @@ func TestAddSampleRate(t *testing.T) {
 
 	root := model.Span{TraceID: tID, SpanID: 1, ParentID: 0, Start: 123, Duration: 100000, Service: "mcnulty", Type: "web"}
 
-	AddSampleRate(&root, 0.4)
+	root.UpdateSampleRate(0.4)
 	assert.Equal(0.4, root.Metrics["_sample_rate"], "sample rate should be 40%%")
 
-	AddSampleRate(&root, 0.5)
+	root.UpdateSampleRate(0.5)
 	assert.Equal(0.2, root.Metrics["_sample_rate"], "sample rate should be 20%% (50%% of 40%%)")
 }

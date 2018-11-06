@@ -19,7 +19,7 @@ func NewMetricBasedExtractor() Extractor {
 // on that span. If priority is 2 (manually sampled) and extraction rate is bigger than 0, then an event is always
 // extracted.
 func (e *metricBasedExtractor) Extract(s *model.WeightedSpan, priority model.SamplingPriority) (extract bool, rate float64) {
-	extractionRate, ok := s.GetMetric(model.KeySamplingRateEventExtraction)
+	extractionRate, ok := s.GetEventExtractionRate()
 
 	if !ok {
 		return false, RateNone

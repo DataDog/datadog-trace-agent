@@ -7,7 +7,7 @@ import (
 
 const (
 	// SpanSampleRateMetricKey is the metric key holding the sample rate
-	SpanSampleRateMetricKey = "_sample_rate"
+	KeySamplingRateGlobal = "_sample_rate"
 
 	// KeySamplingRateClientTrace is the key of the metric storing the trace client sampling rate on an APM event.
 	KeySamplingRateClient = "_dd1.sr.rcusr"
@@ -63,7 +63,7 @@ func (s *Span) Weight() float64 {
 	if s == nil {
 		return 1.0
 	}
-	sampleRate, ok := s.Metrics[SpanSampleRateMetricKey]
+	sampleRate, ok := s.Metrics[KeySamplingRateGlobal]
 	if !ok || sampleRate <= 0.0 || sampleRate > 1.0 {
 		return 1.0
 	}
@@ -109,6 +109,22 @@ func (s *Span) GetSamplingPriority() (SamplingPriority, bool) {
 // SetSamplingPriority sets the sampling priority value on this span, overwriting any previously set value.
 func (s *Span) SetSamplingPriority(priority SamplingPriority) {
 	s.SetMetric(SamplingPriorityKey, float64(priority))
+}
+
+// GetSampleRate gets the cumulative sample rate of the trace to which this span belongs to.
+func (s *Span) GetSampleRate() float64 {
+	return s.GetMetricDefault(KeySamplingRateGlobal, 1.0)
+}
+
+// SetSampleRate sets the cumulative sample rate of the trace to which this span belongs to.
+func (s *Span) SetSampleRate(rate float64) {
+	s.SetMetric(KeySamplingRateGlobal, rate)
+}
+
+// UpdateSampleRate updates the cumulative sample rate of the trace to which this span belongs to with the provided
+// rate which is assumed to belong to an independent sampler. The combination is done by simple multiplications.
+func (s *Span) UpdateSampleRate(rate float64) {
+	s.SetMetric(KeySamplingRateGlobal, s.GetSampleRate()*rate)
 }
 
 // GetEventExtractionRate returns the set APM event extraction rate for this span.

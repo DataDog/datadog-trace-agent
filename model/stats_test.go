@@ -45,7 +45,7 @@ func testTrace() Trace {
 	trace := Trace{
 		&Span{TraceID: 42, SpanID: 42, ParentID: 0, Service: "A",
 			Name: "A.foo", Type: "web", Resource: "α", Start: 0, Duration: 100,
-			Metrics: map[string]float64{SpanSampleRateMetricKey: 0.5}},
+			Metrics: map[string]float64{KeySamplingRateGlobal: 0.5}},
 		&Span{TraceID: 42, SpanID: 100, ParentID: 42, Service: "B",
 			Name: "B.bar", Type: "web", Resource: "α", Start: 1, Duration: 20},
 		&Span{TraceID: 42, SpanID: 2000, ParentID: 100, Service: "C",
@@ -71,7 +71,7 @@ func testTraceTopLevel() Trace {
 	trace := Trace{
 		&Span{TraceID: 42, SpanID: 42, ParentID: 0, Service: "A",
 			Name: "A.foo", Type: "web", Resource: "α", Start: 0, Duration: 100,
-			Metrics: map[string]float64{SpanSampleRateMetricKey: 1}},
+			Metrics: map[string]float64{KeySamplingRateGlobal: 1}},
 		&Span{TraceID: 42, SpanID: 100, ParentID: 42, Service: "B",
 			Name: "B.bar", Type: "web", Resource: "α", Start: 1, Duration: 20},
 		&Span{TraceID: 42, SpanID: 2000, ParentID: 100, Service: "B",
