@@ -204,8 +204,10 @@ func (a *Agent) Process(t model.Trace) {
 
 	// Extract the client sampling rate.
 	clientSampleRate := sampler.GetTraceAppliedSampleRate(root)
+	root.SetClientTraceSampleRate(clientSampleRate)
 	// Combine it with the pre-sampling rate.
 	preSamplerRate := a.Receiver.PreSampler.Rate()
+	root.SetPreSampleRate(preSamplerRate)
 	// Combine them and attach it to the root to be used for weighing.
 	sampler.SetTraceAppliedSampleRate(root, clientSampleRate*preSamplerRate)
 
@@ -263,10 +265,7 @@ func (a *Agent) Process(t model.Trace) {
 		}
 
 		// NOTE: Events can be processed on non-sampled traces.
-		events, numExtracted := a.EventProcessor.Process(pt, event.ProcessorParams{
-			ClientSampleRate: clientSampleRate,
-			PreSampleRate:    preSamplerRate,
-		})
+		events, numExtracted := a.EventProcessor.Process(pt)
 		tracePkg.Events = events
 
 		atomic.AddInt64(&ts.EventsExtracted, int64(numExtracted))

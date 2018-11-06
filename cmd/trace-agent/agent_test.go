@@ -443,7 +443,7 @@ func TestEventProcessorFromConfLegacy(t *testing.T) {
 		{name: "legacy - above max eps - all trace sampled", intakeSPS: 200, serviceName: "serviceD", opName: "opC", extractionRate: -1, pctTraceSampled: 1, expectedEPS: 200, deltaPct: 0.1, duration: 10 * time.Second},
 	} {
 		testEventProcessorFromConf(t, &config.AgentConfig{
-			MaxEPS:                      testMaxEPS,
+			MaxEPS: testMaxEPS,
 			AnalyzedRateByServiceLegacy: rateByService,
 		}, testCase)
 	}
@@ -509,9 +509,10 @@ Loop:
 		trace := model.ProcessedTrace{
 			WeightedTrace: model.WeightedTrace(spans),
 			Sampled:       rand.Float64() < pctTraceSampled,
+			Root:          spans[0].Span,
 		}
 
-		events, _ := processor.Process(trace, event.ProcessorParams{})
+		events, _ := processor.Process(trace)
 
 		totalSampled += len(events)
 

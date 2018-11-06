@@ -58,11 +58,11 @@ func TestProcessor(t *testing.T) {
 
 			testSpans := createTestSpans("test", "test")
 			testTrace := model.ProcessedTrace{WeightedTrace: testSpans}
+			testTrace.Root = testSpans[0].Span
+			testTrace.Root.SetPreSampleRate(testPreSampleRate)
+			testTrace.Root.SetClientTraceSampleRate(testClientSampleRate)
 
-			events, extracted := p.Process(testTrace, ProcessorParams{
-				ClientSampleRate: testClientSampleRate,
-				PreSampleRate:    testPreSampleRate,
-			})
+			events, extracted := p.Process(testTrace)
 			total := len(testSpans)
 			returned := len(events)
 

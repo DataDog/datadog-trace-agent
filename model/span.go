@@ -8,6 +8,12 @@ import (
 const (
 	// SpanSampleRateMetricKey is the metric key holding the sample rate
 	SpanSampleRateMetricKey = "_sample_rate"
+
+	// KeySamplingRateClientTrace is the key of the metric storing the trace client sampling rate on an APM event.
+	KeySamplingRateClient = "_dd1.sr.rcusr"
+	// KeySamplingRatePreSampler is the key of the metric storing the trace pre sampler rate on an APM event.
+	KeySamplingRatePreSampler = "_dd1.sr.rapre"
+
 	// Fake type of span to indicate it is time to flush
 	flushMarkerType = "_FLUSH_MARKER"
 
@@ -108,4 +114,36 @@ func (s *Span) SetSamplingPriority(priority SamplingPriority) {
 // GetEventExtractionRate returns the set APM event extraction rate for this span.
 func (s *Span) GetEventExtractionRate() (float64, bool) {
 	return s.GetMetric(KeySamplingRateEventExtraction)
+}
+
+// GetClientSampleRate gets the rate at which the trace this span belongs to was sampled by the tracer.
+// NOTE: This defaults to 1 if no rate is stored.
+func (s *Span) GetClientSampleRate() float64 {
+	return s.GetMetricDefault(KeySamplingRateClient, 1.0)
+}
+
+// SetClientTraceSampleRate sets the rate at which the trace this span belongs to was sampled by the tracer.
+func (s *Span) SetClientTraceSampleRate(rate float64) {
+	if rate < 1 {
+		s.SetMetric(KeySamplingRateClient, rate)
+	} else {
+		// We assume missing value is 1 to save bandwidth (check getter).
+		delete(s.Metrics, KeySamplingRateClient)
+	}
+}
+
+// GetPreSampleRate returns the rate at which the trace this span belongs to was sampled by the agent's presampler.
+// NOTE: This defaults to 1 if no rate is stored.
+func (s *Span) GetPreSampleRate() float64 {
+	return s.GetMetricDefault(KeySamplingRatePreSampler, 1.0)
+}
+
+// SetPreSampleRate sets the rate at which the trace this span belongs to was sampled by the agent's presampler.
+func (s *Span) SetPreSampleRate(rate float64) {
+	if rate < 1 {
+		s.SetMetric(KeySamplingRatePreSampler, rate)
+	} else {
+		// We assume missing value is 1 to save bandwidth (check getter).
+		delete(s.Metrics, KeySamplingRatePreSampler)
+	}
 }
