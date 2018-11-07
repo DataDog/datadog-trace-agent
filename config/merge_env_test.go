@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -43,5 +44,24 @@ func TestAnalyzedSpansEnvConfigParsing(t *testing.T) {
 
 		_, err = parseAnalyzedSpans("service|operation=1,")
 		assert.NotNil(err)
+	})
+}
+
+func TestLoadEnvMaxTracesPerSecond(t *testing.T) {
+	assert := assert.New(t)
+
+	t.Run("not exist DD_APM_MAX_TRACES_PER_SECOND envvar", func(t *testing.T) {
+		ac := &AgentConfig{}
+		ac.loadEnv()
+		assert.EqualValues(0.0, ac.MaxTPS)
+	})
+
+	t.Run("exist DD_APM_MAX_TRACES_PER_SECOND envvar", func(t *testing.T) {
+		if err := os.Setenv("DD_APM_MAX_TRACES_PER_SECOND", "123.4"); err != nil {
+			t.Fatal(err)
+		}
+		ac := &AgentConfig{}
+		ac.loadEnv()
+		assert.EqualValues(123.4, ac.MaxTPS)
 	})
 }
