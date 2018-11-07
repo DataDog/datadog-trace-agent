@@ -26,6 +26,7 @@ const (
 	envLogLevel        = "DD_LOG_LEVEL"             // logging level
 	envAnalyzedSpans   = "DD_APM_ANALYZED_SPANS"    // spans to analyze for transactions
 	envConnectionLimit = "DD_CONNECTION_LIMIT"      // (deprecated) limit of unique connections
+	envMaxTPS          = "DD_MAX_TPS"               // maximum limit to the total number of traces per second to sample (MaxTPS)
 )
 
 // loadEnv applies overrides from environment variables to the trace agent configuration
@@ -122,6 +123,16 @@ func (c *AgentConfig) loadEnv() {
 			}
 		}
 	}
+
+	if v := os.Getenv(envMaxTPS); v != "" {
+		maxTPS, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			log.Errorf("Failed to parse %s: it should be a float number", envMaxTPS)
+		} else {
+			c.MaxTPS = maxTPS
+		}
+	}
+
 }
 
 func parseNameAndRate(token string) (string, float64, error) {
