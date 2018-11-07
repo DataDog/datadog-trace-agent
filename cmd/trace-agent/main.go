@@ -124,7 +124,13 @@ func runAgent(ctx context.Context) {
 	// Initialize logging (replacing the default logger). No need
 	// to defer log.Flush, it was already done when calling
 	// "SetupDefaultLogger" earlier.
-	logLevel, ok := log.LogLevelFromString(strings.ToLower(cfg.LogLevel))
+	cfgLogLevel := strings.ToLower(cfg.LogLevel)
+	if cfgLogLevel == "warning" {
+		// to match core agent:
+		// https://github.com/DataDog/datadog-agent/blob/6f2d901aeb19f0c0a4e09f149c7cc5a084d2f708/pkg/config/log.go#L74-L76
+		cfgLogLevel = "warn"
+	}
+	logLevel, ok := log.LogLevelFromString(cfgLogLevel)
 	if !ok {
 		logLevel = log.InfoLvl
 	}
