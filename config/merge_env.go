@@ -11,22 +11,22 @@ import (
 )
 
 const (
-	envAPIKey             = "DD_API_KEY"                   // API KEY
-	envSite               = "DD_SITE"                      // server site (us, eu)
-	envAPMEnabled         = "DD_APM_ENABLED"               // APM enabled
-	envURL                = "DD_APM_DD_URL"                // APM URL
-	envProxyDeprecated    = "HTTPS_PROXY"                  // (deprecated) proxy URL
-	envProxy              = "DD_PROXY_HTTPS"               // proxy URL (overrides deprecated)
-	envHostname           = "DD_HOSTNAME"                  // agent hostname
-	envBindHost           = "DD_BIND_HOST"                 // statsd & receiver hostname
-	envReceiverPort       = "DD_RECEIVER_PORT"             // receiver port
-	envDogstatsdPort      = "DD_DOGSTATSD_PORT"            // dogstatsd port
-	envRemoteTraffic      = "DD_APM_NON_LOCAL_TRAFFIC"     // alow non-local traffic
-	envIgnoreResources    = "DD_IGNORE_RESOURCE"           // ignored resources
-	envLogLevel           = "DD_LOG_LEVEL"                 // logging level
-	envAnalyzedSpans      = "DD_APM_ANALYZED_SPANS"        // spans to analyze for transactions
-	envConnectionLimit    = "DD_CONNECTION_LIMIT"          // (deprecated) limit of unique connections
-	envMaxTracesPerSecond = "DD_APM_MAX_TRACES_PER_SECOND" // maximum limit to the total number of traces per second to sample (MaxTPS)
+	envAPIKey          = "DD_API_KEY"               // API KEY
+	envSite            = "DD_SITE"                  // server site (us, eu)
+	envAPMEnabled      = "DD_APM_ENABLED"           // APM enabled
+	envURL             = "DD_APM_DD_URL"            // APM URL
+	envProxyDeprecated = "HTTPS_PROXY"              // (deprecated) proxy URL
+	envProxy           = "DD_PROXY_HTTPS"           // proxy URL (overrides deprecated)
+	envHostname        = "DD_HOSTNAME"              // agent hostname
+	envBindHost        = "DD_BIND_HOST"             // statsd & receiver hostname
+	envReceiverPort    = "DD_RECEIVER_PORT"         // receiver port
+	envDogstatsdPort   = "DD_DOGSTATSD_PORT"        // dogstatsd port
+	envRemoteTraffic   = "DD_APM_NON_LOCAL_TRAFFIC" // alow non-local traffic
+	envIgnoreResources = "DD_IGNORE_RESOURCE"       // ignored resources
+	envLogLevel        = "DD_LOG_LEVEL"             // logging level
+	envAnalyzedSpans   = "DD_APM_ANALYZED_SPANS"    // spans to analyze for transactions
+	envConnectionLimit = "DD_CONNECTION_LIMIT"      // (deprecated) limit of unique connections
+	envMaxTPS          = "DD_MAX_TPS"               // maximum limit to the total number of traces per second to sample (MaxTPS)
 )
 
 // loadEnv applies overrides from environment variables to the trace agent configuration
@@ -124,10 +124,10 @@ func (c *AgentConfig) loadEnv() {
 		}
 	}
 
-	if v := os.Getenv(envMaxTracesPerSecond); v != "" {
+	if v := os.Getenv(envMaxTPS); v != "" {
 		maxTPS, err := strconv.ParseFloat(v, 64)
 		if err != nil {
-			log.Errorf("Failed to parse %s: it should be a float number", envMaxTracesPerSecond)
+			log.Errorf("Failed to parse %s: it should be a float number", envMaxTPS)
 		} else {
 			c.MaxTPS = maxTPS
 		}

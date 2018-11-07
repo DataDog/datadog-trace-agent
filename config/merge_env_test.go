@@ -47,20 +47,22 @@ func TestAnalyzedSpansEnvConfigParsing(t *testing.T) {
 	})
 }
 
-func TestLoadEnvMaxTracesPerSecond(t *testing.T) {
+func TestLoadEnvMaxTPS(t *testing.T) {
 	assert := assert.New(t)
 
-	t.Run("not exist DD_APM_MAX_TRACES_PER_SECOND envvar", func(t *testing.T) {
-		ac := &AgentConfig{}
+	t.Run("default", func(t *testing.T) {
+		ac := New()
 		ac.loadEnv()
-		assert.EqualValues(0.0, ac.MaxTPS)
+		assert.EqualValues(10.0, ac.MaxTPS)
 	})
 
-	t.Run("exist DD_APM_MAX_TRACES_PER_SECOND envvar", func(t *testing.T) {
-		if err := os.Setenv("DD_APM_MAX_TRACES_PER_SECOND", "123.4"); err != nil {
+	t.Run("env", func(t *testing.T) {
+		if err := os.Setenv("DD_MAX_TPS", "123.4"); err != nil {
 			t.Fatal(err)
 		}
-		ac := &AgentConfig{}
+		defer os.Unsetenv("DD_MAX_TPS")
+
+		ac := New()
 		ac.loadEnv()
 		assert.EqualValues(123.4, ac.MaxTPS)
 	})
