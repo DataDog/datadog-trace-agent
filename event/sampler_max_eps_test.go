@@ -10,9 +10,6 @@ import (
 )
 
 func TestMaxEPSSampler(t *testing.T) {
-	testEvents := generateTestEvents(1000, 0)
-	testEventsSampledTraces := generateTestEvents(1000, 100)
-
 	for name, testCase := range map[string]struct {
 		events             []*model.APMEvent
 		maxEPS             float64
@@ -20,11 +17,11 @@ func TestMaxEPSSampler(t *testing.T) {
 		expectedSampleRate float64
 		deltaPct           float64
 	}{
-		"low EPS":      {testEvents, 100, 50, 1., 0},
-		"limit EPS":    {testEvents, 100, 100, 1., 0},
-		"overload EPS": {testEvents, 100, 150, 100. / 150., 0.05},
+		"low EPS":      {generateTestEvents(1000, 0), 100, 50, 1., 0},
+		"limit EPS":    {generateTestEvents(1000, 0), 100, 100, 1., 0},
+		"overload EPS": {generateTestEvents(1000, 0), 100, 150, 100. / 150., 0.05},
 		// We should always keep events for sampled traces even if we are above maxEPS
-		"overload EPS - sampled": {testEventsSampledTraces, 100, 500, 1., 0},
+		"overload EPS - sampled": {generateTestEvents(1000, 100), 100, 500, 1., 0},
 	} {
 		t.Run(name, func(t *testing.T) {
 			assert := assert.New(t)
@@ -47,7 +44,7 @@ func TestMaxEPSSampler(t *testing.T) {
 
 			sampler.Stop()
 
-			assert.InDelta(testCase.expectedSampleRate, float64(sampled)/float64(len(testEvents)), testCase.expectedSampleRate*testCase.deltaPct)
+			assert.InDelta(testCase.expectedSampleRate, float64(sampled)/float64(len(testCase.events)), testCase.expectedSampleRate*testCase.deltaPct)
 
 			nonTraceSampledEvents := 0
 			for _, e := range testCase.events {
