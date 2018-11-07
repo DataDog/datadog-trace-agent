@@ -5,14 +5,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	log "github.com/cihub/seelog"
-
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
+	log "github.com/cihub/seelog"
 )
+
+const pathServices = "/api/v0.2/services"
 
 // ServiceWriter ingests service metadata and flush them to the API.
 type ServiceWriter struct {
@@ -22,28 +24,29 @@ type ServiceWriter struct {
 
 	serviceBuffer model.ServicesMetadata
 
-	BaseWriter
+	sender payloadSender
+	exit   chan struct{}
 }
 
 // NewServiceWriter returns a new writer for services.
 func NewServiceWriter(conf *config.AgentConfig, InServices <-chan model.ServicesMetadata) *ServiceWriter {
-	writerConf := conf.ServiceWriterConfig
-	log.Infof("Service writer initializing with config: %+v", writerConf)
+	cfg := conf.ServiceWriterConfig
+	endpoints := newEndpoints(conf, pathServices)
+	sender := newMultiSender(endpoints, cfg.SenderConfig)
+	log.Infof("Service writer initializing with config: %+v", cfg)
 
 	return &ServiceWriter{
-		conf:          writerConf,
+		conf:          cfg,
 		InServices:    InServices,
 		serviceBuffer: model.ServicesMetadata{},
-		BaseWriter: *NewBaseWriter(conf, "/api/v0.2/services", func(endpoint Endpoint) PayloadSender {
-			senderConf := writerConf.SenderConfig
-			return NewCustomQueuablePayloadSender(endpoint, senderConf)
-		}),
+		sender:        sender,
+		exit:          make(chan struct{}),
 	}
 }
 
 // Start starts the writer.
 func (w *ServiceWriter) Start() {
-	w.BaseWriter.Start()
+	w.sender.Start()
 	go func() {
 		defer watchdog.LogOnPanic()
 		w.Run()
@@ -53,8 +56,7 @@ func (w *ServiceWriter) Start() {
 // Run runs the main loop of the writer goroutine. If buffers
 // services read from input chan and flushes them when necessary.
 func (w *ServiceWriter) Run() {
-	w.exitWG.Add(1)
-	defer w.exitWG.Done()
+	defer close(w.exit)
 
 	// for now, simply flush every x seconds
 	flushTicker := time.NewTicker(w.conf.FlushPeriod)
@@ -67,25 +69,24 @@ func (w *ServiceWriter) Run() {
 
 	// Monitor sender for events
 	go func() {
-		for event := range w.payloadSender.Monitor() {
-			if event == nil {
-				continue
-			}
-
-			switch event := event.(type) {
-			case SenderSuccessEvent:
-				log.Infof("flushed service payload to the API, time:%s, size:%d bytes", event.SendStats.SendTime,
-					len(event.Payload.Bytes))
-				w.statsClient.Gauge("datadog.trace_agent.service_writer.flush_duration",
-					event.SendStats.SendTime.Seconds(), nil, 1)
+		for event := range w.sender.Monitor() {
+			switch event.typ {
+			case eventTypeSuccess:
+				url := event.stats.host
+				log.Infof("flushed service payload; url:%s, time:%s, size:%d bytes", url, event.stats.sendTime,
+					len(event.payload.bytes))
+				tags := []string{"url:" + url}
+				statsd.Client.Gauge("datadog.trace_agent.service_writer.flush_duration",
+					event.stats.sendTime.Seconds(), tags, 1)
 				atomic.AddInt64(&w.stats.Payloads, 1)
-			case SenderFailureEvent:
-				log.Errorf("failed to flush service payload, time:%s, size:%d bytes, error: %s",
-					event.SendStats.SendTime, len(event.Payload.Bytes), event.Error)
+			case eventTypeFailure:
+				url := event.stats.host
+				log.Errorf("failed to flush service payload; url:%s, time:%s, size:%d bytes, error: %s",
+					url, event.stats.sendTime, len(event.payload.bytes), event.err)
 				atomic.AddInt64(&w.stats.Errors, 1)
-			case SenderRetryEvent:
+			case eventTypeRetry:
 				log.Errorf("retrying flush service payload, retryNum: %d, delay:%s, error: %s",
-					event.RetryNum, event.RetryDelay, event.Error)
+					event.retryNum, event.retryDelay, event.err)
 				atomic.AddInt64(&w.stats.Retries, 1)
 			default:
 				log.Debugf("don't know how to handle event with type %T", event)
@@ -112,9 +113,9 @@ func (w *ServiceWriter) Run() {
 
 // Stop stops the main Run loop.
 func (w *ServiceWriter) Stop() {
-	close(w.exit)
-	w.exitWG.Wait()
-	w.BaseWriter.Stop()
+	w.exit <- struct{}{}
+	<-w.exit
+	w.sender.Stop()
 }
 
 func (w *ServiceWriter) handleServiceMetadata(metadata model.ServicesMetadata) {
@@ -145,8 +146,8 @@ func (w *ServiceWriter) flush() {
 
 	atomic.AddInt64(&w.stats.Bytes, int64(len(data)))
 
-	payload := NewPayload(data, headers)
-	w.payloadSender.Send(payload)
+	payload := newPayload(data, headers)
+	w.sender.Send(payload)
 
 	w.serviceBuffer = make(model.ServicesMetadata)
 }
@@ -161,11 +162,12 @@ func (w *ServiceWriter) updateInfo() {
 	swInfo.Errors = atomic.SwapInt64(&w.stats.Errors, 0)
 	swInfo.Retries = atomic.SwapInt64(&w.stats.Retries, 0)
 
-	w.statsClient.Count("datadog.trace_agent.service_writer.payloads", int64(swInfo.Payloads), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.service_writer.services", int64(swInfo.Services), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.service_writer.bytes", int64(swInfo.Bytes), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.service_writer.retries", int64(swInfo.Retries), nil, 1)
-	w.statsClient.Count("datadog.trace_agent.service_writer.errors", int64(swInfo.Errors), nil, 1)
+	// TODO(gbbr): Scope these stats per endpoint (see (config.AgentConfig).AdditionalEndpoints))
+	statsd.Client.Count("datadog.trace_agent.service_writer.payloads", int64(swInfo.Payloads), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.service_writer.services", int64(swInfo.Services), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.service_writer.bytes", int64(swInfo.Bytes), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.service_writer.retries", int64(swInfo.Retries), nil, 1)
+	statsd.Client.Count("datadog.trace_agent.service_writer.errors", int64(swInfo.Errors), nil, 1)
 
 	info.UpdateServiceWriterInfo(swInfo)
 }

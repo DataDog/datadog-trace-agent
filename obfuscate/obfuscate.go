@@ -13,6 +13,7 @@ import (
 // concurrent use.
 type Obfuscator struct {
 	opts  *config.ObfuscationConfig
+	sql   *sqlObfuscator
 	es    *jsonObfuscator // nil if disabled
 	mongo *jsonObfuscator // nil if disabled
 }
@@ -22,7 +23,10 @@ func NewObfuscator(cfg *config.ObfuscationConfig) *Obfuscator {
 	if cfg == nil {
 		cfg = new(config.ObfuscationConfig)
 	}
-	o := Obfuscator{opts: cfg}
+	o := Obfuscator{
+		opts: cfg,
+		sql:  newSQLObfuscator(),
+	}
 	if cfg.ES.Enabled {
 		o.es = newJSONObfuscator(&cfg.ES)
 	}

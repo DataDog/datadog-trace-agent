@@ -8,9 +8,13 @@
 # Your Datadog API key. It can be found here:
 # https://app.datadoghq.com/account/settings
 api_key: 1234
- 
-# # The host of the Datadog intake server where the agent will be
-# # sending stats.
+
+# # The site of the Datadog intake to send data to.
+# # Defaults to 'datadoghq.com', set to 'datadoghq.eu' to send data to the EU site.
+# site: datadoghq.com
+#
+# # The host of the Datadog intake server where the agent will be sending stats.
+# # Overrides the setting from "site".
 # dd_url: https://app.datadog.com
 # 
 # # hostname
@@ -39,8 +43,20 @@ api_key: 1234
 apm_config:
   enabled: true # enable APM
 # 
-#   # Trace intake API.
+#   # Trace intake API. If set, it will override the top level "site" setting.
+#   # Defaults to 'https://trace.agent.<site>'.
 #   apm_dd_url: trace.agent.datadog.com
+#
+#   # The trace agent will also forward traces, stats and services to these endpoints,
+#   # besides the main endpoint.
+#   additional_endpoints:
+#     # Simply specify the list of URLs to forward to along with one or more API keys
+#     # to use for that URL.
+#     https://trace.agent.datadoghq.eu:
+#     - 1234abcd
+#     - 4567efghi
+#     https://trace.agent.other-endpoint.com:
+#     - 890jkl
 # 
 #   # The environment under which traces will be classified in Datadog.
 #   env: pre-prod

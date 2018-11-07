@@ -8,7 +8,9 @@ Trace Agent (v 0.99.0)
 
   Hostname: localhost.localdomain
   Receiver: localhost:8126
-  API Endpoint: https://trace.agent.datadoghq.com
+  Endpoints:
+    https://trace1.agent.datadoghq.com
+    https://trace2.agent.datadoghq.com
 
   --- Receiver stats (1 min) ---
 
@@ -21,6 +23,6 @@ Trace Agent (v 0.99.0)
 
   --- Writer stats (1 min) ---
 
-  Traces: 4 payloads, 26 traces, 123 transactions, 3245 bytes
+  Traces: 4 payloads, 26 traces, 123 events, 3245 bytes
   Stats: 6 payloads, 12 stats buckets, 8329 bytes
   Services: 1 payloads, 2 services, 1234 bytes

@@ -6,8 +6,8 @@ package main
 import (
 	"testing"
 
-	"github.com/DataDog/datadog-trace-agent/fixtures"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/testutil"
 )
 
 const (
@@ -21,7 +21,7 @@ func BenchmarkHandleSpanRandom(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		trace := fixtures.RandomTrace(10, 8)
+		trace := testutil.RandomTrace(10, 8)
 		root := trace.GetRoot()
 		trace.ComputeTopLevel()
 		wt := model.NewWeightedTrace(trace, root)

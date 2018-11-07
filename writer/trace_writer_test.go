@@ -10,9 +10,10 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/fixtures"
 	"github.com/DataDog/datadog-trace-agent/info"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/statsd"
+	"github.com/DataDog/datadog-trace-agent/testutil"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
@@ -32,16 +33,16 @@ func TestTraceWriter(t *testing.T) {
 		traceWriter.Start()
 
 		// Send a few sampled traces through the writer
-		sampledTraces := []*SampledTrace{
+		sampledTraces := []*TracePackage{
 			// These 2 should be grouped together in a single payload
-			randomSampledTrace(1, 1),
-			randomSampledTrace(1, 1),
+			randomTracePackage(1, 1),
+			randomTracePackage(1, 1),
 			// This one should be on its own in a single payload
-			randomSampledTrace(3, 1),
+			randomTracePackage(3, 1),
 			// This one should be on its own in a single payload
-			randomSampledTrace(5, 1),
+			randomTracePackage(5, 1),
 			// This one should be on its own in a single payload
-			randomSampledTrace(1, 1),
+			randomTracePackage(1, 1),
 		}
 		for _, sampledTrace := range sampledTraces {
 			traceChannel <- sampledTrace
@@ -75,7 +76,7 @@ func TestTraceWriter(t *testing.T) {
 		traceWriter.Start()
 
 		// Send a single trace that does not go over the span limit
-		testSampledTrace := randomSampledTrace(2, 2)
+		testSampledTrace := randomTracePackage(2, 2)
 		traceChannel <- testSampledTrace
 
 		// Wait for twice the flush period
@@ -90,7 +91,7 @@ func TestTraceWriter(t *testing.T) {
 			"Content-Encoding":             "gzip",
 		}
 		assert.Len(receivedPayloads, 1, "We expected 1 payload")
-		assertPayloads(assert, traceWriter, expectedHeaders, []*SampledTrace{testSampledTrace},
+		assertPayloads(assert, traceWriter, expectedHeaders, []*TracePackage{testSampledTrace},
 			testEndpoint.SuccessPayloads())
 
 		// Wrap up
@@ -121,10 +122,10 @@ func TestTraceWriter(t *testing.T) {
 		)
 
 		// Send a bunch of sampled traces that should go together in a single payload
-		payload1SampledTraces := []*SampledTrace{
-			randomSampledTrace(2, 0),
-			randomSampledTrace(2, 0),
-			randomSampledTrace(2, 0),
+		payload1SampledTraces := []*TracePackage{
+			randomTracePackage(2, 0),
+			randomTracePackage(2, 0),
+			randomTracePackage(2, 0),
 		}
 		expectedNumPayloads++
 		expectedNumSpans += 6
@@ -136,8 +137,8 @@ func TestTraceWriter(t *testing.T) {
 		}
 
 		// Send a single trace that goes over the span limit
-		payload2SampledTraces := []*SampledTrace{
-			randomSampledTrace(20, 0),
+		payload2SampledTraces := []*TracePackage{
+			randomTracePackage(20, 0),
 		}
 		expectedNumPayloads++
 		expectedNumSpans += 20
@@ -154,10 +155,10 @@ func TestTraceWriter(t *testing.T) {
 
 		// Send a third payload with other 3 traces with an errored out endpoint
 		testEndpoint.SetError(fmt.Errorf("non retriable error"))
-		payload3SampledTraces := []*SampledTrace{
-			randomSampledTrace(2, 0),
-			randomSampledTrace(2, 0),
-			randomSampledTrace(2, 0),
+		payload3SampledTraces := []*TracePackage{
+			randomTracePackage(2, 0),
+			randomTracePackage(2, 0),
+			randomTracePackage(2, 0),
 		}
 
 		expectedNumErrors++
@@ -173,14 +174,14 @@ func TestTraceWriter(t *testing.T) {
 		time.Sleep(2 * testFlushPeriod)
 
 		// And then send a fourth payload with other 3 traces with an errored out endpoint but retriable
-		testEndpoint.SetError(&RetriableError{
+		testEndpoint.SetError(&retriableError{
 			err:      fmt.Errorf("non retriable error"),
 			endpoint: testEndpoint,
 		})
-		payload4SampledTraces := []*SampledTrace{
-			randomSampledTrace(2, 0),
-			randomSampledTrace(2, 0),
-			randomSampledTrace(2, 0),
+		payload4SampledTraces := []*TracePackage{
+			randomTracePackage(2, 0),
+			randomTracePackage(2, 0),
+			randomTracePackage(2, 0),
 		}
 
 		expectedMinNumRetries++
@@ -226,7 +227,7 @@ func TestTraceWriter(t *testing.T) {
 
 		// Retry counts
 		retriesSummary := countSummaries["datadog.trace_agent.trace_writer.retries"]
-		assert.True(len(retriesSummary.Calls) >= 3, "There should have been multiple retries count calls")
+		assert.True(len(retriesSummary.Calls) >= 2, "There should have been multiple retries count calls")
 		assert.True(retriesSummary.Sum >= expectedMinNumRetries)
 
 		// Error counts
@@ -241,7 +242,7 @@ func TestTraceWriter(t *testing.T) {
 	})
 }
 
-func calculateTracePayloadSize(sampledTraces []*SampledTrace) int64 {
+func calculateTracePayloadSize(sampledTraces []*TracePackage) int64 {
 	apiTraces := make([]*model.APITrace, len(sampledTraces))
 
 	for i, trace := range sampledTraces {
@@ -274,24 +275,27 @@ func calculateTracePayloadSize(sampledTraces []*SampledTrace) int64 {
 }
 
 func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expectedHeaders map[string]string,
-	sampledTraces []*SampledTrace, payloads []Payload) {
+	sampledTraces []*TracePackage, payloads []*payload) {
 
-	var expectedTraces []*model.Trace
-	var expectedTransactions []*model.Span
+	var expectedTraces []model.Trace
+	var expectedEvents []*model.APMEvent
 
 	for _, sampledTrace := range sampledTraces {
 		expectedTraces = append(expectedTraces, sampledTrace.Trace)
-		expectedTransactions = append(expectedTransactions, sampledTrace.Transactions...)
+
+		for _, event := range sampledTrace.Events {
+			expectedEvents = append(expectedEvents, event)
+		}
 	}
 
 	var expectedTraceIdx int
-	var expectedTransactionIdx int
+	var expectedEventIdx int
 
 	for _, payload := range payloads {
-		assert.Equal(expectedHeaders, payload.Headers, "Payload headers should match expectation")
+		assert.Equal(expectedHeaders, payload.headers, "Payload headers should match expectation")
 
 		var tracePayload model.TracePayload
-		payloadBuffer := bytes.NewBuffer(payload.Bytes)
+		payloadBuffer := bytes.NewBuffer(payload.bytes)
 		gz, err := gzip.NewReader(payloadBuffer)
 		assert.NoError(err, "Gzip reader should work correctly")
 		uncompressedBuffer := bytes.Buffer{}
@@ -319,12 +323,12 @@ func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expecte
 		for _, seenTransaction := range tracePayload.Transactions {
 			numSpans++
 
-			if !assert.True(proto.Equal(expectedTransactions[expectedTransactionIdx], seenTransaction),
+			if !assert.True(proto.Equal(expectedEvents[expectedEventIdx].Span, seenTransaction),
 				"Unmarshalled transaction should match expectation at index %d", expectedTraceIdx) {
 				return
 			}
 
-			expectedTransactionIdx++
+			expectedEventIdx++
 		}
 
 		// If there's more than 1 trace or transaction in this payload, don't let it go over the limit. Otherwise,
@@ -335,8 +339,8 @@ func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expecte
 	}
 }
 
-func testTraceWriter() (*TraceWriter, chan *SampledTrace, *testEndpoint, *fixtures.TestStatsClient) {
-	payloadChannel := make(chan *SampledTrace)
+func testTraceWriter() (*TraceWriter, chan *TracePackage, *testEndpoint, *testutil.TestStatsClient) {
+	payloadChannel := make(chan *TracePackage)
 	conf := &config.AgentConfig{
 		Hostname:          testHostName,
 		DefaultEnv:        testEnv,
@@ -344,22 +348,28 @@ func testTraceWriter() (*TraceWriter, chan *SampledTrace, *testEndpoint, *fixtur
 	}
 	traceWriter := NewTraceWriter(conf, payloadChannel)
 	testEndpoint := &testEndpoint{}
-	traceWriter.BaseWriter.payloadSender.setEndpoint(testEndpoint)
-	testStatsClient := &fixtures.TestStatsClient{}
-	traceWriter.statsClient = testStatsClient
+	traceWriter.sender.setEndpoint(testEndpoint)
+	testStatsClient := statsd.Client.(*testutil.TestStatsClient)
+	testStatsClient.Reset()
 
 	return traceWriter, payloadChannel, testEndpoint, testStatsClient
 }
 
-func randomSampledTrace(numSpans, numTransactions int) *SampledTrace {
-	if numSpans < numTransactions {
-		panic("can't have more transactions than spans in a RandomSampledTrace")
+func randomTracePackage(numSpans, numEvents int) *TracePackage {
+	if numSpans < numEvents {
+		panic("can't have more events than spans in a RandomSampledTrace")
 	}
 
-	trace := fixtures.GetTestTrace(1, numSpans, true)[0]
+	trace := testutil.GetTestTrace(1, numSpans, true)[0]
 
-	return &SampledTrace{
-		Trace:        &trace,
-		Transactions: trace[:numTransactions],
+	events := make([]*model.APMEvent, 0, numEvents)
+
+	for _, span := range trace[:numEvents] {
+		events = append(events, &model.APMEvent{Span: span})
+	}
+
+	return &TracePackage{
+		Trace:  trace,
+		Events: events,
 	}
 }

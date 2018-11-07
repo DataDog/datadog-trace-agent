@@ -28,13 +28,17 @@ import (
 // handleSignal closes a channel to exit cleanly from routines
 func handleSignal(onSignal func()) {
 	sigChan := make(chan os.Signal, 10)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGPIPE)
 	for signo := range sigChan {
 		switch signo {
 		case syscall.SIGINT, syscall.SIGTERM:
 			log.Infof("received signal %d (%v)", signo, signo)
 			onSignal()
 			return
+		case syscall.SIGPIPE:
+			// By default systemd redirects the stdout to journald. When journald is stopped or crashes we receive a SIGPIPE signal.
+			// Go ignores SIGPIPE signals unless it is when stdout or stdout is closed, in this case the agent is stopped.
+			// We never want the agent to stop upon receiving SIGPIPE, so we intercept the SIGPIPE signals and just discard them.
 		default:
 			log.Warnf("unhandled signal %d (%v)", signo, signo)
 		}
@@ -120,7 +124,13 @@ func runAgent(ctx context.Context) {
 	// Initialize logging (replacing the default logger). No need
 	// to defer log.Flush, it was already done when calling
 	// "SetupDefaultLogger" earlier.
-	logLevel, ok := log.LogLevelFromString(strings.ToLower(cfg.LogLevel))
+	cfgLogLevel := strings.ToLower(cfg.LogLevel)
+	if cfgLogLevel == "warning" {
+		// to match core agent:
+		// https://github.com/DataDog/datadog-agent/blob/6f2d901aeb19f0c0a4e09f149c7cc5a084d2f708/pkg/config/log.go#L74-L76
+		cfgLogLevel = "warn"
+	}
+	logLevel, ok := log.LogLevelFromString(cfgLogLevel)
 	if !ok {
 		logLevel = log.InfoLvl
 	}
@@ -134,15 +144,13 @@ func runAgent(ctx context.Context) {
 	}
 
 	// Initialize dogstatsd client
-	err = statsd.Configure(cfg)
+	err = statsd.Configure(cfg, []string{"version:" + info.Version})
 	if err != nil {
 		osutil.Exitf("cannot configure dogstatsd: %v", err)
 	}
 
 	// count the number of times the agent started
-	statsd.Client.Count("datadog.trace_agent.started", 1, []string{
-		"version:" + info.Version,
-	}, 1)
+	statsd.Client.Count("datadog.trace_agent.started", 1, nil, 1)
 
 	// Seed rand
 	rand.Seed(time.Now().UTC().UnixNano())

@@ -8,14 +8,16 @@ import (
 	"regexp"
 	"time"
 
-	"gopkg.in/yaml.v2"
-
-	"github.com/DataDog/datadog-trace-agent/backoff"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/osutil"
+	"github.com/DataDog/datadog-trace-agent/writer/backoff"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	log "github.com/cihub/seelog"
+	"gopkg.in/yaml.v2"
 )
+
+// apiEndpointPrefix is the URL prefix prepended to the default site value from YamlAgentConfig.
+const apiEndpointPrefix = "https://trace.agent."
 
 // YamlAgentConfig is a structure used for marshaling the datadog.yaml configuration
 // available in Agent versions >= 6
@@ -23,6 +25,7 @@ type YamlAgentConfig struct {
 	APIKey            string `yaml:"api_key"`
 	HostName          string `yaml:"hostname"`
 	LogLevel          string `yaml:"log_level"`
+	Site              string `yaml:"site"`
 	Proxy             proxy  `yaml:"proxy"`
 	SkipSSLValidation *bool  `yaml:"skip_ssl_validation"`
 
@@ -38,17 +41,18 @@ type proxy struct {
 }
 
 type traceAgent struct {
-	Enabled            *bool          `yaml:"enabled"`
-	Endpoint           string         `yaml:"apm_dd_url"`
-	Env                string         `yaml:"env"`
-	ExtraSampleRate    float64        `yaml:"extra_sample_rate"`
-	MaxTracesPerSecond float64        `yaml:"max_traces_per_second"`
-	IgnoreResources    []string       `yaml:"ignore_resources"`
-	LogFilePath        string         `yaml:"log_file"`
-	ReplaceTags        []*ReplaceRule `yaml:"replace_tags"`
-	ReceiverPort       int            `yaml:"receiver_port"`
-	ConnectionLimit    int            `yaml:"connection_limit"`
-	APMNonLocalTraffic *bool          `yaml:"apm_non_local_traffic"`
+	Enabled             *bool               `yaml:"enabled"`
+	Endpoint            string              `yaml:"apm_dd_url"`
+	AdditionalEndpoints map[string][]string `yaml:"additional_endpoints"`
+	Env                 string              `yaml:"env"`
+	ExtraSampleRate     float64             `yaml:"extra_sample_rate"`
+	MaxTracesPerSecond  float64             `yaml:"max_traces_per_second"`
+	IgnoreResources     []string            `yaml:"ignore_resources"`
+	LogFilePath         string              `yaml:"log_file"`
+	ReplaceTags         []*ReplaceRule      `yaml:"replace_tags"`
+	ReceiverPort        int                 `yaml:"receiver_port"`
+	ConnectionLimit     int                 `yaml:"connection_limit"`
+	APMNonLocalTraffic  *bool               `yaml:"apm_non_local_traffic"`
 
 	Obfuscation *ObfuscationConfig `yaml:"obfuscation"`
 
@@ -181,12 +185,12 @@ func NewYaml(configPath string) (*YamlAgentConfig, error) {
 }
 
 func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
-	if yc == nil {
-		return
+	if len(c.Endpoints) == 0 {
+		c.Endpoints = []*Endpoint{{}}
 	}
 
 	if yc.APIKey != "" {
-		c.APIKey = yc.APIKey
+		c.Endpoints[0].APIKey = yc.APIKey
 	}
 	if yc.HostName != "" {
 		c.Hostname = yc.HostName
@@ -197,13 +201,35 @@ func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 	if yc.StatsdPort > 0 {
 		c.StatsdPort = yc.StatsdPort
 	}
-	for _, host := range yc.Proxy.NoProxy {
-		if host == c.APIEndpoint {
-			log.Infof("Trace Agent endpoint matches `proxy.no_proxy` list item %q: ignoring proxy", host)
-			c.NoProxy = true
-			break
+
+	if yc.Site != "" {
+		c.Endpoints[0].Host = apiEndpointPrefix + yc.Site
+	}
+	if host := yc.TraceAgent.Endpoint; host != "" {
+		c.Endpoints[0].Host = host
+		if yc.Site != "" {
+			log.Infof("'site' and 'apm_dd_url' are both set, using endpoint: %q", host)
 		}
 	}
+	for url, keys := range yc.TraceAgent.AdditionalEndpoints {
+		if len(keys) == 0 {
+			log.Errorf("'additional_endpoints' entries must have at least one API key present")
+			continue
+		}
+		for _, key := range keys {
+			c.Endpoints = append(c.Endpoints, &Endpoint{Host: url, APIKey: key})
+		}
+	}
+
+	noProxy := make(map[string]bool, len(yc.Proxy.NoProxy))
+	for _, host := range yc.Proxy.NoProxy {
+		// map of hosts that need to be skipped by proxy
+		noProxy[host] = true
+	}
+	for _, e := range c.Endpoints {
+		e.NoProxy = noProxy[e.Host]
+	}
+
 	if yc.Proxy.HTTPS != "" {
 		url, err := url.Parse(yc.Proxy.HTTPS)
 		if err == nil {
@@ -218,10 +244,6 @@ func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 
 	if yc.TraceAgent.Enabled != nil {
 		c.Enabled = *yc.TraceAgent.Enabled
-	}
-
-	if yc.TraceAgent.Endpoint != "" {
-		c.APIEndpoint = yc.TraceAgent.Endpoint
 	}
 
 	if yc.TraceAgent.LogFilePath != "" {

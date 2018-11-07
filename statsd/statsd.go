@@ -18,13 +18,13 @@ type StatsClient interface {
 // that becomes the new global Statsd client in the package.
 var Client StatsClient = (*statsd.Client)(nil)
 
-// Configure creates a statsd client from a dogweb.ini style config file and set it to the global Statsd.
-func Configure(conf *config.AgentConfig) error {
+// Configure creates a statsd client for the given agent's configuration, using the specified global tags.
+func Configure(conf *config.AgentConfig, tags []string) error {
 	client, err := statsd.New(fmt.Sprintf("%s:%d", conf.StatsdHost, conf.StatsdPort))
 	if err != nil {
 		return err
 	}
-
+	client.Tags = tags
 	Client = client
 	return nil
 }

@@ -8,31 +8,45 @@ import (
 	log "github.com/cihub/seelog"
 )
 
-const (
-	sqlQueryTag      = "sql.query"
-	sqlQuantizeError = "agent.parse.error"
-)
+const sqlQueryTag = "sql.query"
 
-// TokenFilter is a generic interface that a TokenConsumer expects. It defines
+// tokenFilter is a generic interface that a sqlObfuscator expects. It defines
 // the Filter() function used to filter or replace given tokens.
 // A filter can be stateful and keep an internal state to apply the filter later;
 // this can be useful to prevent backtracking in some cases.
-type TokenFilter interface {
+type tokenFilter interface {
 	Filter(token, lastToken int, buffer []byte) (int, []byte)
 	Reset()
 }
 
-// DiscardFilter implements the TokenFilter interface so that the given
+// discardFilter implements the tokenFilter interface so that the given
 // token is discarded or accepted.
-type DiscardFilter struct{}
+type discardFilter struct{}
 
 // Filter the given token so that a `nil` slice is returned if the token
 // is in the token filtered list.
-func (f *DiscardFilter) Filter(token, lastToken int, buffer []byte) (int, []byte) {
+func (f *discardFilter) Filter(token, lastToken int, buffer []byte) (int, []byte) {
 	// filters based on previous token
 	switch lastToken {
+	case FilteredBracketedIdentifier:
+		if token != ']' {
+			// we haven't found the closing bracket yet, keep going
+			if token != ID {
+				// the token between the brackets *must* be an identifier,
+				// otherwise the query is invalid.
+				return LexError, nil
+			}
+			return FilteredBracketedIdentifier, nil
+		}
+		fallthrough
 	case As:
-		// prevent the next comma from being part of a GroupingFilter
+		if token == '[' {
+			// the identifier followed by AS is an MSSQL bracketed identifier
+			// and will continue to be discarded until we find the corresponding
+			// closing bracket counter-part. See GitHub issue #475.
+			return FilteredBracketedIdentifier, nil
+		}
+		// prevent the next comma from being part of a groupingFilter
 		return FilteredComma, nil
 	}
 
@@ -48,15 +62,15 @@ func (f *DiscardFilter) Filter(token, lastToken int, buffer []byte) (int, []byte
 	}
 }
 
-// Reset in a DiscardFilter is a noop action
-func (f *DiscardFilter) Reset() {}
+// Reset in a discardFilter is a noop action
+func (f *discardFilter) Reset() {}
 
-// ReplaceFilter implements the TokenFilter interface so that the given
+// replaceFilter implements the tokenFilter interface so that the given
 // token is replaced with '?' or left unchanged.
-type ReplaceFilter struct{}
+type replaceFilter struct{}
 
 // Filter the given token so that it will be replaced if in the token replacement list
-func (f *ReplaceFilter) Filter(token, lastToken int, buffer []byte) (int, []byte) {
+func (f *replaceFilter) Filter(token, lastToken int, buffer []byte) (int, []byte) {
 	switch lastToken {
 	case Savepoint:
 		return Filtered, []byte("?")
@@ -69,12 +83,12 @@ func (f *ReplaceFilter) Filter(token, lastToken int, buffer []byte) (int, []byte
 	}
 }
 
-// Reset in a ReplaceFilter is a noop action
-func (f *ReplaceFilter) Reset() {}
+// Reset in a replaceFilter is a noop action
+func (f *replaceFilter) Reset() {}
 
-// GroupingFilter implements the TokenFilter interface so that when
+// groupingFilter implements the tokenFilter interface so that when
 // a common pattern is identified, it's discarded to prevent duplicates
-type GroupingFilter struct {
+type groupingFilter struct {
 	groupFilter int
 	groupMulti  int
 }
@@ -83,7 +97,7 @@ type GroupingFilter struct {
 // has been recognized. A grouping is composed by items like:
 //   * '( ?, ?, ? )'
 //   * '( ?, ? ), ( ?, ? )'
-func (f *GroupingFilter) Filter(token, lastToken int, buffer []byte) (int, []byte) {
+func (f *groupingFilter) Filter(token, lastToken int, buffer []byte) (int, []byte) {
 	// increasing the number of groups means that we're filtering an entire group
 	// because it can be represented with a single '( ? )'
 	if (lastToken == '(' && token == Filtered) || (token == '(' && f.groupMulti > 0) {
@@ -115,48 +129,39 @@ func (f *GroupingFilter) Filter(token, lastToken int, buffer []byte) (int, []byt
 	return token, buffer
 }
 
-// Reset in a GroupingFilter restores variables used to count
+// Reset in a groupingFilter restores variables used to count
 // escaped token that should be filtered
-func (f *GroupingFilter) Reset() {
+func (f *groupingFilter) Reset() {
 	f.groupFilter = 0
 	f.groupMulti = 0
 }
 
-// TokenConsumer is a Tokenizer consumer. It calls the Tokenizer Scan() function until tokens
+// sqlObfuscator is a Tokenizer consumer. It calls the Tokenizer Scan() function until tokens
 // are available or if a LEX_ERROR is raised. After retrieving a token, it is sent in the
-// TokenFilter chains so that the token is discarded or replaced.
-type TokenConsumer struct {
+// tokenFilter chains so that the token is discarded or replaced.
+type sqlObfuscator struct {
 	tokenizer *Tokenizer
-	filters   []TokenFilter
+	filters   []tokenFilter
 	lastToken int
 }
 
 // Process the given SQL or No-SQL string so that the resulting one is properly altered. This
-// function is generic and the behavior changes according to chosen TokenFilter implementations.
-// The process calls all filters inside the []TokenFilter.
-func (t *TokenConsumer) Process(in string) (string, error) {
-	out := &bytes.Buffer{}
-	t.tokenizer.InStream.Reset(in)
-
+// function is generic and the behavior changes according to chosen tokenFilter implementations.
+// The process calls all filters inside the []tokenFilter.
+func (t *sqlObfuscator) obfuscate(in string) (string, error) {
+	var out bytes.Buffer
+	t.reset(in)
 	token, buff := t.tokenizer.Scan()
 	for ; token != EOFChar; token, buff = t.tokenizer.Scan() {
-		// handle terminal case
 		if token == LexError {
-			// the tokenizer is unable  to process the SQL  string, so the output will be
-			// surely wrong. In this case we return an error and an empty string.
-			t.Reset()
 			return "", errors.New("the tokenizer was unable to process the string")
 		}
-
-		// apply all registered filters
 		for _, f := range t.filters {
-			token, buff = f.Filter(token, t.lastToken, buff)
+			if token, buff = f.Filter(token, t.lastToken, buff); token == LexError {
+				return "", errors.New("the tokenizer was unable to process the string")
+			}
 		}
-
-		// write the resulting buffer
 		if buff != nil {
-			// ensure that whitespaces properly separate
-			// received tokens
 			if out.Len() != 0 {
 				switch token {
 				case ',':
@@ -169,59 +174,45 @@ func (t *TokenConsumer) Process(in string) (string, error) {
 					out.WriteRune(' ')
 				}
 			}
-
 			out.Write(buff)
 		}
-
 		t.lastToken = token
 	}
-
-	// reset internals to reuse allocated memory
-	t.Reset()
 	return out.String(), nil
 }
 
 // Reset restores the initial states for all components so that memory can be re-used
-func (t *TokenConsumer) Reset() {
-	t.tokenizer.Reset()
+func (t *sqlObfuscator) reset(in string) {
+	t.tokenizer.Reset(in)
 	for _, f := range t.filters {
 		f.Reset()
 	}
 }
 
-// NewTokenConsumer returns a new TokenConsumer capable to process SQL and No-SQL strings.
-func NewTokenConsumer(filters []TokenFilter) *TokenConsumer {
-	return &TokenConsumer{
+// newSQLObfuscator returns a new sqlObfuscator capable to process SQL and No-SQL strings.
+func newSQLObfuscator() *sqlObfuscator {
+	return &sqlObfuscator{
 		tokenizer: NewStringTokenizer(""),
-		filters:   filters,
+		filters: []tokenFilter{
+			&discardFilter{},
+			&replaceFilter{},
+			&groupingFilter{},
+		},
 	}
 }
 
-// token consumer that will quantize the query with
-// the given filters; this quantizer is used only
-// for SQL and CQL strings
-var tokenQuantizer = NewTokenConsumer(
-	[]TokenFilter{
-		&DiscardFilter{},
-		&ReplaceFilter{},
-		&GroupingFilter{},
-	})
-
 // QuantizeSQL generates resource and sql.query meta for SQL spans
-func (*Obfuscator) obfuscateSQL(span *model.Span) {
+func (o *Obfuscator) obfuscateSQL(span *model.Span) {
 	if span.Resource == "" {
 		return
 	}
-
-	quantizedString, err := tokenQuantizer.Process(span.Resource)
-	if err != nil || quantizedString == "" {
-		// if we have an error, the partially parsed SQL is discarded so that we don't pollute
-		// users resources. Here we provide more details to debug the problem.
-		log.Debugf("Error parsing the query: `%s`", span.Resource)
+	result, err := o.sql.obfuscate(span.Resource)
+	if err != nil || result == "" {
+		// we have an error, discard the SQL to avoid polluting user resources.
+		log.Debugf("Error parsing SQL query: %q", span.Resource)
 		if span.Meta == nil {
-			span.Meta = make(map[string]string)
+			span.Meta = make(map[string]string, 1)
 		}
-		span.Meta[sqlQuantizeError] = "Query not parsed"
 		if _, ok := span.Meta[sqlQueryTag]; !ok {
 			span.Meta[sqlQueryTag] = span.Resource
 		}
@@ -229,22 +220,14 @@ func (*Obfuscator) obfuscateSQL(span *model.Span) {
 		return
 	}
 
-	span.Resource = quantizedString
+	span.Resource = result
 
-	// set the sql.query tag if and only if it's not already set by users. If a users set
-	// this value, we send that value AS IS to the backend. If the value is not set, we
-	// try to obfuscate users parameters so that sensitive data are not sent in the backend.
-	// TODO: the current implementation is a rough approximation that assumes
-	// obfuscation == quantization. This is not true in real environments because we're
-	// removing data that could be interesting for users.
 	if span.Meta != nil && span.Meta[sqlQueryTag] != "" {
+		// "sql.query" tag already set by user, do not change it.
 		return
 	}
-
 	if span.Meta == nil {
 		span.Meta = make(map[string]string)
 	}
-
-	span.Meta[sqlQueryTag] = quantizedString
-	return
+	span.Meta[sqlQueryTag] = result
 }

@@ -3,6 +3,7 @@ package obfuscate
 import (
 	"bytes"
 	"strings"
+	"unicode"
 )
 
 // tokenizer.go implemenents a lexer-like iterator that tokenizes SQL and CQL
@@ -44,6 +45,11 @@ const (
 	// FilteredComma specifies that the token is a comma and was discarded by one
 	// of the filters.
 	FilteredComma = 57366
+
+	// FilteredBracketedIdentifier specifies that we are currently discarding
+	// a bracketed identifier (MSSQL).
+	// See issue https://github.com/DataDog/datadog-trace-agent/issues/475.
+	FilteredBracketedIdentifier = 57367
 )
 
 // Tokenizer is the struct used to generate SQL
@@ -61,8 +67,8 @@ func NewStringTokenizer(sql string) *Tokenizer {
 }
 
 // Reset the underlying buffer and positions
-func (tkn *Tokenizer) Reset() {
-	tkn.InStream.Reset("")
+func (tkn *Tokenizer) Reset(in string) {
+	tkn.InStream.Reset(in)
 	tkn.Position = 0
 	tkn.lastChar = 0
 }
@@ -161,10 +167,10 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 			return LexError, []byte("!")
 		case '\'':
 			return tkn.scanString(ch, String)
+		case '"':
+			return tkn.scanString(ch, ID)
 		case '`':
 			return tkn.scanLiteralIdentifier('`')
-		case '"':
-			return tkn.scanLiteralIdentifier('"')
 		case '%':
 			if tkn.lastChar == '(' {
 				return tkn.scanVariableIdentifier('%')
@@ -403,7 +409,15 @@ func (tkn *Tokenizer) scanString(delim uint16, typ int) (int, []byte) {
 		}
 		buffer.WriteByte(byte(ch))
 	}
-	return typ, buffer.Bytes()
+	buf := buffer.Bytes()
+	if typ == ID && len(buf) == 0 || bytes.IndexFunc(buf, func(r rune) bool { return !unicode.IsSpace(r) }) == -1 {
+		// This string is an empty or white-space only identifier.
+		// We should keep the start and end delimiters in order to
+		// avoid creating invalid queries.
+		// See: https://github.com/DataDog/datadog-trace-agent/issues/316
+		return typ, []byte{byte(delim), byte(delim)}
+	}
+	return typ, buf
 }
 
 func (tkn *Tokenizer) scanCommentType1(prefix string) (int, []byte) {

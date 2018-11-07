@@ -35,3 +35,10 @@ func TestSampleRateManyTraces(t *testing.T) {
 		assert.InEpsilon(float64(sampled), float64(times)*rate, 0.01)
 	}
 }
+
+func BenchmarkBackendScoreToSamplerScore(b *testing.B) {
+	s := newSampler(1.0, 10)
+	for i := 0; i < b.N; i++ {
+		s.backendScoreToSamplerScore(10)
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"expvar" // automatically publish `/debug/vars` on HTTP port
+
 	"fmt"
 	"io"
 	"net/http"
@@ -54,7 +55,10 @@ const (
 
   Hostname: {{.Status.Config.Hostname}}
   Receiver: {{.Status.Config.ReceiverHost}}:{{.Status.Config.ReceiverPort}}
-  API Endpoint: {{.Status.Config.APIEndpoint}}
+  Endpoints:
+    {{ range $i, $e := .Status.Config.Endpoints}}
+    {{ $e.Host }}
+    {{end}}
 
   --- Receiver stats (1 min) ---
 
@@ -83,7 +87,7 @@ const (
 
   --- Writer stats (1 min) ---
 
-  Traces: {{.Status.TraceWriter.Payloads}} payloads, {{.Status.TraceWriter.Traces}} traces, {{if gt .Status.TraceWriter.Transactions 0}}{{.Status.TraceWriter.Transactions}} transactions, {{end}}{{.Status.TraceWriter.Bytes}} bytes
+  Traces: {{.Status.TraceWriter.Payloads}} payloads, {{.Status.TraceWriter.Traces}} traces, {{if gt .Status.TraceWriter.Events 0}}{{.Status.TraceWriter.Events}} events, {{end}}{{.Status.TraceWriter.Bytes}} bytes
   {{if gt .Status.TraceWriter.Errors 0}}WARNING: Traces API errors (1 min): {{.Status.TraceWriter.Errors}}{{end}}
   Stats: {{.Status.StatsWriter.Payloads}} payloads, {{.Status.StatsWriter.StatsBuckets}} stats buckets, {{.Status.StatsWriter.Bytes}} bytes
   {{if gt .Status.StatsWriter.Errors 0}}WARNING: Stats API errors (1 min): {{.Status.StatsWriter.Errors}}{{end}}
@@ -258,8 +262,13 @@ func InitInfo(conf *config.AgentConfig) error {
 		expvar.Publish("watchdog", expvar.Func(publishWatchdogInfo))
 		expvar.Publish("presampler", expvar.Func(publishPreSamplerStats))
 
+		// copy the config to ensure we don't expose sensitive data such as API keys
 		c := *conf
-		c.APIKey = "" // should not be exported by JSON, but just to make sure
+		c.Endpoints = make([]*config.Endpoint, len(conf.Endpoints))
+		for i, e := range conf.Endpoints {
+			c.Endpoints[i] = &config.Endpoint{Host: e.Host, NoProxy: e.NoProxy}
+		}
+
 		var buf []byte
 		buf, err = json.Marshal(&c)
 		if err != nil {

@@ -2,10 +2,16 @@ package writer
 
 import (
 	"bytes"
+	"crypto/tls"
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"time"
 
+	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
+	log "github.com/cihub/seelog"
 )
 
 const (
@@ -20,47 +26,65 @@ var userAgent = fmt.Sprintf(
 	userAgentPrefix, info.Version, info.GitCommit, userAgentSupportURL,
 )
 
-// DatadogEndpoint sends payloads to Datadog API.
-type DatadogEndpoint struct {
+// datadogEndpoint sends payloads to Datadog API.
+type datadogEndpoint struct {
 	apiKey string
-	url    string
+	host   string
 	client *http.Client
-
-	path string
+	path   string
 }
 
-// NewDatadogEndpoint returns an initialized DatadogEndpoint, from a provided http client and remote endpoint path.
-func NewDatadogEndpoint(client *http.Client, url, path, apiKey string) *DatadogEndpoint {
-	if apiKey == "" {
-		panic(fmt.Errorf("No API key"))
+// NewEndpoints returns the set of endpoints configured in the AgentConfig, appending the given path.
+// The first endpoint is the main API endpoint, followed by any additional endpoints.
+func newEndpoints(conf *config.AgentConfig, path string) []endpoint {
+	if !conf.Enabled {
+		log.Info("API interface is disabled, flushing to /dev/null instead")
+		return []endpoint{&nullEndpoint{}}
 	}
-
-	return &DatadogEndpoint{
-		apiKey: apiKey,
-		url:    url,
-		path:   path,
-		client: client,
+	if e := conf.Endpoints; len(e) == 0 || e[0].Host == "" || e[0].APIKey == "" {
+		panic(errors.New("must have at least one endpoint with key"))
 	}
+	endpoints := make([]endpoint, len(conf.Endpoints))
+	ignoreProxy := true
+	client := newClient(conf, !ignoreProxy)
+	clientIgnoreProxy := newClient(conf, ignoreProxy)
+	for i, e := range conf.Endpoints {
+		c := client
+		if e.NoProxy {
+			c = clientIgnoreProxy
+		}
+		endpoints[i] = &datadogEndpoint{
+			apiKey: e.APIKey,
+			host:   e.Host,
+			path:   path,
+			client: c,
+		}
+	}
+	return endpoints
 }
 
-// Write will send the serialized traces payload to the Datadog traces endpoint.
-func (e *DatadogEndpoint) Write(payload *Payload) error {
+// baseURL implements Endpoint.
+func (e *datadogEndpoint) baseURL() string { return e.host }
+
+// write will send the serialized traces payload to the Datadog traces endpoint.
+func (e *datadogEndpoint) write(payload *payload) error {
 	// Create the request to be sent to the API
-	url := e.url + e.path
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload.Bytes))
-
+	url := e.host + e.path
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload.bytes))
 	if err != nil {
 		return err
 	}
 
 	req.Header.Set("DD-Api-Key", e.apiKey)
 	req.Header.Set("User-Agent", userAgent)
-	SetExtraHeaders(req.Header, payload.Headers)
+	for key, value := range payload.headers {
+		req.Header.Set(key, value)
+	}
 
 	resp, err := e.client.Do(req)
 
 	if err != nil {
-		return &RetriableError{
+		return &retriableError{
 			err:      err,
 			endpoint: e,
 		}
@@ -73,7 +97,7 @@ func (e *DatadogEndpoint) Write(payload *Payload) error {
 		err := fmt.Errorf("request to %s responded with %s", url, resp.Status)
 		if resp.StatusCode/100 == 5 {
 			// 5xx errors are retriable
-			return &RetriableError{
+			return &retriableError{
 				err:      err,
 				endpoint: e,
 			}
@@ -87,6 +111,30 @@ func (e *DatadogEndpoint) Write(payload *Payload) error {
 	return nil
 }
 
-func (e *DatadogEndpoint) String() string {
-	return fmt.Sprintf("DD endpoint(url=%s, path=%s)", e.url, e.path)
+func (e *datadogEndpoint) String() string {
+	return fmt.Sprintf("DataDogEndpoint(%q)", e.host+e.path)
+}
+
+// timeout is the HTTP timeout for POST requests to the Datadog backend
+const timeout = 10 * time.Second
+
+// newClient returns a http.Client configured with the Agent options.
+func newClient(conf *config.AgentConfig, ignoreProxy bool) *http.Client {
+	transport := &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		TLSClientConfig:       &tls.Config{InsecureSkipVerify: conf.SkipSSLValidation},
+	}
+	if conf.ProxyURL != nil && !ignoreProxy {
+		log.Infof("configuring proxy through: %s", conf.ProxyURL.String())
+		transport.Proxy = http.ProxyURL(conf.ProxyURL)
+	}
+	return &http.Client{Timeout: timeout, Transport: transport}
 }

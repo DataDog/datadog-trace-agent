@@ -3,12 +3,14 @@ package main
 import (
 	"fmt"
 	"reflect"
+	"sync/atomic"
 	"time"
 
 	log "github.com/cihub/seelog"
 
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
+	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
@@ -16,9 +18,10 @@ import (
 // Sampler chooses wich spans to write to the API
 type Sampler struct {
 	// For stats
-	keptTraceCount  int
-	totalTraceCount int
-	lastFlush       time.Time
+	keptTraceCount  uint64
+	totalTraceCount uint64
+
+	lastFlush time.Time
 
 	// actual implementation of the sampling logic
 	engine sampler.Engine
@@ -61,15 +64,13 @@ func (s *Sampler) Run() {
 }
 
 // Add samples a trace and returns true if trace was sampled (should be kept), false otherwise
-func (s *Sampler) Add(t processedTrace) bool {
-	s.totalTraceCount++
-
-	if s.engine.Sample(t.Trace, t.Root, t.Env) {
-		s.keptTraceCount++
-		return true
+func (s *Sampler) Add(t model.ProcessedTrace) (sampled bool, rate float64) {
+	atomic.AddUint64(&s.totalTraceCount, 1)
+	sampled, rate = s.engine.Sample(t.Trace, t.Root, t.Env)
+	if sampled {
+		atomic.AddUint64(&s.keptTraceCount, 1)
 	}
-
-	return false
+	return sampled, rate
 }
 
 // Stop stops the sampler
@@ -79,12 +80,9 @@ func (s *Sampler) Stop() {
 
 // logStats reports statistics and update the info exposed.
 func (s *Sampler) logStats() {
-
 	for now := range time.Tick(10 * time.Second) {
-		keptTraceCount := s.keptTraceCount
-		totalTraceCount := s.totalTraceCount
-		s.keptTraceCount = 0
-		s.totalTraceCount = 0
+		keptTraceCount := atomic.SwapUint64(&s.keptTraceCount, 0)
+		totalTraceCount := atomic.SwapUint64(&s.totalTraceCount, 0)
 
 		duration := now.Sub(s.lastFlush)
 		s.lastFlush = now

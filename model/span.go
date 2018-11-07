@@ -9,6 +9,9 @@ const (
 	SpanSampleRateMetricKey = "_sample_rate"
 	// Fake type of span to indicate it is time to flush
 	flushMarkerType = "_FLUSH_MARKER"
+
+	// SamplingPriorityKey is the key of the sampling priority value in the metrics map of the root span
+	SamplingPriorityKey = "_sampling_priority_v1"
 )
 
 // RandomID generates a random uint64 that we use for IDs
@@ -43,4 +46,27 @@ func (s *Span) Weight() float64 {
 	}
 
 	return 1.0 / sampleRate
+}
+
+// SetMetric sets a value in the span Metrics map.
+func (s *Span) SetMetric(key string, val float64) {
+	if s.Metrics == nil {
+		s.Metrics = make(map[string]float64)
+	}
+	s.Metrics[key] = val
+}
+
+// GetSamplingPriority returns the value of the sampling priority metric set on this span and a boolean indicating if
+// such a metric was actually found or not.
+func (s *Span) GetSamplingPriority() (int, bool) {
+	if s == nil {
+		return 0, false
+	}
+	p, ok := s.Metrics[SamplingPriorityKey]
+	return int(p), ok
+}
+
+// SetSamplingPriority sets the sampling priority value on this span, overwriting any previously set value.
+func (s *Span) SetSamplingPriority(priority int) {
+	s.SetMetric(SamplingPriorityKey, float64(priority))
 }

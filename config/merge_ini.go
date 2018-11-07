@@ -7,16 +7,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/backoff"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/writer/backoff"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	log "github.com/cihub/seelog"
 	"github.com/go-ini/ini"
 )
 
 func (c *AgentConfig) loadIniConfig(conf *File) {
-	if conf == nil {
-		return
+	if len(c.Endpoints) == 0 {
+		c.Endpoints = []*Endpoint{{}}
 	}
 
 	// [Main] section
@@ -37,7 +37,7 @@ func (c *AgentConfig) loadIniConfig(conf *File) {
 		}
 
 		if v := m.Key("api_key").Strings(","); len(v) != 0 {
-			c.APIKey = v[0]
+			c.Endpoints[0].APIKey = v[0]
 		} else {
 			log.Error("Failed to parse api_key from dd-agent config")
 		}
@@ -77,23 +77,14 @@ func (c *AgentConfig) loadIniConfig(conf *File) {
 	}
 
 	// [trace.api] section
-	// TODO: deprecate this old api_key location
 	if v, _ := conf.Get("trace.api", "api_key"); v != "" {
-		vals := strings.Split(v, ",")
-		for i := range vals {
-			vals[i] = strings.TrimSpace(vals[i])
-		}
-		c.APIKey = vals[0]
+		v := strings.Split(v, ",")[0] // take the first
+		c.Endpoints[0].APIKey = strings.TrimSpace(v)
 	}
 	// undocumented
 	if v, _ := conf.Get("trace.api", "endpoint"); v != "" {
-		vals := strings.Split(v, ",")
-		for i := range vals {
-			vals[i] = strings.TrimSpace(vals[i])
-		}
-
-		// Takes the first endpoint
-		c.APIEndpoint = vals[0]
+		v := strings.Split(v, ",")[0]
+		c.Endpoints[0].Host = strings.TrimSpace(v) // take the first
 	}
 
 	// [trace.config] section
@@ -173,11 +164,6 @@ func (c *AgentConfig) loadIniConfig(conf *File) {
 	// [trace.sampler] section
 	if v, e := conf.GetFloat("trace.sampler", "extra_sample_rate"); e == nil {
 		c.ExtraSampleRate = v
-	}
-	// undocumented
-	// TODO: remove, should stay internal?
-	if v, e := conf.GetFloat("trace.sampler", "pre_sample_rate"); e == nil {
-		c.PreSampleRate = v
 	}
 	if v, e := conf.GetFloat("trace.sampler", "max_traces_per_second"); e == nil {
 		c.MaxTPS = v

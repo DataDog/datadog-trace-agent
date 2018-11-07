@@ -81,14 +81,11 @@ func TestSQLResourceWithError(t *testing.T) {
 
 		NewObfuscator(nil).Obfuscate(&tc.span)
 		assert.Equal("Non-parsable SQL query", tc.span.Resource)
-		assert.Equal("Query not parsed", tc.span.Meta["agent.parse.error"])
 		assert.Equal(testSpan.Resource, tc.span.Meta["sql.query"])
 	}
 }
 
 func TestSQLQuantizer(t *testing.T) {
-	assert := assert.New(t)
-
 	cases := []sqlTestCase{
 		{
 			"select * from users where id = 42",
@@ -302,12 +299,79 @@ func TestSQLQuantizer(t *testing.T) {
                     ` + "(@runtot := @runtot + daily_values.value) AS total FROM (SELECT @runtot:=0) AS n, `daily_values`  WHERE `daily_values`.`subject_id` = 12345 AND `daily_values`.`subject_type` = 'Skippity' AND (daily_values.date BETWEEN '2018-05-09' AND '2018-06-19') HAVING value >= 0 ORDER BY date",
 			`SELECT daily_values.*, LEAST ( ( ? - @runtot ), value ), ( @runtot := @runtot + daily_values.value ) FROM ( SELECT @runtot := ? ), daily_values WHERE daily_values . subject_id = ? AND daily_values . subject_type = ? AND ( daily_values.date BETWEEN ? AND ? ) HAVING value >= ? ORDER BY date`,
 		},
+		{
+			`    SELECT
+      t1.userid,
+      t1.fullname,
+      t1.firm_id,
+      t2.firmname,
+      t1.email,
+      t1.location,
+      t1.state,
+      t1.phone,
+      t1.url,
+      DATE_FORMAT( t1.lastmod, "%m/%d/%Y %h:%i:%s" ) AS lastmod,
+      t1.lastmod AS lastmod_raw,
+      t1.user_status,
+      t1.pw_expire,
+      DATE_FORMAT( t1.pw_expire, "%m/%d/%Y" ) AS pw_expire_date,
+      t1.addr1,
+      t1.addr2,
+      t1.zipcode,
+      t1.office_id,
+      t1.default_group,
+      t3.firm_status,
+      t1.title
+    FROM
+           userdata      AS t1
+      LEFT JOIN lawfirm_names AS t2 ON t1.firm_id = t2.firm_id
+      LEFT JOIN lawfirms      AS t3 ON t1.firm_id = t3.firm_id
+    WHERE
+      t1.userid = 'jstein'
+
+  `,
+			`SELECT t1.userid, t1.fullname, t1.firm_id, t2.firmname, t1.email, t1.location, t1.state, t1.phone, t1.url, DATE_FORMAT ( t1.lastmod, %m/%d/%Y %h:%i:%s ), t1.lastmod, t1.user_status, t1.pw_expire, DATE_FORMAT ( t1.pw_expire, %m/%d/%Y ), t1.addr1, t1.addr2, t1.zipcode, t1.office_id, t1.default_group, t3.firm_status, t1.title FROM userdata LEFT JOIN lawfirm_names ON t1.firm_id = t2.firm_id LEFT JOIN lawfirms ON t1.firm_id = t3.firm_id WHERE t1.userid = ?`,
+		},
+		{
+			`SELECT [b].[BlogId], [b].[Name]
+FROM [Blogs] AS [b]
+ORDER BY [b].[Name]`,
+			`SELECT [ b ] . [ BlogId ], [ b ] . [ Name ] FROM [ Blogs ] ORDER BY [ b ] . [ Name ]`,
+		},
+		{
+			`SELECT * FROM users WHERE firstname=''`,
+			`SELECT * FROM users WHERE firstname = ?`,
+		},
+		{
+			`SELECT * FROM users WHERE firstname=' '`,
+			`SELECT * FROM users WHERE firstname = ?`,
+		},
+		{
+			`SELECT * FROM users WHERE firstname=""`,
+			`SELECT * FROM users WHERE firstname = ""`,
+		},
+		{
+			`SELECT * FROM users WHERE lastname=" "`,
+			`SELECT * FROM users WHERE lastname = ""`,
+		},
+		{
+			`SELECT * FROM users WHERE lastname="	 "`,
+			`SELECT * FROM users WHERE lastname = ""`,
+		},
+		{
+			`SELECT [b].[BlogId], [b].[Name]
+FROM [Blogs] AS [b
+ORDER BY [b].[Name]`,
+			`Non-parsable SQL query`,
+		},
 	}
 
-	for _, c := range cases {
-		s := SQLSpan(c.query)
-		NewObfuscator(nil).Obfuscate(s)
-		assert.Equal(c.expected, s.Resource)
+	for i, c := range cases {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			s := SQLSpan(c.query)
+			NewObfuscator(nil).Obfuscate(s)
+			assert.Equal(t, c.expected, s.Resource)
+		})
 	}
 }
 
@@ -328,17 +392,11 @@ func TestMultipleProcess(t *testing.T) {
 		},
 	}
 
-	filters := []TokenFilter{
-		&DiscardFilter{},
-		&ReplaceFilter{},
-		&GroupingFilter{},
-	}
-
 	// The consumer is the same between executions
-	consumer := NewTokenConsumer(filters)
+	obf := newSQLObfuscator()
 
 	for _, tc := range testCases {
-		output, err := consumer.Process(tc.query)
+		output, err := obf.obfuscate(tc.query)
 		assert.Nil(err)
 		assert.Equal(tc.expected, output)
 	}
@@ -350,14 +408,9 @@ func TestConsumerError(t *testing.T) {
 	// Malformed SQL is not accepted and the outer component knows
 	// what to do with malformed SQL
 	input := "SELECT * FROM users WHERE users.id = '1 AND users.name = 'dog'"
-	filters := []TokenFilter{
-		&DiscardFilter{},
-		&ReplaceFilter{},
-		&GroupingFilter{},
-	}
-	consumer := NewTokenConsumer(filters)
+	obf := newSQLObfuscator()
 
-	output, err := consumer.Process(input)
+	output, err := obf.obfuscate(input)
 	assert.NotNil(err)
 	assert.Equal("", output)
 }
@@ -371,19 +424,14 @@ func BenchmarkTokenizer(b *testing.B) {
 		{"Escaping", `INSERT INTO delayed_jobs (attempts, created_at, failed_at, handler, last_error, locked_at, locked_by, priority, queue, run_at, updated_at) VALUES (0, '2016-12-04 17:09:59', NULL, '--- !ruby/object:Delayed::PerformableMethod\nobject: !ruby/object:Item\n  store:\n  - a simple string\n  - an \'escaped \' string\n  - another \'escaped\' string\n  - 42\n  string: a string with many \\\\\'escapes\\\\\'\nmethod_name: :show_store\nargs: []\n', NULL, NULL, NULL, 0, NULL, '2016-12-04 17:09:59', '2016-12-04 17:09:59')`},
 		{"Grouping", `INSERT INTO delayed_jobs (created_at, failed_at, handler) VALUES (0, '2016-12-04 17:09:59', NULL), (0, '2016-12-04 17:09:59', NULL), (0, '2016-12-04 17:09:59', NULL), (0, '2016-12-04 17:09:59', NULL)`},
 	}
-	filters := []TokenFilter{
-		&DiscardFilter{},
-		&ReplaceFilter{},
-		&GroupingFilter{},
-	}
-	consumer := NewTokenConsumer(filters)
+	obf := newSQLObfuscator()
 
 	for _, bm := range benchmarks {
 		b.Run(bm.name+"/"+strconv.Itoa(len(bm.query)), func(b *testing.B) {
 			b.ResetTimer()
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
-				_, _ = consumer.Process(bm.query)
+				_, _ = obf.obfuscate(bm.query)
 			}
 		})
 	}
