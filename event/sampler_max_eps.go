@@ -56,6 +56,10 @@ func (s *maxEPSSampler) Sample(event *model.APMEvent) (sampled bool, rate float6
 
 	sampled = sampler.SampleByRate(event.Span.TraceID, rate)
 
+	if sampled {
+		event.SetMaxEPSSampleRate(rate)
+	}
+
 	return
 }
 

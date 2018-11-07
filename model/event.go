@@ -3,8 +3,8 @@ package model
 const (
 	// KeySamplingRateEventExtraction is the key of the metric storing the event extraction rate on an APM event.
 	KeySamplingRateEventExtraction = "_dd1.sr.eausr"
-	// KeySamplingRateEventSampler is the key of the metric storing the event sampler rate on an APM event.
-	KeySamplingRateEventSampler = "_dd1.sr.eamax"
+	// KeySamplingRateMaxEPSSampler is the key of the metric storing the max eps sampler rate on an APM event.
+	KeySamplingRateMaxEPSSampler = "_dd1.sr.eamax"
 )
 
 // APMEvent is an event extracted from received traces and sent to Datadog's Trace Search functionality.
@@ -53,17 +53,17 @@ func (e *APMEvent) SetExtractionSampleRate(rate float64) {
 	}
 }
 
-// GetEventSampleRate gets the rate at which this event was sampled by the event sampler.
-func (e *APMEvent) GetEventSampleRate() float64 {
-	return e.Span.GetMetricDefault(KeySamplingRateEventSampler, 1.0)
+// GetMaxEPSSampleRate gets the rate at which this event was sampled by the max eps event sampler.
+func (e *APMEvent) GetMaxEPSSampleRate() float64 {
+	return e.Span.GetMetricDefault(KeySamplingRateMaxEPSSampler, 1.0)
 }
 
-// SetEventSampleRate sets the rate at which this event was sampled by the event sampler.
-func (e *APMEvent) SetEventSampleRate(rate float64) {
+// SetMaxEPSSampleRate sets the rate at which this event was sampled by the max eps event sampler.
+func (e *APMEvent) SetMaxEPSSampleRate(rate float64) {
 	if rate < 1 {
-		e.Span.SetMetric(KeySamplingRateEventSampler, rate)
+		e.Span.SetMetric(KeySamplingRateMaxEPSSampler, rate)
 	} else {
 		// We assume missing value is 1 to save bandwidth (check getter).
-		delete(e.Span.Metrics, KeySamplingRateEventSampler)
+		delete(e.Span.Metrics, KeySamplingRateMaxEPSSampler)
 	}
 }

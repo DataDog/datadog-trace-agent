@@ -40,6 +40,7 @@ func TestMaxEPSSampler(t *testing.T) {
 				sample, rate := sampler.Sample(event)
 				if sample {
 					sampled++
+					assert.EqualValues(testCase.expectedSampleRate, event.GetMaxEPSSampleRate())
 				}
 				assert.EqualValues(testCase.expectedSampleRate, rate)
 			}
