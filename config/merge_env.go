@@ -28,6 +28,7 @@ const (
 	envConnectionLimit = "DD_CONNECTION_LIMIT"      // (deprecated) limit of unique connections
 	envMaxTPS          = "DD_MAX_TPS"               // maximum limit to the total number of traces per second to sample (MaxTPS)
 	envMaxEPS          = "DD_MAX_EPS"               // maximum limit to the total number of events per second to sample (MaxEPS)
+	envCollectorAddr   = "DD_APM_COLLECTOR_ADDRESS" // The address of the collector to send data to
 )
 
 // loadEnv applies overrides from environment variables to the trace agent configuration
@@ -144,6 +145,9 @@ func (c *AgentConfig) loadEnv() {
 		}
 	}
 
+	if v := os.Getenv(envCollectorAddr); v != "" {
+		c.CollectorAddr = v
+	}
 }
 
 func parseNameAndRate(token string) (string, float64, error) {

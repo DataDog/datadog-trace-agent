@@ -17,6 +17,11 @@ import (
 // apiEndpointPrefix is the URL prefix prepended to the default site value from YamlAgentConfig.
 const apiEndpointPrefix = "https://trace.agent."
 
+type collectorConfig struct {
+	CollectorAddr      string `mapstructure:"collector_address"`
+	DualCollectorFlush bool   `mapstructure:"dual_collector_flush"`
+}
+
 // ObfuscationConfig holds the configuration for obfuscating sensitive data
 // for various span types.
 type ObfuscationConfig struct {
@@ -281,6 +286,17 @@ func (c *AgentConfig) loadYamlConfig(path string) error {
 	c.DDAgentBin = defaultDDAgentBin
 	if config.Datadog.IsSet("apm_config.dd_agent_bin") {
 		c.DDAgentBin = config.Datadog.GetString("apm_config.dd_agent_bin")
+	}
+
+	// undocumented
+	collectorConfig := collectorConfig{}
+	if err := config.Datadog.UnmarshalKey("apm_config.collector", &collectorConfig); err == nil {
+		if collectorConfig.CollectorAddr != "" {
+			c.CollectorAddr = collectorConfig.CollectorAddr
+			if collectorConfig.DualCollectorFlush != false {
+				c.DualCollectorFlush = true
+			}
+		}
 	}
 
 	return nil

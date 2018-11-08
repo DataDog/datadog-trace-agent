@@ -108,6 +108,11 @@ type AgentConfig struct {
 
 	// Obfuscation holds sensitive data obufscator's configuration.
 	Obfuscation *ObfuscationConfig
+
+	// CollectorAddr contains the address of the collector where to flush traces
+	CollectorAddr string
+	// DualCollector flush will both flush traces to the collector and to the normal backend
+	DualCollectorFlush bool
 }
 
 // New returns a configuration with the default values.
@@ -144,7 +149,7 @@ func New() *AgentConfig {
 		MaxConnections:   200, // in practice, rarely goes over 20
 		WatchdogInterval: time.Minute,
 
-		Ignore:                      make(map[string][]string),
+		Ignore: make(map[string][]string),
 		AnalyzedRateByServiceLegacy: make(map[string]float64),
 		AnalyzedSpansByService:      make(map[string]map[string]float64),
 	}

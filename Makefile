@@ -43,3 +43,9 @@ windows:
 	# pre-packages resources needed for the windows release
 	windmc --target pe-x86-64 -r cmd/trace-agent/windows_resources cmd/trace-agent/windows_resources/trace-agent-msg.mc
 	windres --define MAJ_VER=$(VERSION_MAJOR) --define MIN_VER=$(VERSION_MINOR) --define PATCH_VER=$(VERSION_PATCH) -i cmd/trace-agent/windows_resources/trace-agent.rc --target=pe-x86-64 -O coff -o cmd/trace-agent/rsrc.syso
+
+.PHONY: proto
+proto: model/collector/collector.pb.go
+
+model/collector/collector.pb.go: model/collector/collector.proto
+	protoc -I ../../../ -I model/collector --go_out=plugins=grpc:model/collector model/collector/collector.proto

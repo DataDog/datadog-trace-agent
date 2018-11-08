@@ -87,6 +87,14 @@ func (c *AgentConfig) loadIniConfig(conf *File) {
 		c.Endpoints[0].Host = strings.TrimSpace(v) // take the first
 	}
 
+	// undocumented
+	if v, _ := conf.Get("trace.collector", "address"); v != "" {
+		c.CollectorAddr = v
+		if v, _ := conf.Get("trace.collector", "dual_flush"); strings.ToLower(v) != "true" {
+			c.DualCollectorFlush = true
+		}
+	}
+
 	// [trace.config] section
 	if v, _ := conf.Get("trace.config", "env"); v != "" {
 		c.DefaultEnv = model.NormalizeTag(v)
