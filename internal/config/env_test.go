@@ -205,6 +205,17 @@ func TestLoadEnv(t *testing.T) {
 				assert.NoError(err)
 				assert.Equal(7., cfg.MaxEPS)
 			})
+
+			env = "DD_APM_COLLECTOR_ADDRESS"
+			t.Run(env, func(t *testing.T) {
+				assert := assert.New(t)
+				err := os.Setenv(env, ":5555")
+				assert.NoError(err)
+				defer os.Unsetenv(env)
+				cfg, err := Load("./testdata/full." + ext)
+				assert.NoError(err)
+				assert.Equal(":5555", cfg.CollectorConfig.CollectorAddr)
+			})
 		})
 	}
 }

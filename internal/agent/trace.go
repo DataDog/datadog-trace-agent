@@ -206,3 +206,20 @@ func (t Trace) ExtractTopLevelSubtraces(root *Span) []Subtrace {
 
 	return subtraces
 }
+
+// Clone does a deep copy of the Trace
+func (t Trace) Clone() Trace {
+	clonedTrace := make([]*Span, len(t))
+	for i := range t {
+		clonedSpan := t[i]
+		clonedSpan.Meta = make(map[string]string, len(t[i].Meta))
+		for k, v := range t[i].Meta {
+			clonedSpan.Meta[k] = v
+		}
+		clonedSpan.Metrics = make(map[string]float64, len(t[i].Metrics))
+		for k, v := range t[i].Metrics {
+			clonedSpan.Metrics[k] = v
+		}
+	}
+	return clonedTrace
+}

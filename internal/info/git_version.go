@@ -9,9 +9,9 @@ import (
 )
 
 func init() {
-	Version = "111"
-	GitCommit = "7acc5885"
-	GitBranch = "gbbr/internal"
-	BuildDate = "2018-11-28 13:41:41.829345549 +0100 CET m=+0.009863799"
+	Version = "0.99.0"
+	GitCommit = "24901b8a"
+	GitBranch = "bmermet/collector"
+	BuildDate = "2018-12-13 09:39:49.262417 +0100 CET m=+0.010135958"
 	GoVersion = strings.TrimPrefix(runtime.Version(), "go")
 }

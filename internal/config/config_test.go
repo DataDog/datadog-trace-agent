@@ -321,6 +321,8 @@ func TestFullYamlConfig(t *testing.T) {
 	assert.True(o.RemoveStackTraces)
 	assert.True(c.Obfuscation.Redis.Enabled)
 	assert.True(c.Obfuscation.Memcached.Enabled)
+
+	assert.Equal(NewDefaultCollectorConfig(), c.CollectorConfig)
 }
 
 func TestUndocumentedYamlConfig(t *testing.T) {
@@ -377,6 +379,12 @@ func TestUndocumentedYamlConfig(t *testing.T) {
 	assert.Equal(0.8, c.AnalyzedSpansByService["web"]["request"])
 	assert.Equal(0.9, c.AnalyzedSpansByService["web"]["django.request"])
 	assert.Equal(0.05, c.AnalyzedSpansByService["db"]["intake"])
+
+	assert.Equal(CollectorConfig{
+		CollectorAddr: ":7777",
+		DualFlush:     true,
+		SamplingRate:  0.7,
+	}, c.CollectorConfig)
 }
 
 func TestAcquireHostname(t *testing.T) {

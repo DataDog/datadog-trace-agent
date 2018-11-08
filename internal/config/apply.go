@@ -19,6 +19,20 @@ import (
 // apiEndpointPrefix is the URL prefix prepended to the default site value from YamlAgentConfig.
 const apiEndpointPrefix = "https://trace.agent."
 
+// CollectorConfig contains config elements relevant for interacting with the collector
+type CollectorConfig struct {
+	// CollectorAddr is the address of the collector
+	CollectorAddr string `mapstructure:"collector_address"`
+	// DualFlush if set to true traces will both be sent to the collector and processed locally
+	DualFlush bool `mapstructure:"dual_flush"`
+	// SamplingRate controls the sampling rate applied to traces before they are sent to the collector
+	SamplingRate float64 `mapstructure:"sampling_rate"`
+}
+
+func NewDefaultCollectorConfig() CollectorConfig {
+	return CollectorConfig{SamplingRate: 1}
+}
+
 // ObfuscationConfig holds the configuration for obfuscating sensitive data
 // for various span types.
 type ObfuscationConfig struct {
@@ -284,6 +298,12 @@ func (c *AgentConfig) applyDatadogConfig() error {
 	// undocumented
 	if config.Datadog.IsSet("apm_config.dd_agent_bin") {
 		c.DDAgentBin = config.Datadog.GetString("apm_config.dd_agent_bin")
+	}
+
+	// undocumented
+	collectorConfig := NewDefaultCollectorConfig()
+	if err := config.Datadog.UnmarshalKey("apm_config.collector", &collectorConfig); err == nil {
+		c.CollectorConfig = collectorConfig
 	}
 
 	return c.loadDeprecatedValues()

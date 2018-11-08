@@ -49,6 +49,12 @@ func applyEnv() {
 			log.Errorf("Bad format for %s it should be of the form \"service_name|operation_name=rate,other_service|other_operation=rate\", error: %v", "DD_APM_ANALYZED_SPANS", err)
 		}
 	}
+
+	if v := os.Getenv("DD_APM_COLLECTOR_ADDRESS"); v != "" {
+		collectorConfig := NewDefaultCollectorConfig()
+		collectorConfig.CollectorAddr = v
+		config.Datadog.Set("apm_config.collector", collectorConfig)
+	}
 }
 
 func parseNameAndRate(token string) (string, float64, error) {

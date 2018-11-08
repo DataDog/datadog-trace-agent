@@ -25,25 +25,27 @@ const processStatsInterval = time.Minute
 
 // Agent struct holds all the sub-routines structs and make the data flow between them
 type Agent struct {
-	Receiver           *api.HTTPReceiver
-	Concentrator       *Concentrator
-	Blacklister        *filters.Blacklister
-	Replacer           *filters.Replacer
-	ScoreSampler       *Sampler
-	ErrorsScoreSampler *Sampler
-	PrioritySampler    *Sampler
-	EventProcessor     *event.Processor
-	TraceWriter        *writer.TraceWriter
-	ServiceWriter      *writer.ServiceWriter
-	StatsWriter        *writer.StatsWriter
-	ServiceExtractor   *TraceServiceExtractor
-	ServiceMapper      *ServiceMapper
+	Receiver             *api.HTTPReceiver
+	Concentrator         *Concentrator
+	Blacklister          *filters.Blacklister
+	Replacer             *filters.Replacer
+	ScoreSampler         *Sampler
+	ErrorsScoreSampler   *Sampler
+	PrioritySampler      *Sampler
+	EventProcessor       *event.Processor
+	TraceWriter          *writer.TraceWriter
+	ServiceWriter        *writer.ServiceWriter
+	StatsWriter          *writer.StatsWriter
+	CollectorTraceWriter *writer.CollectorTraceWriter
+	ServiceExtractor     *TraceServiceExtractor
+	ServiceMapper        *ServiceMapper
 
 	// obfuscator is used to obfuscate sensitive data from various span
 	// tags based on their type.
 	obfuscator *obfuscate.Obfuscator
 
-	tracePkgChan chan *writer.TracePackage
+	tracePkgChan       chan *writer.TracePackage
+	collectorTraceChan chan *agent.Trace
 
 	// config
 	conf    *config.AgentConfig
@@ -84,25 +86,34 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	sw := writer.NewStatsWriter(conf, statsChan)
 	svcW := writer.NewServiceWriter(conf, filteredServiceChan)
 
+	var collectorTraceChan chan *agent.Trace
+	var ctw *writer.CollectorTraceWriter
+	if conf.CollectorConfig.CollectorAddr != "" {
+		collectorTraceChan = make(chan *agent.Trace, 5000)
+		ctw = writer.NewCollectorTraceWriter(conf, collectorTraceChan)
+	}
+
 	return &Agent{
-		Receiver:           r,
-		Concentrator:       c,
-		Blacklister:        filters.NewBlacklister(conf.Ignore["resource"]),
-		Replacer:           filters.NewReplacer(conf.ReplaceTags),
-		ScoreSampler:       ss,
-		ErrorsScoreSampler: ess,
-		PrioritySampler:    ps,
-		EventProcessor:     ep,
-		TraceWriter:        tw,
-		StatsWriter:        sw,
-		ServiceWriter:      svcW,
-		ServiceExtractor:   se,
-		ServiceMapper:      sm,
-		obfuscator:         obf,
-		tracePkgChan:       tracePkgChan,
-		conf:               conf,
-		dynConf:            dynConf,
-		ctx:                ctx,
+		Receiver:             r,
+		Concentrator:         c,
+		Blacklister:          filters.NewBlacklister(conf.Ignore["resource"]),
+		Replacer:             filters.NewReplacer(conf.ReplaceTags),
+		ScoreSampler:         ss,
+		ErrorsScoreSampler:   ess,
+		PrioritySampler:      ps,
+		EventProcessor:       ep,
+		TraceWriter:          tw,
+		StatsWriter:          sw,
+		ServiceWriter:        svcW,
+		CollectorTraceWriter: ctw,
+		ServiceExtractor:     se,
+		ServiceMapper:        sm,
+		obfuscator:           obf,
+		tracePkgChan:         tracePkgChan,
+		collectorTraceChan:   collectorTraceChan,
+		conf:                 conf,
+		dynConf:              dynConf,
+		ctx:                  ctx,
 	}
 }
 
@@ -130,6 +141,10 @@ func (a *Agent) Run() {
 	a.PrioritySampler.Run()
 	a.EventProcessor.Start()
 
+	if a.CollectorTraceWriter != nil {
+		a.CollectorTraceWriter.Start()
+	}
+
 	for {
 		select {
 		case t := <-a.Receiver.Out:
@@ -150,6 +165,11 @@ func (a *Agent) Run() {
 			a.ErrorsScoreSampler.Stop()
 			a.PrioritySampler.Stop()
 			a.EventProcessor.Stop()
+
+			if a.CollectorTraceWriter != nil {
+				a.CollectorTraceWriter.Stop()
+			}
+
 			return
 		}
 	}
@@ -201,6 +221,18 @@ func (a *Agent) Process(t agent.Trace) {
 		span.Truncate()
 	}
 	a.Replacer.Replace(&t)
+
+	if a.CollectorTraceWriter != nil {
+		if a.conf.CollectorConfig.DualFlush {
+			// If the trace is going to be processed by the agent, copy it before sending
+			traceCopy := t.Clone()
+			a.collectorTraceChan <- &traceCopy
+		} else {
+			// Flush
+			a.collectorTraceChan <- &t
+			return
+		}
+	}
 
 	// Extract the client sampling rate.
 	clientSampleRate := root.GetSampleRate()

@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package collector;
+
+import "github.com/DataDog/datadog-trace-agent/internal/agent/span.proto";
+
+service CollectorService {
+    rpc SendTraces (SendTracesRequest) returns (SendTracesResponse);
+}
+
+message SendTracesRequest {
+    repeated APITraceChunk chunks = 1;
+}
+
+message SendTracesResponse {
+}
+
+message APITraceChunk {
+    repeated agent.Span spans = 1;
+    string hostname = 2;
+    uint64 traceID = 3;
+}

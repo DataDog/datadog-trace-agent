@@ -39,3 +39,7 @@ apm_config:
     web|django.request: 0.9
     db|intake: 0.05
     bad_format: 0.5
+  collector:
+    collector_address: ":7777"
+    dual_flush: true
+    sampling_rate: 0.7
