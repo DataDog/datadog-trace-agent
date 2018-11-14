@@ -20,11 +20,10 @@ func TestProcessor(t *testing.T) {
 		{"No extractors", nil, -1, 0, 0, 0},
 
 		// Test Extractors
-		{"Extractor(0) - No sampler", []float64{0}, -1, 0, 0, 0},
-		{"Extractor(0.5) - No sampler", []float64{0.5}, -1, 0.5, 1, 0.1},
-		{"Extractor(1) - No sampler", []float64{1}, -1, 1, 1, 0},
-		{"Extractor(-1, 0.8) - No sampler", []float64{RateNone, 0.8}, -1, 0.8, 1, 0.1},
-		{"Extractor(-1, -1, 0.8) - No sampler", []float64{RateNone, RateNone, 0.8}, -1, 0.8, 1, 0.1},
+		{"Extractor(0) - Sampler(1)", []float64{0}, 1, 0, 0, 0},
+		{"Extractor(0.5) - Sampler(1)", []float64{0.5}, 1, 0.5, 1, 0.1},
+		{"Extractor(-1, 0.8) - Sampler(1)", []float64{-1, 0.8}, 1, 0.8, 1, 0.1},
+		{"Extractor(-1, -1, 0.8) - Sampler(1)", []float64{-1, -1, 0.8}, 1, 0.8, 1, 0.1},
 
 		// Test Sampler
 		{"Extractor(1) - Sampler(0)", []float64{1}, 0, 1, 0, 0},
@@ -47,11 +46,7 @@ func TestProcessor(t *testing.T) {
 				extractors[i] = &MockExtractor{Rate: rate}
 			}
 
-			var sampler Sampler
-			if test.samplerRate >= 0 {
-				sampler = &MockSampler{Rate: test.samplerRate}
-			}
-
+			sampler := &MockSampler{Rate: test.samplerRate}
 			p := NewProcessor(extractors, sampler)
 
 			testSpans := createTestSpans("test", "test")
@@ -72,12 +67,9 @@ func TestProcessor(t *testing.T) {
 			expectedReturned := expectedExtracted * test.expectedSampledPct
 			assert.InDelta(expectedReturned, returned, expectedReturned*test.deltaPct)
 
-			if sampler != nil {
-				mockSampler := sampler.(*MockSampler)
-				assert.EqualValues(1, mockSampler.StartCalls)
-				assert.EqualValues(extracted, mockSampler.SampleCalls)
-				assert.EqualValues(1, mockSampler.StopCalls)
-			}
+			assert.EqualValues(1, sampler.StartCalls)
+			assert.EqualValues(extracted, sampler.SampleCalls)
+			assert.EqualValues(1, sampler.StopCalls)
 
 			for _, event := range events {
 				assert.EqualValues(test.expectedExtractedPct, event.GetExtractionSampleRate())
@@ -92,12 +84,12 @@ type MockExtractor struct {
 	Rate float64
 }
 
-func (e *MockExtractor) Extract(s *model.WeightedSpan, priority model.SamplingPriority) (bool, float64) {
+func (e *MockExtractor) Extract(s *model.WeightedSpan, priority model.SamplingPriority) (bool, float64, bool) {
 	if e.Rate >= 0 {
-		return rand.Float64() < e.Rate, e.Rate
+		return rand.Float64() < e.Rate, e.Rate, true
 	}
 
-	return false, RateNone
+	return false, 0, false
 }
 
 type MockSampler struct {
@@ -119,9 +111,5 @@ func (s *MockSampler) Stop() {
 func (s *MockSampler) Sample(event *model.APMEvent) (bool, float64) {
 	s.SampleCalls++
 
-	if s.Rate >= 0 {
-		return rand.Float64() < s.Rate, s.Rate
-	}
-
-	return false, RateNone
+	return rand.Float64() < s.Rate, s.Rate
 }

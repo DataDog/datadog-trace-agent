@@ -22,18 +22,22 @@ func testExtractor(t *testing.T, extractor Extractor, testCase extractorTestCase
 		extracted := 0
 
 		for _, span := range testCase.spans {
-			extract, rate := extractor.Extract(span, testCase.priority)
+			extract, rate, decided := extractor.Extract(span, testCase.priority)
 
 			total++
 
-			if extract {
-				extracted++
+			if decided {
+				if extract {
+					extracted++
+				}
+			} else {
+				rate = -1
 			}
 
 			assert.EqualValues(testCase.expectedExtractionRate, rate)
 		}
 
-		if testCase.expectedExtractionRate != RateNone {
+		if testCase.expectedExtractionRate != -1 {
 			// Assert extraction rate with 10% delta
 			assert.InDelta(testCase.expectedExtractionRate, float64(extracted)/float64(total), testCase.expectedExtractionRate*0.1)
 		}

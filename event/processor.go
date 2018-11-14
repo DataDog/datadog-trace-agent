@@ -11,7 +11,7 @@ type Processor struct {
 // NewProcessor returns a new instance of Processor configured with the provided extractors and sampler.
 //
 // Extractors will look at each span in the trace and decide whether it should be converted to an APM event or not. They
-// will be tried in the provided order, with the first non-neutral decision being the one applied.
+// will be tried in the provided order, with the first one returning a decision being the one applied.
 //
 // All extracted APM events are then submitted to the specified sampler (if any), no matter which extractor extracted
 // them. Only those events that survived this sampling step are returned. If sampler is nil, all extracted events are
@@ -37,10 +37,8 @@ func (p *Processor) Stop() {
 	}
 }
 
-// Process takes a processed trace, extracts events from it, submits them to the samplers and returns a collection of
-// sampled events along with the total count of extracted events. Process also takes a ProcessorParams struct from
-// which trace rates are extracted and set on every sampled event. An extraction callback can also be set which will
-// be called for every extracted event.
+// Process takes a processed trace, extracts events from it and samples them, returning a collection of
+// sampled events along with the total count of extracted events.
 func (p *Processor) Process(t model.ProcessedTrace) (events []*model.APMEvent, numExtracted int64) {
 	if len(p.extractors) == 0 {
 		return
@@ -59,15 +57,15 @@ func (p *Processor) Process(t model.ProcessedTrace) (events []*model.APMEvent, n
 		var event *model.APMEvent
 
 		for _, extractor := range p.extractors {
-			extract, rate := extractor.Extract(span, priority)
+			extract, rate, decided := extractor.Extract(span, priority)
 
-			if rate == RateNone {
+			if !decided {
 				// If the extractor did not make any extraction decision, try the next one
 				continue
 			}
 
 			if extract {
-				event = &model.APMEvent{Span: span.Span, TraceSampled: t.Sampled}
+				event = &model.APMEvent{Span: span.Span, Priority: priority}
 				event.SetExtractionSampleRate(rate)
 			}
 

@@ -9,6 +9,9 @@ import (
 
 // maxEPSSampler (Max Events Per Second Sampler) is an event sampler that samples provided events so as to try to ensure
 // no more than a certain amount of events is sampled per second.
+//
+// Note that events associated with traces with UserPriorityKeep are always sampled and don't influence underlying
+// rate counters so as not to skew stats.
 type maxEPSSampler struct {
 	maxEPS      float64
 	rateCounter rateCounter
@@ -39,13 +42,14 @@ func (s *maxEPSSampler) Stop() {
 // Sample determines whether or not we should sample the provided event in order to ensure no more than maxEPS events
 // are sampled every second.
 func (s *maxEPSSampler) Sample(event *model.APMEvent) (sampled bool, rate float64) {
-	// Count that we saw a new event
-	s.rateCounter.Count()
-
-	// Events with sampled traces are always kept even if that means going a bit above max eps.
-	if event.TraceSampled {
+	// Events associated with traces that were manually sampled (with PriorityUserKeep) should not be subjected to
+	// MaxEPSSampling nor should they affect rate counters otherwise we'll get skewed stats.
+	if event.Priority == model.PriorityUserKeep {
 		return true, 1
 	}
+
+	// Count that we saw a new event
+	s.rateCounter.Count()
 
 	rate = 1.0
 	currentEPS := s.rateCounter.GetRate()
