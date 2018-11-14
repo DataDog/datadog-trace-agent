@@ -160,16 +160,6 @@ func (c *AgentConfig) LoadIni(path string) error {
 	return nil
 }
 
-// LoadYaml reads the contents of the given YAML file into the config.
-func (c *AgentConfig) LoadYaml(path string) error {
-	conf, err := NewYaml(path)
-	if err != nil {
-		return err
-	}
-	c.loadYamlConfig(conf)
-	return nil
-}
-
 // Validate validates if the current configuration is good for the agent to start with.
 func (c *AgentConfig) validate() error {
 	if len(c.Endpoints) == 0 || c.Endpoints[0].APIKey == "" {
@@ -250,7 +240,7 @@ func loadFile(path string) (*AgentConfig, error) {
 			return cfg, err
 		}
 	case ".yaml":
-		if err := cfg.LoadYaml(cfgPath); err != nil {
+		if err := cfg.loadYamlConfig(cfgPath); err != nil {
 			return cfg, err
 		}
 	default:
