@@ -6,11 +6,20 @@ import tempfile
 import shutil
 import sys
 import os
+import re
 
 from invoke import task
 from invoke.exceptions import Exit
 
 from .dogstatsd import DOGSTATSD_TAG
+
+
+@task
+def test(ctx):
+    """
+    Run docker tests
+    """
+    ctx.run("python ./Dockerfiles/agent/secrets-helper/test_readsecret.py")
 
 
 @task
@@ -58,7 +67,7 @@ COPY test.bin /test.bin
             ctx.run("cp -R testdata %s" % temp_folder)
             stream.write("COPY testdata /testdata")
 
-    test_image = client.images.build(path=temp_folder, rm=True)
+    test_image, _ = client.images.build(path=temp_folder, rm=True)
 
     scratch_volume = client.volumes.create()
 
@@ -75,7 +84,7 @@ COPY test.bin /test.bin
                  '/sys/fs/cgroup': {'bind': '/host/sys/fs/cgroup', 'mode': 'ro'},
                  scratch_volume.name: {'bind': '/tmp/scratch', 'mode': 'rw'}})
 
-    exit_code = test_container.wait()
+    exit_code = test_container.wait()['StatusCode']
 
     print(test_container.logs(
         stdout=True,
@@ -94,4 +103,31 @@ COPY test.bin /test.bin
         client.images.remove(test_image.id)
 
     if exit_code != 0:
-        raise Exit(exit_code)
+        raise Exit(code=exit_code)
+
+
+@task
+def mirror_image(ctx, src_image, dst_image="datadog/docker-library", dst_tag="auto"):
+    """
+    Pull an upstream image and mirror it to our docker-library repository
+    for integration tests. Tag format should be A-Z_n_n_n
+    """
+    if dst_tag == "auto":
+        # Autogenerate tag
+        match = re.search('([^:\/\s]+):[v]?(.*)$', src_image)
+        if not match:
+            print("Cannot guess destination tag for {}, please provide a --dst-tag option".format(src_image))
+            raise Exit(code=1)
+        dst_tag = "_".join(match.groups()).replace(".", "_")
+
+    dst = "{}:{}".format(dst_image, dst_tag)
+    publish(src_image, dst)
+
+
+@task
+def publish(ctx, src, dst):
+    print("Uploading {} to {}".format(src, dst))
+    ctx.run("docker pull {src} && docker tag {src} {dst} && docker push {dst}".format(
+        src=src,
+        dst=dst)
+    )

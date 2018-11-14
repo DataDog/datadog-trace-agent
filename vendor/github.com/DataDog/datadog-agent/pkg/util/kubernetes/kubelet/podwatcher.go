@@ -1,91 +1,72 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 // +build kubelet
 
 package kubelet
 
 import (
-	"strconv"
 	"sync"
 	"time"
 
-	log "github.com/cihub/seelog"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
 // PodWatcher regularly pools the kubelet for new/changed/removed containers.
 // It keeps an internal state to only send the updated pods.
 type PodWatcher struct {
 	sync.Mutex
-	kubeUtil         *KubeUtil
-	latestResVersion int
-	expiryDuration   time.Duration
-	lastSeen         map[string]time.Time
+	kubeUtil       *KubeUtil
+	expiryDuration time.Duration
+	lastSeen       map[string]time.Time
 }
 
 // NewPodWatcher creates a new watcher. User call must then trigger PullChanges
 // and ExpireContainers when needed.
-func NewPodWatcher() (*PodWatcher, error) {
+func NewPodWatcher(expiryDuration time.Duration) (*PodWatcher, error) {
 	kubeutil, err := GetKubeUtil()
 	if err != nil {
 		return nil, err
 	}
 	watcher := &PodWatcher{
-		kubeUtil:         kubeutil,
-		latestResVersion: -1,
-		lastSeen:         make(map[string]time.Time),
-		expiryDuration:   5 * time.Minute,
+		kubeUtil:       kubeutil,
+		lastSeen:       make(map[string]time.Time),
+		expiryDuration: expiryDuration,
 	}
 	return watcher, nil
 }
 
-// PullChanges pulls a new podlist from the kubelet and returns Pod objects for
+// PullChanges pulls a new podList from the kubelet and returns Pod objects for
 // new / updated pods. Updated pods will be sent entirely, user must replace
 // previous info for these pods.
 func (w *PodWatcher) PullChanges() ([]*Pod, error) {
-	podlist, err := w.kubeUtil.GetLocalPodList()
+	var podList []*Pod
+	podList, err := w.kubeUtil.GetLocalPodList()
 	if err != nil {
-		return []*Pod{}, err
+		return podList, err
 	}
-	return w.computechanges(podlist)
+	return w.computeChanges(podList)
 }
 
-// computechanges is used by PullChanges, split for testing
-func (w *PodWatcher) computechanges(podlist []*Pod) ([]*Pod, error) {
+// computeChanges is used by PullChanges, split for testing
+func (w *PodWatcher) computeChanges(podList []*Pod) ([]*Pod, error) {
 	now := time.Now()
-	newResVersion := w.latestResVersion
 	var updatedPods []*Pod
 
 	w.Lock()
 	defer w.Unlock()
-	for _, pod := range podlist {
-		// Converting resVersion
-		var version int
-		if pod.Metadata.ResVersion == "" {
-			/* System pods don't have a ressource version, using
-			   0 to return them once. If they're restarted, we
-			   will detect the new containers and send the pod
-			   again anyway */
-			version = 0
-		} else {
-			var err error
-			version, err = strconv.Atoi(pod.Metadata.ResVersion)
-			if err != nil {
-				log.Warnf("can't parse resVersion %s for pod %s: %s",
-					pod.Metadata.ResVersion, pod.Metadata.Name, err)
-			}
+	for _, pod := range podList {
+		// Only process ready pods
+		if IsPodReady(pod) == false {
+			continue
 		}
-		// Detect new/updated pods
-		newPod := false
-		if version > w.latestResVersion {
-			newPod = true
-			if version > newResVersion {
-				newResVersion = version
-			}
-		}
-		// Detect new containers within existing pods
+
+		// Refresh last pod seen time
+		w.lastSeen[PodUIDToEntityName(pod.Metadata.UID)] = now
+
+		// Detect new containers
 		newContainer := false
 		for _, container := range pod.Status.Containers {
 			if _, found := w.lastSeen[container.ID]; found == false {
@@ -93,20 +74,20 @@ func (w *PodWatcher) computechanges(podlist []*Pod) ([]*Pod, error) {
 			}
 			w.lastSeen[container.ID] = now
 		}
-		if newPod || newContainer {
+		if newContainer {
 			updatedPods = append(updatedPods, pod)
 		}
 	}
-	log.Debugf("found %d changed pods out of %d, new resversion %d",
-		len(updatedPods), len(podlist), newResVersion)
-	w.latestResVersion = newResVersion
+	log.Debugf("Found %d changed pods out of %d", len(updatedPods), len(podList))
 	return updatedPods, nil
 }
 
-// ExpireContainers returns a list of container id for containers
+// Expire returns a list of entities (containers and pods)
 // that are not listed in the podlist anymore. It must be called
 // immediately after a PullChanges.
-func (w *PodWatcher) ExpireContainers() ([]string, error) {
+// For containers, string is kubernetes container ID (with runtime name)
+// For pods, string is "kubernetes_pod://uid" format
+func (w *PodWatcher) Expire() ([]string, error) {
 	now := time.Now()
 	w.Lock()
 	defer w.Unlock()
@@ -125,9 +106,9 @@ func (w *PodWatcher) ExpireContainers() ([]string, error) {
 	return expiredContainers, nil
 }
 
-// GetPodForContainerID fetches the podlist and returns the pod running
-// a given container on the node. Returns a nil pointer if not found.
-// It just proxies the call to its kubeutil.
-func (w *PodWatcher) GetPodForContainerID(containerID string) (*Pod, error) {
-	return w.kubeUtil.GetPodForContainerID(containerID)
+// GetPodForEntityID finds the pod corresponding to an entity.
+// EntityIDs can be Docker container IDs or pod UIDs (prefixed).
+// Returns a nil pointer if not found.
+func (w *PodWatcher) GetPodForEntityID(entityID string) (*Pod, error) {
+	return w.kubeUtil.GetPodForEntityID(entityID)
 }

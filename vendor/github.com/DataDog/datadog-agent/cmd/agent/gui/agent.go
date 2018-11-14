@@ -2,18 +2,20 @@ package gui
 
 import (
 	"encoding/json"
+	"html"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/DataDog/datadog-agent/cmd/agent/common"
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/flare"
 	"github.com/DataDog/datadog-agent/pkg/status"
 	"github.com/DataDog/datadog-agent/pkg/util"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/datadog-agent/pkg/version"
-	log "github.com/cihub/seelog"
 	"github.com/gorilla/mux"
 	yaml "gopkg.in/yaml.v2"
 )
@@ -33,7 +35,8 @@ func agentHandler(r *mux.Router) {
 
 // Sends a simple reply (for checking connection to server)
 func ping(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Pong"))
+	elapsed := time.Now().Unix() - startTimestamp
+	w.Write([]byte(strconv.FormatInt(elapsed, 10)))
 }
 
 // Sends the current agent status
@@ -47,7 +50,6 @@ func getStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	json, _ := json.Marshal(status)
-
 	html, e := renderStatus(json, statusType)
 	if e != nil {
 		w.Write([]byte("Error generating status html: " + e.Error()))
@@ -60,7 +62,7 @@ func getStatus(w http.ResponseWriter, r *http.Request) {
 
 // Sends the current agent version
 func getVersion(w http.ResponseWriter, r *http.Request) {
-	version, e := version.New(version.AgentVersion)
+	version, e := version.New(version.AgentVersion, version.Commit)
 	if e != nil {
 		log.Errorf("Error getting version: " + e.Error())
 		w.Write([]byte("Error: " + e.Error()))
@@ -100,12 +102,13 @@ func getLog(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Error: " + e.Error()))
 		return
 	}
+	escapedLogFileContents := html.EscapeString(string(logFileContents))
 
-	html := strings.Replace(string(logFileContents), "\n", "<br>", -1)
+	html := strings.Replace(escapedLogFileContents, "\n", "<br>", -1)
 
 	if flip {
 		// Reverse the order so that the bottom of the file is read first
-		arr := strings.Split(string(logFileContents), "\n")
+		arr := strings.Split(escapedLogFileContents, "\n")
 		for i, j := 0, len(arr)-1; i < j; i, j = i+1, j-1 {
 			arr[i], arr[j] = arr[j], arr[i]
 		}
@@ -131,8 +134,7 @@ func makeFlare(w http.ResponseWriter, r *http.Request) {
 		logFile = common.DefaultLogFile
 	}
 
-	// Initiate the flare locally
-	filePath, e := flare.CreateArchive(true, common.GetDistPath(), common.PyChecksPath, logFile)
+	filePath, e := flare.CreateArchive(false, common.GetDistPath(), common.PyChecksPath, logFile)
 	if e != nil {
 		w.Write([]byte("Error creating flare zipfile: " + e.Error()))
 		log.Errorf("Error creating flare zipfile: " + e.Error())

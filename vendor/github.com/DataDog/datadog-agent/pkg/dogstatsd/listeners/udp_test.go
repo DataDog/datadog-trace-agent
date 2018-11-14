@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 // +build !windows
 
 package listeners
@@ -19,8 +19,10 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/config"
 )
 
+var packetPoolUDP = NewPacketPool(config.Datadog.GetInt("dogstatsd_buffer_size"))
+
 func TestNewUDPListener(t *testing.T) {
-	s, err := NewUDPListener(nil)
+	s, err := NewUDPListener(nil, packetPoolUDP)
 	require.NotNil(t, s)
 	assert.Nil(t, err)
 
@@ -32,7 +34,7 @@ func TestStartStopUDPListener(t *testing.T) {
 	require.Nil(t, err)
 	config.Datadog.SetDefault("dogstatsd_port", port)
 	config.Datadog.SetDefault("dogstatsd_non_local_traffic", false)
-	s, err := NewUDPListener(nil)
+	s, err := NewUDPListener(nil, packetPoolUDP)
 	require.NotNil(t, s)
 
 	assert.Nil(t, err)
@@ -44,12 +46,18 @@ func TestStartStopUDPListener(t *testing.T) {
 	assert.NotNil(t, err)
 
 	s.Stop()
-	// Port should be available again
-	conn, err := net.ListenUDP("udp", address)
-	require.NotNil(t, conn)
 
-	assert.Nil(t, err)
-	conn.Close()
+	// check that the port can be bound, try for 100 ms
+	for i := 0; i < 10; i++ {
+		var conn net.Conn
+		conn, err = net.ListenUDP("udp", address)
+		if err == nil {
+			conn.Close()
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	require.NoError(t, err, "port is not available, it should be")
 }
 
 func TestUDPNonLocal(t *testing.T) {
@@ -57,7 +65,7 @@ func TestUDPNonLocal(t *testing.T) {
 	require.Nil(t, err)
 	config.Datadog.SetDefault("dogstatsd_port", port)
 	config.Datadog.SetDefault("dogstatsd_non_local_traffic", true)
-	s, err := NewUDPListener(nil)
+	s, err := NewUDPListener(nil, packetPoolUDP)
 	assert.Nil(t, err)
 	require.NotNil(t, s)
 
@@ -81,7 +89,7 @@ func TestUDPLocalOnly(t *testing.T) {
 	require.Nil(t, err)
 	config.Datadog.SetDefault("dogstatsd_port", port)
 	config.Datadog.SetDefault("dogstatsd_non_local_traffic", false)
-	s, err := NewUDPListener(nil)
+	s, err := NewUDPListener(nil, packetPoolUDP)
 	assert.Nil(t, err)
 	require.NotNil(t, s)
 
@@ -110,7 +118,7 @@ func TestUDPReceive(t *testing.T) {
 	config.Datadog.SetDefault("dogstatsd_port", port)
 
 	packetChannel := make(chan *Packet)
-	s, err := NewUDPListener(packetChannel)
+	s, err := NewUDPListener(packetChannel, packetPoolUDP)
 	require.NotNil(t, s)
 	assert.Nil(t, err)
 

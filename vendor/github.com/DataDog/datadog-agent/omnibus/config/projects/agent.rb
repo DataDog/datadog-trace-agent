@@ -1,7 +1,7 @@
 # Unless explicitly stated otherwise all files in this repository are licensed
 # under the Apache License Version 2.0.
 # This product includes software developed at Datadog (https:#www.datadoghq.com/).
-# Copyright 2017 Datadog, Inc.
+# Copyright 2018 Datadog, Inc.
 
 require "./lib/ostools.rb"
 
@@ -67,28 +67,28 @@ end
 # OSX .pkg specific flags
 package :pkg do
   identifier 'com.datadoghq.agent'
-  #signing_identity 'Developer ID Installer: Datadog, Inc. (JKFCB4CN7C)'
+  unless ENV['SKIP_SIGN_MAC'] == 'true'
+    signing_identity 'Developer ID Installer: Datadog, Inc. (JKFCB4CN7C)'
+  end
 end
 compress :dmg do
-  window_bounds '200, 200, 750, 600'
+  window_bounds '200, 200, 584, 632'
+
   pkg_position '10, 10'
 end
 
 # Windows .msi specific flags
 package :msi do
-  # previous upgrade code was used for older installs, and generated
-  # per-user installs.  Changing upgrade code, and switching to
-  # per-machine
-  per_user_upgrade_code = '82210ed1-bbe4-4051-aa15-002ea31dde15'
 
   # For a consistent package management, please NEVER change this code
   upgrade_code '0c50421b-aefb-4f15-a809-7af256d608a5'
-  bundle_msi true
-  bundle_theme true
   wix_candle_extension 'WixUtilExtension'
   wix_light_extension 'WixUtilExtension'
   extra_package_dir "#{Omnibus::Config.source_dir()}\\etc\\datadog-agent\\extra_package_files"
-#  extra_package_files File.absolute_path("..\\..\\etc\\datadog-agent\\extra_package_files")
+  additional_sign_files [
+      "#{install_dir}\\bin\\agent\\trace-agent.exe",
+      "#{Omnibus::Config.source_dir()}\\datadog-agent\\src\\github.com\\DataDog\\datadog-agent\\bin\\agent\\agent.exe"
+    ]
   if ENV['SIGN_WINDOWS']
     signing_identity "ECCDAE36FDCB654D2CBAB3E8975AA55469F96E4C", machine_store: true, algorithm: "SHA256"
   end
@@ -97,7 +97,6 @@ package :msi do
     'InstallFiles' => "#{Omnibus::Config.source_dir()}/datadog-agent/dd-agent/packaging/datadog-agent/win32/install_files",
     'BinFiles' => "#{Omnibus::Config.source_dir()}/datadog-agent/src/github.com/DataDog/datadog-agent/bin/agent",
     'EtcFiles' => "#{Omnibus::Config.source_dir()}\\etc\\datadog-agent",
-    'PerUserUpgradeCode' => per_user_upgrade_code
   })
 end
 
@@ -112,30 +111,31 @@ if linux?
   dependency 'curl'
 end
 
+dependency 'cacerts'
 # creates required build directories
 dependency 'datadog-agent-prepare'
-
-# Windows-specific dependencies
-if windows?
-  dependency 'datadog-upgrade-helper'
-  dependency 'pywin32'
-end
 
 # Datadog agent
 dependency 'datadog-agent'
 
 # Additional software
+dependency 'datadog-pip'
 dependency 'datadog-agent-integrations'
 dependency 'jmxfetch'
+
+# External agents
 dependency 'datadog-trace-agent'
-unless windows?
-  dependency 'datadog-process-agent'
-  dependency 'datadog-logs-agent'
+dependency 'datadog-process-agent'
+
+if osx?
+  dependency 'datadog-agent-mac-app'
 end
 
 # Remove pyc/pyo files from package
 # should be built after all the other python-related software defs
-dependency 'py-compiled-cleanup'
+unless osx?
+  dependency 'py-compiled-cleanup'
+end
 
 # version manifest file
 dependency 'version-manifest'
@@ -151,9 +151,22 @@ dependency 'datadog-agent-finalize'
 
 if linux?
   extra_package_file '/etc/init/datadog-agent.conf'
-  extra_package_file '/lib/systemd/system/datadog-agent.service'
+  extra_package_file '/etc/init/datadog-agent-process.conf'
+  extra_package_file '/etc/init/datadog-agent-trace.conf'
+  systemd_directory = "/usr/lib/systemd/system"
+  if debian?
+    systemd_directory = "/lib/systemd/system"
+
+    extra_package_file "/etc/init.d/datadog-agent"
+    extra_package_file "/etc/init.d/datadog-agent-process"
+    extra_package_file "/etc/init.d/datadog-agent-trace"
+  end
+  extra_package_file "#{systemd_directory}/datadog-agent.service"
+  extra_package_file "#{systemd_directory}/datadog-agent-process.service"
+  extra_package_file "#{systemd_directory}/datadog-agent-trace.service"
   extra_package_file '/etc/datadog-agent/'
   extra_package_file '/usr/bin/dd-agent'
+  extra_package_file '/var/log/datadog/'
 end
 
 exclude '\.git*'

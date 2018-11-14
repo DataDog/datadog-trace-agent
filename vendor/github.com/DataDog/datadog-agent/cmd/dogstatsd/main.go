@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 //go:generate go run ../../pkg/config/render_config.go dogstatsd ../../pkg/config/config_template.yaml ./dist/dogstatsd.yaml
 
@@ -11,12 +11,12 @@ import (
 	_ "expvar"
 	"fmt"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	log "github.com/cihub/seelog"
 	"github.com/spf13/cobra"
 
 	"github.com/DataDog/datadog-agent/pkg/aggregator"
@@ -27,6 +27,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/serializer"
 	"github.com/DataDog/datadog-agent/pkg/tagger"
 	"github.com/DataDog/datadog-agent/pkg/util"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/datadog-agent/pkg/version"
 )
 
@@ -54,7 +55,7 @@ extensions for special Datadog features.`,
 		Short: "Print the version number",
 		Long:  ``,
 		Run: func(cmd *cobra.Command, args []string) {
-			av, _ := version.New(version.AgentVersion)
+			av, _ := version.New(version.AgentVersion, version.Commit)
 			fmt.Println(fmt.Sprintf("DogStatsD from Agent %s - Codename: %s - Commit: %s - Serialization version: %s", av.GetNumber(), av.Meta, av.Commit, serializer.AgentPayloadVersion))
 		},
 	}
@@ -86,7 +87,7 @@ func start(cmd *cobra.Command, args []string) error {
 		// we'll search for a config file named `dogstastd.yaml`
 		config.Datadog.SetConfigName("dogstatsd")
 		config.Datadog.AddConfigPath(confPath)
-		confErr := config.Datadog.ReadInConfig()
+		confErr := config.Load()
 		if confErr != nil {
 			log.Error(confErr)
 		} else {
@@ -115,9 +116,8 @@ func start(cmd *cobra.Command, args []string) error {
 		logFile,
 		syslogURI,
 		config.Datadog.GetBool("syslog_rfc"),
-		config.Datadog.GetBool("syslog_tls"),
-		config.Datadog.GetString("syslog_pem"),
 		config.Datadog.GetBool("log_to_console"),
+		config.Datadog.GetBool("log_format_json"),
 	)
 	if err != nil {
 		log.Criticalf("Unable to setup logger: %s", err)
@@ -136,7 +136,7 @@ func start(cmd *cobra.Command, args []string) error {
 	}
 	f := forwarder.NewDefaultForwarder(keysPerDomain)
 	f.Start()
-	s := &serializer.Serializer{Forwarder: f}
+	s := serializer.NewSerializer(f)
 
 	hname, err := util.GetHostname()
 	if err != nil {
@@ -169,7 +169,7 @@ func start(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	aggregatorInstance := aggregator.InitAggregator(s, hname)
+	aggregatorInstance := aggregator.InitAggregator(s, hname, "agent")
 	statsd, err := dogstatsd.NewServer(aggregatorInstance.GetChannels())
 	if err != nil {
 		log.Criticalf("Unable to start dogstatsd: %s", err)

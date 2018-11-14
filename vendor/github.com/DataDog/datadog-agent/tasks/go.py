@@ -3,17 +3,31 @@ Golang related tasks go here
 """
 from __future__ import print_function
 import os
+import shutil
+import sys
 
 from invoke import task
 from invoke.exceptions import Exit
 from .build_tags import get_default_build_tags
+from .utils import pkg_config_path, get_build_flags
+from .bootstrap import get_deps, process_deps
 
 
 # List of modules to ignore when running lint on Windows platform
 WIN_MODULE_WHITELIST = [
+    "doflare.go",
+    "iostats_pdh_windows.go",
     "iostats_wmi_windows.go",
+    "pdh.go",
+    "pdhhelper.go",
+    "tailer_windows.go",
 ]
 
+# List of paths to ignore in misspell's output
+MISSPELL_IGNORED_TARGETS = [
+    os.path.join("cmd", "agent", "dist", "checks", "prometheus_check"),
+    os.path.join("cmd", "agent", "gui", "views", "private"),
+]
 
 @task
 def fmt(ctx, targets, fail_on_fmt=False):
@@ -34,7 +48,7 @@ def fmt(ctx, targets, fail_on_fmt=False):
         print("Reformatted the following files: {}".format(','.join(files)))
         if fail_on_fmt:
             print("Code was not properly formatted, exiting...")
-            raise Exit(1)
+            raise Exit(code=1)
     print("gofmt found no issues")
 
 
@@ -67,7 +81,7 @@ def lint(ctx, targets):
 
         if files:
             print("Linting issues found in {} files.".format(len(files)))
-            raise Exit(1)
+            raise Exit(code=1)
 
         if skipped_files:
             for skipped in skipped_files:
@@ -77,7 +91,7 @@ def lint(ctx, targets):
 
 
 @task
-def vet(ctx, targets):
+def vet(ctx, targets, use_embedded_libs=False):
     """
     Run go vet on targets.
 
@@ -92,7 +106,10 @@ def vet(ctx, targets):
     # add the /... suffix to the targets
     args = ["{}/...".format(t) for t in targets]
     build_tags = get_default_build_tags()
-    ctx.run("go vet -tags \"{}\" ".format(build_tags) + " ".join(args))
+
+    _, _, env = get_build_flags(ctx, use_embedded_libs=use_embedded_libs)
+
+    ctx.run("go vet -tags \"{}\" ".format(" ".join(build_tags)) + " ".join(args), env=env)
     # go vet exits with status 1 when it finds an issue, if we're here
     # everything went smooth
     print("go vet found no issues")
@@ -150,30 +167,135 @@ def misspell(ctx, targets):
         # as comma separated tokens in a string
         targets = targets.split(',')
 
-    ctx.run("misspell --error " + " ".join(targets))
-    # misspell exits with status 2 when it finds an issue, if we're here
-    # everything went smooth
-    print("misspell found no issues")
+    result = ctx.run("misspell " + " ".join(targets), hide=True)
+    legit_misspells = []
+    for found_misspell in result.stdout.split("\n"):
+        if len(found_misspell.strip()) > 0:
+            if not any([ignored_target in found_misspell for ignored_target in MISSPELL_IGNORED_TARGETS]):
+                legit_misspells.append(found_misspell)
 
+    if len(legit_misspells) > 0:
+        print("Misspell issues found:\n" + "\n".join(legit_misspells))
+        raise Exit(code=2)
+    else:
+        print("misspell found no issues")
 
 @task
-def deps(ctx):
+def deps(ctx, no_checks=False, core_dir=None, verbose=False, android=False):
     """
     Setup Go dependencies
     """
-    ctx.run("go get -u github.com/golang/dep/cmd/dep")
-    ctx.run("go get -u github.com/golang/lint/golint")
-    ctx.run("go get -u github.com/fzipp/gocyclo")
-    ctx.run("go get -u github.com/gordonklaus/ineffassign")
-    ctx.run("go get -u github.com/client9/misspell/cmd/misspell")
-    ctx.run("dep ensure")
-    # prune packages from /vendor, remove this hack
-    # as soon as `dep prune` is merged within `dep ensure`,
-    # see https://github.com/golang/dep/issues/944
-    ctx.run("mv vendor/github.com/shirou/gopsutil/host/include .")
-    ctx.run("dep prune")
-    ctx.run("mv include vendor/github.com/shirou/gopsutil/host/")
+    verbosity = ' -v' if verbose else ''
+    deps = get_deps('deps')
+    order = deps.get("order", deps.keys())
+    for dependency in order:
+        tool = deps.get(dependency)
+        if not tool:
+            print("Malformed bootstrap JSON, dependency {} not found". format(dependency))
+            raise Exit(code=1)
 
+        process_deps(ctx, dependency, tool.get('version'), tool.get('type'), 'checkout', verbose=verbose)
+
+    order = deps.get("order", deps.keys())
+    for dependency in order:
+        tool = deps.get(dependency)
+        process_deps(ctx, dependency, tool.get('version'), tool.get('type'), 'install', verbose=verbose)
+
+    if android:
+        ndkhome = os.environ.get('ANDROID_NDK_HOME')
+        if not ndkhome:
+            print("set ANDROID_NDK_HOME to build android")
+            raise Exit(code=1)
+
+        cmd = "gomobile init -ndk {}". format(ndkhome)
+        print("gomobile command {}". format(cmd))
+        ctx.run(cmd)
+
+    # source level deps
+    ctx.run("dep ensure{}".format(verbosity))
+
+    # If github.com/DataDog/datadog-agent gets vendored too - nuke it
+    #
+    # This may happen as a result of having to introduce DEPPROJECTROOT
+    # in our builders to get around a known-issue with go dep, and the
+    # strange GOPATH situation in our builders.
+    #
+    # This is only a workaround, we should eliminate the need to resort
+    # to DEPPROJECTROOT.
+    if os.path.exists('vendor/github.com/DataDog/datadog-agent'):
+        print("Removing vendored github.com/DataDog/datadog-agent")
+        shutil.rmtree('vendor/github.com/DataDog/datadog-agent')
+
+    # make sure PSUTIL is gone on windows; the dep ensure above will vendor it
+    # in because it's necessary on other platforms
+    if not android and sys.platform == 'win32':
+        print("Removing PSUTIL on Windows")
+        ctx.run("rd /s/q vendor\\github.com\\shirou\\gopsutil")
+
+    # Make sure that golang.org/x/mobile is deleted.  It will get vendored in
+    # because we use it, and there's no way to exclude; however, we must use
+    # the version from $GOPATH
+    if os.path.exists('vendor/golang.org/x/mobile'):
+        print("Removing vendored golang.org/x/mobile")
+        shutil.rmtree('vendor/golang.org/x/mobile')
+
+    if not no_checks:
+        verbosity = 'v' if verbose else 'q'
+        core_dir = core_dir or os.getenv('DD_CORE_DIR')
+
+        if core_dir:
+            checks_base = os.path.join(os.path.abspath(core_dir), 'datadog_checks_base')
+            ctx.run('pip install -{} -e {}'.format(verbosity, checks_base))
+            ctx.run('pip install -{} -r {}'.format(verbosity, os.path.join(checks_base, 'requirements.in')))
+        else:
+            core_dir = os.path.join(os.getcwd(), 'vendor', 'integrations-core')
+            checks_base = os.path.join(core_dir, 'datadog_checks_base')
+            if not os.path.isdir(core_dir):
+                ctx.run('git clone -{} https://github.com/DataDog/integrations-core {}'.format(verbosity, core_dir))
+            ctx.run('pip install -{} {}'.format(verbosity, checks_base))
+            ctx.run('pip install -{} -r {}'.format(verbosity, os.path.join(checks_base, 'requirements.in')))
+
+
+@task
+def lint_licenses(ctx):
+    """
+    Checks that the LICENSE-3rdparty.csv file is up-to-date with contents of Gopkg.lock
+    """
+    import csv
+    import toml
+
+    # non-go deps that should be listed in the license file, but not in Gopkg.lock
+    NON_GO_DEPS = set([
+        'github.com/codemirror/CodeMirror',
+        'github.com/FortAwesome/Font-Awesome',
+        'github.com/jquery/jquery',
+    ])
+
+    # Read all dep names from Gopkg.lock
+    go_deps = set()
+    gopkg_lock = toml.load('Gopkg.lock')
+    for project in gopkg_lock['projects']:
+        # FIXME: this conditional is necessary because of the issue introduced by DEPPROJECTROOT
+        # (for some reason `datadog-agent` gets added to Gopkg.lock and vendored), see comment in `deps`
+        # task for details
+        if project['name'] != 'github.com/DataDog/datadog-agent':
+            go_deps.add(project['name'])
+
+    deps = go_deps | NON_GO_DEPS
+
+    # Read all dep names listed in LICENSE-3rdparty
+    licenses = csv.DictReader(open('LICENSE-3rdparty.csv'))
+    license_deps = set()
+    for entry in licenses:
+        if len(entry['License']) == 0:
+            raise Exit(message="LICENSE-3rdparty entry '{}' has an empty license".format(entry['Origin']), code=1)
+        license_deps.add(entry['Origin'])
+
+    if deps != license_deps:
+        raise Exit(message="LICENSE-3rdparty.csv is outdated compared to deps listed in Gopkg.lock:\n" +
+                           "missing from LICENSE-3rdparty.csv: {}\n".format(deps - license_deps) +
+                           "listed in LICENSE-3rdparty.csv but not in Gopkg.lock: {}".format(license_deps - deps),
+                   code=1)
 
 @task
 def reset(ctx):

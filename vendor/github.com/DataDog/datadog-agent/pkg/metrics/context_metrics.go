@@ -1,30 +1,30 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package metrics
 
 import (
+	"fmt"
 	"math"
 
-	log "github.com/cihub/seelog"
+	"github.com/DataDog/datadog-agent/pkg/aggregator/ckey"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
 // ContextMetrics stores all the metrics by context key
-type ContextMetrics map[string]Metric
+type ContextMetrics map[ckey.ContextKey]Metric
 
 // MakeContextMetrics returns a new ContextMetrics
 func MakeContextMetrics() ContextMetrics {
-	return ContextMetrics(make(map[string]Metric))
+	return ContextMetrics(make(map[ckey.ContextKey]Metric))
 }
 
 // AddSample add a sample to the current ContextMetrics and initialize a new metrics if needed.
-// TODO: Pass a reference to *MetricSample instead
-func (m ContextMetrics) AddSample(contextKey string, sample *MetricSample, timestamp float64, interval int64) {
-	if math.IsInf(sample.Value, 0) {
-		log.Warn("Ignoring sample with +/-Inf value on context key:", contextKey)
-		return
+func (m ContextMetrics) AddSample(contextKey ckey.ContextKey, sample *MetricSample, timestamp float64, interval int64) error {
+	if math.IsInf(sample.Value, 0) || math.IsNaN(sample.Value) {
+		return fmt.Errorf("sample with value '%v'", sample.Value)
 	}
 	if _, ok := m[contextKey]; !ok {
 		switch sample.Mtype {
@@ -45,16 +45,20 @@ func (m ContextMetrics) AddSample(contextKey string, sample *MetricSample, times
 		case CounterType:
 			m[contextKey] = NewCounter(interval)
 		default:
-			log.Error("Can't add unknown sample metric type:", sample.Mtype)
-			return
+			err := fmt.Errorf("unknown sample metric type: %v", sample.Mtype)
+			log.Error(err)
+			return err
 		}
 	}
 	m[contextKey].addSample(sample, timestamp)
+	return nil
 }
 
-// Flush flushes every metrics in the ContextMetrics
-func (m ContextMetrics) Flush(timestamp float64) []*Serie {
+// Flush flushes every metrics in the ContextMetrics.
+// Returns the slice of Series and a map of errors by context key.
+func (m ContextMetrics) Flush(timestamp float64) ([]*Serie, map[ckey.ContextKey]error) {
 	var series []*Serie
+	errors := make(map[ckey.ContextKey]error)
 
 	for contextKey, metric := range m {
 		metricSeries, err := metric.flush(timestamp)
@@ -67,12 +71,12 @@ func (m ContextMetrics) Flush(timestamp float64) []*Serie {
 		} else {
 			switch err.(type) {
 			case NoSerieError:
-				// this error happens in nominal conditions and shouldn't be logged
+				// this error happens in nominal conditions and shouldn't be returned
 			default:
-				log.Infof("An error occurred while flushing metric on context key '%s': %s", contextKey, err)
+				errors[contextKey] = err
 			}
 		}
 	}
 
-	return series
+	return series, errors
 }

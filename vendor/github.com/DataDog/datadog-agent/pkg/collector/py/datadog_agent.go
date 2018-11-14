@@ -1,7 +1,9 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
+
+// +build cpython
 
 package py
 
@@ -13,10 +15,13 @@ import (
 	"syscall"
 	"unsafe"
 
-	log "github.com/cihub/seelog"
+	"github.com/DataDog/datadog-agent/pkg/metadata/externalhost"
+
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/util"
+	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/clustername"
 	"github.com/DataDog/datadog-agent/pkg/version"
 )
 
@@ -26,10 +31,12 @@ import (
 // #include "datadog_agent.h"
 import "C"
 
-// GetVersion expose the version of the agent to python check (used as a PyCFunction in the datadog_agent python module)
+// GetVersion exposes the version of the agent to Python checks.
+// Used as a PyCFunction of type METH_VARARGS mapped to `datadog_agent.get_version`.
+// `self` is the module object.
 //export GetVersion
 func GetVersion(self *C.PyObject, args *C.PyObject) *C.PyObject {
-	av, _ := version.New(version.AgentVersion)
+	av, _ := version.New(version.AgentVersion, version.Commit)
 
 	cStr := C.CString(av.GetNumber())
 	pyStr := C.PyString_FromString(cStr)
@@ -37,7 +44,9 @@ func GetVersion(self *C.PyObject, args *C.PyObject) *C.PyObject {
 	return pyStr
 }
 
-// GetHostname expose the current hostname of the agent to python check (used as a PyCFunction in the datadog_agent python module)
+// GetHostname exposes the current hostname of the agent to Python checks.
+// Used as a PyCFunction of type METH_VARARGS mapped to `datadog_agent.get_hostname`.
+// `self` is the module object.
 //export GetHostname
 func GetHostname(self *C.PyObject, args *C.PyObject) *C.PyObject {
 	hostname, err := util.GetHostname()
@@ -52,9 +61,24 @@ func GetHostname(self *C.PyObject, args *C.PyObject) *C.PyObject {
 	return pyStr
 }
 
-// Headers return HTTP headers with basic information like UserAgent already set (used as a PyCFunction in the datadog_agent python module)
+// GetClustername exposes the current clustername (if it exists) of the agent to Python checks.
+// Used as a PyCFunction of type METH_VARARGS mapped to `datadog_agent.get_clustername`.
+// `self` is the module object.
+//export GetClusterName
+func GetClusterName(self *C.PyObject, args *C.PyObject) *C.PyObject {
+	clusterName := clustername.GetClusterName()
+
+	cStr := C.CString(clusterName)
+	pyStr := C.PyString_FromString(cStr)
+	C.free(unsafe.Pointer(cStr))
+	return pyStr
+}
+
+// Headers returns a basic set of HTTP headers that can be used by clients in Python checks.
+// Used as a PyCFunction of type METH_KEYWORDS mapped to `datadog_agent.headers`.
+// `self` is the module object.
 //export Headers
-func Headers(self *C.PyObject, args *C.PyObject) *C.PyObject {
+func Headers(self *C.PyObject, args, kwargs *C.PyObject) *C.PyObject {
 	h := util.HTTPHeaders()
 
 	dict := C.PyDict_New()
@@ -71,10 +95,27 @@ func Headers(self *C.PyObject, args *C.PyObject) *C.PyObject {
 
 		C.PyDict_SetItem(dict, pyKey, pyVal)
 	}
+
+	// some checks need to add an extra header when they pass `http_host`
+	if kwargs != nil {
+		cKey := C.CString("http_host")
+		// in case of failure, the following doesn't set an exception
+		// pyHttpHost is borrowed
+		pyHTTPHost := C.PyDict_GetItemString(kwargs, cKey)
+		C.free(unsafe.Pointer(cKey))
+		if pyHTTPHost != nil {
+			// set the Host header
+			cKey = C.CString("Host")
+			C.PyDict_SetItemString(dict, cKey, pyHTTPHost)
+			C.free(unsafe.Pointer(cKey))
+		}
+	}
+
 	return dict
 }
 
 // GetConfig returns a value from the agent configuration.
+// Indirectly used by the C function `get_config` that's mapped to `datadog_agent.get_config`.
 //export GetConfig
 func GetConfig(key *C.char) *C.PyObject {
 	goKey := C.GoString(key)
@@ -94,6 +135,7 @@ func GetConfig(key *C.char) *C.PyObject {
 
 // LogMessage logs a message from python through the agent logger (see
 // https://docs.python.org/2.7/library/logging.html#logging-levels)
+// Indirectly used by the C function `log_message` that's mapped to `datadog_agent.log`.
 //export LogMessage
 func LogMessage(message *C.char, logLevel C.int) *C.PyObject {
 	goMsg := C.GoString(message)
@@ -117,6 +159,7 @@ func LogMessage(message *C.char, logLevel C.int) *C.PyObject {
 }
 
 // GetSubprocessOutput runs the subprocess and returns the output
+// Indirectly used by the C function `get_subprocess_output` that's mapped to `_util.get_subprocess_output`.
 //export GetSubprocessOutput
 func GetSubprocessOutput(argv **C.char, argc, raise int) *C.PyObject {
 
@@ -125,6 +168,9 @@ func GetSubprocessOutput(argv **C.char, argc, raise int) *C.PyObject {
 	//            to release it - we can let the caller do that.
 
 	// https://github.com/golang/go/wiki/cgo#turning-c-arrays-into-go-slices
+
+	threadState := SaveThreadState()
+
 	length := int(argc)
 	subprocessArgs := make([]string, length-1)
 	cmdSlice := (*[1 << 30]*C.char)(unsafe.Pointer(argv))[:length:length]
@@ -134,15 +180,15 @@ func GetSubprocessOutput(argv **C.char, argc, raise int) *C.PyObject {
 	}
 	cmd := exec.Command(subprocessCmd, subprocessArgs...)
 
-	glock := C.PyGILState_Ensure()
-	defer C.PyGILState_Release(glock)
-
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
+		glock := RestoreThreadStateAndLock(threadState)
+		defer C.PyGILState_Release(glock)
+
 		cErr := C.CString(fmt.Sprintf("internal error creating stdout pipe: %v", err))
 		C.PyErr_SetString(C.PyExc_Exception, cErr)
 		C.free(unsafe.Pointer(cErr))
-		return C._none()
+		return nil
 	}
 
 	var wg sync.WaitGroup
@@ -155,10 +201,13 @@ func GetSubprocessOutput(argv **C.char, argc, raise int) *C.PyObject {
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
+		glock := RestoreThreadStateAndLock(threadState)
+		defer C.PyGILState_Release(glock)
+
 		cErr := C.CString(fmt.Sprintf("internal error creating stderr pipe: %v", err))
 		C.PyErr_SetString(C.PyExc_Exception, cErr)
 		C.free(unsafe.Pointer(cErr))
-		return C._none()
+		return nil
 	}
 
 	var outputErr []byte
@@ -170,6 +219,9 @@ func GetSubprocessOutput(argv **C.char, argc, raise int) *C.PyObject {
 
 	cmd.Start()
 
+	// Wait for the pipes to be closed *before* waiting for the cmd to exit, as per os.exec docs
+	wg.Wait()
+
 	retCode := 0
 	err = cmd.Wait()
 	if exiterr, ok := err.(*exec.ExitError); ok {
@@ -177,19 +229,18 @@ func GetSubprocessOutput(argv **C.char, argc, raise int) *C.PyObject {
 			retCode = status.ExitStatus()
 		}
 	}
-	wg.Wait()
+
+	glock := RestoreThreadStateAndLock(threadState)
+	defer C.PyGILState_Release(glock)
 
 	if raise > 0 {
 		// raise on error
 		if len(output) == 0 {
-			cModuleName := C.CString("util")
+			cModuleName := C.CString("_util")
 			utilModule := C.PyImport_ImportModule(cModuleName)
 			C.free(unsafe.Pointer(cModuleName))
 			if utilModule == nil {
-				cErr := C.CString("unable to import subprocess empty output exception")
-				C.PyErr_SetString(C.PyExc_Exception, cErr)
-				C.free(unsafe.Pointer(cErr))
-				return C._none()
+				return nil
 			}
 			defer C.Py_DecRef(utilModule)
 
@@ -197,17 +248,14 @@ func GetSubprocessOutput(argv **C.char, argc, raise int) *C.PyObject {
 			excClass := C.PyObject_GetAttrString(utilModule, cExcName)
 			C.free(unsafe.Pointer(cExcName))
 			if excClass == nil {
-				cErr := C.CString("unable to import subprocess empty output exception")
-				C.PyErr_SetString(C.PyExc_Exception, cErr)
-				C.free(unsafe.Pointer(cErr))
-				return C._none()
+				return nil
 			}
 			defer C.Py_DecRef(excClass)
 
 			cErr := C.CString("get_subprocess_output expected output but had none.")
 			C.PyErr_SetString((*C.PyObject)(unsafe.Pointer(excClass)), cErr)
 			C.free(unsafe.Pointer(cErr))
-			return C._none()
+			return nil
 		}
 	}
 
@@ -225,6 +273,26 @@ func GetSubprocessOutput(argv **C.char, argc, raise int) *C.PyObject {
 	C.PyTuple_SetItem(pyResult, 2, pyRetCode)
 
 	return pyResult
+}
+
+// SetExternalTags adds a set of tags for a given hostnane to the External Host
+// Tags metadata provider cache.
+// Indirectly used by the C function `set_external_tags` that's mapped to `datadog_agent.set_external_tags`.
+//export SetExternalTags
+func SetExternalTags(hostname, sourceType *C.char, tags **C.char, tagsLen C.int) *C.PyObject {
+	hname := C.GoString(hostname)
+	stype := C.GoString(sourceType)
+	tlen := int(tagsLen)
+	tagsSlice := (*[1 << 30]*C.char)(unsafe.Pointer(tags))[:tlen:tlen]
+	tagsStrings := []string{}
+
+	for i := 0; i < tlen; i++ {
+		tag := C.GoString(tagsSlice[i])
+		tagsStrings = append(tagsStrings, tag)
+	}
+
+	externalhost.SetExternalTags(hname, stype, tagsStrings)
+	return C._none()
 }
 
 func initDatadogAgent() {

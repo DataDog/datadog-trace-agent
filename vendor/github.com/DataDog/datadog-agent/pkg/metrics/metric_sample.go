@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package metrics
 
@@ -20,15 +20,11 @@ const (
 	SetType
 	// NOTE: DistributionType is in development and is NOT supported
 	DistributionType
-	DistributionKType
-	DistributionCType
 )
 
 // DistributionMetricTypes contains the MetricTypes that are used for percentiles
 var DistributionMetricTypes = map[MetricType]struct{}{
-	DistributionType:  {},
-	DistributionKType: {},
-	DistributionCType: {},
+	DistributionType: {},
 }
 
 // String returns a string representation of MetricType
@@ -52,10 +48,6 @@ func (m MetricType) String() string {
 		return "Set"
 	case DistributionType:
 		return "Distribution"
-	case DistributionKType:
-		return "DistributionK"
-	case DistributionCType:
-		return "DistributionC"
 	default:
 		return ""
 	}
@@ -71,4 +63,13 @@ type MetricSample struct {
 	Host       string
 	SampleRate float64
 	Timestamp  float64
+}
+
+// Copy returns a deep copy of the src MetricSample
+func (src *MetricSample) Copy() *MetricSample {
+	dst := &MetricSample{}
+	*dst = *src
+	dst.Tags = make([]string, len(src.Tags))
+	copy(dst.Tags, src.Tags)
+	return dst
 }

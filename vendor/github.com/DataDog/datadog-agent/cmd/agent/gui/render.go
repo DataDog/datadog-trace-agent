@@ -4,36 +4,35 @@ import (
 	"bytes"
 	"encoding/json"
 	"expvar"
-	"fmt"
 	"html/template"
 	"io"
 	"path/filepath"
 	"strings"
-	"unicode"
 
 	"github.com/DataDog/datadog-agent/cmd/agent/common"
-	"github.com/DataDog/datadog-agent/pkg/collector/autodiscovery"
+	"github.com/DataDog/datadog-agent/pkg/autodiscovery"
+	"github.com/DataDog/datadog-agent/pkg/collector"
 	"github.com/DataDog/datadog-agent/pkg/collector/check"
 	"github.com/DataDog/datadog-agent/pkg/status"
 )
 
-var fmap = template.FuncMap{
-	"stringToHTML":       stringToHTML,
-	"lastErrorTraceback": lastErrorTraceback,
-	"lastErrorMessage":   status.LastErrorMessage,
-	"pythonLoaderError":  pythonLoaderError,
-	"formatUnixTime":     status.FormatUnixTime,
-	"humanizeF":          status.MkHuman,
-	"humanizeI":          mkHumanI,
-	"formatTitle":        formatTitle,
-	"add":                add,
-	"instances":          instances,
+var fmap = status.Fmap()
+
+func init() {
+	fmap["lastErrorTraceback"] = lastErrorTraceback
+	fmap["lastErrorMessage"] = lastErrorMessage
+	fmap["pythonLoaderError"] = pythonLoaderError
+	fmap["status"] = displayStatus
 }
+
+const (
+	timeFormat = "2006-01-02 15:04:05.000000 UTC"
+)
 
 // Data is a struct used for filling templates
 type Data struct {
 	Name       string
-	LoaderErrs map[string]autodiscovery.LoaderErrors
+	LoaderErrs map[string]map[string]string
 	ConfigErrs map[string]string
 	Stats      map[string]interface{}
 	CheckStats []*check.Stats
@@ -58,7 +57,7 @@ func renderRunningChecks() (string, error) {
 	runnerStatsJSON := []byte(expvar.Get("runner").String())
 	runnerStats := make(map[string]interface{})
 	json.Unmarshal(runnerStatsJSON, &runnerStats)
-	loaderErrs := autodiscovery.GetLoaderErrors()
+	loaderErrs := collector.GetLoaderErrors()
 	configErrs := autodiscovery.GetConfigErrors()
 
 	data := Data{LoaderErrs: loaderErrs, ConfigErrs: configErrs, Stats: runnerStats}
@@ -83,7 +82,7 @@ func renderCheck(name string, stats []*check.Stats) (string, error) {
 func renderError(name string) (string, error) {
 	var b = new(bytes.Buffer)
 
-	loaderErrs := autodiscovery.GetLoaderErrors()
+	loaderErrs := collector.GetLoaderErrors()
 	configErrs := autodiscovery.GetConfigErrors()
 
 	data := Data{Name: name, LoaderErrs: loaderErrs, ConfigErrs: configErrs}
@@ -108,19 +107,11 @@ func fillTemplate(w io.Writer, data Data, request string) error {
 
 /****** Helper functions for the template formatting ******/
 
-func stringToHTML(value string) template.HTML {
-	return template.HTML(value)
-}
-
 func pythonLoaderError(value string) template.HTML {
-	value = strings.Replace(value, "', '", "", -1)
-	value = strings.Replace(value, "['", "", -1)
-	value = strings.Replace(value, "\\n']", "", -1)
-	value = strings.Replace(value, "']", "", -1)
-	value = strings.Replace(value, "\\n", "<br>", -1)
+	value = template.HTMLEscapeString(value)
+
+	value = strings.Replace(value, "\n", "<br>", -1)
 	value = strings.Replace(value, "  ", "&nbsp;&nbsp;&nbsp;", -1)
-	var loaderErrorArray []string
-	json.Unmarshal([]byte(value), &loaderErrorArray)
 	return template.HTML(value)
 }
 
@@ -132,62 +123,31 @@ func lastErrorTraceback(value string) template.HTML {
 		return template.HTML("No traceback")
 	}
 
-	lastErrorArray[0]["traceback"] = strings.Replace(lastErrorArray[0]["traceback"], "\n", "<br>", -1)
-	lastErrorArray[0]["traceback"] = strings.Replace(lastErrorArray[0]["traceback"], "  ", "&nbsp;&nbsp;&nbsp;", -1)
+	traceback := template.HTMLEscapeString(lastErrorArray[0]["traceback"])
 
-	return template.HTML(lastErrorArray[0]["traceback"])
+	traceback = strings.Replace(traceback, "\n", "<br>", -1)
+	traceback = strings.Replace(traceback, "  ", "&nbsp;&nbsp;&nbsp;", -1)
+
+	return template.HTML(traceback)
 }
 
-// same as status.mkHuman, but accepts integer input (vs float)
-func mkHumanI(i int64) string {
-	str := fmt.Sprintf("%d", i)
-
-	if i > 1000000 {
-		str = "over 1M"
-	} else if i > 100000 {
-		str = "over 100K"
-	}
-
-	return str
-}
-
-func formatTitle(title string) string {
-	if title == "os" {
-		return "OS"
-	}
-
-	// Split camel case words
-	var words []string
-	l := 0
-	for s := title; s != ""; s = s[l:] {
-		l = strings.IndexFunc(s[1:], unicode.IsUpper) + 1
-		if l <= 0 {
-			l = len(s)
-		}
-		words = append(words, s[:l])
-	}
-	title = strings.Join(words, " ")
-
-	// Capitalize the first letter
-	return strings.Title(title)
-}
-
-func add(x, y int) int {
-	return x + y
-}
-
-func instances(checks map[string]interface{}) map[string][]interface{} {
-	instances := make(map[string][]interface{})
-	for _, ch := range checks {
-		if check, ok := ch.(map[string]interface{}); ok {
-			if name, ok := check["CheckName"].(string); ok {
-				if len(instances[name]) == 0 {
-					instances[name] = []interface{}{check}
-				} else {
-					instances[name] = append(instances[name], check)
-				}
-			}
+func lastErrorMessage(value string) string {
+	var lastErrorArray []map[string]string
+	err := json.Unmarshal([]byte(value), &lastErrorArray)
+	if err == nil && len(lastErrorArray) > 0 {
+		if msg, ok := lastErrorArray[0]["message"]; ok {
+			return msg
 		}
 	}
-	return instances
+	return "UNKNOWN ERROR"
+}
+
+func displayStatus(check map[string]interface{}) template.HTML {
+	if check["LastError"].(string) != "" {
+		return template.HTML("[<span class=\"error\">ERROR</span>]")
+	}
+	if len(check["LastWarnings"].([]interface{})) != 0 {
+		return template.HTML("[<span class=\"warning\">WARNING</span>]")
+	}
+	return template.HTML("[<span class=\"ok\">OK</span>]")
 }

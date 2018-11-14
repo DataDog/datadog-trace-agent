@@ -1,23 +1,28 @@
 """
 Utilities to manage build tags
 """
-import invoke
+import sys
+import platform
 from invoke import task
 
 # ALL_TAGS lists any available build tag
 ALL_TAGS = set([
     "apm",
+    "clusterchecks",
     "consul",
     "cpython",
+    "cri",
     "docker",
     "ec2",
     "etcd",
     "gce",
     "jmx",
+    "kubeapiserver",
     "kubelet",
     "log",
     "process",
     "snmp",
+    "systemd",
     "zk",
     "zlib",
 ])
@@ -27,16 +32,43 @@ PUPPY_TAGS = set([
     "zlib",
 ])
 
+LINUX_ONLY_TAGS = [
+    "docker",
+    "kubelet",
+    "kubeapiserver",
+    "cri",
+]
+
+REDHAT_AND_DEBIAN_ONLY_TAGS = [
+    "systemd",
+]
+
+REDHAT_AND_DEBIAN_DIST = [
+    'debian',
+    'ubuntu',
+    'centos',
+    'redhat'
+]
+
 
 def get_default_build_tags(puppy=False):
     """
     Build the default list of tags based on the current platform.
+
+    The container integrations are currently only supported on Linux, disabling on
+    the Windows and Darwin builds.
     """
     if puppy:
         return PUPPY_TAGS
 
     include = ["all"]
-    exclude = ["docker", "kubelet"] if invoke.platform.WINDOWS else []
+    exclude = [] if sys.platform.startswith('linux') else LINUX_ONLY_TAGS
+
+    # remove all tags that are only available on debian distributions
+    distname = platform.linux_distribution()[0].lower()
+    if distname not in REDHAT_AND_DEBIAN_DIST:
+        exclude = exclude + REDHAT_AND_DEBIAN_ONLY_TAGS
+
     return get_build_tags(include, exclude)
 
 

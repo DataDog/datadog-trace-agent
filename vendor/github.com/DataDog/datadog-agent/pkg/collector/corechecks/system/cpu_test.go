@@ -1,7 +1,8 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
+// +build !windows
 
 package system
 
@@ -33,13 +34,13 @@ var (
 		{
 			CPU:       "cpu-total",
 			User:      1229586,
-			Nice:      627,
+			Nice:      625,
 			System:    268584,
 			Idle:      25596761,
 			Iowait:    12153,
 			Irq:       15,
 			Softirq:   1451,
-			Steal:     0,
+			Steal:     2,
 			Guest:     0,
 			GuestNice: 0,
 			Stolen:    0,
@@ -88,11 +89,11 @@ func TestCPUCheckLinux(t *testing.T) {
 	mock.AssertNumberOfCalls(t, "Commit", 0)
 
 	sample = secondSample
-	mock.On("Gauge", "system.cpu.user", 0.19327516129949124, "", []string(nil)).Return().Times(1)
+	mock.On("Gauge", "system.cpu.user", 0.1913803067769472, "", []string(nil)).Return().Times(1)
 	mock.On("Gauge", "system.cpu.system", 5.026101621048045, "", []string(nil)).Return().Times(1)
 	mock.On("Gauge", "system.cpu.iowait", 0.03789709045088063, "", []string(nil)).Return().Times(1)
 	mock.On("Gauge", "system.cpu.idle", 94.74272612720159, "", []string(nil)).Return().Times(1)
-	mock.On("Gauge", "system.cpu.stolen", 0.0, "", []string(nil)).Return().Times(1)
+	mock.On("Gauge", "system.cpu.stolen", 0.0018948545225440318, "", []string(nil)).Return().Times(1)
 	mock.On("Gauge", "system.cpu.guest", 0.0, "", []string(nil)).Return().Times(1)
 	mock.On("Commit").Return().Times(1)
 	cpuCheck.Run()

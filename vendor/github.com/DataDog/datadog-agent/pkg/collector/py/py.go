@@ -1,7 +1,9 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
+
+// +build cpython
 
 package py
 
@@ -12,8 +14,10 @@ import (
 	"strings"
 
 	"github.com/DataDog/datadog-agent/cmd/agent/common/signals"
-	log "github.com/cihub/seelog"
-	"github.com/kardianos/osext"
+	"github.com/DataDog/datadog-agent/pkg/util/cache"
+	"github.com/DataDog/datadog-agent/pkg/util/executable"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
+
 	python "github.com/sbinet/go-python"
 )
 
@@ -88,6 +92,10 @@ func Initialize(paths ...string) *python.PyThreadState {
 	// store the Python version after killing \n chars within the string
 	if res := C.Py_GetVersion(); res != nil {
 		PythonVersion = strings.Replace(C.GoString(res), "\n", "", -1)
+
+		// Set python version in the cache
+		key := cache.BuildAgentKey("pythonVersion")
+		cache.Cache.Set(key, PythonVersion, cache.NoExpiration)
 	}
 
 	// store the Python path
@@ -107,13 +115,16 @@ func Initialize(paths ...string) *python.PyThreadState {
 	// (all these calls will take care of the GIL)
 	initAPI()          // `aggregator` module
 	initDatadogAgent() // `datadog_agent` module
+	initKubeutil()     // `kubeutil` module if compiled in
+	initTagger()       // `tagger` module
+	initContainers()   // `containers` module
 
 	// return the state so the caller can resume
 	return state
 }
 
 func setPythonHome() {
-	_here, _ := osext.ExecutableFolder()
+	_here, _ := executable.Folder()
 
 	if pythonHome == "" {
 		// don't do anything if not set, to support system python builds
@@ -130,4 +141,25 @@ func setPythonHome() {
 	// set the python path
 	pPythonHome := C.CString(pythonHome)
 	C.Py_SetPythonHome(pPythonHome)
+}
+
+// SaveThreadState is a wrapper around the Python C-API PyEval_SaveThread
+// call. It releases the GIL, and resets the python thread state to NULL.
+// The previous thread state is returned.
+func SaveThreadState() *C.PyThreadState {
+	return C.PyEval_SaveThread()
+}
+
+// RestoreThreadStateAndLock is a wrapper around the Python C-API PyEval_RestoreThread
+// call. It acquires the GIL, and restores the thread state we pass as a parameter.
+// The GIL lock state is returned.
+func RestoreThreadStateAndLock(state *C.PyThreadState) C.PyGILState_STATE {
+	C.PyEval_RestoreThread(state)
+
+	//Note: Technically the GIL is already acquired here, but we want
+	//      a reference to the GIL, so lets just reacquire it (NOP),
+	//      and return get the glock reference to release at will.
+	glock := C.PyGILState_Ensure()
+
+	return glock
 }

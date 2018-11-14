@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package collector
 
@@ -10,10 +10,11 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/DataDog/datadog-agent/pkg/autodiscovery/integration"
 	"github.com/DataDog/datadog-agent/pkg/collector/check"
 	"github.com/DataDog/datadog-agent/pkg/collector/runner"
 	"github.com/DataDog/datadog-agent/pkg/collector/scheduler"
-	log "github.com/cihub/seelog"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
 const (
@@ -35,6 +36,9 @@ type Collector struct {
 func NewCollector(paths ...string) *Collector {
 	run := runner.NewRunner()
 	sched := scheduler.NewScheduler(run.GetChan())
+
+	// let the runner some visibility into the scheduler
+	run.SetScheduler(sched)
 	sched.Run()
 
 	c := &Collector{
@@ -51,6 +55,12 @@ func NewCollector(paths ...string) *Collector {
 		log.Infof("Embedding Python %s", pyVer)
 		log.Debugf("Python Home: %s", pyHome)
 		log.Debugf("Python path: %s", pyPath)
+	}
+
+	// Prepare python environment if necessary
+	err := pyPrepareEnv()
+	if err != nil {
+		log.Errorf("Unable to perform additional configuration of the python environment: %v", err)
 	}
 
 	log.Debug("Collector up and running!")
@@ -97,14 +107,22 @@ func (c *Collector) RunCheck(ch check.Check) (check.ID, error) {
 
 	// Track the total number of checks running in order to have an appropriate number of workers
 	c.checkInstances++
-	c.runner.UpdateNumWorkers(c.checkInstances)
+	if ch.Interval() == 0 {
+		// Adding a temporary runner for long running check in case the
+		// number of runners is lower than the number of long running
+		// checks.
+		log.Infof("Adding an extra runner for the '%s' long running check", ch)
+		c.runner.AddWorker()
+	} else {
+		c.runner.UpdateNumWorkers(c.checkInstances)
+	}
 
 	c.checks[ch.ID()] = ch
 	return ch.ID(), nil
 }
 
 // ReloadCheck stops and restart a check with a new configuration
-func (c *Collector) ReloadCheck(id check.ID, config, initConfig check.ConfigData) error {
+func (c *Collector) ReloadCheck(id check.ID, config, initConfig integration.Data) error {
 	if !c.started() {
 		return fmt.Errorf("the collector is not running")
 	}
@@ -122,7 +140,7 @@ func (c *Collector) ReloadCheck(id check.ID, config, initConfig check.ConfigData
 	// unschedule the instance
 	err := c.scheduler.Cancel(id)
 	if err != nil {
-		return fmt.Errorf("an error occurred while cancelling the check schedule: %s", err)
+		return fmt.Errorf("an error occurred while canceling the check schedule: %s", err)
 	}
 
 	// stop the instance
@@ -157,10 +175,9 @@ func (c *Collector) StopCheck(id check.ID) error {
 	// unschedule the instance
 	err := c.scheduler.Cancel(id)
 	if err != nil {
-		return fmt.Errorf("an error occurred while cancelling the check schedule: %s", err)
+		return fmt.Errorf("an error occurred while canceling the check schedule: %s", err)
 	}
 
-	// stop the instance, this might time out
 	err = c.runner.StopCheck(id)
 	if err != nil {
 		return fmt.Errorf("an error occurred while stopping the check: %s", err)

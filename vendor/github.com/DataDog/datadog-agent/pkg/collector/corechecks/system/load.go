@@ -1,32 +1,32 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
+// +build !windows
 
 package system
 
 import (
 	"fmt"
-	"time"
+
+	"github.com/shirou/gopsutil/load"
 
 	"github.com/DataDog/datadog-agent/pkg/aggregator"
+	"github.com/DataDog/datadog-agent/pkg/autodiscovery/integration"
 	"github.com/DataDog/datadog-agent/pkg/collector/check"
 	core "github.com/DataDog/datadog-agent/pkg/collector/corechecks"
-	log "github.com/cihub/seelog"
-	"github.com/shirou/gopsutil/load"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
+
+const loadCheckName = "load"
 
 // For testing purpose
 var loadAvg = load.Avg
 
 // LoadCheck doesn't need additional fields
 type LoadCheck struct {
-	lastWarnings []error
-	nbCPU        int32
-}
-
-func (c *LoadCheck) String() string {
-	return "load"
+	core.CheckBase
+	nbCPU int32
 }
 
 // Run executes the check
@@ -54,12 +54,23 @@ func (c *LoadCheck) Run() error {
 	return nil
 }
 
-// Configure the CPU check doesn't need configuration
-func (c *LoadCheck) Configure(data check.ConfigData, initConfig check.ConfigData) error {
-	// do nothing
+// Configure the CPU check
+func (c *LoadCheck) Configure(data integration.Data, initConfig integration.Data) error {
+	err := c.CommonConfigure(data)
+	if err != nil {
+		return err
+	}
+	// NOTE: This check is disabled on windows - so the following doesn't apply
+	//       currently:
+	//
+	//       This runs before the python checks, so we should be good, but cpuInfo()
+	//       on windows initializes COM to the multithreaded model. Therefore,
+	//       if a python check has run on this native windows thread prior and
+	//       CoInitialized() the thread to a different model (ie. single-threaded)
+	//       This will cause cpuInfo() to fail.
 	info, err := cpuInfo()
 	if err != nil {
-		return fmt.Errorf("system.LoadCheck: could not query CPU info")
+		return fmt.Errorf("system.LoadCheck: could not query CPU info - %v", err)
 	}
 	for _, i := range info {
 		c.nbCPU += i.Cores
@@ -67,55 +78,12 @@ func (c *LoadCheck) Configure(data check.ConfigData, initConfig check.ConfigData
 	return nil
 }
 
-// Interval returns the scheduling time for the check
-func (c *LoadCheck) Interval() time.Duration {
-	return check.DefaultCheckInterval
-}
-
-// ID returns the name of the check since there should be only one instance running
-func (c *LoadCheck) ID() check.ID {
-	return check.ID(c.String())
-}
-
-// Stop does nothing
-func (c *LoadCheck) Stop() {}
-
-// GetWarnings grabs the last warnings from the sender
-func (c *LoadCheck) GetWarnings() []error {
-	w := c.lastWarnings
-	c.lastWarnings = []error{}
-	return w
-}
-
-// Warn will log a warning and add it to the warnings
-func (c *LoadCheck) warn(v ...interface{}) error {
-	w := log.Warn(v)
-	c.lastWarnings = append(c.lastWarnings, w)
-
-	return w
-}
-
-// Warnf will log a formatted warning and add it to the warnings
-func (c *LoadCheck) warnf(format string, params ...interface{}) error {
-	w := log.Warnf(format, params)
-	c.lastWarnings = append(c.lastWarnings, w)
-
-	return w
-}
-
-// GetMetricStats returns the stats from the last run of the check
-func (c *LoadCheck) GetMetricStats() (map[string]int64, error) {
-	sender, err := aggregator.GetSender(c.ID())
-	if err != nil {
-		return nil, fmt.Errorf("Failed to retrieve a Sender instance: %v", err)
-	}
-	return sender.GetMetricStats(), nil
-}
-
 func loadFactory() check.Check {
-	return &LoadCheck{}
+	return &LoadCheck{
+		CheckBase: core.NewCheckBase(loadCheckName),
+	}
 }
 
 func init() {
-	core.RegisterCheck("load", loadFactory)
+	core.RegisterCheck(loadCheckName, loadFactory)
 }

@@ -1,12 +1,13 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package common
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/DataDog/datadog-agent/pkg/config"
@@ -25,10 +26,10 @@ func SetupConfig(confFilePath string) error {
 		}
 	}
 	config.Datadog.AddConfigPath(DefaultConfPath)
-
 	// load the configuration
-	err := config.Datadog.ReadInConfig()
+	err := config.Load()
 	if err != nil {
+		log.Printf("config.load %v", err)
 		return fmt.Errorf("unable to load Datadog config file: %s", err)
 	}
 	return nil

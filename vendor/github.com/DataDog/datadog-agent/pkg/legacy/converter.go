@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package legacy
 
@@ -18,7 +18,9 @@ import (
 // the values into the current config.Datadog object
 func FromAgentConfig(agentConfig Config) error {
 
-	config.Datadog.Set("dd_url", agentConfig["dd_url"])
+	if err := extractURLAPIKeys(agentConfig); err != nil {
+		return err
+	}
 
 	if proxy, err := buildProxySettings(agentConfig); err == nil {
 		config.Datadog.Set("proxy", proxy)
@@ -28,17 +30,14 @@ func FromAgentConfig(agentConfig Config) error {
 		config.Datadog.Set("skip_ssl_validation", enabled)
 	}
 
-	config.Datadog.Set("api_key", agentConfig["api_key"])
 	config.Datadog.Set("hostname", agentConfig["hostname"])
 
-	if enabled, err := isAffirmative(agentConfig["apm_enabled"]); err == nil && !enabled {
-		// apm is enabled by default through the check config file `apm.yaml.default`
-		config.Datadog.Set("apm_enabled", false)
-	}
-
-	if enabled, err := isAffirmative(agentConfig["process_agent_enabled"]); err == nil && !enabled {
-		// process agent is enabled by default through the check config file `process_agent.yaml.default`
-		config.Datadog.Set("process_agent_enabled", false)
+	if enabled, err := isAffirmative(agentConfig["process_agent_enabled"]); enabled {
+		// process agent is explicitly enabled
+		config.Datadog.Set("process_config.enabled", "true")
+	} else if err == nil && !enabled {
+		// process agent is explicitly disabled
+		config.Datadog.Set("process_config.enabled", "disabled")
 	}
 
 	config.Datadog.Set("tags", strings.Split(agentConfig["tags"], ","))
@@ -47,8 +46,13 @@ func FromAgentConfig(agentConfig Config) error {
 		config.Datadog.Set("forwarder_timeout", value)
 	}
 
-	// TODO: default_integration_http_timeout
-	// TODO: collect_ec2_tags
+	if value, err := strconv.Atoi(agentConfig["default_integration_http_timeout"]); err == nil {
+		config.Datadog.Set("default_integration_http_timeout", value)
+	}
+
+	if enabled, err := isAffirmative(agentConfig["collect_ec2_tags"]); err == nil {
+		config.Datadog.Set("collect_ec2_tags", enabled)
+	}
 
 	// config.Datadog has a default value for this, do nothing if the value is empty
 	if agentConfig["additional_checksd"] != "" {
@@ -56,8 +60,16 @@ func FromAgentConfig(agentConfig Config) error {
 	}
 
 	// TODO: exclude_process_args
-	// TODO: histogram_aggregates
-	// TODO: histogram_percentiles
+
+	histogramAggregates := buildHistogramAggregates(agentConfig)
+	if histogramAggregates != nil && len(histogramAggregates) != 0 {
+		config.Datadog.Set("histogram_aggregates", histogramAggregates)
+	}
+
+	histogramPercentiles := buildHistogramPercentiles(agentConfig)
+	if histogramPercentiles != nil && len(histogramPercentiles) != 0 {
+		config.Datadog.Set("histogram_percentiles", histogramPercentiles)
+	}
 
 	if agentConfig["service_discovery_backend"] == "docker" {
 		// `docker` is the only possible value also on the Agent v5
@@ -82,7 +94,7 @@ func FromAgentConfig(agentConfig Config) error {
 		config.Datadog.Set("dogstatsd_port", value)
 	}
 
-	// TODO: statsd_metric_namespace
+	config.Datadog.Set("statsd_metric_namespace", agentConfig["statsd_metric_namespace"])
 
 	// config.Datadog has a default value for this, do nothing if the value is empty
 	if agentConfig["log_level"] != "" {
@@ -112,6 +124,48 @@ func FromAgentConfig(agentConfig Config) error {
 		config.Datadog.Set("enable_gohai", enabled)
 	}
 
+	if agentConfig["bind_host"] != "" {
+		config.Datadog.Set("bind_host", agentConfig["bind_host"])
+	}
+
+	//Trace APM based configurations
+
+	if agentConfig["apm_enabled"] != "" {
+		if enabled, err := isAffirmative(agentConfig["apm_enabled"]); err == nil && !enabled {
+			// apm is enabled by default, convert the config only if it was disabled
+			config.Datadog.Set("apm_config.enabled", enabled)
+		}
+	}
+
+	if agentConfig["env"] != "" {
+		config.Datadog.Set("apm_config.env", agentConfig["env"])
+	}
+
+	if receiverPort, err := strconv.Atoi(agentConfig["receiver_port"]); err == nil {
+		config.Datadog.Set("apm_config.receiver_port", receiverPort)
+	}
+
+	if agentConfig["non_local_traffic"] != "" {
+		if enabled, err := isAffirmative(agentConfig["non_local_traffic"]); err == nil && enabled {
+			// trace-agent listen locally by default, convert the config only if configured to listen to more
+			config.Datadog.Set("apm_config.apm_non_local_traffic", enabled)
+		}
+	}
+
+	if sampleRate, err := strconv.ParseFloat(agentConfig["extra_sample_rate"], 64); err == nil {
+		config.Datadog.Set("apm_config.extra_sample_rate", sampleRate)
+	}
+
+	if maxTraces, err := strconv.ParseFloat(agentConfig["max_traces_per_second"], 64); err == nil {
+		config.Datadog.Set("apm_config.max_traces_per_second", maxTraces)
+	}
+
+	if agentConfig["resource"] != "" {
+		config.Datadog.Set("apm_config.ignore_resources", strings.Split(agentConfig["resource"], ","))
+	}
+
+	config.Datadog.Set("hostname_fqdn", true)
+
 	return nil
 }
 
@@ -124,19 +178,57 @@ func isAffirmative(value string) (bool, error) {
 	return v == "true" || v == "yes" || v == "1", nil
 }
 
-func buildProxySettings(agentConfig Config) (string, error) {
+func extractURLAPIKeys(agentConfig Config) error {
+	urls := strings.Split(agentConfig["dd_url"], ",")
+	keys := strings.Split(agentConfig["api_key"], ",")
+
+	if len(urls) != len(keys) {
+		return fmt.Errorf("Invalid number of 'dd_url'/'api_key': please provide one api_key for each url")
+	}
+
+	if urls[0] != "https://app.datadoghq.com" {
+		// 'dd_url' is optional in v6, so only set it if it's set to a non-default value in datadog.conf
+		config.Datadog.Set("dd_url", urls[0])
+	}
+
+	config.Datadog.Set("api_key", keys[0])
+	if len(urls) == 1 {
+		return nil
+	}
+
+	urls = urls[1:]
+	keys = keys[1:]
+
+	additionalEndpoints := map[string][]string{}
+	for idx, url := range urls {
+		if url == "" || keys[idx] == "" {
+			return fmt.Errorf("Found empty additional 'dd_url' or 'api_key'. Please check that you don't have any misplaced commas")
+		}
+		if _, ok := additionalEndpoints[url]; ok {
+			additionalEndpoints[url] = append(additionalEndpoints[url], keys[idx])
+		} else {
+			additionalEndpoints[url] = []string{keys[idx]}
+		}
+	}
+	config.Datadog.Set("additional_endpoints", additionalEndpoints)
+	return nil
+}
+
+func buildProxySettings(agentConfig Config) (map[string]string, error) {
 	proxyHost := agentConfig["proxy_host"]
+
+	proxyMap := make(map[string]string)
 
 	if proxyHost == "" {
 		// this is expected, not an error
-		return "", nil
+		return nil, nil
 	}
 
 	var err error
 	var u *url.URL
 
 	if u, err = url.Parse(proxyHost); err != nil {
-		return "", fmt.Errorf("unable to import value of settings 'proxy_host': %v", err)
+		return nil, fmt.Errorf("unable to import value of settings 'proxy_host': %v", err)
 	}
 
 	// set scheme if missing
@@ -156,7 +248,11 @@ func buildProxySettings(agentConfig Config) (string, error) {
 		}
 	}
 
-	return u.String(), nil
+	proxyMap["http"] = u.String()
+	proxyMap["https"] = u.String()
+
+	return proxyMap, nil
+
 }
 
 func buildSyslogURI(agentConfig Config) string {
@@ -210,4 +306,60 @@ func buildConfigProviders(agentConfig Config) ([]config.ConfigurationProviders, 
 	}
 
 	return []config.ConfigurationProviders{cp}, nil
+}
+
+func buildHistogramAggregates(agentConfig Config) []string {
+	configValue := agentConfig["histogram_aggregates"]
+
+	var histogramBuild []string
+	// The valid values for histogram_aggregates as defined in agent5
+	validValues := []string{"min", "max", "median", "avg", "sum", "count"}
+
+	if configValue == "" {
+		return nil
+	}
+	configValue = strings.Replace(configValue, " ", "", -1)
+	result := strings.Split(configValue, ",")
+
+	for _, res := range result {
+		found := false
+		for _, val := range validValues {
+			if res == val {
+				histogramBuild = append(histogramBuild, res)
+				found = true
+				break
+			}
+		}
+		if !found {
+			// print the value skipped because invalid value
+			fmt.Println("warning: ignored histogram aggregate", res, "is invalid")
+		}
+	}
+
+	return histogramBuild
+}
+
+func buildHistogramPercentiles(agentConfig Config) []string {
+	configList := agentConfig["histogram_percentiles"]
+	var histogramPercentile []string
+
+	if configList == "" {
+		// return an empty list, not an error
+		return nil
+	}
+
+	// percentiles are rounded down to 2 digits and (0:1)
+	configList = strings.Replace(configList, " ", "", -1)
+	result := strings.Split(configList, ",")
+	for _, res := range result {
+		num, err := strconv.ParseFloat(res, 64)
+		if num < 1 && num > 0 && err == nil {
+			fixed := strconv.FormatFloat(num, 'f', 2, 64)
+			histogramPercentile = append(histogramPercentile, fixed)
+		} else {
+			fmt.Println("warning: ignoring invalid histogram percentile", res)
+		}
+	}
+
+	return histogramPercentile
 }

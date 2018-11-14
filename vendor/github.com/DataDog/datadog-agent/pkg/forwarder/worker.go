@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package forwarder
 
@@ -9,9 +9,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/http/httptrace"
 	"time"
 
-	log "github.com/cihub/seelog"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/util"
@@ -31,6 +32,7 @@ type Worker struct {
 	RequeueChan chan<- Transaction
 
 	stopChan    chan bool
+	stopped     chan struct{}
 	blockedList *blockedEndpoints
 }
 
@@ -49,6 +51,7 @@ func NewWorker(highPrioChan <-chan Transaction, lowPrioChan <-chan Transaction, 
 		LowPrio:     lowPrioChan,
 		RequeueChan: requeueChan,
 		stopChan:    make(chan bool),
+		stopped:     make(chan struct{}),
 		Client:      httpClient,
 		blockedList: blocked,
 	}
@@ -57,11 +60,15 @@ func NewWorker(highPrioChan <-chan Transaction, lowPrioChan <-chan Transaction, 
 // Stop stops the worker.
 func (w *Worker) Stop() {
 	w.stopChan <- true
+	<-w.stopped
 }
 
 // Start starts a Worker.
 func (w *Worker) Start() {
 	go func() {
+		// notify that the worker did stop
+		defer close(w.stopped)
+
 		for {
 			// handling high priority transactions first
 			select {
@@ -95,7 +102,7 @@ func (w *Worker) Start() {
 // worker.
 func (w *Worker) callProcess(t Transaction) error {
 	ctx, cancel := context.WithCancel(context.Background())
-
+	ctx = httptrace.WithClientTrace(ctx, trace)
 	done := make(chan interface{})
 	go func() {
 		w.process(ctx, t)
@@ -108,6 +115,7 @@ func (w *Worker) callProcess(t Transaction) error {
 	case <-w.stopChan:
 		// cancel current Transaction if we need to stop the worker
 		cancel()
+		<-done // We still need to wait for the process func to return
 		return fmt.Errorf("Worker was requested to stop")
 	}
 	cancel()
@@ -116,7 +124,6 @@ func (w *Worker) callProcess(t Transaction) error {
 
 func (w *Worker) process(ctx context.Context, t Transaction) {
 	requeue := func() {
-		t.Reschedule()
 		select {
 		case w.RequeueChan <- t:
 		default:
@@ -124,16 +131,16 @@ func (w *Worker) process(ctx context.Context, t Transaction) {
 		}
 	}
 
-	// First we check if we don't have recently received an error for that endpoint
+	// Run the endpoint through our blockedEndpoints circuit breaker
 	target := t.GetTarget()
 	if w.blockedList.isBlock(target) {
 		requeue()
 		log.Errorf("Too many errors for endpoint '%s': retrying later", target)
 	} else if err := t.Process(ctx, w.Client); err != nil {
-		w.blockedList.block(target)
+		w.blockedList.close(target)
 		requeue()
 		log.Errorf("Error while processing transaction: %v", err)
 	} else {
-		w.blockedList.unblock(target)
+		w.blockedList.recover(target)
 	}
 }

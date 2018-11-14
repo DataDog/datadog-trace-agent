@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package metadata
 
@@ -31,7 +31,7 @@ func TestMain(m *testing.M) {
 func TestNewScheduler(t *testing.T) {
 	fwd := forwarder.NewDefaultForwarder(nil)
 	fwd.Start()
-	s := &serializer.Serializer{Forwarder: fwd}
+	s := serializer.NewSerializer(fwd)
 	c := NewScheduler(s, "hostname")
 	assert.Equal(t, fwd, c.srl.Forwarder)
 	assert.Equal(t, "hostname", c.hostname)

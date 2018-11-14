@@ -1,18 +1,19 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 // +build docker
 
 package collectors
 
 import (
-	"fmt"
 	"time"
 
+	"github.com/DataDog/datadog-agent/pkg/errors"
 	taggerutil "github.com/DataDog/datadog-agent/pkg/tagger/utils"
-	ecsutil "github.com/DataDog/datadog-agent/pkg/util/ecs"
+	"github.com/DataDog/datadog-agent/pkg/util/containers"
+	"github.com/DataDog/datadog-agent/pkg/util/ecs"
 )
 
 const (
@@ -27,36 +28,40 @@ type ECSCollector struct {
 	expire     *taggerutil.Expire
 	lastExpire time.Time
 	expireFreq time.Duration
+	ecsUtil    *ecs.Util
 }
 
 // Detect tries to connect to the ECS agent
 func (c *ECSCollector) Detect(out chan<- []*TagInfo) (CollectionMode, error) {
-	var err error
-	if ecsutil.IsInstance() {
-		c.infoOut = out
-		c.lastExpire = time.Now()
-		c.expireFreq = ecsExpireFreq
-
-		c.expire, err = taggerutil.NewExpire(ecsExpireFreq)
-
-		if err != nil {
-			return FetchOnlyCollection, fmt.Errorf("Failed to instantiate the container expiring process")
-		}
-		return FetchOnlyCollection, nil
-	} else {
-		return NoCollection, fmt.Errorf("Failed to connect to ECS, ECS tagging will not work")
+	ecsUtil, err := ecs.GetUtil()
+	if err != nil {
+		return NoCollection, err
 	}
+	c.ecsUtil = ecsUtil
+	c.infoOut = out
+	c.lastExpire = time.Now()
+	c.expireFreq = ecsExpireFreq
 
+	c.expire, err = taggerutil.NewExpire(ecsExpireFreq)
+
+	if err != nil {
+		return NoCollection, err
+	}
+	return FetchOnlyCollection, nil
 }
 
 // Fetch fetches ECS tags
 func (c *ECSCollector) Fetch(container string) ([]string, []string, error) {
+	runtime, cID := containers.SplitEntityName(container)
+	if runtime != containers.RuntimeNameDocker || len(cID) == 0 {
+		return nil, nil, nil
+	}
 
-	tasks_list, err := ecsutil.GetTasks()
+	tasks_list, err := c.ecsUtil.GetTasks()
 	if err != nil {
 		return []string{}, []string{}, err
 	}
-	updates, err := c.parseTasks(tasks_list)
+	updates, err := c.parseTasks(tasks_list, cID)
 	if err != nil {
 		return []string{}, []string{}, err
 	}
@@ -76,7 +81,7 @@ func (c *ECSCollector) Fetch(container string) ([]string, []string, error) {
 		}
 	}
 	// container not found in updates
-	return []string{}, []string{}, fmt.Errorf("entity %s not found in tasklist", container)
+	return []string{}, []string{}, errors.NewNotFound(container)
 }
 
 func ecsFactory() Collector {
@@ -84,5 +89,5 @@ func ecsFactory() Collector {
 }
 
 func init() {
-	registerCollector(ecsCollectorName, ecsFactory)
+	registerCollector(ecsCollectorName, ecsFactory, NodeRuntime)
 }

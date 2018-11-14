@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 // +build linux windows darwin
 
@@ -22,9 +22,12 @@ func GetPayload(hostname string) *Payload {
 	rp := resources.GetPayload(hostname)
 
 	p := &Payload{
-		CommonPayload:    CommonPayload{*cp},
-		HostPayload:      HostPayload{*hp},
-		ResourcesPayload: ResourcesPayload{*rp},
+		CommonPayload: CommonPayload{*cp},
+		HostPayload:   HostPayload{*hp},
+	}
+
+	if rp != nil {
+		p.ResourcesPayload = ResourcesPayload{*rp}
 	}
 
 	if config.Datadog.GetBool("enable_gohai") {

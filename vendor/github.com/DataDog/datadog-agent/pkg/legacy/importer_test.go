@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package legacy
 
@@ -42,16 +42,21 @@ func TestGetAgentConfig(t *testing.T) {
 
 		valueStr := python.PyString_AS_STRING(value.Str())
 
+		goValue, found := agentConfigGo[keyStr]
+		// histogram_aggregates value was converted from string to list
+		// of strings in Agent6.
+		if keyStr == "histogram_aggregates" {
+			goValue = "['max', 'median', 'avg', 'count']"
+		}
 		// histogram_percentiles were converted from string to float
 		// by the config module in agent5. In agent6 this is now the
 		// responsibility of the histogram class.
 		// The value is overwritten anyway: we're just testing the
 		// default value.
 		if keyStr == "histogram_percentiles" {
-			valueStr = "['0.95']"
+			goValue = "[0.95]"
 		}
 
-		goValue, found := agentConfigGo[keyStr]
 		if valueStr != goValue {
 			t.Log(keyStr)
 		}

@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package host
 
@@ -29,15 +29,16 @@ type Meta struct {
 }
 
 type tags struct {
-	System              []string `json:"system"`
-	GoogleCloudPlatform []string `json:"google cloud platform"`
+	System              []string `json:"system,omitempty"`
+	GoogleCloudPlatform []string `json:"google cloud platform,omitempty"`
 }
 
 // Payload handles the JSON unmarshalling of the metadata payload
 type Payload struct {
-	Os            string       `json:"os"`
-	PythonVersion string       `json:"python"`
-	SystemStats   *systemStats `json:"systemStats"`
-	Meta          *Meta        `json:"meta"`
-	HostTags      *tags        `json:"host-tags"`
+	Os            string            `json:"os"`
+	PythonVersion string            `json:"python"`
+	SystemStats   *systemStats      `json:"systemStats"`
+	Meta          *Meta             `json:"meta"`
+	HostTags      *tags             `json:"host-tags"`
+	ContainerMeta map[string]string `json:"container-meta,omitempty"`
 }

@@ -1,108 +1,79 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 // +build ec2
 
 package ec2
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetIAMRole(t *testing.T) {
-	expected := "test-role"
-	var lastRequest *http.Request
+	const expected = "test-role"
+
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain")
-		io.WriteString(w, expected)
-		lastRequest = r
+		if r.URL.Path == "/iam/security-credentials/" {
+			w.Header().Set("Content-Type", "text/plain")
+			io.WriteString(w, expected)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 	}))
 	defer ts.Close()
 	metadataURL = ts.URL
 
 	val, err := getIAMRole()
-	assert.Nil(t, err)
+	require.Nil(t, err)
 	assert.Equal(t, expected, val)
-	assert.Equal(t, lastRequest.URL.Path, "/iam/security-credentials/")
 }
 
 func TestGetSecurityCreds(t *testing.T) {
-	expected1 := "test-role"
-	expected2 := map[string]string{
-		"Code":            "Success",
-		"LastUpdated":     "2017-09-06T19:18:06Z",
-		"Type":            "AWS-HMAC",
-		"AccessKeyId":     "123123",
-		"SecretAccessKey": "ddddd",
-		"Token":           "asdfasdf",
-		"Expiration":      "2017-09-07T01:45:43Z",
-	}
-	var lastRequest *http.Request
-	var requestNumber = 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if requestNumber == 0 {
+		if r.URL.Path == "/iam/security-credentials/" {
 			w.Header().Set("Content-Type", "text/plain")
-			io.WriteString(w, expected1)
+			io.WriteString(w, "test-role")
+		} else if r.URL.Path == "/iam/security-credentials/test-role/" {
+			w.Header().Set("Content-Type", "text/plain")
+			content, err := ioutil.ReadFile("payloads/security_cred.json")
+			require.Nil(t, err, fmt.Sprintf("failed to load json in payloads/security_cred.json: %v", err))
+			io.WriteString(w, string(content))
 		} else {
-			w.Header().Set("Content-Type", "text/plain")
-			b, err := json.Marshal(expected2)
-			if err != nil {
-				assert.Fail(t, fmt.Sprintf("failed to marshall the map into json: %v", err))
-			}
-			io.WriteString(w, string(b))
+			w.WriteHeader(http.StatusInternalServerError)
 		}
-		requestNumber++
-		lastRequest = r
 	}))
 	defer ts.Close()
 	metadataURL = ts.URL
 
-	val, err := getSecurityCreds()
-	assert.Nil(t, err)
-	assert.Equal(t, expected2, val)
-	assert.Equal(t, lastRequest.URL.Path, "/iam/security-credentials/test-role/")
+	cred, err := getSecurityCreds()
+	require.Nil(t, err)
+	assert.Equal(t, "123456", cred.AccessKeyId)
+	assert.Equal(t, "secret access key", cred.SecretAccessKey)
+	assert.Equal(t, "secret token", cred.Token)
 }
 
 func TestGetInstanceIdentity(t *testing.T) {
-	expected := map[string]string{
-		"privateIp":          "172.21.21.184",
-		"devpayProductCodes": "",
-		"availabilityZone":   "us-east-1a",
-		"version":            "2010-08-31",
-		"region":             "us-east-1",
-		"instanceId":         "i-07d4be5da8ffb9d1b",
-		"billingProducts":    "",
-		"instanceType":       "c3.xlarge",
-		"accountId":          "727006795293",
-		"architecture":       "x86_64",
-		"kernelId":           "",
-		"ramdiskId":          "",
-		"imageId":            "ami-ca5003dd",
-		"pendingTime":        "2017-05-22T15:15:20Z",
-	}
-	var lastRequest *http.Request
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
-		b, err := json.Marshal(expected)
-		if err != nil {
-			assert.Fail(t, fmt.Sprintf("failed to marshall the map into json: %v", err))
-		}
-		io.WriteString(w, string(b))
-		lastRequest = r
+		content, err := ioutil.ReadFile("payloads/instance_indentity.json")
+		require.Nil(t, err, fmt.Sprintf("failed to load json in payloads/instance_indentity.json: %v", err))
+		io.WriteString(w, string(content))
 	}))
 	defer ts.Close()
 	instanceIdentityURL = ts.URL
 
 	val, err := getInstanceIdentity()
-	assert.Nil(t, err)
-	assert.Equal(t, expected, val)
+	require.Nil(t, err)
+	assert.Equal(t, "us-east-1", val.Region)
+	assert.Equal(t, "i-aaaaaaaaaaaaaaaaa", val.InstanceId)
 }

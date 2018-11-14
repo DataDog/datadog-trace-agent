@@ -1,18 +1,18 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package app
 
 import (
+	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"path/filepath"
 
 	"github.com/DataDog/datadog-agent/cmd/agent/common"
+	"github.com/DataDog/datadog-agent/pkg/api/security"
+	"github.com/DataDog/datadog-agent/pkg/api/util"
 	"github.com/DataDog/datadog-agent/pkg/config"
-	log "github.com/cihub/seelog"
 	"github.com/spf13/cobra"
 )
 
@@ -40,23 +40,40 @@ func launchGui(cmd *cobra.Command, args []string) error {
 
 	guiPort := config.Datadog.GetString("GUI_port")
 	if guiPort == "-1" {
-		log.Warnf("GUI not enabled: to enable, please set an appropriate port in your datadog.yaml file")
 		return fmt.Errorf("GUI not enabled: to enable, please set an appropriate port in your datadog.yaml file")
 	}
 
 	// Read the authentication token: can only be done if user can read from datadog.yaml
-	authToken, err := ioutil.ReadFile(filepath.Join(filepath.Dir(config.Datadog.ConfigFileUsed()), "gui_auth_token"))
+	authToken, err := security.FetchAuthToken()
 	if err != nil {
-		return fmt.Errorf("unable to access GUI authentication token: " + err.Error())
+		return err
+	}
+
+	// Get the CSRF token from the agent
+	c := util.GetClient(false) // FIX: get certificates right then make this true
+	urlstr := fmt.Sprintf("https://localhost:%v/agent/gui/csrf-token", config.Datadog.GetInt("cmd_port"))
+	err = util.SetAuthToken()
+	if err != nil {
+		return err
+	}
+
+	csrfToken, err := util.DoGet(c, urlstr)
+	if err != nil {
+		var errMap = make(map[string]string)
+		json.Unmarshal(csrfToken, errMap)
+		if e, found := errMap["error"]; found {
+			err = fmt.Errorf(e)
+		}
+		fmt.Printf("Could not reach agent: %v \nMake sure the agent is running before attempting to open the GUI.\n", err)
+		return err
 	}
 
 	// Open the GUI in a browser, passing the authorization tokens as parameters
-	err = open("http://127.0.0.1:" + guiPort + string(authToken))
+	err = open("http://127.0.0.1:" + guiPort + "/authenticate?authToken=" + string(authToken) + ";csrf=" + string(csrfToken))
 	if err != nil {
-		log.Warnf("error opening GUI: " + err.Error())
 		return fmt.Errorf("error opening GUI: " + err.Error())
 	}
 
-	log.Infof("GUI opened at 127.0.0.1:" + guiPort)
+	fmt.Printf("GUI opened at 127.0.0.1:" + guiPort + "\n")
 	return nil
 }

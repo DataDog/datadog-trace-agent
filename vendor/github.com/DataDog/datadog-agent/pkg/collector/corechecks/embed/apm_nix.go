@@ -1,26 +1,29 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
-// +build !windows
 // +build apm
+// +build !windows
+// +build !linux
+
+// linux handled by systemd/upstart
 
 package embed
 
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 
-	"github.com/kardianos/osext"
+	"github.com/DataDog/datadog-agent/pkg/util/executable"
 )
 
 const apm_binary_name = "trace-agent"
 
 func getAPMAgentDefaultBinPath() (string, error) {
-	here, _ := osext.ExecutableFolder()
-	binPath := path.Join(here, "..", "..", "embedded", "bin", apm_binary_name)
+	here, _ := executable.Folder()
+	binPath := filepath.Join(here, "..", "..", "embedded", "bin", apm_binary_name)
 	if _, err := os.Stat(binPath); err == nil {
 		return binPath, nil
 	}

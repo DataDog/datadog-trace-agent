@@ -1,11 +1,17 @@
 # IPC (Inter Process Communication) API
 
 The agent communicates with the outside world through an HTTP API to ease the
-development of 3rd party tools and interfaces. Since HTTP is transported over
-a [Unix Socket](https://en.wikipedia.org/wiki/Unix_domain_socket) on *nix platforms
-and [Named Pipes](https://msdn.microsoft.com/en-us/library/windows/desktop/aa365590.aspx)
-on Windows, authorization is delegated to the filesystem.
+development of 3rd party tools and interfaces. The API is available from `localhost`
+and through HTTPS only. It listens on port `5001` by default but can be configured differently.
 
-Endpoints implemented so far (this list should be killed in favor of [swagger](http://swagger.io/)
-at some point):
-    * [GET] http://localhost/agent/version
+## Security and Authentication
+
+To avoid unprivileged users to access the API, authentication is required and based on a token.
+The token is written to a file that's only readable by the user that the Agent runs as.
+
+## Endpoints
+
+Please refer to the [`cmd/agent/api`](https://github.com/DataDog/datadog-agent/tree/master/cmd/agent/api)
+package for a list of endpoints implemented so far.
+
+TODO: generate a list of endpoints with [swagger](http://swagger.io/)

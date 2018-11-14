@@ -1,8 +1,9 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
+// +build !android
 //go:generate go run ../../pkg/config/render_config.go agent ../../pkg/config/config_template.yaml ./dist/datadog.yaml
 
 package main
@@ -12,13 +13,12 @@ import (
 	"fmt"
 	_ "net/http/pprof"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/DataDog/datadog-agent/cmd/agent/app"
 	"github.com/DataDog/datadog-agent/cmd/agent/common"
 	"github.com/DataDog/datadog-agent/cmd/agent/common/signals"
-	log "github.com/cihub/seelog"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
 	"golang.org/x/sys/windows/svc/eventlog"
@@ -26,35 +26,21 @@ import (
 
 var elog debug.Log
 
-func setupLogger(logLevel string) error {
-	configTemplate := `<seelog minlevel="%s">
-    <outputs formatid="common"><console/></outputs>
-    <formats>
-        <format id="common" format="%%LEVEL | (%%RelFile:%%Line) | %%Msg%%n"/>
-    </formats>
-</seelog>`
-	config := fmt.Sprintf(configTemplate, strings.ToLower(logLevel))
-
-	logger, err := log.LoggerFromConfigAsString(config)
-	if err != nil {
-		return err
-	}
-	err = log.ReplaceLogger(logger)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func main() {
-	isIntSess, err := svc.IsAnInteractiveSession()
-	if err != nil {
-		fmt.Printf("failed to determine if we are running in an interactive session: %v", err)
-	}
-	if !isIntSess {
-		common.EnableLoggingToFile()
-		runService(false)
-		return
+	common.EnableLoggingToFile()
+	// if command line arguments are supplied, even in a non interactive session,
+	// then just execute that.  Used when the service is executing the executable,
+	// for instance to trigger a restart.
+	if len(os.Args) == 1 {
+		isIntSess, err := svc.IsAnInteractiveSession()
+		if err != nil {
+			fmt.Printf("failed to determine if we are running in an interactive session: %v", err)
+		}
+		if !isIntSess {
+			common.EnableLoggingToFile()
+			runService(false)
+			return
+		}
 	}
 	defer log.Flush()
 
@@ -71,7 +57,6 @@ func (m *myservice) Execute(args []string, r <-chan svc.ChangeRequest, changes c
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
 	changes <- svc.Status{State: svc.StartPending}
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
-
 	if err := common.ImportRegistryConfig(); err != nil {
 		elog.Warning(0x80000001, err.Error())
 		// continue running agent with existing config
@@ -80,8 +65,15 @@ func (m *myservice) Execute(args []string, r <-chan svc.ChangeRequest, changes c
 		elog.Warning(0x80000002, err.Error())
 		// continue running with what we have.
 	}
-	app.StartAgent()
+	if err := app.StartAgent(); err != nil {
+		log.Errorf("Failed to start agent %v", err)
+		elog.Error(0xc000000B, err.Error())
+		errno = 1 // indicates non-successful return from handler.
+		changes <- svc.Status{State: svc.Stopped}
+		return
+	}
 	elog.Info(0x40000003, app.ServiceName)
+
 loop:
 	for {
 		select {
@@ -92,8 +84,13 @@ loop:
 				// Testing deadlock from https://code.google.com/p/winsvc/issues/detail?id=4
 				time.Sleep(100 * time.Millisecond)
 				changes <- c.CurrentStatus
-			case svc.Stop, svc.Shutdown:
-				app.StopAgent()
+			case svc.Stop:
+				log.Info("Received stop message from service control manager")
+				elog.Info(0x4000000c, app.ServiceName)
+				break loop
+			case svc.Shutdown:
+				log.Info("Received shutdown message from service control manager")
+				elog.Info(0x4000000d, app.ServiceName)
 				break loop
 			default:
 				log.Warnf("unexpected control request #%d", c)
@@ -101,13 +98,15 @@ loop:
 			}
 		case <-signals.Stopper:
 			elog.Info(0x4000000a, app.ServiceName)
-			app.StopAgent()
 			break loop
 
 		}
 	}
-	elog.Info(1, fmt.Sprintf("prestopping %s service", app.ServiceName))
+	elog.Info(0x4000000d, app.ServiceName)
+	log.Infof("Initiating service shutdown")
 	changes <- svc.Status{State: svc.StopPending}
+	app.StopAgent()
+	changes <- svc.Status{State: svc.Stopped}
 	return
 }
 

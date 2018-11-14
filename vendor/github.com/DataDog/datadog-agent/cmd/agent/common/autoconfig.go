@@ -1,22 +1,21 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package common
 
 import (
-	"fmt"
 	"path/filepath"
 
+	"github.com/DataDog/datadog-agent/pkg/autodiscovery"
+	"github.com/DataDog/datadog-agent/pkg/autodiscovery/providers"
+	"github.com/DataDog/datadog-agent/pkg/autodiscovery/scheduler"
 	"github.com/DataDog/datadog-agent/pkg/collector"
-	"github.com/DataDog/datadog-agent/pkg/collector/autodiscovery"
-	"github.com/DataDog/datadog-agent/pkg/collector/listeners"
-	"github.com/DataDog/datadog-agent/pkg/collector/loaders"
-	"github.com/DataDog/datadog-agent/pkg/collector/providers"
 	"github.com/DataDog/datadog-agent/pkg/config"
+	"github.com/DataDog/datadog-agent/pkg/logs"
 	"github.com/DataDog/datadog-agent/pkg/tagger"
-	log "github.com/cihub/seelog"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
 // SetupAutoConfig configures the global AutoConfig:
@@ -26,27 +25,33 @@ func SetupAutoConfig(confdPath string) {
 	// start tagging system
 	err := tagger.Init()
 	if err != nil {
-		fmt.Printf("Unable to start tagging system: %s", err)
+		log.Errorf("Unable to start tagging system: %s", err)
 	}
 
 	// create the Collector instance and start all the components
 	// NOTICE: this will also setup the Python environment, if available
 	Coll = collector.NewCollector(GetPythonPaths()...)
 
-	// create the Autoconfig instance
-	AC = autodiscovery.NewAutoConfig(Coll)
+	// creating the meta scheduler
+	metaScheduler := scheduler.NewMetaScheduler()
 
-	// add the check loaders
-	for _, loader := range loaders.LoaderCatalog() {
-		AC.AddLoader(loader)
-		log.Debugf("Added %s to AutoConfig", loader)
+	// registering the check scheduler
+	metaScheduler.Register("check", collector.InitCheckScheduler(Coll))
+
+	// registering the logs scheduler
+	if logs.IsAgentRunning() {
+		metaScheduler.Register("logs", logs.GetScheduler())
 	}
+
+	// create the Autoconfig instance
+	AC = autodiscovery.NewAutoConfig(metaScheduler)
 
 	// Add the configuration providers
 	// File Provider is hardocded and always enabled
 	confSearchPaths := []string{
 		confdPath,
 		filepath.Join(GetDistPath(), "conf.d"),
+		"",
 	}
 	AC.AddProvider(providers.NewFileConfigProvider(confSearchPaths), false)
 
@@ -75,22 +80,13 @@ func SetupAutoConfig(confdPath string) {
 	// Autodiscovery listeners
 	// for now, no need to implement a registry of available listeners since we
 	// have only docker
-	var Listeners []config.Listeners
-	if err = config.Datadog.UnmarshalKey("listeners", &Listeners); err == nil {
-		for _, l := range Listeners {
-			serviceListenerFactory, ok := listeners.ServiceListenerFactories[l.Name]
-			if !ok {
-				// Factory has not been registered.
-				log.Warnf("Listener %s was not registered", l)
-				continue
-			}
-			serviceListener, err := serviceListenerFactory()
-			if err != nil {
-				log.Errorf("Failed to create a %s listener: %s", l.Name, err)
-			} else {
-				AC.AddListener(serviceListener)
-			}
-		}
+	var listeners []config.Listeners
+	err = config.Datadog.UnmarshalKey("listeners", &listeners)
+	if err == nil {
+		listeners = AutoAddListeners(listeners)
+		AC.AddListeners(listeners)
+	} else {
+		log.Errorf("Error while reading 'listeners' settings: %v", err)
 	}
 }
 
@@ -99,6 +95,6 @@ func SetupAutoConfig(confdPath string) {
 //   2. load all the configurations available at startup
 //   3. run all the Checks for each configuration found
 func StartAutoConfig() {
-	AC.StartPolling()
+	AC.StartConfigPolling()
 	AC.LoadAndRun()
 }

@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package app
 
@@ -15,6 +15,8 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/api/util"
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/status"
+
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -40,6 +42,9 @@ var statusCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("unable to set up global agent configuration: %v", err)
 		}
+		if flagNoColor {
+			color.NoColor = true
+		}
 		err = requestStatus()
 		if err != nil {
 			return err
@@ -52,13 +57,16 @@ func requestStatus() error {
 	fmt.Printf("Getting the status from the agent.\n\n")
 	var e error
 	var s string
-	c := common.GetClient(false) // FIX: get certificates right then make this true
+	c := util.GetClient(false) // FIX: get certificates right then make this true
 	urlstr := fmt.Sprintf("https://localhost:%v/agent/status", config.Datadog.GetInt("cmd_port"))
 
 	// Set session token
-	util.SetAuthToken()
+	e = util.SetAuthToken()
+	if e != nil {
+		return e
+	}
 
-	r, e := common.DoGet(c, urlstr)
+	r, e := util.DoGet(c, urlstr)
 	if e != nil {
 		var errMap = make(map[string]string)
 		json.Unmarshal(r, errMap)

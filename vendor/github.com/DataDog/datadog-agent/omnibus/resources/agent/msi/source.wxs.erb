@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" 
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
      xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
   <!-- This is how we include wxi files -->
   <?include "parameters.wxi" ?>
@@ -9,7 +9,7 @@
     Name is made of localized product name and version number.
   -->
   <Product Id="*"
-           Name="Datadog Agent"
+           Name="!(loc.ProductName)"
            Language="1033"
            Version="$(var.VersionNumber)"
            Manufacturer="!(loc.ManufacturerName)"
@@ -22,8 +22,8 @@
     -->
     <Package Id="*"
              Keywords="Installer"
-             Comments="Copyright 2015 Datadog, Inc."
-             Description="Datadog Agent v$(var.DisplayVersionNumber)"
+             Comments="!(loc.InstallerComment)"
+             Description="!(loc.ProductName) $(var.DisplayVersionNumber)"
              Manufacturer="!(loc.ManufacturerName)"
              InstallScope="perMachine"
              InstallerVersion="400"
@@ -38,18 +38,12 @@
                         Minimum='1.0.0' IncludeMinimum='yes'
                         Maximum="99.99.99.99" IncludeMaximum='no'/>
     </Upgrade>
-    <!-- This removes entirely the previous version -->
-    <Upgrade Id="$(var.PerUserUpgradeCode)">
-        <UpgradeVersion OnlyDetect='no'
-                        Property='PREVIOUSFOUND'
-                        Minimum='1.0.0' IncludeMinimum='yes'
-                        Maximum="99.99.99.99" IncludeMaximum='no'/>
-    </Upgrade>
 
     <!-- Close application when uninstalling -->
     <util:CloseApplication Id="CloseTrayApp" 
                           CloseMessage="yes" 
-                          Target="agent-manager.exe" 
+                          EndSessionMessage="yes"
+                          Target="ddtray.exe" 
                           ElevatedCloseMessage="yes"
                           TerminateProcess="1"
                           Timeout="1"
@@ -67,7 +61,7 @@
      <PropertyRef Id="WIX_ACCOUNT_ADMINISTRATORS" />
      <PropertyRef Id="WIX_ACCOUNT_LOCALSYSTEM" />
      <PropertyRef Id="WIX_ACCOUNT_USERS" />
- 
+
     <Media Id="1" Cabinet="agent.cab" EmbedCab="yes" />
 
     <Directory Id="TARGETDIR" Name="SourceDir">
@@ -94,19 +88,11 @@
 
     <CustomAction
         Id="LaunchApp"
-        Directory="DIST"
+        Directory="AGENT"
         Execute="immediate"
-        Return="check"
-        ExeCommand="[SystemFolder]cmd.exe /C start agent-manager.exe" />
+        Return="asyncNoWait"
+        ExeCommand="&quot;[AGENT]ddtray.exe&quot; &quot;-launch-gui&quot;" />
 
-    <Binary Id="UpgradeHelper" SourceFile="$(var.HelperDir)\upgrade-helper.exe" />
-    <CustomAction
-        Id="CheckForOldVersion"
-        BinaryKey="UpgradeHelper"
-        ExeCommand="-oldcode={$(var.PerUserUpgradeCode)} -newcode={$(var.UpgradeCode)} -checkonly=true"
-        Execute="deferred"
-        Return="check"
-        Impersonate="no" />
 
     <!-- Delete application when uninstalling -->
     <!--
@@ -145,8 +131,47 @@
           <RegistryValue Name="hostname"
                          Type="string"
                          Value="[HOSTNAME]" />
+           <RegistryValue Name="proxy_host"
+                         Type="string"
+                         Value="[PROXY_HOST]" />
+          <RegistryValue Name="proxy_port"
+                         Type="string"
+                         Value="[PROXY_PORT]" />
+          <RegistryValue Name="proxy_user"
+                         Type="string"
+                         Value="[PROXY_USER]" />
+          <RegistryValue Name="proxy_password"
+                         Type="string"
+                         Value="[PROXY_PASSWORD]" />
+          <RegistryValue Name="logs_enabled"
+                         Type="string"
+                         Value="[LOGS_ENABLED]" />
+          <RegistryValue Name="apm_enabled"
+                         Type="string"
+                         Value="[APM_ENABLED]" />
+          <RegistryValue Name="process_enabled"
+                         Type="string"
+                         Value="[PROCESS_ENABLED]" />
+          <RegistryValue Name="cmd_port"
+                         Type="string"
+                         Value="[CMD_PORT]" />
+          <RegistryValue Name="site"
+                         Type="string"
+                         Value="[SITE]" />
+          <RegistryValue Name="dd_url"
+                         Type="string"
+                         Value="[DD_URL]" />
+          <RegistryValue Name="logs_dd_url"
+                         Type="string"
+                         Value="[LOGS_DD_URL]" />
+          <RegistryValue Name="process_dd_url"
+                         Type="string"
+                         Value="[PROCESS_DD_URL]" />
+          <RegistryValue Name="trace_dd_url"
+                         Type="string"
+                         Value="[TRACE_DD_URL]" />
         </RegistryKey>
-        
+
       </Component>
     </DirectoryRef>
 
@@ -163,8 +188,8 @@
                 DiskId="1"
                 Source="$(var.BinFiles)/agent.exe"/>
           <ServiceInstall Id="DatadogServiceInstaller"
-                          DisplayName="Datadog Agent"
-                          Description="Send metrics to Datadog"
+                          DisplayName="!(loc.ServiceDisplayName)"
+                          Description="!(loc.ServiceDescription)"
                           Name="DatadogAgent"
                           ErrorControl="ignore"
                           Start="auto"
@@ -172,14 +197,21 @@
                           Vital="yes"
                           Interactive="no"
                           Account="LocalSystem">
-              <ServiceDependency Id="winmgmt" />
+            <ServiceConfig DelayedAutoStart="yes" OnInstall="yes" OnReinstall ="yes" />
+            <util:ServiceConfig
+              FirstFailureActionType='restart'
+              SecondFailureActionType='restart'
+              ThirdFailureActionType='restart'
+              RestartServiceDelayInSeconds='30'
+              ResetPeriodInDays='1'/>
+            <ServiceDependency Id="winmgmt" />
           </ServiceInstall>
           <ServiceControl Id="DatadogStartService"
                           Name="DatadogAgent"
                           Start="install"
                           Stop="both"
                           Remove="uninstall"
-                          Wait="yes" />
+                          Wait="no" />
           <RemoveFolder Id="APPLICATIONROOTDIRECTORY" On="uninstall" />
           <!-- The "Name" field must match the argument to eventlog.Open() -->
           <util:EventSource Log="Application" Name="DatadogAgent"
@@ -188,7 +220,93 @@
                 SupportsInformationals="yes"
                 SupportsWarnings="yes"/>
         </Component>
+      </Directory>
+      <Directory Id="BIN" Name="bin">
+        <Directory Id="AGENT" Name="agent">
+          <!-- Windows service declaration for APM agent -->
+          <Component Id="DATADOGAPMSERVICE" Guid="a8e611fa-aedb-4c16-969c-bb827af0bd53">
+            <File Id="trace_agent.exe"
+                Name="trace-agent.exe"
+                Vital="yes"
+                KeyPath="yes"
+                DiskId="1"
+                Source="$(var.InstallDir)/bin/agent/trace-agent.exe"/>
+            <ServiceInstall Id="DatadogAPMServiceInstaller"
+                            DisplayName="!(loc.ServiceApmDisplayName)"
+                            Description="!(loc.ServiceApmDescription)"
+                            Name="datadog-trace-agent"
+                            ErrorControl="ignore"
+                            Start="demand"
+                            Type="ownProcess"
+                            Vital="yes"
+                            Interactive="no"
+                            Account="LocalSystem"
+                            Arguments="--config=c:\programdata\datadog\datadog.yaml" >
+              <ServiceConfig DelayedAutoStart="yes" OnInstall="yes" OnReinstall ="yes" />
+              <util:ServiceConfig
+                FirstFailureActionType='restart'
+                SecondFailureActionType='restart'
+                ThirdFailureActionType='restart'
+                RestartServiceDelayInSeconds='30'
+                ResetPeriodInDays='1'/>
+              <ServiceDependency Id="datadogagent" />
+            </ServiceInstall>
+            <ServiceControl Id="DatadogAPMStartService"
+                            Name="datadog-trace-agent"
+                            Start="install"
+                            Stop="both"
+                            Remove="uninstall"
+                            Wait="no" />
+            <!-- The "Name" field must match the argument to eventlog.Open() -->
+            <util:EventSource Log="Application" Name="datadog-trace-agent"
+                    EventMessageFile="[AGENT]trace-agent.exe"
+                    SupportsErrors="yes"
+                    SupportsInformationals="yes"
+                    SupportsWarnings="yes"/>
+          </Component>
+          <!-- Windows service declaration for Process agent -->
+          <Component Id="DATADOGPROCESSSERVICE" Guid="3b119795-ddf8-44eb-9d53-301f7186e2f3">
+            <File Id="process_agent.exe"
+                Name="process-agent.exe"
+                Vital="yes"
+                KeyPath="yes"
+                DiskId="1"
+                Source="$(var.InstallDir)/bin/agent/process-agent.exe"/>
+            <ServiceInstall Id="DatadogProcessServiceInstaller"
+                            DisplayName="!(loc.ServiceProcessDisplayName)"
+                            Description="!(loc.ServiceProcessDescription)"
+                            Name="datadog-process-agent"
+                            ErrorControl="ignore"
+                            Start="demand"
+                            Type="ownProcess"
+                            Vital="yes"
+                            Interactive="no"
+                            Account="LocalSystem"
+                            Arguments="--config=c:\programdata\datadog\datadog.yaml" >
+              <ServiceConfig DelayedAutoStart="yes" OnInstall="yes" OnReinstall ="yes" />
+              <util:ServiceConfig
+                FirstFailureActionType='restart'
+                SecondFailureActionType='restart'
+                ThirdFailureActionType='restart'
+                RestartServiceDelayInSeconds='30'
+                ResetPeriodInDays='1'/>
+                <ServiceDependency Id="datadogagent" />
+            </ServiceInstall>
+            <ServiceControl Id="DatadogProcessStartService"
+                            Name="datadog-process-agent"
+                            Start="install"
+                            Stop="both"
+                            Remove="uninstall"
+                            Wait="no" />
+            <!-- The "Name" field must match the argument to eventlog.Open() -->
+            <util:EventSource Log="Application" Name="datadog-process-agent"
+                    EventMessageFile="[AGENT]process-agent.exe"
+                    SupportsErrors="yes"
+                    SupportsInformationals="yes"
+                    SupportsWarnings="yes"/>
+          </Component>
 
+        </Directory>
       </Directory>
     </DirectoryRef>
 
@@ -198,8 +316,10 @@
         <Shortcut Id="ApplicationStartMenuShortcut"
                   Name="Datadog Agent Manager"
                   Description="Manage your Datadog Agent"
-                  Target="[DIST]agent-manager.exe"
-                  WorkingDirectory="DIST"/>
+                  Target="[AGENT]ddtray.exe"
+                  Arguments= "&quot;-launch-gui&quot;"
+                  WorkingDirectory="AGENT"/>
+
         <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall"/>
         <RegistryValue Root="HKCU"
                        Key="Software\Microsoft\Datadog"
@@ -209,7 +329,15 @@
                        KeyPath="yes"/>
       </Component>
     </DirectoryRef>
-    
+
+    <Property Id="TUFMETALOCATION">
+      <RegistrySearch Root="HKLM"
+                      Key="SOFTWARE\Datadog\Datadog Agent"
+                      Type="raw"
+                      Id="TUFMETADIRECTORY_REGSEARCH"
+                      Name="TufMetaPath" />
+    </Property>
+
     <DirectoryRef Id="APPLICATIONDATADIRECTORY">
       <Component Id="datadog.yaml.example"
                  Guid="83461594-01AC-11E2-BE35-37EC6088709B"
@@ -218,14 +346,6 @@
         <File Id="datadog.yaml.example"
               Name="datadog.yaml"
               Source="$(var.EtcFiles)\datadog.yaml.example"/>
-      </Component>
-      <Component Id="trace_agent.conf"
-        Guid="CE6515EE-3103-417E-8810-0B465545EB0B"
-        NeverOverwrite="yes"
-        Permanent="yes">
-        <File Id="trace_agent.conf"
-          Name="trace-agent.conf"
-          Source="$(var.EtcFiles)\trace-agent.conf"/>
       </Component>
 
       <Directory Id="checks.d" Name="checks.d">
@@ -259,30 +379,77 @@
           <CreateFolder/>
         </Component>
       </Directory>
-   </DirectoryRef>
+
+      <Directory Id="TUFMETALOCATION" Name="repositories">
+         <Component Id="CleanupTUFMetaFolder" Guid="2031779f-2616-4eea-ac09-42ce47e07cc2">
+           <!-- We need to use TUFMETALOCATION variable here or RemoveFolderEx
+                will not remove on "install". -->
+           <RegistryValue Root="HKLM"
+                          Key="SOFTWARE\Datadog\Datadog Agent"
+                          Name="TufMetaPath"
+                          Type="string"
+                          Value="[TUFMETALOCATION]" />
+            <util:RemoveFolderEx On="uninstall" Property="TUFMETALOCATION" />
+         </Component>
+
+         <Directory Id="cache" Name="cache">
+           <Component Id="cache"
+                      Guid="cdcbdd55-fe32-4b68-a1a5-bb0635da0ba1"
+                      Location="either">
+             <CreateFolder/>
+           </Component>
+         </Directory>
+         <Directory Id="public_integrations_core" Name="public-integrations-core">
+           <Directory Id="metadata" Name="metadata">
+             <Directory Id="current" Name="current">
+               <Component Id="current_metadata"
+                          Guid="0ce7cd2c-5ce1-44bf-ac42-965f3f74ef78"
+                          Location="either">
+                 <CreateFolder/>
+               </Component>
+               <Component Id="root.json"
+                          Guid="f77002ee-be92-4304-ada7-e93cf011d16e"
+                          NeverOverwrite="yes"
+                          Permanent="yes">
+                 <File Id="root.json"
+                       Name="root.json"
+                       Source="$(var.EtcFiles)\root.json"/>
+               </Component>
+             </Directory>
+             <Directory Id="previous" Name="previous">
+               <Component Id="previous_metadata"
+                          Guid="4d80f73b-b84c-41b2-bbc4-b374ae4d3eba"
+                          Location="either">
+                 <CreateFolder/>
+               </Component>
+             </Directory>
+           </Directory>
+         </Directory>
+      </Directory>
+    </DirectoryRef>
 
     <!-- Set the components defined in our fragment files that will be used for our feature  -->
     <Feature Id="MainApplication" Title="Datadog Agent" Level="1" ConfigurableDirectory="APPLICATIONROOTDIRECTORY">
       <ComponentRef Id="conffolder" />
       <ComponentGroupRef Id="ProjectDir" />
       <ComponentRef Id="datadog.yaml.example" />
-      <ComponentRef Id="trace_agent.conf" />
       <ComponentRef Id="logs" />
       <ComponentRef Id="conf.d" />
       <ComponentRef Id="checks.d" />
+      <ComponentRef Id="cache" />
+      <ComponentRef Id="current_metadata" />
+      <ComponentRef Id="previous_metadata" />
+      <ComponentRef Id="root.json" />
       <ComponentRef Id="ApplicationShortcut" />
       <ComponentRef Id="DATADOGAGENTSERVICE" />
+      <ComponentRef Id="DATADOGAPMSERVICE" />
+      <ComponentRef Id="DATADOGPROCESSSERVICE" />
       <ComponentGroupRef Id="ExtraEXAMPLECONFSLOCATION" />
       <ComponentRef Id="CleanupMainApplicationFolder" />
+      <ComponentRef Id="CleanupTUFMetaFolder" />
       <ComponentRef Id="RegisterConfVariables" />
     </Feature>
 
-    <InstallExecuteSequence>
-      <Custom Action="WixCloseApplications"
-          After="InstallInitialize"><![CDATA[REMOVE="ALL" OR REINSTALL]]></Custom>
-      <Custom Action="CheckForOldVersion"
-          After="InstallInitialize"><![CDATA[NOT Installed AND NOT REMOVE]]></Custom>
-    </InstallExecuteSequence>
     <!-- UI Stuff: 100% Omnibus Generated -->
     <Icon Id="project.ico" SourceFile="Resources\assets\project_16x16.ico"/>
     <Property Id="ARPPRODUCTICON" Value="project.ico" />
@@ -291,23 +458,106 @@
 
     <UIRef Id="ProjectUI_InstallDir"/>
     <UI Id="ProjectUI_InstallDir">
-      <UIRef Id="WixUI_Minimal"/>
+      <UIRef Id="WixUI_Common"/>
+      <UIRef Id="WixUI_ErrorProgressText" />
+      <Property Id="DefaultUIFont">DlgFont8</Property>
       <TextStyle Id="WixUI_Font_Normal_White" FaceName="Tahoma" Size="8" Red="255" Green="255" Blue="255" />
       <TextStyle Id="WixUI_Font_Bigger_White" FaceName="Tahoma" Size="12" Red="255" Green="255" Blue="255" />
       <TextStyle Id="WixUI_Font_Title_White" FaceName="Tahoma" Size="9" Bold="yes" Red="255" Green="255" Blue="255" />
+
+      <TextStyle Id="TahomaHeader" FaceName="Tahoma" Size="18" Bold="yes" />
+      <TextStyle Id="TahomaNormal" FaceName="Tahoma" Size="8" />
+
+      <TextStyle Id="DlgFont8" FaceName="Tahoma" Size="8" />
+      <TextStyle Id="DlgFontBold8" FaceName="Tahoma" Size="8" Bold="yes" />
+      <TextStyle Id="Verdana13Bold" FaceName="Verdana" Size="13" Bold="yes" />
+
+      <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
+      <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12" />
+      <TextStyle Id="WixUI_Font_Title" FaceName="Tahoma" Size="9" Bold="yes" />
+
+
       <Publish Dialog="ExitDialog"
           Control="Finish"
           Event="DoAction"
           Value="LaunchApp">
           WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed
       </Publish>
+      <?include Resources\assets\apikeydlg.wxi ?>
+      <DialogRef Id="ErrorDlg" />
+      <DialogRef Id="FatalError" />
+      <DialogRef Id="FilesInUse" />
+      <DialogRef Id="MsiRMFilesInUse" />
+      <DialogRef Id="PrepareDlg" />
+      <DialogRef Id="ProgressDlg" />
+      <DialogRef Id="ResumeDlg" />
+      <DialogRef Id="UserExit" />
+      <DialogRef Id="WelcomeDlg" />
+      <DialogRef Id="ApiKeyDlg"/>
+      <DialogRef Id="LicenseAgreementDlg"/>
+
+      <DialogRef Id="MaintenanceWelcomeDlg"/>
+      <DialogRef Id="MaintenanceTypeDlg"/>
+      <DialogRef Id="ResumeDlg"/>
+
+
+
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="LicenseAgreementDlg">NOT Installed</Publish>
+
+      <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="ApiKeyDlg">NOT PREVIOUSFOUND</Publish>
+      <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg">PREVIOUSFOUND</Publish>
+
+      <Publish Dialog="LicenseAgreementDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg">NOT Installed</Publish>
+
+      <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="3">1</Publish>
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ApiKeyDlg">NOT PREVIOUSFOUND</Publish>
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="LicenseAgreementDlg">PREVIOUSFOUND</Publish>
+
+      <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg">1</Publish>
+
+      <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg">1</Publish>
+
+      <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="ApiKeyDlg">NOT APIKEY</Publish>
+      <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg">APIKEY</Publish>
+
+      <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
+
+      <AdminUISequence>
+        <Show Dialog="FatalError" OnExit="error" />
+        <Show Dialog="UserExit" OnExit="cancel" />
+        <Show Dialog="ExitDialog" OnExit="success" />
+        <Show Dialog="MaintenanceWelcomeDlg" After="CostFinalize" />
+        <Show Dialog ="ProgressDlg" After="MaintenanceWelcomeDlg" />
+      </AdminUISequence>
+      <InstallUISequence>
+        <Show Dialog="FatalError" OnExit="error" />
+        <Show Dialog="UserExit" OnExit="cancel" />
+        <Show Dialog="ExitDialog" OnExit="success" />
+
+        <Show Dialog="WelcomeDlg" After="MigrateFeatureStates"><![CDATA[NOT Installed]]></Show>
+        <Show Dialog="MaintenanceWelcomeDlg" Before="ProgressDlg" >Installed AND NOT RESUME AND NOT Preselected AND NOT PATCH</Show>
+
+        <!--
+        <Show Dialog="ResumeDlg" After="WelcomeDlg"><![CDATA[Installed AND (RESUME OR Preselected)]]></Show>
+        -->
+        <!--
+        <Show Dialog="MaintenanceWelcomeDlg" After="ResumeDlg"><![CDATA[Installed AND NOT RESUME AND NOT Preselected]]></Show>
+        <Show Dialog="ProgressDlg" After="MaintenanceWelcomeDlg" />
+        -->
+      </InstallUISequence>
     </UI>
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT"
                   Value="!(loc.LaunchAgentManager)" />
-    
+
 
     <WixVariable Id="WixUILicenseRtf" Value="Resources\assets\LICENSE.rtf" />
     <WixVariable Id="WixUIDialogBmp" Value="Resources\assets\dialog_background.bmp" />
     <WixVariable Id="WixUIBannerBmp" Value="Resources\assets\banner_background.bmp" />
+
+   <Binary Id="BannerBmp" SourceFile="Resources\assets\banner_background.bmp" />
+    <Binary Id="BackgroundBmp" SourceFile="Resources\assets\dialog_background.bmp" />
+    
+    <Property Id="ShortCompanyName" Value="!(loc.CompanyNameShort)" />
+
   </Product>
 </Wix>

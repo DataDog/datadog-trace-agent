@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package gohai
 
@@ -12,7 +12,8 @@ import (
 	"github.com/DataDog/gohai/network"
 	"github.com/DataDog/gohai/platform"
 
-	log "github.com/cihub/seelog"
+	"github.com/DataDog/datadog-agent/pkg/config"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
 // GetPayload builds a payload of every metadata collected with gohai except processes metadata.
@@ -23,7 +24,6 @@ func GetPayload() *Payload {
 }
 
 func getGohaiInfo() *gohai {
-
 	res := new(gohai)
 
 	cpuPayload, err := new(cpu.Cpu).Collect()
@@ -47,11 +47,13 @@ func getGohaiInfo() *gohai {
 		log.Errorf("Failed to retrieve memory metadata: %s", err)
 	}
 
-	networkPayload, err := new(network.Network).Collect()
-	if err == nil {
-		res.Network = networkPayload
-	} else {
-		log.Errorf("Failed to retrieve network metadata: %s", err)
+	if !config.IsContainerized() {
+		networkPayload, err := new(network.Network).Collect()
+		if err == nil {
+			res.Network = networkPayload
+		} else {
+			log.Errorf("Failed to retrieve network metadata: %s", err)
+		}
 	}
 
 	platformPayload, err := new(platform.Platform).Collect()

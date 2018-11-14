@@ -1,7 +1,7 @@
 # Unless explicitly stated otherwise all files in this repository are licensed
 # under the Apache License Version 2.0.
 # This product includes software developed at Datadog (https:#www.datadoghq.com/).
-# Copyright 2017 Datadog, Inc.
+# Copyright 2018 Datadog, Inc.
 require 'pathname'
 
 name 'datadog-dogstatsd'
@@ -37,12 +37,12 @@ build do
   if linux?
     erb source: "upstart.conf.erb",
         dest: "#{install_dir}/scripts/datadog-dogstatsd.conf",
-        mode: 0755,
+        mode: 0644,
         vars: { install_dir: install_dir }
 
     erb source: "systemd.service.erb",
         dest: "#{install_dir}/scripts/datadog-dogstatsd.service",
-        mode: 0755,
+        mode: 0644,
         vars: { install_dir: install_dir }
   end
 

@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 // Package common provides a set of common symbols needed by different packages,
 // to avoid circular dependencies.
@@ -12,13 +12,16 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
+
+	"github.com/fatih/color"
+	yaml "gopkg.in/yaml.v2"
 
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/legacy"
-	"github.com/fatih/color"
-	yaml "gopkg.in/yaml.v2"
 )
 
 // ImportConfig imports the agent5 configuration into the agent6 yaml config
@@ -26,7 +29,6 @@ func ImportConfig(oldConfigDir string, newConfigDir string, force bool) error {
 	datadogConfPath := filepath.Join(oldConfigDir, "datadog.conf")
 	datadogYamlPath := filepath.Join(newConfigDir, "datadog.yaml")
 	traceAgentConfPath := filepath.Join(newConfigDir, "trace-agent.conf")
-	processAgentConfPath := filepath.Join(newConfigDir, "process-agent.conf")
 	const cfgExt = ".yaml"
 	const dirExt = ".d"
 
@@ -49,7 +51,7 @@ func ImportConfig(oldConfigDir string, newConfigDir string, force bool) error {
 
 	// setup the configuration system
 	config.Datadog.AddConfigPath(newConfigDir)
-	err = config.Datadog.ReadInConfig()
+	err = config.Load()
 	if err != nil {
 		return fmt.Errorf("unable to load Datadog config file: %s", err)
 	}
@@ -77,14 +79,14 @@ func ImportConfig(oldConfigDir string, newConfigDir string, force bool) error {
 	// marshal the config object to YAML
 	b, err := yaml.Marshal(config.Datadog.AllSettings())
 	if err != nil {
-		return fmt.Errorf("unable to unmarshal config to YAML: %v", err)
+		return fmt.Errorf("unable to marshal config to YAML: %v", err)
 	}
 
 	// dump the current configuration to datadog.yaml
 	// file permissions will be used only to create the file if doesn't exist,
 	// please note on Windows such permissions have no effect.
 	if err = ioutil.WriteFile(datadogYamlPath, b, 0640); err != nil {
-		return fmt.Errorf("unable to unmarshal config to %s: %v", datadogYamlPath, err)
+		return fmt.Errorf("unable to write config to %s: %v", datadogYamlPath, err)
 	}
 
 	fmt.Fprintln(
@@ -110,6 +112,27 @@ func ImportConfig(oldConfigDir string, newConfigDir string, force bool) error {
 
 		src := filepath.Join(oldConfigDir, "conf.d", f.Name())
 		dst := filepath.Join(newConfigDir, "conf.d", checkName+dirExt, "conf"+cfgExt)
+
+		if f.Name() == "docker_daemon.yaml" {
+			err := legacy.ImportDockerConf(src, filepath.Join(newConfigDir, "conf.d", "docker.yaml"), force)
+			if err != nil {
+				return err
+			}
+			continue
+		} else if f.Name() == "docker.yaml" {
+			// if people upgrade from a very old version of the agent who ship the old docker check.
+			fmt.Fprintln(
+				color.Output,
+				fmt.Sprintf("Ignoring %s, old docker check has been deprecated.", color.YellowString(src)),
+			)
+			continue
+		} else if f.Name() == "kubernetes.yaml" {
+			err := legacy.ImportKubernetesConf(src, filepath.Join(newConfigDir, "conf.d", "kubelet.yaml"), force)
+			if err != nil {
+				return err
+			}
+			continue
+		}
 
 		if err := copyFile(src, dst, force); err != nil {
 			return fmt.Errorf("unable to copy %s to %s: %v", src, dst, err)
@@ -175,15 +198,6 @@ func ImportConfig(oldConfigDir string, newConfigDir string, force bool) error {
 		fmt.Printf("Wrote Trace Agent specific settings to %s\n", traceAgentConfPath)
 	}
 
-	// Extract process-agent specific info and dump it to its own config file.
-	imported, err = configProcessAgent(datadogConfPath, processAgentConfPath, force)
-	if err != nil {
-		return fmt.Errorf("failed to import Process Agent specific settings: %v", err)
-	}
-	if imported {
-		fmt.Printf("Wrote Process Agent specific settings to %s\n", processAgentConfPath)
-	}
-
 	return nil
 }
 
@@ -225,6 +239,28 @@ func copyFile(src, dst string, overwrite bool) error {
 		return err
 	}
 
+	ddGroup, errGroup := user.LookupGroup("dd-agent")
+	ddUser, errUser := user.LookupId("dd-agent")
+
+	// Only change the owner/group of the configuration files if we can detect the dd-agent user
+	// This will not take affect on Windows/MacOS as the user is not available.
+	if errGroup == nil && errUser == nil {
+		ddGID, err := strconv.Atoi(ddGroup.Gid)
+		if err != nil {
+			return fmt.Errorf("Couldn't convert dd-agent group ID: %s into an int: %s", ddGroup.Gid, err)
+		}
+
+		ddUID, err := strconv.Atoi(ddUser.Uid)
+		if err != nil {
+			return fmt.Errorf("Couldn't convert dd-agent user ID: %s into an int: %s", ddUser.Uid, err)
+		}
+
+		err = out.Chown(ddUID, ddGID)
+		if err != nil {
+			return fmt.Errorf("Couldn't change the file permissions for this check. Error: %s", err)
+		}
+	}
+
 	err = out.Chmod(0640)
 	if err != nil {
 		return err
@@ -249,22 +285,4 @@ func configTraceAgent(datadogConfPath, traceAgentConfPath string, overwrite bool
 	}
 
 	return legacy.ImportTraceAgentConfig(datadogConfPath, traceAgentConfPath)
-}
-
-// configProcessAgent extracts process-agent specific info and dump to its own config file
-func configProcessAgent(datadogConfPath, processAgentConfPath string, overwrite bool) (bool, error) {
-	// if the file exists check whether we can overwrite
-	if _, err := os.Stat(processAgentConfPath); !os.IsNotExist(err) {
-		if overwrite {
-			// we'll overwrite, backup the original file first
-			err = os.Rename(processAgentConfPath, processAgentConfPath+".bak")
-			if err != nil {
-				return false, fmt.Errorf("unable to create a backup for the existing file: %s", processAgentConfPath)
-			}
-		} else {
-			return false, fmt.Errorf("destination file %s already exists, run the command again with --force or -f to overwrite it", processAgentConfPath)
-		}
-	}
-
-	return legacy.ImportProcessAgentConfig(datadogConfPath, processAgentConfPath)
 }

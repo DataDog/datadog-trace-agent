@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package mocksender
 
@@ -47,6 +47,11 @@ func (m *MockSender) Gauge(metric string, value float64, hostname string, tags [
 //ServiceCheck enables the service check mock call.
 func (m *MockSender) ServiceCheck(checkName string, status metrics.ServiceCheckStatus, hostname string, tags []string, message string) {
 	m.Called(checkName, status, hostname, tags, message)
+}
+
+//DisableDefaultHostname enables the hostname mock call.
+func (m *MockSender) DisableDefaultHostname(d bool) {
+	m.Called(d)
 }
 
 //Event enables the event mock call.

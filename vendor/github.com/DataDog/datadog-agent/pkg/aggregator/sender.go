@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package aggregator
 
@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/cihub/seelog"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 
 	"github.com/DataDog/datadog-agent/pkg/collector/check"
 	"github.com/DataDog/datadog-agent/pkg/metrics"
@@ -34,10 +34,11 @@ type Sender interface {
 	ServiceCheck(checkName string, status metrics.ServiceCheckStatus, hostname string, tags []string, message string)
 	Event(e metrics.Event)
 	GetMetricStats() map[string]int64
+	DisableDefaultHostname(disable bool)
 }
 
 type metricStats struct {
-	Metrics       int64
+	MetricSamples int64
 	Events        int64
 	ServiceChecks int64
 	Lock          sync.RWMutex
@@ -52,12 +53,14 @@ type RawSender interface {
 
 // checkSender implements Sender
 type checkSender struct {
-	id               check.ID
-	metricStats      metricStats
-	priormetricStats metricStats
-	smsOut           chan<- senderMetricSample
-	serviceCheckOut  chan<- metrics.ServiceCheck
-	eventOut         chan<- metrics.Event
+	id                      check.ID
+	defaultHostname         string
+	defaultHostnameDisabled bool
+	metricStats             metricStats
+	priormetricStats        metricStats
+	smsOut                  chan<- senderMetricSample
+	serviceCheckOut         chan<- metrics.ServiceCheck
+	eventOut                chan<- metrics.Event
 }
 
 type senderMetricSample struct {
@@ -77,9 +80,10 @@ func init() {
 	}
 }
 
-func newCheckSender(id check.ID, smsOut chan<- senderMetricSample, serviceCheckOut chan<- metrics.ServiceCheck, eventOut chan<- metrics.Event) *checkSender {
+func newCheckSender(id check.ID, defaultHostname string, smsOut chan<- senderMetricSample, serviceCheckOut chan<- metrics.ServiceCheck, eventOut chan<- metrics.Event) *checkSender {
 	return &checkSender{
 		id:               id,
+		defaultHostname:  defaultHostname,
 		smsOut:           smsOut,
 		serviceCheckOut:  serviceCheckOut,
 		eventOut:         eventOut,
@@ -127,17 +131,32 @@ func GetDefaultSender() (Sender, error) {
 	senderInit.Do(func() {
 		var defaultCheckID check.ID // the default value is the zero value
 		aggregatorInstance.registerSender(defaultCheckID)
-		senderInstance = newCheckSender(defaultCheckID, aggregatorInstance.checkMetricIn, aggregatorInstance.serviceCheckIn, aggregatorInstance.eventIn)
+		senderInstance = newCheckSender(defaultCheckID, aggregatorInstance.hostname, aggregatorInstance.checkMetricIn, aggregatorInstance.serviceCheckIn, aggregatorInstance.eventIn)
 	})
 
 	return senderInstance, nil
+}
+
+// changeAllSendersDefaultHostname is to be called by the aggregator
+// when its hostname changes. All existing senders will have their
+// default hostname updated.
+func changeAllSendersDefaultHostname(hostname string) {
+	if senderPool != nil {
+		senderPool.changeAllSendersDefaultHostname(hostname)
+	}
+}
+
+// DisableDefaultHostname allows check to override the default hostname that will be injected
+// when no hostname is specified at submission (for metrics, events and service checks).
+func (s *checkSender) DisableDefaultHostname(disable bool) {
+	s.defaultHostnameDisabled = disable
 }
 
 // Commit commits the metric samples that were added during a check run
 // Should be called at the end of every check run
 func (s *checkSender) Commit() {
 	s.smsOut <- senderMetricSample{s.id, &metrics.MetricSample{}, true}
-	go s.cyclemetricStats()
+	s.cyclemetricStats()
 }
 
 func (s *checkSender) GetMetricStats() map[string]int64 {
@@ -145,7 +164,7 @@ func (s *checkSender) GetMetricStats() map[string]int64 {
 	defer s.priormetricStats.Lock.RUnlock()
 
 	metricStats := make(map[string]int64)
-	metricStats["Metrics"] = s.priormetricStats.Metrics
+	metricStats["MetricSamples"] = s.priormetricStats.MetricSamples
 	metricStats["Events"] = s.priormetricStats.Events
 	metricStats["ServiceChecks"] = s.priormetricStats.ServiceChecks
 
@@ -155,10 +174,10 @@ func (s *checkSender) GetMetricStats() map[string]int64 {
 func (s *checkSender) cyclemetricStats() {
 	s.metricStats.Lock.Lock()
 	s.priormetricStats.Lock.Lock()
-	s.priormetricStats.Metrics = s.metricStats.Metrics
+	s.priormetricStats.MetricSamples = s.metricStats.MetricSamples
 	s.priormetricStats.Events = s.metricStats.Events
 	s.priormetricStats.ServiceChecks = s.metricStats.ServiceChecks
-	s.metricStats.Metrics = 0
+	s.metricStats.MetricSamples = 0
 	s.metricStats.Events = 0
 	s.metricStats.ServiceChecks = 0
 	s.metricStats.Lock.Unlock()
@@ -172,7 +191,7 @@ func (s *checkSender) SendRawMetricSample(sample *metrics.MetricSample) {
 }
 
 func (s *checkSender) sendMetricSample(metric string, value float64, hostname string, tags []string, mType metrics.MetricType) {
-	log.Debug(mType.String(), " sample: ", metric, ": ", value, " for hostname: ", hostname, " tags: ", tags)
+	log.Trace(mType.String(), " sample: ", metric, ": ", value, " for hostname: ", hostname, " tags: ", tags)
 
 	metricSample := &metrics.MetricSample{
 		Name:       metric,
@@ -184,10 +203,14 @@ func (s *checkSender) sendMetricSample(metric string, value float64, hostname st
 		Timestamp:  timeNowNano(),
 	}
 
+	if hostname == "" && !s.defaultHostnameDisabled {
+		metricSample.Host = s.defaultHostname
+	}
+
 	s.smsOut <- senderMetricSample{s.id, metricSample, false}
 
 	s.metricStats.Lock.Lock()
-	s.metricStats.Metrics++
+	s.metricStats.MetricSamples++
 	s.metricStats.Lock.Unlock()
 }
 
@@ -238,7 +261,7 @@ func (s *checkSender) SendRawServiceCheck(sc *metrics.ServiceCheck) {
 
 // ServiceCheck submits a service check
 func (s *checkSender) ServiceCheck(checkName string, status metrics.ServiceCheckStatus, hostname string, tags []string, message string) {
-	log.Debug("Service check submitted: ", checkName, ": ", status.String(), " for hostname: ", hostname, " tags: ", tags)
+	log.Trace("Service check submitted: ", checkName, ": ", status.String(), " for hostname: ", hostname, " tags: ", tags)
 	serviceCheck := metrics.ServiceCheck{
 		CheckName: checkName,
 		Status:    status,
@@ -246,6 +269,10 @@ func (s *checkSender) ServiceCheck(checkName string, status metrics.ServiceCheck
 		Ts:        time.Now().Unix(),
 		Tags:      tags,
 		Message:   message,
+	}
+
+	if hostname == "" && !s.defaultHostnameDisabled {
+		serviceCheck.Host = s.defaultHostname
 	}
 
 	s.serviceCheckOut <- serviceCheck
@@ -257,13 +284,30 @@ func (s *checkSender) ServiceCheck(checkName string, status metrics.ServiceCheck
 
 // Event submits an event
 func (s *checkSender) Event(e metrics.Event) {
-	log.Debug("Event submitted: ", e.Title, " for hostname: ", e.Host, " tags: ", e.Tags)
+	log.Trace("Event submitted: ", e.Title, " for hostname: ", e.Host, " tags: ", e.Tags)
+
+	if e.Host == "" && !s.defaultHostnameDisabled {
+		e.Host = s.defaultHostname
+	}
 
 	s.eventOut <- e
 
 	s.metricStats.Lock.Lock()
 	s.metricStats.Events++
 	s.metricStats.Lock.Unlock()
+}
+
+// changeAllSendersDefaultHostname u
+func (sp *checkSenderPool) changeAllSendersDefaultHostname(hostname string) {
+	sp.m.Lock()
+	defer sp.m.Unlock()
+	for _, sender := range sp.senders {
+		cs, ok := sender.(*checkSender)
+		if !ok {
+			continue
+		}
+		cs.defaultHostname = hostname
+	}
 }
 
 func (sp *checkSenderPool) getSender(id check.ID) (Sender, error) {
@@ -281,7 +325,7 @@ func (sp *checkSenderPool) mkSender(id check.ID) (Sender, error) {
 	defer sp.m.Unlock()
 
 	err := aggregatorInstance.registerSender(id)
-	sender := newCheckSender(id, aggregatorInstance.checkMetricIn, aggregatorInstance.serviceCheckIn, aggregatorInstance.eventIn)
+	sender := newCheckSender(id, aggregatorInstance.hostname, aggregatorInstance.checkMetricIn, aggregatorInstance.serviceCheckIn, aggregatorInstance.eventIn)
 	sp.senders[id] = sender
 	return sender, err
 }

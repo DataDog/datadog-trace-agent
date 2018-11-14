@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package ec2
 
@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/util/ecs"
-	log "github.com/cihub/seelog"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
 // declare these as vars not const to ease testing
@@ -83,9 +83,11 @@ func IsDefaultHostname(hostname string) bool {
 
 // HostnameProvider gets the hostname
 func HostnameProvider(hostName string) (string, error) {
-	if ecs.IsInstance() || IsDefaultHostname(hostName) {
+	_, err := ecs.GetUtil()
+	if err == nil || IsDefaultHostname(hostName) {
 		log.Debug("GetHostname trying EC2 metadata...")
 		return GetInstanceID()
 	}
-	return "", nil
+
+	return "", fmt.Errorf("not retrieving hostname from AWS: the host is not an ECS instance, and other providers already retrieve non-default hostnames")
 }

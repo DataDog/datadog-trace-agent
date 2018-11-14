@@ -1,31 +1,63 @@
 # Setting up your development environment
 
-## Invoke
+## Invoke + Python Dependencies
 
-[Invoke](http://www.pyinvoke.org/installing.html) is a task runner written in
-Python that is extensively used in this project to orchestrate builds and test
+[Invoke](http://www.pyinvoke.org/) is a task runner written in Python
+that is extensively used in this project to orchestrate builds and test
 runs.
 
-The easiest way to install it on any supported platform is using `pip`:
-```
-pip install invoke
+Though you may install invoke in a variety of way we suggest you use
+the provided [requirements](https://github.com/DataDog/datadog-agent/blob/master/requirements.txt)
+file and `pip`:
+
+```bash
+pip install -r requirements.txt
 ```
 
-OSX users can install it via [Homebrew](https://brew.sh) with:
-```
-brew install invoke
-```
+This procedure ensures you not only get the correct version of invoke, but
+also any additional python dependencies our development workflow may require,
+at their expected versions.
+It will also pull other handy development tools/deps (reno, or docker).
 
 Tasks are usually parameterized and Invoke comes with some default values that
 are used in the official build. Such values are listed in the `invoke.yaml`
 file at the root of this repo and can be overridden by setting `INVOKE_*` env
 variables (see Invoke docs for more details).
 
+
+### Note
+
+We don't want to pollute your system-wide python installation, so a python virtual
+environment is recommended (though optional). It will help keep an isolated development
+environment and ensure a clean system python.
+
+- Install the virtualenv module:
+```pip install virtualenv```
+- Create the virtual environment:
+```virtualenv $GOPATH/src/github.com/DataDog/datadog-agent/venv```
+- Enable the virtual environment:
+```source $GOPATH/src/github.com/DataDog/datadog-agent/venv/bin/activate```
+
+
 ## Golang
 
-You must install [go](https://golang.org/doc/install) version 1.8 or above. Make
+You must install [go](https://golang.org/doc/install) version 1.10.2 or above. Make
 sure that `$GOPATH/bin` is in your `$PATH` otherwise Invoke cannot use any
 additional tool it might need.
+
+## Installing dependencies
+
+From the root of `datadog-agent`, run `invoke deps`. This will:
+
+- Use `go` to install the necessary dependencies
+- Use `git` to clone [integrations-core][integrations-core]
+- Use `pip` to install [datadog_checks_base][datadog_checks_base]
+
+If you already installed [datadog_checks_base][datadog_checks_base] in your desired
+Python, you can do `invoke deps --no-checks` to prevent cloning and pip install. If
+you are already doing development on [integrations-core][integrations-core], you
+can specify a path to [integrations-core][integrations-core] using the `--core-dir`
+option or `DD_CORE_DIR` environment variable to omit just the cloning step.
 
 ## System or Embedded?
 
@@ -80,7 +112,7 @@ files to be available in the dev env.
 If you're on OSX/macOS, installing Python 2.7 with [Homebrew](https://brew.sh) will
 bring along all the development files needed:
 ```
-brew install python
+brew install python@2
 ```
 
 On Windows, the [official installer](https://www.python.org/downloads/) will
@@ -115,6 +147,20 @@ need to work/debug on the SNMP integration, you could just build the agent witho
 it (see [Building the Agent][building] for how to do it) and avoid the dependencies
 setup efforts altogether.
 
+### Systemd
+
+The agent is able to collect systemd journal logs using a wrapper on the systemd utility library.
+
+On Ubuntu/Debian:
+```
+sudo apt-get install libsystemd-dev
+```
+
+On Redhat/CentOS:
+```
+sudo yum install systemd-devel
+```
+
 ## Docker
 
 If you want to build a Docker image containing the Agent, or if you wan to run
@@ -125,3 +171,5 @@ dev environment.
 [testing]: agent_tests.md
 [building]: agent_build.md
 [agent-omnibus]: agent_omnibus.md
+[integrations-core]: https://github.com/DataDog/integrations-core
+[datadog_checks_base]: https://github.com/DataDog/integrations-core/tree/master/datadog_checks_base

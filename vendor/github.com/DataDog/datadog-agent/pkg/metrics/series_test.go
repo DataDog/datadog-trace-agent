@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package metrics
 
@@ -51,18 +51,47 @@ func TestMarshalSeries(t *testing.T) {
 }
 
 func TestPopulateDeviceField(t *testing.T) {
+	tags := [][]string{
+		{},
+		{"some:tag", "device:/dev/sda1"},
+		{"some:tag", "device:/dev/sda2", "some_other:tag"},
+		{"yet_another:value", "one_last:tag_value"},
+	}
 	series := Series{
 		&Serie{},
 		&Serie{
-			Tags: []string{"some:tag", "device:/dev/sda1"},
+			Tags: tags[1],
 		},
 		&Serie{
-			Tags: []string{"some:tag", "device:/dev/sda2", "some_other:tag"},
+			Tags: tags[2],
 		},
 		&Serie{
-			Tags: []string{"yet_another:value", "one_last:tag_value"},
+			Tags: tags[3],
 		}}
 
+	populateDeviceField(series)
+
+	require.Len(t, series, 4)
+	assert.Empty(t, series[0].Tags)
+	assert.Empty(t, series[0].Device)
+	assert.Equal(t, series[1].Tags, []string{"some:tag"})
+	assert.Equal(t, series[1].Device, "/dev/sda1")
+	assert.Equal(t, series[2].Tags, []string{"some:tag", "some_other:tag"})
+	assert.Equal(t, series[2].Device, "/dev/sda2")
+	assert.Equal(t, series[3].Tags, []string{"yet_another:value", "one_last:tag_value"})
+	assert.Empty(t, series[3].Device)
+
+	series = Series{
+		&Serie{},
+		&Serie{
+			Tags: tags[1],
+		},
+		&Serie{
+			Tags: tags[2],
+		},
+		&Serie{
+			Tags: tags[3],
+		}}
 	populateDeviceField(series)
 
 	require.Len(t, series, 4)
@@ -95,52 +124,107 @@ func TestMarshalJSONSeries(t *testing.T) {
 	assert.Equal(t, payload, []byte("{\"series\":[{\"metric\":\"test.metrics\",\"points\":[[12345,21.21],[67890,12.12]],\"tags\":[\"tag1\",\"tag2:yes\"],\"host\":\"localHost\",\"device\":\"/dev/sda1\",\"type\":\"gauge\",\"interval\":0,\"source_type_name\":\"System\"}]}\n"))
 }
 
-func TestSplitSeries(t *testing.T) {
+func TestSplitSerieasOneMetric(t *testing.T) {
+	s := Series{
+		{Points: []Point{
+			{Ts: 12345.0, Value: float64(21.21)},
+			{Ts: 67890.0, Value: float64(12.12)},
+		},
+			MType: APIGaugeType,
+			Name:  "test.metrics",
+			Host:  "localHost",
+			Tags:  []string{"tag1", "tag2:yes"},
+		},
+		{Points: []Point{
+			{Ts: 12345.0, Value: float64(21.21)},
+			{Ts: 67890.0, Value: float64(12.12)},
+		},
+			MType: APIGaugeType,
+			Name:  "test.metrics",
+			Host:  "localHost",
+			Tags:  []string{"tag3"},
+		},
+	}
+
+	// One metric should not be splitable
+	res, err := s.SplitPayload(2)
+	assert.Nil(t, res)
+	assert.NotNil(t, err)
+}
+
+func TestSplitSerieasByName(t *testing.T) {
 	var series = Series{}
-	for i := 0; i < 2; i++ {
-		s := Serie{
+	for _, name := range []string{"name1", "name2", "name3"} {
+		s1 := Serie{
 			Points: []Point{
 				{Ts: 12345.0, Value: float64(21.21)},
 				{Ts: 67890.0, Value: float64(12.12)},
 			},
 			MType: APIGaugeType,
-			Name:  "test.metrics",
+			Name:  name,
 			Host:  "localHost",
 			Tags:  []string{"tag1", "tag2:yes"},
 		}
-		series = append(series, &s)
+		series = append(series, &s1)
+		s2 := Serie{
+			Points: []Point{
+				{Ts: 12345.0, Value: float64(21.21)},
+				{Ts: 67890.0, Value: float64(12.12)},
+			},
+			MType: APIGaugeType,
+			Name:  name,
+			Host:  "localHost",
+			Tags:  []string{"tag3"},
+		}
+		series = append(series, &s2)
 	}
 
-	newSeries, err := series.SplitPayload(2)
-	require.Nil(t, err)
-	require.Len(t, newSeries, 2)
-	newSeries, err = series.SplitPayload(3)
-	require.Nil(t, err)
-	require.Len(t, newSeries, 2)
+	// splitting 3 group of 2 series in two should not be possible. We
+	// should endup we 3 groups
+	res, err := series.SplitPayload(2)
+	assert.Nil(t, err)
+	require.Len(t, res, 3)
+	// Test grouping by name works
+	assert.Equal(t, res[0].(Series)[0].Name, res[0].(Series)[1].Name)
+	assert.Equal(t, res[1].(Series)[0].Name, res[1].(Series)[1].Name)
+	assert.Equal(t, res[2].(Series)[0].Name, res[2].(Series)[1].Name)
+}
 
-	series = Series{{
-		Points: []Point{
-			{Ts: 12345.0, Value: float64(21.21)},
-			{Ts: 67890.0, Value: float64(12.12)},
+func TestSplitOversizedMetric(t *testing.T) {
+	var series = Series{
+		{
+			Points: []Point{
+				{Ts: 12345.0, Value: float64(21.21)},
+				{Ts: 67890.0, Value: float64(12.12)},
+			},
+			MType: APIGaugeType,
+			Name:  "test.test1",
+			Host:  "localHost",
+			Tags:  []string{"tag1", "tag2:yes"},
 		},
-		MType: APIGaugeType,
-		Name:  "test.metrics",
-		Host:  "localHost",
-		Tags:  []string{"tag1", "tag2:yes"},
-	}}
-	newSeries, err = series.SplitPayload(2)
-	require.Nil(t, err)
-	require.Len(t, newSeries, 2)
-	for _, s := range newSeries {
-		ser := s.(Series)
-		require.Len(t, ser[0].Points, 1)
 	}
-	newSeries, err = series.SplitPayload(3)
-	require.Nil(t, err)
-	require.Len(t, newSeries, 2)
-	for _, s := range newSeries {
-		ser := s.(Series)
-		require.Len(t, ser[0].Points, 1)
+	for _, tag := range []string{"tag1", "tag2", "tag3"} {
+		series = append(series, &Serie{
+			Points: []Point{
+				{Ts: 12345.0, Value: float64(21.21)},
+				{Ts: 67890.0, Value: float64(12.12)},
+			},
+			MType: APIGaugeType,
+			Name:  "test.test2",
+			Host:  "localHost",
+			Tags:  []string{tag},
+		})
+	}
+
+	// splitting 3 group of 2 series in two should not be possible. We
+	// should endup we 3 groups
+	res, err := series.SplitPayload(2)
+	assert.Nil(t, err)
+	require.Len(t, res, 2)
+	// Test grouping by name works
+	if !((len(res[0].(Series)) == 1 && len(res[1].(Series)) == 3) ||
+		(len(res[1].(Series)) == 1 && len(res[0].(Series)) == 3)) {
+		assert.Fail(t, "Oversized metric was split among multiple payload")
 	}
 }
 

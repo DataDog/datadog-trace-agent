@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package retry
 
@@ -133,7 +133,7 @@ func TestRetryCount(t *testing.T) {
 		AttemptMethod: mocked.Attempt,
 		Strategy:      RetryCount,
 		RetryCount:    5,
-		RetryDelay:    1 * time.Nanosecond,
+		RetryDelay:    100 * time.Nanosecond,
 	}
 	err := mocked.SetupRetrier(config)
 	assert.Nil(t, err)
@@ -170,7 +170,7 @@ func TestRetryDelayNotElapsed(t *testing.T) {
 	assert.True(t, IsErrWillRetry(err))
 
 	// Testing the NextRetry value is within 1ms
-	expectedNext := time.Now().Add(retryDelay)
+	expectedNext := time.Now().Add(retryDelay - 100*time.Millisecond)
 	assert.WithinDuration(t, expectedNext, mocked.NextRetry(), time.Millisecond)
 
 	// Second call should skip
@@ -188,7 +188,7 @@ func TestRetryDelayRecover(t *testing.T) {
 		AttemptMethod: mocked.Attempt,
 		Strategy:      RetryCount,
 		RetryCount:    5,
-		RetryDelay:    1 * time.Nanosecond,
+		RetryDelay:    100 * time.Millisecond,
 	}
 	err := mocked.SetupRetrier(config)
 	assert.Nil(t, err)

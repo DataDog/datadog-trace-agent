@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 // Package agent implements the api endpoints for the `/agent` prefix.
 // This group of endpoints is meant to provide high-level functionalities
@@ -12,19 +12,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 
-	log "github.com/cihub/seelog"
+	"github.com/gorilla/mux"
 
+	"github.com/DataDog/datadog-agent/cmd/agent/api/response"
 	"github.com/DataDog/datadog-agent/cmd/agent/common"
 	"github.com/DataDog/datadog-agent/cmd/agent/common/signals"
-	apiutil "github.com/DataDog/datadog-agent/pkg/api/util"
+	"github.com/DataDog/datadog-agent/cmd/agent/gui"
+	"github.com/DataDog/datadog-agent/pkg/autodiscovery"
+	"github.com/DataDog/datadog-agent/pkg/autodiscovery/integration"
 	"github.com/DataDog/datadog-agent/pkg/collector/py"
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/flare"
 	"github.com/DataDog/datadog-agent/pkg/status"
+	"github.com/DataDog/datadog-agent/pkg/status/health"
+	"github.com/DataDog/datadog-agent/pkg/tagger"
 	"github.com/DataDog/datadog-agent/pkg/util"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/datadog-agent/pkg/version"
-	"github.com/gorilla/mux"
 )
 
 // SetupHandlers adds the specific handlers for /agent endpoints
@@ -35,15 +41,16 @@ func SetupHandlers(r *mux.Router) {
 	r.HandleFunc("/stop", stopAgent).Methods("POST")
 	r.HandleFunc("/status", getStatus).Methods("GET")
 	r.HandleFunc("/status/formatted", getFormattedStatus).Methods("GET")
+	r.HandleFunc("/status/health", getHealth).Methods("GET")
 	r.HandleFunc("/{component}/status", componentStatusGetterHandler).Methods("GET")
 	r.HandleFunc("/{component}/status", componentStatusHandler).Methods("POST")
 	r.HandleFunc("/{component}/configs", componentConfigHandler).Methods("GET")
+	r.HandleFunc("/gui/csrf-token", getCSRFToken).Methods("GET")
+	r.HandleFunc("/config-check", getConfigCheck).Methods("GET")
+	r.HandleFunc("/tagger-list", getTaggerList).Methods("GET")
 }
 
 func stopAgent(w http.ResponseWriter, r *http.Request) {
-	if err := apiutil.Validate(w, r); err != nil {
-		return
-	}
 	signals.Stopper <- true
 	w.Header().Set("Content-Type", "application/json")
 	j, _ := json.Marshal("")
@@ -51,19 +58,13 @@ func stopAgent(w http.ResponseWriter, r *http.Request) {
 }
 
 func getVersion(w http.ResponseWriter, r *http.Request) {
-	if err := apiutil.Validate(w, r); err != nil {
-		return
-	}
 	w.Header().Set("Content-Type", "application/json")
-	av, _ := version.New(version.AgentVersion)
+	av, _ := version.New(version.AgentVersion, version.Commit)
 	j, _ := json.Marshal(av)
 	w.Write(j)
 }
 
 func getHostname(w http.ResponseWriter, r *http.Request) {
-	if err := apiutil.Validate(w, r); err != nil {
-		return
-	}
 	w.Header().Set("Content-Type", "application/json")
 	hname, err := util.GetHostname()
 	if err != nil {
@@ -87,10 +88,6 @@ func getPythonStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func makeFlare(w http.ResponseWriter, r *http.Request) {
-	if err := apiutil.Validate(w, r); err != nil {
-		return
-	}
-
 	logFile := config.Datadog.GetString("log_file")
 	if logFile == "" {
 		logFile = common.DefaultLogFile
@@ -149,10 +146,6 @@ func componentStatusHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getStatus(w http.ResponseWriter, r *http.Request) {
-	if err := apiutil.Validate(w, r); err != nil {
-		return
-	}
-
 	log.Info("Got a request for the status. Making status.")
 	s, err := status.GetStatus()
 	w.Header().Set("Content-Type", "application/json")
@@ -175,10 +168,6 @@ func getStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func getFormattedStatus(w http.ResponseWriter, r *http.Request) {
-	if err := apiutil.Validate(w, r); err != nil {
-		return
-	}
-
 	log.Info("Got a request for the formatted status. Making formatted status.")
 	s, err := status.GetAndFormatStatus()
 	if err != nil {
@@ -190,4 +179,66 @@ func getFormattedStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write(s)
+}
+
+func getHealth(w http.ResponseWriter, r *http.Request) {
+	h := health.GetStatus()
+
+	if len(h.Unhealthy) > 0 {
+		log.Debugf("Healthcheck failed on: %v", h.Unhealthy)
+	}
+
+	jsonHealth, err := json.Marshal(h)
+	if err != nil {
+		log.Errorf("Error marshalling status. Error: %v, Status: %v", err, h)
+		body, _ := json.Marshal(map[string]string{"error": err.Error()})
+		http.Error(w, string(body), 500)
+		return
+	}
+
+	w.Write(jsonHealth)
+}
+
+func getCSRFToken(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte(gui.CsrfToken))
+}
+
+func getConfigCheck(w http.ResponseWriter, r *http.Request) {
+	var response response.ConfigCheckResponse
+
+	configs := common.AC.GetLoadedConfigs()
+	configSlice := make([]integration.Config, 0)
+	for _, config := range configs {
+		configSlice = append(configSlice, config)
+	}
+	sort.Slice(configSlice, func(i, j int) bool {
+		return configSlice[i].Name < configSlice[j].Name
+	})
+	response.Configs = configSlice
+	response.ResolveWarnings = autodiscovery.GetResolveWarnings()
+	response.ConfigErrors = autodiscovery.GetConfigErrors()
+	response.Unresolved = common.AC.GetUnresolvedTemplates()
+
+	jsonConfig, err := json.Marshal(response)
+	if err != nil {
+		log.Errorf("Unable to marshal config check response: %s", err)
+		body, _ := json.Marshal(map[string]string{"error": err.Error()})
+		http.Error(w, string(body), 500)
+		return
+	}
+
+	w.Write(jsonConfig)
+}
+
+func getTaggerList(w http.ResponseWriter, r *http.Request) {
+	response := tagger.List(tagger.IsFullCardinality())
+
+	jsonTags, err := json.Marshal(response)
+	if err != nil {
+		log.Errorf("Unable to marshal tagger list response: %s", err)
+		body, _ := json.Marshal(map[string]string{"error": err.Error()})
+		http.Error(w, string(body), 500)
+		return
+	}
+	w.Write(jsonTags)
 }
