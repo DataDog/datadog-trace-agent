@@ -98,15 +98,15 @@ type MockExtractor struct {
 	Rate float64
 }
 
-func (e *MockExtractor) Extract(s *model.WeightedSpan, priority model.SamplingPriority) (*model.Event, float64) {
+func (e *MockExtractor) Extract(s *model.WeightedSpan, priority model.SamplingPriority) (*model.Event, float64, bool) {
 	if e.Rate < 0 {
-		return nil, 0
+		return nil, 0, false
 	}
 
 	return &model.Event{
 		Span:     s.Span,
 		Priority: priority,
-	}, e.Rate
+	}, e.Rate, true
 }
 
 type MockEventSampler struct {

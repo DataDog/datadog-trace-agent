@@ -59,8 +59,8 @@ func (p *Processor) Process(t model.ProcessedTrace) (events []*model.Event, numE
 	preSampleRate := t.Root.GetPreSampleRate()
 
 	for _, span := range t.WeightedTrace {
-		event, extractionRate := p.extract(span, priority)
-		if event == nil {
+		event, extractionRate, ok := p.extract(span, priority)
+		if !ok {
 			continue
 		}
 
@@ -88,14 +88,13 @@ func (p *Processor) Process(t model.ProcessedTrace) (events []*model.Event, numE
 	return
 }
 
-func (p *Processor) extract(span *model.WeightedSpan, priority model.SamplingPriority) (*model.Event, float64) {
+func (p *Processor) extract(span *model.WeightedSpan, priority model.SamplingPriority) (*model.Event, float64, bool) {
 	for _, extractor := range p.extractors {
-		event, rate := extractor.Extract(span, priority)
-		if event != nil {
-			return event, rate
+		if event, rate, ok := extractor.Extract(span, priority); ok {
+			return event, rate, ok
 		}
 	}
-	return nil, 0
+	return nil, 0, false
 }
 
 func (p *Processor) extractionSample(event *model.Event, extractionRate float64) bool {

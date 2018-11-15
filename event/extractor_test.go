@@ -21,11 +21,14 @@ func testExtractor(t *testing.T, extractor Extractor, testCase extractorTestCase
 		total := 0
 
 		for _, span := range testCase.spans {
-			event, rate := extractor.Extract(span, testCase.priority)
+			event, rate, ok := extractor.Extract(span, testCase.priority)
 
 			total++
 
-			if event == nil {
+			if ok {
+				assert.EqualValues(span.Span, event.Span)
+				assert.EqualValues(testCase.priority, event.Priority)
+			} else {
 				rate = -1
 			}
 
