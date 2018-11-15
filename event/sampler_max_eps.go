@@ -7,7 +7,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/sampler"
 )
 
-// maxEPSSampler (Max Events Per Second Sampler) is an event sampler that samples provided events so as to try to ensure
+// maxEPSSampler (Max Events Per Second Sampler) is an event maxEPSSampler that samples provided events so as to try to ensure
 // no more than a certain amount of events is sampled per second.
 //
 // Note that events associated with traces with UserPriorityKeep are always sampled and don't influence underlying
@@ -18,14 +18,10 @@ type maxEPSSampler struct {
 }
 
 // NewMaxEPSSampler creates a new instance of a maxEPSSampler with the provided maximum amount of events per second.
-func NewMaxEPSSampler(maxEPS float64) Sampler {
-	return newMaxEPSSampler(maxEPS, newSamplerBackendRateCounter())
-}
-
-func newMaxEPSSampler(maxEPS float64, rateCounter rateCounter) Sampler {
+func newMaxEPSSampler(maxEPS float64) *maxEPSSampler {
 	return &maxEPSSampler{
 		maxEPS:      maxEPS,
-		rateCounter: rateCounter,
+		rateCounter: newSamplerBackendRateCounter(),
 	}
 }
 
@@ -41,29 +37,15 @@ func (s *maxEPSSampler) Stop() {
 
 // Sample determines whether or not we should sample the provided event in order to ensure no more than maxEPS events
 // are sampled every second.
-func (s *maxEPSSampler) Sample(event *model.APMEvent) (sampled bool, rate float64) {
-	// Events associated with traces that were manually sampled (with PriorityUserKeep) should not be subjected to
-	// MaxEPSSampling nor should they affect rate counters otherwise we'll get skewed stats.
-	if event.Priority == model.PriorityUserKeep {
-		return true, 1
-	}
-
+func (s *maxEPSSampler) Sample(event *model.Event) (sampled bool, rate float64) {
 	// Count that we saw a new event
 	s.rateCounter.Count()
-
 	rate = 1.0
 	currentEPS := s.rateCounter.GetRate()
-
 	if currentEPS > s.maxEPS {
 		rate = s.maxEPS / currentEPS
 	}
-
 	sampled = sampler.SampleByRate(event.Span.TraceID, rate)
-
-	if sampled {
-		event.SetMaxEPSSampleRate(rate)
-	}
-
 	return
 }
 
@@ -75,7 +57,7 @@ type rateCounter interface {
 	Stop()
 }
 
-// samplerBackendRateCounter is a rateCounter backed by a sampler.Backend.
+// samplerBackendRateCounter is a rateCounter backed by a maxEPSSampler.Backend.
 type samplerBackendRateCounter struct {
 	backend sampler.Backend
 }

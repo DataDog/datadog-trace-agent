@@ -27,21 +27,22 @@ func TestAnalyzedExtractor(t *testing.T) {
 	config["serviceC"]["opC"] = 1
 
 	tests := []extractorTestCase{
-		{"No priority - No service match", createTestSpans("serviceZ", "opA"), 0, -1},
-		{"No priority - No name match", createTestSpans("serviceA", "opZ"), 0, -1},
-		{"No priority - Match - 0", createTestSpans("serviceA", "opA"), 0, 0},
-		{"No priority - Match - 0.5", createTestSpans("serviceB", "opB"), 0, 0.5},
-		{"No priority - Match - 1", createTestSpans("serviceC", "opC"), 0, 1},
-		{"Priority 1 - No service match", createTestSpans("serviceZ", "opA"), 1, -1},
-		{"Priority 1 - No name match", createTestSpans("serviceA", "opZ"), 1, -1},
-		{"Priority 1 - Match - 0", createTestSpans("serviceA", "opA"), 1, 0},
-		{"Priority 1 - Match - 0.5", createTestSpans("serviceB", "opB"), 1, 0.5},
-		{"Priority 1 - Match - 1", createTestSpans("serviceC", "opC"), 1, 1},
-		{"Priority 2 - No service match", createTestSpans("serviceZ", "opA"), 2, -1},
-		{"Priority 2 - No name match", createTestSpans("serviceA", "opZ"), 2, -1},
-		{"Priority 2 - Match - 0", createTestSpans("serviceA", "opA"), 2, 0},
-		{"Priority 2 - Match - 0.5", createTestSpans("serviceB", "opB"), 2, 1},
-		{"Priority 2 - Match - 1", createTestSpans("serviceC", "opC"), 2, 1},
+		// Name: <priority>/(<no match reason>/<extraction rate>)
+		{"none/noservice", createTestSpans("serviceZ", "opA"), 0, -1},
+		{"none/noname", createTestSpans("serviceA", "opZ"), 0, -1},
+		{"none/0", createTestSpans("serviceA", "opA"), 0, 0},
+		{"none/0.5", createTestSpans("serviceB", "opB"), 0, 0.5},
+		{"none/1", createTestSpans("serviceC", "opC"), 0, 1},
+		{"1/noservice", createTestSpans("serviceZ", "opA"), 1, -1},
+		{"1/noname", createTestSpans("serviceA", "opZ"), 1, -1},
+		{"1/0", createTestSpans("serviceA", "opA"), 1, 0},
+		{"1/0.5", createTestSpans("serviceB", "opB"), 1, 0.5},
+		{"1/1", createTestSpans("serviceC", "opC"), 1, 1},
+		{"2/noservice", createTestSpans("serviceZ", "opA"), 2, -1},
+		{"2/noname", createTestSpans("serviceA", "opZ"), 2, -1},
+		{"2/0", createTestSpans("serviceA", "opA"), 2, 0},
+		{"2/0.5", createTestSpans("serviceB", "opB"), 2, 1},
+		{"2/1", createTestSpans("serviceC", "opC"), 2, 1},
 	}
 
 	for _, test := range tests {

@@ -13,25 +13,30 @@ func TestProcessor(t *testing.T) {
 		name                 string
 		extractorRates       []float64
 		samplerRate          float64
+		priority             model.SamplingPriority
 		expectedExtractedPct float64
 		expectedSampledPct   float64
 		deltaPct             float64
 	}{
-		{"No extractors", nil, -1, 0, 0, 0},
+		// Name: <extraction rates>/<maxEPSSampler rate>/<priority>
+		{"none/1/none", nil, 1, model.PriorityNone, 0, 0, 0},
 
 		// Test Extractors
-		{"Extractor(0) - Sampler(1)", []float64{0}, 1, 0, 0, 0},
-		{"Extractor(0.5) - Sampler(1)", []float64{0.5}, 1, 0.5, 1, 0.1},
-		{"Extractor(-1, 0.8) - Sampler(1)", []float64{-1, 0.8}, 1, 0.8, 1, 0.1},
-		{"Extractor(-1, -1, 0.8) - Sampler(1)", []float64{-1, -1, 0.8}, 1, 0.8, 1, 0.1},
+		{"0/1/none", []float64{0}, 1, model.PriorityNone, 0, 0, 0},
+		{"0.5/1/none", []float64{0.5}, 1, model.PriorityNone, 0.5, 1, 0.1},
+		{"-1,0.8/1/none", []float64{-1, 0.8}, 1, model.PriorityNone, 0.8, 1, 0.1},
+		{"-1,-1,-0.8/1/none", []float64{-1, -1, 0.8}, 1, model.PriorityNone, 0.8, 1, 0.1},
 
-		// Test Sampler
-		{"Extractor(1) - Sampler(0)", []float64{1}, 0, 1, 0, 0},
-		{"Extractor(1) - Sampler(0.5)", []float64{1}, 0.5, 1, 0.5, 0.1},
-		{"Extractor(1) - Sampler(1)", []float64{1}, 1, 1, 1, 0},
+		// Test MaxEPS sampler
+		{"1/0/none", []float64{1}, 0, model.PriorityNone, 1, 0, 0},
+		{"1/0.5/none", []float64{1}, 0.5, model.PriorityNone, 1, 0.5, 0.1},
+		{"1/1/none", []float64{1}, 1, model.PriorityNone, 1, 1, 0},
 
 		// Test Extractor and Sampler combinations
-		{"Extractor(-1, 0.8) - Sampler(0.8)", []float64{-1, 0.8}, 0.8, 0.8, 0.8, 0.1},
+		{"-1,0.8/0.8/none", []float64{-1, 0.8}, 0.8, model.PriorityNone, 0.8, 0.8, 0.1},
+		{"-1,0.8/0.8/autokeep", []float64{-1, 0.8}, 0.8, model.PriorityAutoKeep, 0.8, 0.8, 0.1},
+		// Test userkeep bypass of max eps
+		{"-1,0.8/0.8/userkeep", []float64{-1, 0.8}, 0.8, model.PriorityUserKeep, 0.8, 1, 0.1},
 	}
 
 	testClientSampleRate := 0.3
@@ -46,14 +51,17 @@ func TestProcessor(t *testing.T) {
 				extractors[i] = &MockExtractor{Rate: rate}
 			}
 
-			sampler := &MockSampler{Rate: test.samplerRate}
-			p := NewProcessor(extractors, sampler)
+			sampler := &MockEventSampler{Rate: test.samplerRate}
+			p := newProcessor(extractors, sampler)
 
 			testSpans := createTestSpans("test", "test")
 			testTrace := model.ProcessedTrace{WeightedTrace: testSpans}
 			testTrace.Root = testSpans[0].Span
 			testTrace.Root.SetPreSampleRate(testPreSampleRate)
 			testTrace.Root.SetClientTraceSampleRate(testClientSampleRate)
+			if test.priority != model.PriorityNone {
+				testTrace.Root.SetSamplingPriority(test.priority)
+			}
 
 			p.Start()
 			events, extracted := p.Process(testTrace)
@@ -68,11 +76,17 @@ func TestProcessor(t *testing.T) {
 			assert.InDelta(expectedReturned, returned, expectedReturned*test.deltaPct)
 
 			assert.EqualValues(1, sampler.StartCalls)
-			assert.EqualValues(extracted, sampler.SampleCalls)
 			assert.EqualValues(1, sampler.StopCalls)
+
+			expectedSampleCalls := extracted
+			if test.priority == model.PriorityUserKeep {
+				expectedSampleCalls = 0
+			}
+			assert.EqualValues(expectedSampleCalls, sampler.SampleCalls)
 
 			for _, event := range events {
 				assert.EqualValues(test.expectedExtractedPct, event.GetExtractionSampleRate())
+				assert.EqualValues(test.expectedSampledPct, event.GetMaxEPSSampleRate())
 				assert.EqualValues(testClientSampleRate, event.GetClientTraceSampleRate())
 				assert.EqualValues(testPreSampleRate, event.GetPreSampleRate())
 			}
@@ -84,15 +98,18 @@ type MockExtractor struct {
 	Rate float64
 }
 
-func (e *MockExtractor) Extract(s *model.WeightedSpan, priority model.SamplingPriority) (bool, float64, bool) {
-	if e.Rate >= 0 {
-		return rand.Float64() < e.Rate, e.Rate, true
+func (e *MockExtractor) Extract(s *model.WeightedSpan, priority model.SamplingPriority) (*model.Event, float64) {
+	if e.Rate < 0 {
+		return nil, 0
 	}
 
-	return false, 0, false
+	return &model.Event{
+		Span:     s.Span,
+		Priority: priority,
+	}, e.Rate
 }
 
-type MockSampler struct {
+type MockEventSampler struct {
 	Rate float64
 
 	StartCalls  int
@@ -100,15 +117,15 @@ type MockSampler struct {
 	SampleCalls int
 }
 
-func (s *MockSampler) Start() {
+func (s *MockEventSampler) Start() {
 	s.StartCalls++
 }
 
-func (s *MockSampler) Stop() {
+func (s *MockEventSampler) Stop() {
 	s.StopCalls++
 }
 
-func (s *MockSampler) Sample(event *model.APMEvent) (bool, float64) {
+func (s *MockEventSampler) Sample(event *model.Event) (bool, float64) {
 	s.SampleCalls++
 
 	return rand.Float64() < s.Rate, s.Rate

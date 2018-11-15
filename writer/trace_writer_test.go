@@ -278,7 +278,7 @@ func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expecte
 	sampledTraces []*TracePackage, payloads []*payload) {
 
 	var expectedTraces []model.Trace
-	var expectedEvents []*model.APMEvent
+	var expectedEvents []*model.Event
 
 	for _, sampledTrace := range sampledTraces {
 		expectedTraces = append(expectedTraces, sampledTrace.Trace)
@@ -362,10 +362,10 @@ func randomTracePackage(numSpans, numEvents int) *TracePackage {
 
 	trace := testutil.GetTestTrace(1, numSpans, true)[0]
 
-	events := make([]*model.APMEvent, 0, numEvents)
+	events := make([]*model.Event, 0, numEvents)
 
 	for _, span := range trace[:numEvents] {
-		events = append(events, &model.APMEvent{Span: span})
+		events = append(events, &model.Event{Span: span})
 	}
 
 	return &TracePackage{

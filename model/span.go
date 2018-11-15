@@ -76,9 +76,7 @@ func (s *Span) GetMetric(k string) (float64, bool) {
 	if s == nil || s.Metrics == nil {
 		return 0, false
 	}
-
 	val, ok := s.Metrics[k]
-
 	return val, ok
 }
 
@@ -87,7 +85,6 @@ func (s *Span) GetMetricDefault(k string, def float64) float64 {
 	if val, ok := s.GetMetric(k); ok {
 		return val
 	}
-
 	return def
 }
 

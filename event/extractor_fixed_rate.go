@@ -2,7 +2,6 @@ package event
 
 import (
 	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/DataDog/datadog-trace-agent/sampler"
 )
 
 // fixedRateExtractor is an event extractor that decides whether to extract APM events from spans based on
@@ -20,21 +19,23 @@ func NewFixedRateExtractor(rateByServiceAndName map[string]map[string]float64) E
 }
 
 // Extract decides to extract an apm event from a span if its service and name have a corresponding extraction rate
-// and the span's trace id is chosen based on said rate.
-//
-// If no rate is set for the service and name pair in the span, the returned rate is UnknownRate.
-func (e *fixedRateExtractor) Extract(s *model.WeightedSpan, priority model.SamplingPriority) (extract bool, rate float64, decided bool) {
+// on the rateByServiceAndName map passed in the constructor. The extracted event is returned along with the associated
+// extraction rate or nil if no extraction happened.
+func (e *fixedRateExtractor) Extract(s *model.WeightedSpan, priority model.SamplingPriority) (*model.Event, float64) {
 	operations, ok := e.rateByServiceAndName[s.Service]
 	if !ok {
-		return false, 0, false
+		return nil, 0
 	}
 	extractionRate, ok := operations[s.Name]
 	if !ok {
-		return false, 0, false
+		return nil, 0
 	}
 	if extractionRate > 0 && priority >= model.PriorityUserKeep {
-		// If the span has been manually sampled, we always want to extract events.
-		return true, 1, true
+		// If the span has been manually sampled, we always want to keep these events
+		extractionRate = 1
 	}
-	return sampler.SampleByRate(s.TraceID, extractionRate), extractionRate, true
+	return &model.Event{
+		Span:     s.Span,
+		Priority: priority,
+	}, extractionRate
 }

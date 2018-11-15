@@ -27,7 +27,7 @@ type TracePackage struct {
 	// Trace will contain a trace if it was sampled or be empty if it wasn't.
 	Trace model.Trace
 	// Events contains all APMEvents extracted from a trace. If no events were extracted, it will be empty.
-	Events []*model.APMEvent
+	Events []*model.Event
 }
 
 // Empty returns true if this TracePackage has no data.
@@ -186,7 +186,7 @@ func (w *TraceWriter) appendTrace(trace model.Trace) {
 	w.spansInBuffer += numSpans
 }
 
-func (w *TraceWriter) appendEvents(events []*model.APMEvent) {
+func (w *TraceWriter) appendEvents(events []*model.Event) {
 	for _, event := range events {
 		log.Tracef("Handling new APM event: %v", event)
 		w.events = append(w.events, event.Span)

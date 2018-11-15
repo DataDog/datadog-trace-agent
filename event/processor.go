@@ -1,51 +1,56 @@
 package event
 
-import "github.com/DataDog/datadog-trace-agent/model"
+import (
+	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/sampler"
+)
 
 // Processor is responsible for all the logic surrounding extraction and sampling of APM events from processed traces.
 type Processor struct {
-	extractors []Extractor
-	sampler    Sampler
+	extractors    []Extractor
+	maxEPSSampler eventSampler
 }
 
-// NewProcessor returns a new instance of Processor configured with the provided extractors and sampler.
+// NewProcessor returns a new instance of Processor configured with the provided extractors and max eps limitation.
 //
 // Extractors will look at each span in the trace and decide whether it should be converted to an APM event or not. They
-// will be tried in the provided order, with the first one returning a decision being the one applied.
+// will be tried in the provided order, with the first one returning an event stopping the chain.
 //
-// All extracted APM events are then submitted to the specified sampler (if any), no matter which extractor extracted
-// them. Only those events that survived this sampling step are returned. If sampler is nil, all extracted events are
-// assumed to be sampled and shall be returned.
-func NewProcessor(extractors []Extractor, sampler Sampler) *Processor {
+// All extracted APM events are then submitted to sampling. This sampling is 2-fold:
+// * A first sampling step is done based on the extraction sampling rate returned by an Extractor. If an Extractor
+//   returns an event accompanied with a 0.1 extraction rate, then there's a 90% chance that this event will get
+//   discarded.
+// * A max events per second maxEPSSampler is applied to all non-PriorityUserKeep events that survived the first step
+//   and will ensure that, in average, the total rate of events returned by the processor is not bigger than maxEPS.
+func NewProcessor(extractors []Extractor, maxEPS float64) *Processor {
+	return newProcessor(extractors, newMaxEPSSampler(maxEPS))
+}
+
+func newProcessor(extractors []Extractor, maxEPSSampler eventSampler) *Processor {
 	return &Processor{
-		extractors: extractors,
-		sampler:    sampler,
+		extractors:    extractors,
+		maxEPSSampler: maxEPSSampler,
 	}
 }
 
 // Start starts the processor.
 func (p *Processor) Start() {
-	if p.sampler != nil {
-		p.sampler.Start()
-	}
+	p.maxEPSSampler.Start()
 }
 
 // Stop stops the processor.
 func (p *Processor) Stop() {
-	if p.sampler != nil {
-		p.sampler.Stop()
-	}
+	p.maxEPSSampler.Stop()
 }
 
 // Process takes a processed trace, extracts events from it and samples them, returning a collection of
 // sampled events along with the total count of extracted events.
-func (p *Processor) Process(t model.ProcessedTrace) (events []*model.APMEvent, numExtracted int64) {
+func (p *Processor) Process(t model.ProcessedTrace) (events []*model.Event, numExtracted int64) {
 	if len(p.extractors) == 0 {
 		return
 	}
 
 	priority, hasPriority := t.GetSamplingPriority()
-
 	if !hasPriority {
 		priority = model.PriorityNone
 	}
@@ -54,46 +59,58 @@ func (p *Processor) Process(t model.ProcessedTrace) (events []*model.APMEvent, n
 	preSampleRate := t.Root.GetPreSampleRate()
 
 	for _, span := range t.WeightedTrace {
-		var event *model.APMEvent
-
-		for _, extractor := range p.extractors {
-			extract, rate, decided := extractor.Extract(span, priority)
-
-			if !decided {
-				// If the extractor did not make any extraction decision, try the next one
-				continue
-			}
-
-			if extract {
-				event = &model.APMEvent{Span: span.Span, Priority: priority}
-				event.SetExtractionSampleRate(rate)
-			}
-
-			// If this extractor applied a valid sampling Rate then that means it processed this span so don't try the
-			// next ones.
-			break
-		}
-
+		event, extractionRate := p.extract(span, priority)
 		if event == nil {
-			// If we didn't find any event in this span, try the next span
 			continue
 		}
 
+		sampled := p.extractionSample(event, extractionRate)
+		if !sampled {
+			continue
+		}
 		numExtracted++
 
-		if p.sampler != nil {
-			if sampled, _ := p.sampler.Sample(event); !sampled {
-				// If we didn't sample this event, try the next span
-				continue
-			}
+		sampled, epsRate := p.maxEPSSample(event)
+		if !sampled {
+			continue
 		}
 
-		// Otherwise, this event got sampled, so add it to results
+		// This event got sampled, so add it to results
 		events = append(events, event)
 		// And set whatever rates had been set on the trace initially
 		event.SetClientTraceSampleRate(clientSampleRate)
 		event.SetPreSampleRate(preSampleRate)
+		// As well as the rates of sampling done during this processing
+		event.SetExtractionSampleRate(extractionRate)
+		event.SetMaxEPSSampleRate(epsRate)
 	}
 
 	return
+}
+
+func (p *Processor) extract(span *model.WeightedSpan, priority model.SamplingPriority) (*model.Event, float64) {
+	for _, extractor := range p.extractors {
+		event, rate := extractor.Extract(span, priority)
+		if event != nil {
+			return event, rate
+		}
+	}
+	return nil, 0
+}
+
+func (p *Processor) extractionSample(event *model.Event, extractionRate float64) bool {
+	return sampler.SampleByRate(event.Span.TraceID, extractionRate)
+}
+
+func (p *Processor) maxEPSSample(event *model.Event) (sampled bool, rate float64) {
+	if event.Priority == model.PriorityUserKeep {
+		return true, 1
+	}
+	return p.maxEPSSampler.Sample(event)
+}
+
+type eventSampler interface {
+	Start()
+	Sample(event *model.Event) (sampled bool, rate float64)
+	Stop()
 }
