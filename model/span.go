@@ -161,6 +161,14 @@ func (s *Span) SetPreSampleRate(rate float64) {
 	}
 }
 
+// SetMeta sets a value in the span Meta map.
+func (s *Span) SetMeta(key string, val string) {
+	if s.Meta == nil {
+		s.Meta = make(map[string]string)
+	}
+	s.Meta[key] = val
+}
+
 func (s *Span) GetService() string {
 	return s.Service
 }
@@ -190,9 +198,35 @@ func (s *Span) GetStart() int64 {
 }
 
 func (s *Span) GetError() bool {
-	return s.Error > 1
+	return s.Error > 0
 }
 
 func (s *Span) GetDuration() int64 {
 	return s.Duration
+}
+
+// GetMetaWithKey returns metadata for the given key
+func (s *Span) GetMetaWithKey(key string) string {
+	return s.Meta[key]
+}
+
+// SetMetaWithKey set metadata for the given key
+func (s *Span) SetMetaWithKey(key, value string) {
+	if s.Meta == nil {
+		s.Meta = make(map[string]string)
+	}
+	s.Meta[key] = value
+}
+
+// GetMetricWithKey returns metric for the given key
+func (s *Span) GetMetricWithKey(key string) float64 {
+	return s.Metrics[key]
+}
+
+// SetMetricWithKey set metric for the given key
+func (s *Span) SetMetricWithKey(key string, value float64) {
+	if s.Metrics == nil {
+		s.Metrics = make(map[string]float64)
+	}
+	s.Metrics[key] = value
 }
