@@ -32,7 +32,7 @@ type Agent struct {
 	ScoreSampler       *Sampler
 	ErrorsScoreSampler *Sampler
 	PrioritySampler    *Sampler
-	EventExtractor     event.Extractor
+	EventProcessor     *event.Processor
 	TraceWriter        *writer.TraceWriter
 	ServiceWriter      *writer.ServiceWriter
 	StatsWriter        *writer.StatsWriter
@@ -77,7 +77,7 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	ss := NewScoreSampler(conf)
 	ess := NewErrorsSampler(conf)
 	ps := NewPrioritySampler(conf, dynConf)
-	ee := eventExtractorFromConf(conf)
+	ep := eventProcessorFromConf(conf)
 	se := NewTraceServiceExtractor(serviceChan)
 	sm := NewServiceMapper(serviceChan, filteredServiceChan)
 	tw := writer.NewTraceWriter(conf, tracePkgChan)
@@ -92,7 +92,7 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 		ScoreSampler:       ss,
 		ErrorsScoreSampler: ess,
 		PrioritySampler:    ps,
-		EventExtractor:     ee,
+		EventProcessor:     ep,
 		TraceWriter:        tw,
 		StatsWriter:        sw,
 		ServiceWriter:      svcW,
@@ -128,6 +128,7 @@ func (a *Agent) Run() {
 	a.ScoreSampler.Run()
 	a.ErrorsScoreSampler.Run()
 	a.PrioritySampler.Run()
+	a.EventProcessor.Start()
 
 	for {
 		select {
@@ -148,6 +149,7 @@ func (a *Agent) Run() {
 			a.ScoreSampler.Stop()
 			a.ErrorsScoreSampler.Stop()
 			a.PrioritySampler.Stop()
+			a.EventProcessor.Stop()
 			return
 		}
 	}
@@ -201,11 +203,13 @@ func (a *Agent) Process(t model.Trace) {
 	a.Replacer.Replace(&t)
 
 	// Extract the client sampling rate.
-	clientSampleRate := sampler.GetTraceAppliedSampleRate(root)
+	clientSampleRate := root.GetSampleRate()
+	root.SetClientTraceSampleRate(clientSampleRate)
 	// Combine it with the pre-sampling rate.
 	preSamplerRate := a.Receiver.PreSampler.Rate()
-	// Combine them and attach it to the root to be used for weighing.
-	sampler.SetTraceAppliedSampleRate(root, clientSampleRate*preSamplerRate)
+	root.SetPreSampleRate(preSamplerRate)
+	// Update root's global sample rate to include the presampler rate as well
+	root.UpdateSampleRate(preSamplerRate)
 
 	// Figure out the top-level spans and sublayers now as it involves modifying the Metrics map
 	// which is not thread-safe while samplers and Concentrator might modify it too.
@@ -256,12 +260,16 @@ func (a *Agent) Process(t model.Trace) {
 
 		if sampled {
 			pt.Sampled = sampled
-			sampler.AddSampleRate(pt.Root, rate)
+			pt.Root.UpdateSampleRate(rate)
 			tracePkg.Trace = pt.Trace
 		}
 
-		// NOTE: Events can be extracted from non-sampled traces.
-		tracePkg.Events = a.EventExtractor.Extract(pt)
+		// NOTE: Events can be processed on non-sampled traces.
+		events, numExtracted := a.EventProcessor.Process(pt)
+		tracePkg.Events = events
+
+		atomic.AddInt64(&ts.EventsExtracted, int64(numExtracted))
+		atomic.AddInt64(&ts.EventsSampled, int64(len(tracePkg.Events)))
 
 		if !tracePkg.Empty() {
 			a.tracePkgChan <- &tracePkg
@@ -328,14 +336,15 @@ func traceContainsError(trace model.Trace) bool {
 	return false
 }
 
-func eventExtractorFromConf(conf *config.AgentConfig) event.Extractor {
-	if len(conf.AnalyzedSpansByService) > 0 {
-		return event.NewFixedRateExtractor(conf.AnalyzedSpansByService)
+func eventProcessorFromConf(conf *config.AgentConfig) *event.Processor {
+	extractors := []event.Extractor{
+		event.NewMetricBasedExtractor(),
 	}
-	if len(conf.AnalyzedRateByServiceLegacy) > 0 {
-		return event.NewLegacyExtractor(conf.AnalyzedRateByServiceLegacy)
+	if len(conf.AnalyzedSpansByService) > 0 {
+		extractors = append(extractors, event.NewFixedRateExtractor(conf.AnalyzedSpansByService))
+	} else if len(conf.AnalyzedRateByServiceLegacy) > 0 {
+		extractors = append(extractors, event.NewLegacyExtractor(conf.AnalyzedRateByServiceLegacy))
 	}
 
-	// TODO: Replace disabled extractor with TaggedExtractor
-	return event.NewNoopExtractor()
+	return event.NewProcessor(extractors, conf.MaxEPS)
 }

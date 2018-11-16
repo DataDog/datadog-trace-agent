@@ -60,6 +60,7 @@ type AgentConfig struct {
 	// Sampler configuration
 	ExtraSampleRate float64
 	MaxTPS          float64
+	MaxEPS          float64
 
 	// Receiver
 	ReceiverHost    string
@@ -121,6 +122,7 @@ func New() *AgentConfig {
 
 		ExtraSampleRate: 1.0,
 		MaxTPS:          10,
+		MaxEPS:          200,
 
 		ReceiverHost:    "localhost",
 		ReceiverPort:    8126,
@@ -142,7 +144,7 @@ func New() *AgentConfig {
 		MaxConnections:   200, // in practice, rarely goes over 20
 		WatchdogInterval: time.Minute,
 
-		Ignore: make(map[string][]string),
+		Ignore:                      make(map[string][]string),
 		AnalyzedRateByServiceLegacy: make(map[string]float64),
 		AnalyzedSpansByService:      make(map[string]map[string]float64),
 	}

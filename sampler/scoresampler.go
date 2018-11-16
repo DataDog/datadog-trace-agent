@@ -57,7 +57,7 @@ func (s *ScoreEngine) Stop() {
 }
 
 func applySampleRate(root *model.Span, rate float64) bool {
-	initialRate := GetTraceAppliedSampleRate(root)
+	initialRate := root.GetSampleRate()
 	newRate := initialRate * rate
 	traceID := root.TraceID
 	return SampleByRate(traceID, newRate)

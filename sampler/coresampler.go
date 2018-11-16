@@ -166,20 +166,6 @@ func (s *Sampler) GetMaxTPSSampleRate() float64 {
 	return maxTPSrate
 }
 
-// GetTraceAppliedSampleRate gets the sample rate the sample rate applied earlier in the pipeline.
-func GetTraceAppliedSampleRate(root *model.Span) float64 {
-	if rate, ok := root.Metrics[model.SpanSampleRateMetricKey]; ok {
-		return rate
-	}
-
-	return 1.0
-}
-
-// SetTraceAppliedSampleRate sets the currently applied sample rate in the trace data to allow chained up sampling.
-func SetTraceAppliedSampleRate(root *model.Span, rate float64) {
-	root.SetMetric(model.SpanSampleRateMetricKey, rate)
-}
-
 // CombineRates merges two rates from Sampler1, Sampler2. Both samplers law are independant,
 // and {sampled} = {sampled by Sampler1} or {sampled by Sampler2}
 func CombineRates(rate1 float64, rate2 float64) float64 {
@@ -187,12 +173,4 @@ func CombineRates(rate1 float64, rate2 float64) float64 {
 		return 1
 	}
 	return rate1 + rate2 - rate1*rate2
-}
-
-// AddSampleRate adds a new sampling rate to the trace sampling rate. Previous and new sampling rate must be independant
-// and the sampling decisions sequential.
-func AddSampleRate(root *model.Span, rate float64) {
-	initialRate := GetTraceAppliedSampleRate(root)
-	newRate := initialRate * rate
-	SetTraceAppliedSampleRate(root, newRate)
 }

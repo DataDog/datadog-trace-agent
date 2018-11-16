@@ -168,6 +168,9 @@ func (c *AgentConfig) loadIniConfig(conf *File) {
 	if v, e := conf.GetFloat("trace.sampler", "max_traces_per_second"); e == nil {
 		c.MaxTPS = v
 	}
+	if v, e := conf.GetFloat("trace.sampler", "max_events_per_second"); e == nil {
+		c.MaxEPS = v
+	}
 
 	// [trace.receiver] section
 	if v, e := conf.GetInt("trace.receiver", "receiver_port"); e == nil {

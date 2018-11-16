@@ -2,49 +2,36 @@ package event
 
 import (
 	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/DataDog/datadog-trace-agent/sampler"
 )
 
-// legacyExtractor is an event extractor that extracts APM events from traces based on `serviceName => sampling
-// ratio` mappings.
+// legacyExtractor is an event extractor that decides whether to extract APM events from spans based on
+// `serviceName => sampling rate` mappings.
 type legacyExtractor struct {
 	rateByService map[string]float64
 }
 
-// NewLegacyExtractor returns an APM event extractor that extracts APM events from a trace following the specified
-// extraction rates for any spans matching a specific service.
+// NewLegacyExtractor returns an APM event extractor that decides whether to extract APM events from spans following the
+// specified extraction rates for a span's service.
 func NewLegacyExtractor(rateByService map[string]float64) Extractor {
 	return &legacyExtractor{
 		rateByService: rateByService,
 	}
 }
 
-// Extract extracts apm events from the trace and returns them as a slice.
-func (s *legacyExtractor) Extract(t model.ProcessedTrace) []*model.APMEvent {
-	var events []*model.APMEvent
-
-	for _, span := range t.WeightedTrace {
-		if s.shouldExtractEvent(span) {
-			events = append(events, &model.APMEvent{
-				Span:         span.Span,
-				TraceSampled: t.Sampled,
-			})
-		}
+// Extract decides to extract an apm event from the provided span if there's an extraction rate configured for that
+// span's service. In this case the extracted event is returned along with the found extraction rate and a true value.
+// If this rate doesn't exist or the provided span is not a top level one, then no extraction is done and false is
+// returned as the third value, with the others being invalid.
+func (e *legacyExtractor) Extract(s *model.WeightedSpan, priority model.SamplingPriority) (*model.Event, float64, bool) {
+	if !s.TopLevel {
+		return nil, 0, false
 	}
-
-	return events
-}
-
-func (s *legacyExtractor) shouldExtractEvent(span *model.WeightedSpan) bool {
-	if !span.TopLevel {
-		return false
+	extractionRate, ok := e.rateByService[s.Service]
+	if !ok {
+		return nil, 0, false
 	}
-
-	if analyzeRate, ok := s.rateByService[span.Service]; ok {
-		if sampler.SampleByRate(span.TraceID, analyzeRate) {
-			return true
-		}
-	}
-
-	return false
+	return &model.Event{
+		Span:     s.Span,
+		Priority: priority,
+	}, extractionRate, true
 }

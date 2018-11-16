@@ -3,6 +3,7 @@ hostname: thing
 apm_config:
   extra_sample_rate: 0.33
   max_traces_per_second: 100.0
+  max_events_per_second: 1000.0
   receiver_port: 25
   max_cpu_percent: 7
   max_connections: 50

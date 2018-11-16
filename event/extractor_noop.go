@@ -10,6 +10,6 @@ func NewNoopExtractor() Extractor {
 	return &noopExtractor{}
 }
 
-func (s *noopExtractor) Extract(t model.ProcessedTrace) []*model.APMEvent {
-	return nil
+func (e *noopExtractor) Extract(_ *model.WeightedSpan, _ model.SamplingPriority) (*model.Event, float64, bool) {
+	return nil, 0, false
 }

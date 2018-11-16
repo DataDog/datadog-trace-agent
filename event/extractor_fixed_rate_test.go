@@ -1,62 +1,51 @@
 package event
 
 import (
-	"fmt"
 	"math/rand"
 	"testing"
 
 	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/stretchr/testify/assert"
 )
 
-func createTrace(serviceName string, operationName string, topLevel bool, hasPriority bool, priority int) model.ProcessedTrace {
-	ws := model.WeightedSpan{TopLevel: topLevel, Span: &model.Span{Service: serviceName, Name: operationName}}
-	if hasPriority {
-		ws.SetSamplingPriority(priority)
+func createTestSpans(serviceName string, operationName string) []*model.WeightedSpan {
+	spans := make([]*model.WeightedSpan, 1000)
+	for i, _ := range spans {
+		spans[i] = &model.WeightedSpan{Span: &model.Span{TraceID: rand.Uint64(), Service: serviceName, Name: operationName}}
 	}
-	wt := model.WeightedTrace{&ws}
-	return model.ProcessedTrace{WeightedTrace: wt, Root: ws.Span}
+	return spans
 }
 
 func TestAnalyzedExtractor(t *testing.T) {
-	assert := assert.New(t)
-
 	config := make(map[string]map[string]float64)
-	config["myService"] = make(map[string]float64)
-	config["myService"]["myOperation"] = 1
+	config["serviceA"] = make(map[string]float64)
+	config["serviceA"]["opA"] = 0
 
-	config["mySampledService"] = make(map[string]float64)
-	config["mySampledService"]["myOperation"] = 0
+	config["serviceB"] = make(map[string]float64)
+	config["serviceB"]["opB"] = 0.5
 
-	tests := []struct {
-		name             string
-		trace            model.ProcessedTrace
-		expectedSampling bool
-	}{
-		{"Top-level service and span name match", createTrace("myService", "myOperation", true, false, 0), true},
-		{"Top-level service name doesn't match", createTrace("otherService", "myOperation", true, false, 0), false},
-		{"Top-level span name doesn't match", createTrace("myService", "otherOperation", true, false, 0), false},
-		{"Top-level service and span name don't match", createTrace("otherService", "otherOperation", true, false, 0), false},
-		{"Non top-level service and span name match", createTrace("myService", "myOperation", false, false, 0), true},
-		{"Non top-level service name doesn't match", createTrace("otherService", "myOperation", false, false, 0), false},
-		{"Non top-level span name doesn't match", createTrace("myService", "otherOperation", false, false, 0), false},
-		{"Non top-level service and span name don't match", createTrace("otherService", "otherOperation", false, false, 0), false},
-		{"Match, sampling rate 0, no priority", createTrace("mySampledService", "myOperation", true, false, 0), false},
-		{"Match, sampling rate 0, priority 1", createTrace("mySampledService", "myOperation", true, true, 1), false},
-		{"Match, sampling rate 0, priority 2", createTrace("mySampledService", "myOperation", true, true, 2), true},
+	config["serviceC"] = make(map[string]float64)
+	config["serviceC"]["opC"] = 1
+
+	tests := []extractorTestCase{
+		// Name: <priority>/(<no match reason>/<extraction rate>)
+		{"none/noservice", createTestSpans("serviceZ", "opA"), 0, -1},
+		{"none/noname", createTestSpans("serviceA", "opZ"), 0, -1},
+		{"none/0", createTestSpans("serviceA", "opA"), 0, 0},
+		{"none/0.5", createTestSpans("serviceB", "opB"), 0, 0.5},
+		{"none/1", createTestSpans("serviceC", "opC"), 0, 1},
+		{"1/noservice", createTestSpans("serviceZ", "opA"), 1, -1},
+		{"1/noname", createTestSpans("serviceA", "opZ"), 1, -1},
+		{"1/0", createTestSpans("serviceA", "opA"), 1, 0},
+		{"1/0.5", createTestSpans("serviceB", "opB"), 1, 0.5},
+		{"1/1", createTestSpans("serviceC", "opC"), 1, 1},
+		{"2/noservice", createTestSpans("serviceZ", "opA"), 2, -1},
+		{"2/noname", createTestSpans("serviceA", "opZ"), 2, -1},
+		{"2/0", createTestSpans("serviceA", "opA"), 2, 0},
+		{"2/0.5", createTestSpans("serviceB", "opB"), 2, 1},
+		{"2/1", createTestSpans("serviceC", "opC"), 2, 1},
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			ae := NewFixedRateExtractor(config)
-			test.trace.Sampled = rand.Int() > 0
-			analyzedSpans := ae.Extract(test.trace)
-
-			if test.expectedSampling {
-				assert.Len(analyzedSpans, 1, fmt.Sprintf("Trace %v should have been sampled", test.trace))
-			} else {
-				assert.Len(analyzedSpans, 0, fmt.Sprintf("Trace %v should not have been sampled", test.trace))
-			}
-		})
+		testExtractor(t, NewFixedRateExtractor(config), test)
 	}
 }

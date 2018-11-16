@@ -2,51 +2,41 @@ package event
 
 import (
 	"github.com/DataDog/datadog-trace-agent/model"
-	"github.com/DataDog/datadog-trace-agent/sampler"
 )
 
-// fixedRateExtractor is an event extractor that extracts APM events from traces based on
+// fixedRateExtractor is an event extractor that decides whether to extract APM events from spans based on
 // `(service name, operation name) => sampling rate` mappings.
 type fixedRateExtractor struct {
 	rateByServiceAndName map[string]map[string]float64
 }
 
-// NewFixedRateExtractor returns an APM event extractor that extracts APM events from a trace following the provided
-// extraction rates for any spans matching a (service name, operation name) pair.
+// NewFixedRateExtractor returns an APM event extractor that decides whether to extract APM events from spans following
+// the provided extraction rates for a span's (service name, operation name) pair.
 func NewFixedRateExtractor(rateByServiceAndName map[string]map[string]float64) Extractor {
 	return &fixedRateExtractor{
 		rateByServiceAndName: rateByServiceAndName,
 	}
 }
 
-// Extract extracts analyzed spans from the trace and returns them as a slice
-func (s *fixedRateExtractor) Extract(t model.ProcessedTrace) []*model.APMEvent {
-	var events []*model.APMEvent
-
-	// Get the trace priority
-	priority, hasPriority := t.GetSamplingPriority()
-
-	for _, span := range t.WeightedTrace {
-		if s.shouldExtractEvent(span, hasPriority, priority) {
-			events = append(events, &model.APMEvent{
-				Span:         span.Span,
-				TraceSampled: t.Sampled,
-			})
-		}
+// Extract decides to extract an apm event from a span if its service and name have a corresponding extraction rate
+// on the rateByServiceAndName map passed in the constructor. The extracted event is returned along with the associated
+// extraction rate and a true value. If no extraction happened, false is returned as the third value and the others
+// are invalid.
+func (e *fixedRateExtractor) Extract(s *model.WeightedSpan, priority model.SamplingPriority) (*model.Event, float64, bool) {
+	operations, ok := e.rateByServiceAndName[s.Service]
+	if !ok {
+		return nil, 0, false
 	}
-
-	return events
-}
-
-func (s *fixedRateExtractor) shouldExtractEvent(span *model.WeightedSpan, hasPriority bool, priority int) bool {
-	if operations, ok := s.rateByServiceAndName[span.Service]; ok {
-		if analyzeRate, ok := operations[span.Name]; ok {
-			// If the trace has been manually sampled, we keep all matching spans
-			highPriority := hasPriority && priority >= 2
-			if highPriority || sampler.SampleByRate(span.TraceID, analyzeRate) {
-				return true
-			}
-		}
+	extractionRate, ok := operations[s.Name]
+	if !ok {
+		return nil, 0, false
 	}
-	return false
+	if extractionRate > 0 && priority >= model.PriorityUserKeep {
+		// If the span has been manually sampled, we always want to keep these events
+		extractionRate = 1
+	}
+	return &model.Event{
+		Span:     s.Span,
+		Priority: priority,
+	}, extractionRate, true
 }
