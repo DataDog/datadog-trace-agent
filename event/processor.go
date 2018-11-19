@@ -83,6 +83,9 @@ func (p *Processor) Process(t model.ProcessedTrace) (events []*model.Event, numE
 		// As well as the rates of sampling done during this processing
 		event.SetExtractionSampleRate(extractionRate)
 		event.SetMaxEPSSampleRate(epsRate)
+		if hasPriority {
+			event.Span.SetSamplingPriority(priority)
+		}
 	}
 
 	return
