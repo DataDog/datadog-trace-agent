@@ -89,6 +89,12 @@ func TestProcessor(t *testing.T) {
 				assert.EqualValues(test.expectedSampledPct, event.GetMaxEPSSampleRate())
 				assert.EqualValues(testClientSampleRate, event.GetClientTraceSampleRate())
 				assert.EqualValues(testPreSampleRate, event.GetPreSampleRate())
+
+				eventSpanPriority, ok := event.Span.GetSamplingPriority()
+				if !ok {
+					eventSpanPriority = model.PriorityNone
+				}
+				assert.EqualValues(test.priority, eventSpanPriority)
 			}
 		})
 	}
