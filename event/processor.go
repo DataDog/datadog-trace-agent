@@ -84,7 +84,6 @@ func (p *Processor) Process(t model.ProcessedTrace) (events []*model.Event, numE
 		event.SetExtractionSampleRate(extractionRate)
 		event.SetMaxEPSSampleRate(epsRate)
 		if hasPriority {
-			// Make sure to set the sampling priority on the event span so that this gets propagated to the backend.
 			event.Span.SetSamplingPriority(priority)
 		}
 	}
