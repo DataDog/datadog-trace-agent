@@ -215,6 +215,11 @@ func (c *AgentConfig) loadYamlConfig(path string) error {
 		}
 	}
 
+	if config.Datadog.IsSet("bind_host") {
+		host := config.Datadog.GetString("bind_host")
+		c.StatsdHost = host
+		c.ReceiverHost = host
+	}
 	if config.Datadog.IsSet("apm_config.apm_non_local_traffic") {
 		if config.Datadog.GetBool("apm_config.apm_non_local_traffic") {
 			c.ReceiverHost = "0.0.0.0"
@@ -283,6 +288,41 @@ func (c *AgentConfig) loadYamlConfig(path string) error {
 		c.DDAgentBin = config.Datadog.GetString("apm_config.dd_agent_bin")
 	}
 
+	return c.loadDeprecatedValues()
+}
+
+// loadDeprecatedValues loads a set of deprecated values which are kept for
+// backwards compatibility with Agent 5. These should eventually be removed.
+// TODO(x): remove them gradually or fully in a future release.
+func (c *AgentConfig) loadDeprecatedValues() error {
+	cfg := config.Datadog
+	if cfg.IsSet("apm_config.api_key") {
+		c.Endpoints[0].APIKey = config.Datadog.GetString("apm_config.api_key")
+	}
+	if cfg.IsSet("apm_config.log_level") {
+		c.LogLevel = config.Datadog.GetString("apm_config.log_level")
+	}
+	if v := cfg.GetString("apm_config.extra_aggregators"); v != "" {
+		aggs, err := splitString(v, ',')
+		if err != nil {
+			return err
+		}
+		c.ExtraAggregators = append(c.ExtraAggregators, aggs...)
+	}
+	if !cfg.GetBool("apm_config.log_throttling") {
+		c.LogThrottlingEnabled = false
+	}
+	if cfg.IsSet("apm_config.bucket_size_seconds") {
+		d := time.Duration(cfg.GetInt("apm_config.bucket_size_seconds"))
+		c.BucketInterval = d * time.Second
+	}
+	if cfg.IsSet("apm_config.receiver_timeout") {
+		c.ReceiverTimeout = cfg.GetInt("apm_config.receiver_timeout")
+	}
+	if cfg.IsSet("apm_config.watchdog_check_delay") {
+		d := time.Duration(cfg.GetInt("apm_config.watchdog_check_delay"))
+		c.WatchdogInterval = d * time.Second
+	}
 	return nil
 }
 
