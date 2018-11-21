@@ -1,17 +1,18 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 // +build kubelet
 
 package collectors
 
 import (
-	"fmt"
+	"strings"
 	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/config"
+	"github.com/DataDog/datadog-agent/pkg/errors"
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/kubelet"
 )
 
@@ -24,25 +25,39 @@ const (
 // tags. It is to be supplemented by the cluster agent collector for tags from
 // the apiserver.
 type KubeletCollector struct {
-	watcher        *kubelet.PodWatcher
-	infoOut        chan<- []*TagInfo
-	lastExpire     time.Time
-	expireFreq     time.Duration
-	labelTagPrefix string
+	watcher           *kubelet.PodWatcher
+	infoOut           chan<- []*TagInfo
+	lastExpire        time.Time
+	expireFreq        time.Duration
+	labelsAsTags      map[string]string
+	annotationsAsTags map[string]string
 }
 
 // Detect tries to connect to the kubelet
 func (c *KubeletCollector) Detect(out chan<- []*TagInfo) (CollectionMode, error) {
-	watcher, err := kubelet.NewPodWatcher()
+	watcher, err := kubelet.NewPodWatcher(5 * time.Minute)
 	if err != nil {
-		return NoCollection, fmt.Errorf("Failed to connect to kubelet, Kubernetes tagging will not work: %s", err)
+		return NoCollection, err
 	}
 	c.watcher = watcher
 	c.infoOut = out
 	c.lastExpire = time.Now()
 	c.expireFreq = kubeletExpireFreq
-	c.labelTagPrefix = config.Datadog.GetString("kubernetes_pod_label_to_tag_prefix")
 
+	// We lower-case the values collected by viper as well as the ones from inspecting the labels of containers.
+	labelsList := config.Datadog.GetStringMapString("kubernetes_pod_labels_as_tags")
+	for label, value := range labelsList {
+		delete(labelsList, label)
+		labelsList[strings.ToLower(label)] = value
+	}
+	c.labelsAsTags = labelsList
+
+	annotationsList := config.Datadog.GetStringMapString("kubernetes_pod_annotations_as_tags")
+	for annotation, value := range annotationsList {
+		delete(annotationsList, annotation)
+		annotationsList[strings.ToLower(annotation)] = value
+	}
+	c.annotationsAsTags = annotationsList
 	return PullCollection, nil
 }
 
@@ -54,6 +69,7 @@ func (c *KubeletCollector) Pull() error {
 	if err != nil {
 		return err
 	}
+
 	updates, err := c.parsePods(updatedPods)
 	if err != nil {
 		return err
@@ -66,7 +82,7 @@ func (c *KubeletCollector) Pull() error {
 	}
 
 	// Compute deleted pods
-	expireList, err := c.watcher.ExpireContainers()
+	expireList, err := c.watcher.Expire()
 	if err != nil {
 		return err
 	}
@@ -79,26 +95,28 @@ func (c *KubeletCollector) Pull() error {
 	return nil
 }
 
-// Fetch fetches tags for a given container by iterating on the whole podlist
+// Fetch fetches tags for a given entity by iterating on the whole podlist
 // TODO: optimize if called too often on production
-func (c *KubeletCollector) Fetch(container string) ([]string, []string, error) {
-	pod, err := c.watcher.GetPodForContainerID(container)
+func (c *KubeletCollector) Fetch(entity string) ([]string, []string, error) {
+	pod, err := c.watcher.GetPodForEntityID(entity)
 	if err != nil {
 		return []string{}, []string{}, err
 	}
-	updates, err := c.parsePods([]*kubelet.Pod{pod})
+
+	pods := []*kubelet.Pod{pod}
+	updates, err := c.parsePods(pods)
 	if err != nil {
 		return []string{}, []string{}, err
 	}
 	c.infoOut <- updates
 
 	for _, info := range updates {
-		if info.Entity == container {
+		if info.Entity == entity {
 			return info.LowCardTags, info.HighCardTags, nil
 		}
 	}
-	// container not found in updates
-	return []string{}, []string{}, fmt.Errorf("entity %s not found in podlist", container)
+	// entity not found in updates
+	return []string{}, []string{}, errors.NewNotFound(entity)
 }
 
 // parseExpires transforms event from the PodWatcher to TagInfo objects
@@ -120,5 +138,5 @@ func kubeletFactory() Collector {
 }
 
 func init() {
-	registerCollector(kubeletCollectorName, kubeletFactory)
+	registerCollector(kubeletCollectorName, kubeletFactory, NodeOrchestrator)
 }

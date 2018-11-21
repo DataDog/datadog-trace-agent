@@ -3,6 +3,7 @@ Benchmarking tasks
 """
 from __future__ import print_function
 import os
+import sys
 
 import invoke
 from invoke import task
@@ -29,7 +30,7 @@ def build_aggregator(ctx, rebuild=False):
 
     if os.environ.get("DELVE"):
         gcflags = "-N -l"
-        if invoke.platform.WINDOWS:
+        if sys.platform == 'win32':
             # On windows, need to build with the extra argument -ldflags="-linkmode internal"
             # if you want to be able to use the delve debugger.
             ldflags += " -linkmode internal"
@@ -74,9 +75,10 @@ def dogstastd(ctx):
 
     key = os.environ.get("DD_AGENT_API_KEY")
     if key:
-      options +=" -api-key {}".format(key)
+        options += " -api-key {}".format(key)
 
     ctx.run("{} -pps=5000 -dur 45 -ser 5 -brk -inc 1000 {}".format(bin_path, options))
+
 
 @task(pre=[build_aggregator])
 def aggregator(ctx):
@@ -89,7 +91,7 @@ def aggregator(ctx):
 
     key = os.environ.get("DD_AGENT_API_KEY")
     if key:
-      options +=" -api-key {}".format(key)
+        options += " -api-key {}".format(key)
 
     ctx.run("{} -points 2,10,100,500,1000 -series 10,100,1000 -log-level info -json {}".format(bin_path, options))
     ctx.run("{} -points 2,10,100,500,1000 -series 10,100,1000 -log-level info -json -memory -duration 10 {}".format(bin_path, options))

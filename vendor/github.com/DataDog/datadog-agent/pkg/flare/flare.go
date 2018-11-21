@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package flare
 
@@ -14,10 +14,12 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/util"
+	"github.com/DataDog/datadog-agent/pkg/version"
 )
 
 var datadogSupportURL = "/support/flare"
@@ -33,7 +35,7 @@ func SendFlareWithHostname(archivePath string, caseID string, email string, host
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 
-	p, err := writer.CreateFormFile("flare_file", archivePath)
+	p, err := writer.CreateFormFile("flare_file", filepath.Base(archivePath))
 	if err != nil {
 		return "", err
 	}
@@ -53,6 +55,9 @@ func SendFlareWithHostname(archivePath string, caseID string, email string, host
 		writer.WriteField("email", email)
 	}
 
+	// Send the full version
+	av, _ := version.New(version.AgentVersion, version.Commit)
+	writer.WriteField("agent_version", av.String())
 	writer.WriteField("hostname", hostname)
 
 	err = writer.Close()
@@ -116,7 +121,8 @@ func mkHTTPClient() *http.Client {
 }
 
 func mkURL(caseID string) string {
-	var url = config.Datadog.GetString("dd_url") + datadogSupportURL
+	baseURL, _ := config.AddAgentVersionToDomain(config.GetMainInfraEndpoint(), "flare")
+	var url = baseURL + datadogSupportURL
 	if caseID != "" {
 		url += "/" + caseID
 	}

@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package common
 
@@ -10,24 +10,30 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
+	"strconv"
+	"strings"
 
 	"path/filepath"
 
 	"github.com/DataDog/datadog-agent/pkg/config"
 
-	log "github.com/cihub/seelog"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
+	"github.com/cihub/seelog"
 	"golang.org/x/sys/windows/registry"
 	yaml "gopkg.in/yaml.v2"
 )
 
 var (
 	// PyChecksPath holds the path to the python checks from integrations-core shipped with the agent
-	PyChecksPath = filepath.Join(_here, "..", "agent", "checks.d")
-	// PySitePackages holds the path to the python checks from integrations-core installed via wheels
-	PySitePackages = filepath.Join(_here, "lib", "python2.7", "site-packages")
-	distPath       string
+	PyChecksPath = filepath.Join(_here, "..", "checks.d")
+	distPath     string
 	// ViewsPath holds the path to the folder containing the GUI support files
-	viewsPath string
+	viewsPath   string
+	enabledVals = map[string]bool{"yes": true, "true": true, "1": true,
+		"no": false, "false": false, "0": false}
+	subServices = map[string]string{"logs_enabled": "logs_enabled",
+		"apm_enabled":     "apm_config.enabled",
+		"process_enabled": "process_config.enabled"}
 )
 
 const (
@@ -35,6 +41,8 @@ const (
 	DefaultConfPath = "c:\\programdata\\datadog"
 	// DefaultLogFile points to the log file that will be used if not configured
 	DefaultLogFile = "c:\\programdata\\datadog\\logs\\agent.log"
+	// DefaultDCALogFile points to the log file that will be used if not configured
+	DefaultDCALogFile = "c:\\programdata\\datadog\\logs\\cluster-agent.log"
 )
 
 // EnableLoggingToFile -- set up logging to file
@@ -45,7 +53,7 @@ func EnableLoggingToFile() {
 		<rollingfile type="size" filename="c:\\ProgramData\\DataDog\\Logs\\agent.log" maxsize="1000000" maxrolls="2" />
 	</outputs>
 </seelog>`
-	logger, _ := log.LoggerFromConfigAsBytes([]byte(seeConfig))
+	logger, _ := seelog.LoggerFromConfigAsBytes([]byte(seeConfig))
 	log.ReplaceLogger(logger)
 }
 
@@ -79,7 +87,6 @@ func GetDistPath() string {
 			return ""
 		}
 		distPath = filepath.Join(s, `bin/agent/dist`)
-		log.Debug("DistPath is now %s", distPath)
 	}
 	return distPath
 }
@@ -106,7 +113,7 @@ func CheckAndUpgradeConfig() error {
 		return nil
 	}
 	config.Datadog.AddConfigPath(DefaultConfPath)
-	err := config.Datadog.ReadInConfig()
+	err := config.Load()
 	if err == nil {
 		// was able to read config, check for api key
 		if config.Datadog.GetString("api_key") != "" {
@@ -156,7 +163,7 @@ func ImportRegistryConfig() error {
 		log.Debug("API key not found, not setting")
 	}
 	if val, _, err = k.GetStringValue("tags"); err == nil {
-		config.Datadog.Set("tags", val)
+		config.Datadog.Set("tags", strings.Split(val, ","))
 		log.Debugf("Setting tags %s", val)
 	} else {
 		log.Debug("Tags not found, not setting")
@@ -165,9 +172,54 @@ func ImportRegistryConfig() error {
 		config.Datadog.Set("hostname", val)
 		log.Debugf("Setting hostname %s", val)
 	} else {
-		log.Debug("hostname not found, not setting")
+		log.Debug("hostname not found in registry: using default value")
 	}
-	if val, _, err = k.GetStringValue("proxy_host"); err == nil {
+	if val, _, err = k.GetStringValue("cmd_port"); err == nil && val != "" {
+		cmdPortInt, err := strconv.Atoi(val)
+		if err != nil {
+			log.Warnf("Not setting api port, invalid configuration %s %v", val, err)
+		} else if cmdPortInt <= 0 || cmdPortInt > 65534 {
+			log.Warnf("Not setting api port, invalid configuration %s", val)
+		} else {
+			config.Datadog.Set("cmd_port", cmdPortInt)
+			log.Debugf("Setting cmd_port  %d", cmdPortInt)
+		}
+	} else {
+		log.Debug("cmd_port not found, not setting")
+	}
+	for key, cfg := range subServices {
+		if val, _, err = k.GetStringValue(key); err == nil {
+			val = strings.ToLower(val)
+			if enabled, ok := enabledVals[val]; ok {
+				// some of the entries require booleans, some
+				// of the entries require strings.
+				if enabled {
+					switch cfg {
+					case "logs_enabled":
+						config.Datadog.Set(cfg, true)
+					case "apm_config.enabled":
+						config.Datadog.Set(cfg, true)
+					case "process_config.enabled":
+						config.Datadog.Set(cfg, "true")
+					}
+					log.Debugf("Setting %s to true", cfg)
+				} else {
+					switch cfg {
+					case "logs_enabled":
+						config.Datadog.Set(cfg, false)
+					case "apm_config.enabled":
+						config.Datadog.Set(cfg, false)
+					case "process_config.enabled":
+						config.Datadog.Set(cfg, "false")
+					}
+					log.Debugf("Setting %s to false", cfg)
+				}
+			} else {
+				log.Warnf("Unknown setting %s = %s", key, val)
+			}
+		}
+	}
+	if val, _, err = k.GetStringValue("proxy_host"); err == nil && val != "" {
 		var u *url.URL
 		if u, err = url.Parse(val); err != nil {
 			log.Warnf("unable to import value of settings 'proxy_host': %v", err)
@@ -176,21 +228,45 @@ func ImportRegistryConfig() error {
 			if u.Scheme == "" {
 				u, _ = url.Parse("http://" + val)
 			}
-			if val, _, err = k.GetStringValue("proxy_port"); err == nil {
+			if val, _, err = k.GetStringValue("proxy_port"); err == nil && val != "" {
 				u.Host = u.Host + ":" + val
 			}
-			if user, _, _ := k.GetStringValue("proxy_user"); user != "" {
-				if pass, _, _ := k.GetStringValue("proxy_password"); pass != "" {
+			if user, _, _ := k.GetStringValue("proxy_user"); err == nil && user != "" {
+				if pass, _, _ := k.GetStringValue("proxy_password"); err == nil && pass != "" {
 					u.User = url.UserPassword(user, pass)
 				} else {
 					u.User = url.User(user)
 				}
 			}
 		}
-		config.Datadog.Set("proxy", u.String())
+		proxyMap := make(map[string]string)
+		proxyMap["http"] = u.String()
+		proxyMap["https"] = u.String()
+		config.Datadog.Set("proxy", proxyMap)
 	} else {
 		log.Debug("proxy key not found, not setting proxy config")
 	}
+	if val, _, err = k.GetStringValue("site"); err == nil && val != "" {
+		config.Datadog.Set("site", val)
+		log.Debugf("Setting site to %s", val)
+	}
+	if val, _, err = k.GetStringValue("dd_url"); err == nil && val != "" {
+		config.Datadog.Set("dd_url", val)
+		log.Debugf("Setting dd_url to %s", val)
+	}
+	if val, _, err = k.GetStringValue("logs_dd_url"); err == nil && val != "" {
+		config.Datadog.Set("logs_config.dd_url", val)
+		log.Debugf("Setting logs_config.dd_url to %s", val)
+	}
+	if val, _, err = k.GetStringValue("process_dd_url"); err == nil && val != "" {
+		config.Datadog.Set("process_config.process_dd_url", val)
+		log.Debugf("Setting process_config.process_dd_url to %s", val)
+	}
+	if val, _, err = k.GetStringValue("trace_dd_url"); err == nil && val != "" {
+		config.Datadog.Set("apm_config.apm_dd_url", val)
+		log.Debugf("Setting apm_config.apm_dd_url to %s", val)
+	}
+
 	// dump the current configuration to datadog.yaml
 	b, err := yaml.Marshal(config.Datadog.AllSettings())
 	if err != nil {
@@ -205,8 +281,11 @@ func ImportRegistryConfig() error {
 	}
 
 	valuenames := []string{"api_key", "tags", "hostname",
-		"proxy_host", "proxy_port", "proxy_user", "proxy_password"}
+		"proxy_host", "proxy_port", "proxy_user", "proxy_password", "cmd_port"}
 	for _, valuename := range valuenames {
+		k.DeleteValue(valuename)
+	}
+	for valuename := range subServices {
 		k.DeleteValue(valuename)
 	}
 	log.Debugf("Successfully wrote the config into %s\n", datadogYamlPath)

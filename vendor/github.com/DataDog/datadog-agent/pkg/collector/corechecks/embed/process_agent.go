@@ -1,9 +1,10 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 // +build process
+// +build darwin freebsd
 
 package embed
 
@@ -12,16 +13,17 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"sync/atomic"
 	"time"
 
+	"github.com/DataDog/datadog-agent/pkg/autodiscovery/integration"
 	"github.com/DataDog/datadog-agent/pkg/collector/check"
 	core "github.com/DataDog/datadog-agent/pkg/collector/corechecks"
 	"github.com/DataDog/datadog-agent/pkg/config"
+	"github.com/DataDog/datadog-agent/pkg/util/executable"
 
-	log "github.com/cihub/seelog"
-	"github.com/kardianos/osext"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"gopkg.in/yaml.v2"
 )
 
@@ -48,6 +50,10 @@ func (c *ProcessAgentCheck) String() string {
 	return "Process Agent"
 }
 
+func (c *ProcessAgentCheck) Version() string {
+	return ""
+}
+
 // Run executes the check with retries
 func (c *ProcessAgentCheck) Run() error {
 	atomic.StoreUint32(&c.running, 1)
@@ -68,20 +74,13 @@ func (c *ProcessAgentCheck) run() error {
 	select {
 	// poll the stop channel once to make sure no stop was requested since the last call to `run`
 	case <-c.stop:
-		log.Info("Not starting Logs check: stop requested")
+		log.Info("Not starting Process Agent check: stop requested")
 		c.stopDone <- struct{}{}
 		return nil
 	default:
 	}
 
 	cmd := exec.Command(c.binPath, c.commandOpts...)
-
-	env := os.Environ()
-	env = append(env, fmt.Sprintf("DD_API_KEY=%s", config.Datadog.GetString("api_key")))
-	env = append(env, fmt.Sprintf("DD_HOSTNAME=%s", getHostname()))
-	env = append(env, fmt.Sprintf("DD_DOGSTATSD_PORT=%s", config.Datadog.GetString("dogstatsd_port")))
-	env = append(env, fmt.Sprintf("DD_LOG_LEVEL=%s", config.Datadog.GetString("log_level")))
-	cmd.Env = env
 
 	// forward the standard output to the Agent logger
 	stdout, err := cmd.StdoutPipe()
@@ -133,7 +132,7 @@ func (c *ProcessAgentCheck) run() error {
 }
 
 // Configure the ProcessAgentCheck
-func (c *ProcessAgentCheck) Configure(data check.ConfigData, initConfig check.ConfigData) error {
+func (c *ProcessAgentCheck) Configure(data integration.Data, initConfig integration.Data) error {
 	// handle the case when the agent is disabled via the old `datadog.conf` file
 	if enabled := config.Datadog.GetBool("process_agent_enabled"); !enabled {
 		return fmt.Errorf("Process Agent disabled through main configuration file")
@@ -165,20 +164,6 @@ func (c *ProcessAgentCheck) Configure(data check.ConfigData, initConfig check.Co
 			return defaultBinPathErr
 		}
 		c.binPath = defaultBinPath
-	}
-
-	// let the process agent use its own config file provided by the Agent package
-	// if we haven't found one in the process-agent.yaml check config
-	configFile := checkConf.ConfPath
-	if configFile == "" {
-		configFile = path.Join(config.FileUsedDir(), "process-agent.conf")
-	}
-
-	c.commandOpts = []string{}
-
-	// if the process-agent.conf file is available, use it
-	if _, err := os.Stat(configFile); !os.IsNotExist(err) {
-		c.commandOpts = append(c.commandOpts, fmt.Sprintf("-ddconfig=%s", configFile))
 	}
 
 	return nil
@@ -225,8 +210,8 @@ func init() {
 }
 
 func getProcessAgentDefaultBinPath() (string, error) {
-	here, _ := osext.ExecutableFolder()
-	binPath := path.Join(here, "..", "..", "embedded", "bin", "process-agent")
+	here, _ := executable.Folder()
+	binPath := filepath.Join(here, "..", "..", "embedded", "bin", "process-agent")
 	if _, err := os.Stat(binPath); err == nil {
 		return binPath, nil
 	}

@@ -1,36 +1,34 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 // +build docker
 
 package ecs
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/DataDog/datadog-agent/pkg/util/log"
+
 	"github.com/DataDog/datadog-agent/pkg/config"
-	dockerutil "github.com/DataDog/datadog-agent/pkg/util/docker"
-	"github.com/docker/docker/client"
+	"github.com/DataDog/datadog-agent/pkg/util/cache"
+	"github.com/DataDog/datadog-agent/pkg/util/docker"
+	"github.com/DataDog/datadog-agent/pkg/util/retry"
 )
 
 const (
 	// DefaultAgentPort is the default port used by the ECS Agent.
 	DefaultAgentPort = 51678
-	// DefaultECSContainer is the default container used by ECS.
-	DefaultECSContainer = "ecs-agent"
+	// Cache the fact we're running on ECS Fargate
+	isFargateInstanceCacheKey = "IsFargateInstanceCacheKey"
 )
-
-// DetectedAgentURL stores the URL of the ECS agent. After the first call to
-// getHostname this will be detected and used as-is going forward. It will only
-// be re-detected if getHostname is called again.
-var detectedAgentURL string
 
 type (
 	// CommandsV1Response is the format of a response from the ECS-agent on the root.
@@ -62,16 +60,80 @@ type (
 	}
 )
 
-// IsInstance returns whether this host is part of an ECS cluster
-func IsInstance() bool {
-	if detectedAgentURL == "" {
-		_, err := detectAgentURL()
-		if err != nil {
-			return false
-		}
-		return true
+var globalUtil *Util
+var initOnce sync.Once
+
+// GetUtil returns a ready to use ecs Util. It is backed by a shared singleton.
+func GetUtil() (*Util, error) {
+	initOnce.Do(func() {
+		globalUtil = &Util{}
+		globalUtil.initRetry.SetupRetrier(&retry.Config{
+			Name:          "ecsutil",
+			AttemptMethod: globalUtil.init,
+			Strategy:      retry.RetryCount,
+			RetryCount:    10,
+			RetryDelay:    30 * time.Second,
+		})
+	})
+	if err := globalUtil.initRetry.TriggerRetry(); err != nil {
+		log.Debugf("ECS init error: %s", err)
+		return nil, err
 	}
+	return globalUtil, nil
+}
+
+// init makes an empty Util bootstrap itself.
+func (u *Util) init() error {
+	url, err := detectAgentURL()
+	if err != nil {
+		return err
+	}
+	u.agentURL = url
+
+	return nil
+}
+
+// IsFargateInstance returns whether the agent is in an ECS fargate task.
+// It detects it by getting and unmarshalling the metadata API response.
+func IsFargateInstance() bool {
+	var ok, isFargate bool
+
+	if cached, hit := cache.Cache.Get(isFargateInstanceCacheKey); hit {
+		isFargate, ok = cached.(bool)
+		if !ok {
+			log.Errorf("Invalid fargate instance cache format, forcing a cache miss")
+		} else {
+			return isFargate
+		}
+	}
+
+	client := &http.Client{Timeout: timeout}
+	r, err := client.Get(metadataURL)
+	if err != nil {
+		cacheIsFargateInstance(false)
+		return false
+	}
+	if r.StatusCode != http.StatusOK {
+		cacheIsFargateInstance(false)
+		return false
+	}
+	var resp TaskMetadata
+	if err := json.NewDecoder(r.Body).Decode(&resp); err != nil {
+		fmt.Printf("decode err: %s\n", err)
+		cacheIsFargateInstance(false)
+		return false
+	}
+
+	cacheIsFargateInstance(true)
 	return true
+}
+
+func cacheIsFargateInstance(isFargate bool) {
+	cacheDuration := 5 * time.Minute
+	if isFargate {
+		cacheDuration = cache.NoExpiration
+	}
+	cache.Cache.Set(isFargateInstanceCacheKey, isFargate, cacheDuration)
 }
 
 // IsAgentNotDetected indicates if an error from GetTasks was about no
@@ -83,19 +145,10 @@ func IsAgentNotDetected(err error) bool {
 
 // GetTasks returns a TasksV1Response containing information about the state
 // of the local ECS containers running on this node. This data is provided via
-// the local ECS agent.
-func GetTasks() (TasksV1Response, error) {
-
+// the local ECS agent
+func (u *Util) GetTasks() (TasksV1Response, error) {
 	var resp TasksV1Response
-	if detectedAgentURL == "" {
-		_, err := detectAgentURL()
-		if err != nil {
-			return resp, err
-		}
-	}
-	// TODO: Use IsAgentNotDetected ?
-
-	r, err := http.Get(fmt.Sprintf("%sv1/tasks", detectedAgentURL))
+	r, err := http.Get(fmt.Sprintf("%sv1/tasks", u.agentURL))
 	if err != nil {
 		return resp, err
 	}
@@ -117,32 +170,17 @@ func detectAgentURL() (string, error) {
 	}
 
 	if config.IsContainerized() {
-		cli, err := dockerutil.ConnectToDocker()
+		// List all interfaces for the ecs-agent container
+		agentURLS, err := getAgentContainerURLS()
 		if err != nil {
-			return "", err
+			log.Debugf("could inspect ecs-agent container: ", err)
+		} else {
+			urls = append(urls, agentURLS...)
 		}
-		defer cli.Close()
-
-		// Try all networks available on the ecs container.
-		ecsConfig, err := cli.ContainerInspect(context.TODO(), DefaultECSContainer)
-		if client.IsErrContainerNotFound(err) {
-			return "", fmt.Errorf("could not detect ECS agent, missing %s container", DefaultECSContainer)
-		} else if err != nil {
-			return "", err
-		}
-		for _, network := range ecsConfig.NetworkSettings.Networks {
-			ip := network.IPAddress
-			if ip != "" {
-				urls = append(urls, fmt.Sprintf("http://%s:%d/", ip, DefaultAgentPort))
-			}
-		}
-
 		// Try the default gateway
-		gw, err := dockerutil.DefaultGateway()
+		gw, err := docker.DefaultGateway()
 		if err != nil {
-			// "expected" errors are handled in DefaultGateway so only
-			// unexpected errors are bubbled up, so we keep bubbling.
-			return "", err
+			log.Debugf("could not get docker default gateway: ", err)
 		}
 		if gw != nil {
 			urls = append(urls, fmt.Sprintf("http://%s:%d/", gw.String(), DefaultAgentPort))
@@ -151,9 +189,9 @@ func detectAgentURL() (string, error) {
 
 	// Always try the localhost URL.
 	urls = append(urls, fmt.Sprintf("http://localhost:%d/", DefaultAgentPort))
+
 	detected := testURLs(urls, 1*time.Second)
 	if detected != "" {
-		detectedAgentURL = detected
 		return detected, nil
 	}
 	return "", fmt.Errorf("could not detect ECS agent, tried URLs: %s", urls)
@@ -180,4 +218,25 @@ func testURLs(urls []string, timeout time.Duration) string {
 		}
 	}
 	return ""
+}
+
+func getAgentContainerURLS() ([]string, error) {
+	var urls []string
+
+	du, err := docker.GetDockerUtil()
+	if err != nil {
+		return nil, err
+	}
+	ecsConfig, err := du.Inspect(config.Datadog.GetString("ecs_agent_container_name"), false)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, network := range ecsConfig.NetworkSettings.Networks {
+		ip := network.IPAddress
+		if ip != "" {
+			urls = append(urls, fmt.Sprintf("http://%s:%d/", ip, DefaultAgentPort))
+		}
+	}
+	return urls, nil
 }

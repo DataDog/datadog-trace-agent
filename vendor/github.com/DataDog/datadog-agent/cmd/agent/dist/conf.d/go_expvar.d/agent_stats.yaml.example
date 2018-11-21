@@ -38,34 +38,45 @@ instances:
   # The following instance pulls the go_expvar metrics of the running datadog-agent
   # Feel free to comment out the instance if you're not interested in these metrics
   - expvar_url: http://localhost:5000/debug/vars  # if you've defined `expvar_port` in datadog.yaml, change the port here to that value
-    namespace: datadog
+    namespace: datadog.agent
     metrics:
       # datadog-agent forwarder monitoring
-      - path: forwarder/TransactionsCreated/Series
+      - path: forwarder/Transactions/Series
         type: rate
-      - path: forwarder/TransactionsCreated/Events
+      - path: forwarder/Transactions/Events
         type: rate
-      - path: forwarder/TransactionsCreated/ServiceChecks
+      - path: forwarder/Transactions/ServiceChecks
         type: rate
-      - path: forwarder/TransactionsCreated/HostMetadata
+      - path: forwarder/Transactions/HostMetadata
         type: rate
-      - path: forwarder/TransactionsCreated/Metadata
+      - path: forwarder/Transactions/Metadata
         type: rate
-      - path: forwarder/TransactionsCreated/TimeseriesV1
+      - path: forwarder/Transactions/TimeseriesV1
         type: rate
-      - path: forwarder/TransactionsCreated/CheckRunsV1
+      - path: forwarder/Transactions/CheckRunsV1
         type: rate
-      - path: forwarder/TransactionsCreated/IntakeV1
+      - path: forwarder/Transactions/IntakeV1
         type: rate
-      - path: forwarder/TransactionsCreated/Dropped
+      - path: forwarder/Transactions/DroppedOnInput
         type: rate
-      - path: forwarder/TransactionsCreated/RetryQueueSize
-      - path: forwarder/TransactionsCreated/Requeued
+      - path: forwarder/Transactions/RetryQueueSize
+      - path: forwarder/Transactions/Success
         type: rate
-      - path: forwarder/TransactionsCreated/Errors
+      - path: forwarder/Transactions/Errors
         type: rate
-      - path: forwarder/TransactionsCreated/Success
+      - path: forwarder/Transactions/ErrorsByType/DNSErrors
         type: rate
+      - path: forwarder/Transactions/ErrorsByType/TLSErrors
+        type: rate
+      - path: forwarder/Transactions/ErrorsByType/ConnectionErrors
+        type: rate
+      - path: forwarder/Transactions/ErrorsByType/WroteRequestErrors
+        type: rate
+      - path: forwarder/Transactions/ErrorsByType/SentRequestErrors
+        type: rate
+      - path: forwarder/Transactions/HTTPErrors
+        type: rate
+
 
       # datadog-agent dogstatsd monitoring
       - path: dogstatsd-udp/PacketReadingErrors
@@ -130,4 +141,18 @@ instances:
       - path: splitter/TooBig
         type: rate
       - path: splitter/TotalLoops
+        type: rate
+      - path: splitter/PayloadDrops
+        type: rate
+
+      # datadog-agent logs-agent monitoring
+      - path: logs-agent/IsRunning
+        type: gauge
+      - path: logs-agent/DestinationErrors
+        type: rate
+      - path: logs-agent/LogsDecoded
+        type: rate
+      - path: logs-agent/LogsProcessed
+        type: rate
+      - path: logs-agent/LogsSent
         type: rate

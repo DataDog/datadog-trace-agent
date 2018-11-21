@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 // +build docker
 
@@ -10,7 +10,7 @@ package legacy
 import (
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -53,23 +53,25 @@ instances:
     collect_labels_as_tags: ["test1", "test2"]
 `
 
-	dockerNewConf string = `collect_container_size: true
-collect_exit_codes: true
-collect_images_stats: false
-collect_image_size: true
-collect_disk_stats: true
-collect_volume_count: true
-tags:
-- tag:value
-- value
-collect_events: false
-filtered_event_types:
-- top
-- exec_start
-- exec_create
-capped_metrics:
-  docker.cpu.system: 1000
-  docker.cpu.user: 1000
+	dockerNewConf string = `instances:
+- collect_container_size: true
+  collect_container_size_frequency: 5
+  collect_exit_codes: true
+  collect_images_stats: false
+  collect_image_size: true
+  collect_disk_stats: true
+  collect_volume_count: true
+  tags:
+  - tag:value
+  - value
+  collect_events: false
+  filtered_event_types:
+  - top
+  - exec_start
+  - exec_create
+  capped_metrics:
+    docker.cpu.system: 1000
+    docker.cpu.user: 1000
 `
 )
 
@@ -78,8 +80,8 @@ func TestConvertDocker(t *testing.T) {
 	require.Nil(t, err)
 	defer os.RemoveAll(dir)
 
-	src := path.Join(dir, "docker_daemon.yaml")
-	dst := path.Join(dir, "docker.yaml")
+	src := filepath.Join(dir, "docker_daemon.yaml")
+	dst := filepath.Join(dir, "docker.yaml")
 
 	err = ioutil.WriteFile(src, []byte(dockerDaemonLegacyConf), 0640)
 	require.Nil(t, err)
@@ -87,7 +89,7 @@ func TestConvertDocker(t *testing.T) {
 	err = ImportDockerConf(src, dst, true)
 	require.Nil(t, err)
 
-	newConf, err := ioutil.ReadFile(path.Join(dir, "docker.yaml"))
+	newConf, err := ioutil.ReadFile(filepath.Join(dir, "docker.yaml"))
 	require.Nil(t, err)
 
 	assert.Equal(t, dockerNewConf, string(newConf))
@@ -105,11 +107,11 @@ func TestConvertDocker(t *testing.T) {
 	// test overwrite
 	err = ImportDockerConf(src, dst, false)
 	require.NotNil(t, err)
-	_, err = os.Stat(path.Join(dir, "docker.yaml.bak"))
+	_, err = os.Stat(filepath.Join(dir, "docker.yaml.bak"))
 	assert.True(t, os.IsNotExist(err))
 
 	err = ImportDockerConf(src, dst, true)
 	require.Nil(t, err)
-	_, err = os.Stat(path.Join(dir, "docker.yaml.bak"))
+	_, err = os.Stat(filepath.Join(dir, "docker.yaml.bak"))
 	assert.False(t, os.IsNotExist(err))
 }

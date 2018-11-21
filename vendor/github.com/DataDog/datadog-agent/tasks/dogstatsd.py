@@ -4,6 +4,7 @@ Dogstatsd tasks
 from __future__ import print_function, absolute_import
 
 import os
+import sys
 import shutil
 from distutils.dir_util import copy_tree
 
@@ -12,7 +13,7 @@ from invoke import task
 from invoke.exceptions import Exit
 
 from .build_tags import get_build_tags, get_default_build_tags
-from .utils import get_build_flags, bin_name, get_root
+from .utils import get_build_flags, bin_name, get_root, load_release_versions
 from .utils import REPO_PATH
 
 from .go import deps
@@ -20,14 +21,13 @@ from .go import deps
 # constants
 DOGSTATSD_BIN_PATH = os.path.join(".", "bin", "dogstatsd")
 STATIC_BIN_PATH = os.path.join(".", "bin", "static")
-MAX_BINARY_SIZE = 15 * 1024
+MAX_BINARY_SIZE = 20 * 1024
 DOGSTATSD_TAG = "datadog/dogstatsd:master"
 DEFAULT_BUILD_TAGS = [
     "zlib",
     "docker",
     "kubelet",
 ]
-
 
 
 @task
@@ -39,14 +39,15 @@ def build(ctx, rebuild=False, race=False, static=False, build_include=None,
     build_include = DEFAULT_BUILD_TAGS if build_include is None else build_include.split(",")
     build_exclude = [] if build_exclude is None else build_exclude.split(",")
     build_tags = get_build_tags(build_include, build_exclude)
-    ldflags, gcflags = get_build_flags(ctx, static=static, use_embedded_libs=use_embedded_libs)
+    ldflags, gcflags, env = get_build_flags(ctx, static=static, use_embedded_libs=use_embedded_libs)
     bin_path = DOGSTATSD_BIN_PATH
 
     if static:
         bin_path = STATIC_BIN_PATH
 
+    # NOTE: consider stripping symbols to reduce binary size
     cmd = "go build {race_opt} {build_type} -tags '{build_tags}' -o {bin_name} "
-    cmd += "-gcflags=\"{gcflags}\" -ldflags=\"{ldflags}\" {REPO_PATH}/cmd/dogstatsd/"
+    cmd += "-gcflags=\"{gcflags}\" -ldflags=\"{ldflags}\" {REPO_PATH}/cmd/dogstatsd"
     args = {
         "race_opt": "-race" if race else "",
         "build_type": "-a" if rebuild else "",
@@ -56,10 +57,28 @@ def build(ctx, rebuild=False, race=False, static=False, build_include=None,
         "ldflags": ldflags,
         "REPO_PATH": REPO_PATH,
     }
-    ctx.run(cmd.format(**args))
+    ctx.run(cmd.format(**args), env=env)
 
+    # Render the configuration file template
+    #
+    # We need to remove cross compiling bits if any because go generate must
+    # build and execute in the native platform
+    env = {
+        "GOOS": "",
+        "GOARCH": "",
+    }
     cmd = "go generate {}/cmd/dogstatsd"
-    ctx.run(cmd.format(REPO_PATH))
+    ctx.run(cmd.format(REPO_PATH), env=env)
+
+    if static and sys.platform.startswith("linux"):
+        cmd = "file {bin_name} "
+        args = {
+            "bin_name": os.path.join(bin_path, bin_name("dogstatsd")),
+        }
+        result = ctx.run(cmd.format(**args))
+        if "statically linked" not in result.stdout:
+            print("Dogstatsd binary is not static, exiting...")
+            raise Exit(code=1)
 
     refresh_assets(ctx)
 
@@ -131,14 +150,14 @@ def size_test(ctx, skip_build=False):
     if size > MAX_BINARY_SIZE:
         print("DogStatsD static build size too big: {} kB".format(size))
         print("This means your PR added big classes or dependencies in the packages dogstatsd uses")
-        raise Exit(1)
+        raise Exit(code=1)
 
     print("DogStatsD static build size OK: {} kB".format(size))
 
 
 @task
 def omnibus_build(ctx, log_level="info", base_dir=None, gem_path=None,
-                  skip_deps=False):
+                  skip_deps=False, release_version="nightly", omnibus_s3_cache=False):
     """
     Build the Dogstatsd packages with Omnibus Installer.
     """
@@ -148,7 +167,7 @@ def omnibus_build(ctx, log_level="info", base_dir=None, gem_path=None,
     # omnibus config overrides
     overrides = []
 
-    # base dir (can be overridden through env vars, command line takes precendence)
+    # base dir (can be overridden through env vars, command line takes precedence)
     base_dir = base_dir or os.environ.get("DSD_OMNIBUS_BASE_DIR")
     if base_dir:
         overrides.append("base_dir:{}".format(base_dir))
@@ -158,18 +177,22 @@ def omnibus_build(ctx, log_level="info", base_dir=None, gem_path=None,
         overrides_cmd = "--override=" + " ".join(overrides)
 
     with ctx.cd("omnibus"):
+        env = load_release_versions(ctx, release_version)
         cmd = "bundle install"
         if gem_path:
             cmd += " --path {}".format(gem_path)
-        ctx.run(cmd)
-        omnibus = "bundle exec omnibus.bat" if invoke.platform.WINDOWS else "bundle exec omnibus"
-        cmd = "{omnibus} build dogstatsd --log-level={log_level} {overrides}"
+        ctx.run(cmd, env=env)
+        omnibus = "bundle exec omnibus.bat" if sys.platform == 'win32' else "bundle exec omnibus"
+        cmd = "{omnibus} build dogstatsd --log-level={log_level} {populate_s3_cache} {overrides}"
         args = {
             "omnibus": omnibus,
             "log_level": log_level,
-            "overrides": overrides_cmd
+            "overrides": overrides_cmd,
+            "populate_s3_cache": ""
         }
-        ctx.run(cmd.format(**args))
+        if omnibus_s3_cache:
+            args['populate_s3_cache'] = " --populate-s3-cache "
+        ctx.run(cmd.format(**args), env=env)
 
 
 @task
@@ -207,15 +230,19 @@ def image_build(ctx, skip_build=False):
     import docker
     client = docker.from_env()
 
-    target = os.path.join(STATIC_BIN_PATH, bin_name("dogstatsd"))
+    src = os.path.join(STATIC_BIN_PATH, bin_name("dogstatsd"))
+    dst = os.path.join("Dockerfiles", "dogstatsd", "alpine", "static")
+
     if not skip_build:
         build(ctx, rebuild=True, static=True)
-    if not os.path.exists(target):
-        raise Exit(1)
+    if not os.path.exists(src):
+        raise Exit(code=1)
+    if not os.path.exists(dst):
+        os.makedirs(dst)
 
-    shutil.copy2(target, "Dockerfiles/dogstatsd/alpine/dogstatsd")
+    shutil.copy(src, dst)
     client.images.build(path="Dockerfiles/dogstatsd/alpine/", rm=True, tag=DOGSTATSD_TAG)
-    ctx.run("rm Dockerfiles/dogstatsd/alpine/dogstatsd")
+    ctx.run("rm -rf Dockerfiles/dogstatsd/alpine/static")
 
 
 @task

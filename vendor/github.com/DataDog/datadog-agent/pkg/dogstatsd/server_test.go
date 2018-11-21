@@ -1,53 +1,95 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package dogstatsd
 
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/metrics"
 )
 
+// getAvailableUDPPort requests a random port number and makes sure it is available
+func getAvailableUDPPort() (int, error) {
+	conn, err := net.ListenPacket("udp", ":0")
+	if err != nil {
+		return -1, fmt.Errorf("can't find an available udp port: %s", err)
+	}
+	defer conn.Close()
+
+	_, portString, err := net.SplitHostPort(conn.LocalAddr().String())
+	if err != nil {
+		return -1, fmt.Errorf("can't find an available udp port: %s", err)
+	}
+	portInt, err := strconv.Atoi(portString)
+	if err != nil {
+		return -1, fmt.Errorf("can't convert udp port: %s", err)
+	}
+
+	return portInt, nil
+}
+
 func TestNewServer(t *testing.T) {
+	port, err := getAvailableUDPPort()
+	require.NoError(t, err)
+	config.Datadog.SetDefault("dogstatsd_port", port)
+
 	s, err := NewServer(nil, nil, nil)
-	assert.Nil(t, err)
+	require.NoError(t, err, "cannot start DSD")
 	defer s.Stop()
 	assert.NotNil(t, s)
 	assert.True(t, s.Started)
 }
 
 func TestStopServer(t *testing.T) {
+	port, err := getAvailableUDPPort()
+	require.NoError(t, err)
+	config.Datadog.SetDefault("dogstatsd_port", port)
+
 	s, err := NewServer(nil, nil, nil)
-	assert.Nil(t, err)
+	require.NoError(t, err, "cannot start DSD")
 	s.Stop()
 
-	// check that the port can be bind
-	address, _ := net.ResolveUDPAddr("udp", "localhost:8126")
-	conn, err := net.ListenUDP("udp", address)
-	assert.Nil(t, err)
-	conn.Close()
+	// check that the port can be bound, try for 100 ms
+	address, err := net.ResolveUDPAddr("udp", fmt.Sprintf("127.0.0.1:%d", port))
+	require.NoError(t, err, "cannot resolve address")
+	for i := 0; i < 10; i++ {
+		var conn net.Conn
+		conn, err = net.ListenUDP("udp", address)
+		if err == nil {
+			conn.Close()
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	require.NoError(t, err, "port is not available, it should be")
 }
 
 func TestUPDReceive(t *testing.T) {
+	port, err := getAvailableUDPPort()
+	require.NoError(t, err)
+	config.Datadog.SetDefault("dogstatsd_port", port)
+
 	metricOut := make(chan *metrics.MetricSample)
 	eventOut := make(chan metrics.Event)
 	serviceOut := make(chan metrics.ServiceCheck)
 	s, err := NewServer(metricOut, eventOut, serviceOut)
-	assert.Nil(t, err)
+	require.NoError(t, err, "cannot start DSD")
 	defer s.Stop()
 
 	url := fmt.Sprintf("127.0.0.1:%d", config.Datadog.GetInt("dogstatsd_port"))
 	conn, err := net.Dial("udp", url)
-	assert.Nil(t, err)
+	require.NoError(t, err, "cannot connect to DSD socket")
 	defer conn.Close()
 
 	// Test metric
@@ -58,6 +100,7 @@ func TestUPDReceive(t *testing.T) {
 		assert.Equal(t, res.Name, "daemon")
 		assert.EqualValues(t, res.Value, 666.0)
 		assert.Equal(t, res.Mtype, metrics.GaugeType)
+		assert.ElementsMatch(t, res.Tags, []string{"sometag1:somevalue1", "sometag2:somevalue2"})
 	case <-time.After(2 * time.Second):
 		assert.FailNow(t, "Timeout on receive channel")
 	}
@@ -143,6 +186,7 @@ func TestUPDReceive(t *testing.T) {
 	select {
 	case res := <-eventOut:
 		assert.NotNil(t, res)
+		assert.ElementsMatch(t, res.Tags, []string{"tag1", "tag2:test"})
 	case <-time.After(2 * time.Second):
 		assert.FailNow(t, "Timeout on receive channel")
 	}
@@ -153,6 +197,130 @@ func TestUPDReceive(t *testing.T) {
 	case res := <-eventOut:
 		assert.NotNil(t, res)
 		assert.Equal(t, res.Title, "test title2")
+	case <-time.After(2 * time.Second):
+		assert.FailNow(t, "Timeout on receive channel")
+	}
+}
+
+func TestUDPForward(t *testing.T) {
+	fport, err := getAvailableUDPPort()
+	require.NoError(t, err)
+
+	// Setup UDP server to forward to
+	config.Datadog.SetDefault("statsd_forward_port", fport)
+	config.Datadog.SetDefault("statsd_forward_host", "127.0.0.1")
+
+	addr := fmt.Sprintf("127.0.0.1:%d", fport)
+	pc, err := net.ListenPacket("udp", addr)
+	require.NoError(t, err)
+
+	defer pc.Close()
+
+	// Setup dogstatsd server
+	port, err := getAvailableUDPPort()
+	require.NoError(t, err)
+	config.Datadog.SetDefault("dogstatsd_port", port)
+
+	metricOut := make(chan *metrics.MetricSample)
+	eventOut := make(chan metrics.Event)
+	serviceOut := make(chan metrics.ServiceCheck)
+	s, err := NewServer(metricOut, eventOut, serviceOut)
+	require.NoError(t, err, "cannot start DSD")
+	defer s.Stop()
+
+	url := fmt.Sprintf("127.0.0.1:%d", config.Datadog.GetInt("dogstatsd_port"))
+	conn, err := net.Dial("udp", url)
+	require.NoError(t, err, "cannot connect to DSD socket")
+	defer conn.Close()
+
+	// Check if message is forwarded
+	message := []byte("daemon:666|g|#sometag1:somevalue1,sometag2:somevalue2")
+
+	conn.Write(message)
+
+	pc.SetReadDeadline(time.Now().Add(2 * time.Second))
+
+	buffer := make([]byte, len(message))
+	_, _, err = pc.ReadFrom(buffer)
+	require.NoError(t, err)
+
+	assert.Equal(t, message, buffer)
+}
+
+func TestHistToDist(t *testing.T) {
+	port, err := getAvailableUDPPort()
+	require.NoError(t, err)
+	defaultPort := config.Datadog.GetInt("dogstatsd_port")
+	config.Datadog.SetDefault("dogstatsd_port", port)
+	defer config.Datadog.SetDefault("dogstatsd_port", defaultPort)
+	config.Datadog.SetDefault("histogram_copy_to_distribution", true)
+	defer config.Datadog.SetDefault("histogram_copy_to_distribution", false)
+	config.Datadog.SetDefault("histogram_copy_to_distribution_prefix", "dist.")
+	defer config.Datadog.SetDefault("histogram_copy_to_distribution_prefix", "")
+
+	metricOut := make(chan *metrics.MetricSample)
+	eventOut := make(chan metrics.Event)
+	serviceOut := make(chan metrics.ServiceCheck)
+	s, err := NewServer(metricOut, eventOut, serviceOut)
+	require.NoError(t, err, "cannot start DSD")
+	defer s.Stop()
+
+	url := fmt.Sprintf("127.0.0.1:%d", config.Datadog.GetInt("dogstatsd_port"))
+	conn, err := net.Dial("udp", url)
+	require.NoError(t, err, "cannot connect to DSD socket")
+	defer conn.Close()
+
+	// Test metric
+	conn.Write([]byte("daemon:666|h|#sometag1:somevalue1,sometag2:somevalue2"))
+	select {
+	case histMetric := <-metricOut:
+		assert.NotNil(t, histMetric)
+		assert.Equal(t, histMetric.Name, "daemon")
+		assert.EqualValues(t, histMetric.Value, 666.0)
+		assert.Equal(t, metrics.HistogramType, histMetric.Mtype)
+	case <-time.After(2 * time.Second):
+		assert.FailNow(t, "Timeout on receive channel")
+	}
+
+	select {
+	case distMetric := <-metricOut:
+		assert.NotNil(t, distMetric)
+		assert.Equal(t, distMetric.Name, "dist.daemon")
+		assert.EqualValues(t, distMetric.Value, 666.0)
+		assert.Equal(t, metrics.DistributionType, distMetric.Mtype)
+	case <-time.After(2 * time.Second):
+		assert.FailNow(t, "Timeout on receive channel")
+	}
+}
+
+func TestExtraTags(t *testing.T) {
+	port, err := getAvailableUDPPort()
+	require.NoError(t, err)
+	config.Datadog.SetDefault("dogstatsd_port", port)
+	config.Datadog.SetDefault("dogstatsd_tags", []string{"sometag3:somevalue3"})
+	defer config.Datadog.SetDefault("dogstatsd_tags", []string{})
+
+	metricOut := make(chan *metrics.MetricSample)
+	eventOut := make(chan metrics.Event)
+	serviceOut := make(chan metrics.ServiceCheck)
+	s, err := NewServer(metricOut, eventOut, serviceOut)
+	require.NoError(t, err, "cannot start DSD")
+	defer s.Stop()
+
+	url := fmt.Sprintf("127.0.0.1:%d", config.Datadog.GetInt("dogstatsd_port"))
+	conn, err := net.Dial("udp", url)
+	require.NoError(t, err, "cannot connect to DSD socket")
+	defer conn.Close()
+
+	// Test metric
+	conn.Write([]byte("daemon:666|g|#sometag1:somevalue1,sometag2:somevalue2"))
+	select {
+	case res := <-metricOut:
+		assert.NotNil(t, res)
+		assert.Equal(t, res.Name, "daemon")
+		assert.EqualValues(t, res.Value, 666.0)
+		assert.Equal(t, res.Mtype, metrics.GaugeType)
+		assert.ElementsMatch(t, res.Tags, []string{"sometag1:somevalue1", "sometag2:somevalue2", "sometag3:somevalue3"})
 	case <-time.After(2 * time.Second):
 		assert.FailNow(t, "Timeout on receive channel")
 	}

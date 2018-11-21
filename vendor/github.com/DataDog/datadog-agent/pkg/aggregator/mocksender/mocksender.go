@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package mocksender
 
@@ -19,7 +19,7 @@ import (
 func NewMockSender(id check.ID) *MockSender {
 	mockSender := new(MockSender)
 	// The MockSender will be injected in the corecheck via the aggregator
-	aggregator.InitAggregatorWithFlushInterval(nil, "", 1*time.Hour)
+	aggregator.InitAggregatorWithFlushInterval(nil, "", "", 1*time.Hour)
 	aggregator.SetSender(mockSender, id)
 
 	return mockSender
@@ -50,7 +50,7 @@ func (m *MockSender) SetupAcceptAll() {
 	).Return()
 	m.On("Event", mock.AnythingOfType("metrics.Event")).Return()
 	m.On("GetMetricStats", mock.AnythingOfType("map[string]int64")).Return()
-
+	m.On("DisableDefaultHostname", mock.AnythingOfType("bool")).Return()
 	m.On("Commit").Return()
 }
 

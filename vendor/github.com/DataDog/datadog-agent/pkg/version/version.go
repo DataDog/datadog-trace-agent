@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package version
 
@@ -22,10 +22,8 @@ type Version struct {
 	Commit string
 }
 
-var commit string
-
-// New parses a version string like `0.0.0` and returns an AgentVersion instance
-func New(version string) (Version, error) {
+// New parses a version string like `0.0.0` and a commit identifier and returns a Version instance
+func New(version, commit string) (Version, error) {
 	re := regexp.MustCompile(`(\d+\.\d+\.\d+)(\-[^\+]+)*(\+.+)*`)
 	toks := re.FindStringSubmatch(version)
 	if len(toks) == 0 || toks[0] != version {

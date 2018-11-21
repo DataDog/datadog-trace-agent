@@ -1,6 +1,7 @@
 package util
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -10,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/DataDog/datadog-agent/pkg/collector/check"
+	"github.com/DataDog/datadog-agent/pkg/autodiscovery/integration"
 	"github.com/DataDog/datadog-agent/pkg/config"
 
 	"gopkg.in/yaml.v2"
@@ -106,12 +107,12 @@ func TestJSONConverter(t *testing.T) {
 		"jmx_alt",
 	}
 
-	cache := map[string]check.ConfigRawMap{}
+	cache := map[string]integration.RawMap{}
 	for _, c := range checks {
-		var cf check.ConfigRawMap
+		var cf integration.RawMap
 
 		// Read file contents
-		yamlFile, err := ioutil.ReadFile(fmt.Sprintf("../collector/corechecks/embed/fixtures/%s.yaml", c))
+		yamlFile, err := ioutil.ReadFile(fmt.Sprintf("../collector/corechecks/embed/jmx/fixtures/%s.yaml", c))
 		assert.Nil(t, err)
 
 		// Parse configuration
@@ -132,4 +133,27 @@ func TestJSONConverter(t *testing.T) {
 	//json encode
 	_, err := json.Marshal(GetJSONSerializableMap(j))
 	assert.Nil(t, err)
+}
+
+func TestCreateHTTPTransport(t *testing.T) {
+	skipSSL := config.Datadog.GetBool("skip_ssl_validation")
+	forceTLS := config.Datadog.GetBool("force_tls_12")
+	defer config.Datadog.Set("skip_ssl_validation", skipSSL)
+	defer config.Datadog.Set("force_tls_12", forceTLS)
+
+	config.Datadog.Set("skip_ssl_validation", false)
+	config.Datadog.Set("force_tls_12", false)
+	transport := CreateHTTPTransport()
+	assert.False(t, transport.TLSClientConfig.InsecureSkipVerify)
+	assert.Equal(t, transport.TLSClientConfig.MinVersion, uint16(0))
+
+	config.Datadog.Set("skip_ssl_validation", true)
+	transport = CreateHTTPTransport()
+	assert.True(t, transport.TLSClientConfig.InsecureSkipVerify)
+	assert.Equal(t, transport.TLSClientConfig.MinVersion, uint16(0))
+
+	config.Datadog.Set("force_tls_12", true)
+	transport = CreateHTTPTransport()
+	assert.True(t, transport.TLSClientConfig.InsecureSkipVerify)
+	assert.Equal(t, transport.TLSClientConfig.MinVersion, uint16(tls.VersionTLS12))
 }

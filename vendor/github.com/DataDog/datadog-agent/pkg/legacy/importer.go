@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package legacy
 
@@ -24,7 +24,6 @@ var (
 		"skip_ssl_validation",
 		"api_key",
 		"hostname",
-		"apm_enabled",
 		"tags",
 		"forwarder_timeout",
 		"default_integration_http_timeout",
@@ -51,24 +50,25 @@ var (
 		"syslog_host",
 		"syslog_port",
 		"collect_instance_metadata",
-		"listen_port",                // not for 6.0, ignore for now
-		"non_local_traffic",          // not for 6.0, ignore for now
-		"create_dd_check_tags",       // not for 6.0, ignore for now
-		"bind_host",                  // not for 6.0, ignore for now
+		"listen_port",          // not for 6.0, ignore for now
+		"non_local_traffic",    // not for 6.0, converted for the trace-agent
+		"create_dd_check_tags", // not for 6.0, ignore for now
+		"bind_host",
 		"proxy_forbid_method_switch", // deprecated
 		"collect_orchestrator_tags",  // deprecated
 		"use_curl_http_client",       // deprecated
 		"dogstatsd_target",           // deprecated
 		"gce_updated_hostname",       // deprecated
 		"process_agent_enabled",
-		// trace-agent specific
-		"extra_sample_rate",
-		"max_traces_per_second",
-		"receiver_port",
-		"connection_limit",
-		"resource",
 		"disable_file_logging",
 		"enable_gohai",
+		// trace-agent specific
+		"apm_enabled",
+		"env",
+		"receiver_port",
+		"extra_sample_rate",
+		"max_traces_per_second",
+		"resource",
 	}
 )
 
@@ -87,9 +87,24 @@ func GetAgentConfig(datadogConfPath string) (Config, error) {
 		return config, err
 	}
 
+	// get the Trace sections
+	// some of these aren't likely to exist
+	traceConfig := iniFile.Section("trace.config")
+	traceReceiver := iniFile.Section("trace.receiver")
+	traceSampler := iniFile.Section("trace.sampler")
+	traceIgnore := iniFile.Section("trace.ignore")
+
 	// Grab the values needed to do a comparison of the Go vs Python algorithm.
 	for _, supportedValue := range supportedValues {
 		if value, err := main.GetKey(supportedValue); err == nil {
+			config[supportedValue] = value.String()
+		} else if value, err := traceConfig.GetKey(supportedValue); err == nil {
+			config[supportedValue] = value.String()
+		} else if value, err := traceReceiver.GetKey(supportedValue); err == nil {
+			config[supportedValue] = value.String()
+		} else if value, err := traceSampler.GetKey(supportedValue); err == nil {
+			config[supportedValue] = value.String()
+		} else if value, err := traceIgnore.GetKey(supportedValue); err == nil {
 			config[supportedValue] = value.String()
 		} else {
 			// provide an empty default value so we don't need to check for
@@ -108,8 +123,6 @@ func GetAgentConfig(datadogConfPath string) (Config, error) {
 	config["use_web_info_page"] = "True"
 
 	// these values are postprocessed in config.py, manually overwrite them
-	config["histogram_aggregates"] = "['max', 'median', 'avg', 'count']"
-	config["histogram_percentiles"] = "['0.95']"
 	config["endpoints"] = "{}"
 	config["version"] = "5.18.0"
 	config["proxy_settings"] = "{'host': 'my-proxy.com', 'password': 'password', 'port': 3128, 'user': 'user'}"

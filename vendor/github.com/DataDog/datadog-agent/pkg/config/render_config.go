@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 // +build ignore
 
@@ -21,14 +21,19 @@ type context struct {
 	Agent             bool
 	Metadata          bool
 	Dogstatsd         bool
+	LogsAgent         bool
 	JMX               bool
 	Autoconfig        bool
 	Logging           bool
 	Autodiscovery     bool
 	DockerTagging     bool
+	Kubelet           bool
 	KubernetesTagging bool
 	ECS               bool
+	CRI               bool
 	ProcessAgent      bool
+	KubeApiServer     bool
+	TraceAgent        bool
 }
 
 func mkContext(buildType string) context {
@@ -41,6 +46,7 @@ func mkContext(buildType string) context {
 			Agent:             true,
 			Metadata:          true,
 			Dogstatsd:         true,
+			LogsAgent:         true,
 			JMX:               true,
 			Autoconfig:        true,
 			Logging:           true,
@@ -48,7 +54,11 @@ func mkContext(buildType string) context {
 			DockerTagging:     true,
 			KubernetesTagging: true,
 			ECS:               true,
+			CRI:               true,
 			ProcessAgent:      true,
+			TraceAgent:        true,
+			Kubelet:           true,
+			KubeApiServer:     true, // TODO: remove when phasing out from node-agent
 		}
 	case "dogstatsd":
 		return context{
@@ -58,6 +68,14 @@ func mkContext(buildType string) context {
 			Logging:           true,
 			KubernetesTagging: true,
 			ECS:               true,
+			TraceAgent:        true,
+			Kubelet:           true,
+		}
+	case "dca":
+		return context{
+			Common:        true,
+			Logging:       true,
+			KubeApiServer: true,
 		}
 	}
 

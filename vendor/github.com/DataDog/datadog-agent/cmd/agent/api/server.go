@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 /*
 Package api implements the agent IPC api. Using HTTP
@@ -18,6 +18,7 @@ import (
 	stdLog "log"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/DataDog/datadog-agent/cmd/agent/api/agent"
 	"github.com/DataDog/datadog-agent/cmd/agent/api/check"
@@ -40,6 +41,9 @@ func StartServer() error {
 	agent.SetupHandlers(r.PathPrefix("/agent").Subrouter())
 	check.SetupHandlers(r.PathPrefix("/check").Subrouter())
 
+	// Validate token for every request
+	r.Use(validateToken)
+
 	// get the transport we're going to use under HTTP
 	var err error
 	listener, err = getListener()
@@ -48,9 +52,12 @@ func StartServer() error {
 		// no way we can recover from this error
 		return fmt.Errorf("Unable to create the api server: %v", err)
 	}
-	util.SetAuthToken()
 
-	//
+	err = util.SetAuthToken()
+	if err != nil {
+		return err
+	}
+
 	hosts := []string{"127.0.0.1", "localhost"}
 	_, rootCertPEM, rootKey, err := security.GenerateRootCert(hosts, 2048)
 	if err != nil {
@@ -73,9 +80,10 @@ func StartServer() error {
 	}
 
 	srv := &http.Server{
-		Handler:   r,
-		ErrorLog:  stdLog.New(&config.ErrorLogWriter{}, "", 0), // log errors to seelog
-		TLSConfig: &tlsConfig,
+		Handler:      r,
+		ErrorLog:     stdLog.New(&config.ErrorLogWriter{}, "", 0), // log errors to seelog
+		TLSConfig:    &tlsConfig,
+		WriteTimeout: config.Datadog.GetDuration("server_timeout") * time.Second,
 	}
 	tlsListener := tls.NewListener(listener, &tlsConfig)
 
@@ -89,4 +97,18 @@ func StopServer() {
 	if listener != nil {
 		listener.Close()
 	}
+}
+
+// ServerAddress retruns the server address.
+func ServerAddress() *net.TCPAddr {
+	return listener.Addr().(*net.TCPAddr)
+}
+
+func validateToken(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := util.Validate(w, r); err != nil {
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }

@@ -2,7 +2,6 @@ package gui
 
 import (
 	"crypto/rand"
-	"crypto/rsa"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -10,25 +9,26 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/DataDog/datadog-agent/cmd/agent/common"
-	"github.com/DataDog/datadog-agent/pkg/config"
-
-	log "github.com/cihub/seelog"
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/DataDog/datadog-agent/pkg/api/security"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/gorilla/mux"
 	"github.com/urfave/negroni"
 )
 
 var (
-	listener      net.Listener
-	privateKey    *rsa.PrivateKey
-	publicKey     *rsa.PublicKey
-	csrfToken     string
-	authTokenPath string
+	listener  net.Listener
+	authToken string
+
+	// CsrfToken is a session-specific token passed to the GUI's authentication endpoint by app.launchGui
+	CsrfToken string
+
+	// To compute uptime
+	startTimestamp int64
 )
 
 // Payload struct is for the JSON messages received from a client POST request
@@ -43,15 +43,13 @@ func StopGUIServer() {
 	if listener != nil {
 		listener.Close()
 	}
-
-	err := os.Remove(authTokenPath)
-	if err != nil {
-		log.Infof("error deleting gui_auth_token file: " + err.Error())
-	}
 }
 
 // StartGUIServer creates the router, starts the HTTP server & generates the authentication token for access
 func StartGUIServer(port string) error {
+	// Set start time...
+	startTimestamp = time.Now().Unix()
+
 	// Instantiate the gorilla/mux router
 	router := mux.NewRouter()
 
@@ -59,7 +57,7 @@ func StartGUIServer(port string) error {
 	router.HandleFunc("/authenticate", generateAuthEndpoint)
 
 	// Serve the (secured) index page on the default endpoint
-	router.Handle("/", authorizeAccess(http.FileServer(http.Dir(filepath.Join(common.GetViewsPath(), "private")))))
+	router.Handle("/", authorizeAccess(http.HandlerFunc(generateIndex)))
 
 	// Mount our (secured) filesystem at the view/{path} route
 	router.PathPrefix("/view/").Handler(http.StripPrefix("/view/", authorizeAccess(http.FileServer(http.Dir(filepath.Join(common.GetViewsPath(), "private"))))))
@@ -80,39 +78,45 @@ func StartGUIServer(port string) error {
 		return e
 	}
 	go http.Serve(listener, router)
+	log.Infof("GUI server is listening at 127.0.0.1:" + port)
 
-	return createAuthToken()
+	// Create a CSRF token (unique to each session)
+	e = createCSRFToken()
+	if e != nil {
+		return e
+	}
+
+	// Fetch the authentication token (persists across sessions)
+	authToken, e = security.FetchAuthToken()
+	if e != nil {
+		listener.Close()
+		listener = nil
+	}
+	return e
 }
 
-// Generates a JWT & CSRF token, then saves them both to a file with the same permissions as datadog.yaml
-func createAuthToken() error {
-	// Generate a pair of RSA keys
-	privateKey, e := rsa.GenerateKey(rand.Reader, 2048)
-	if e != nil {
-		return fmt.Errorf("error generating RSA key: " + e.Error())
-	}
-	publicKey = &privateKey.PublicKey
-
-	// Create a JWT signed with the private key
-	JWT := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
-		"admin": true,
-		"name":  "Datadog Agent Manager",
-	})
-	jwtString, e := JWT.SignedString(privateKey)
-	if e != nil {
-		return fmt.Errorf("error creating JWT: " + e.Error())
-	}
-
-	// Create a CSRF token
+func createCSRFToken() error {
 	key := make([]byte, 32)
-	_, e = rand.Read(key)
+	_, e := rand.Read(key)
 	if e != nil {
 		return fmt.Errorf("error creating CSRF token: " + e.Error())
 	}
-	csrfToken = hex.EncodeToString(key)
+	CsrfToken = hex.EncodeToString(key)
+	return nil
+}
 
-	authTokenPath = filepath.Join(filepath.Dir(config.Datadog.ConfigFileUsed()), "gui_auth_token")
-	return saveAuthToken("/authenticate?jwt=" + jwtString + ";csrf=" + csrfToken)
+func generateIndex(w http.ResponseWriter, r *http.Request) {
+	t, e := template.New("index.tmpl").ParseFiles(filepath.Join(common.GetViewsPath(), "templates/index.tmpl"))
+	if e != nil {
+		http.Error(w, e.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	e = t.Execute(w, map[string]bool{"restartEnabled": restartEnabled()})
+	if e != nil {
+		http.Error(w, e.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func generateAuthEndpoint(w http.ResponseWriter, r *http.Request) {
@@ -122,7 +126,7 @@ func generateAuthEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	e = t.Execute(w, map[string]interface{}{"csrf": csrfToken})
+	e = t.Execute(w, map[string]interface{}{"csrf": CsrfToken})
 	if e != nil {
 		http.Error(w, e.Error(), http.StatusInternalServerError)
 		return
@@ -135,15 +139,16 @@ func authorizeAccess(h http.Handler) http.Handler {
 		// Disable caching
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 
-		cookie, _ := r.Cookie("jwt")
+		cookie, _ := r.Cookie("authToken")
 		if cookie == nil {
 			w.WriteHeader(http.StatusUnauthorized)
 			http.Error(w, "no authorization token", 401)
 			return
 		}
 
-		e := verifyJWT(w, cookie.Value)
-		if e != nil {
+		if cookie.Value != authToken {
+			w.WriteHeader(http.StatusUnauthorized)
+			http.Error(w, "invalid authorization token", 401)
 			return
 		}
 
@@ -161,30 +166,14 @@ func authorizePOST(w http.ResponseWriter, r *http.Request, next http.HandlerFunc
 		return
 	}
 
-	e := verifyJWT(w, strings.Split(authHeader[0], " ")[1])
-	if e != nil {
+	token := strings.Split(authHeader[0], " ")[1]
+	if token != authToken {
+		w.WriteHeader(http.StatusUnauthorized)
+		http.Error(w, "invalid authorization token", 401)
 		return
 	}
 
 	next(w, r)
-}
-
-func verifyJWT(w http.ResponseWriter, tokenString string) error {
-	// Use public key to verify the token
-	token, e := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		return publicKey, nil
-	})
-
-	if e != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		http.Error(w, "token validation error: "+e.Error(), 500)
-	} else if !token.Valid {
-		w.WriteHeader(http.StatusUnauthorized)
-		http.Error(w, "invalid authorization token", 401)
-		e = fmt.Errorf("invalid authorization token")
-	}
-
-	return e
 }
 
 // Helper function which unmarshals a POST requests data into a Payload object

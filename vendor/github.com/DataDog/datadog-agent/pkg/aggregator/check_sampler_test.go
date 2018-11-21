@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package aggregator
 
@@ -18,7 +18,7 @@ import (
 )
 
 func TestCheckGaugeSampling(t *testing.T) {
-	checkSampler := newCheckSampler("")
+	checkSampler := newCheckSampler()
 
 	mSample1 := metrics.MetricSample{
 		Name:       "my.metric.name",
@@ -85,7 +85,7 @@ func TestCheckGaugeSampling(t *testing.T) {
 }
 
 func TestCheckRateSampling(t *testing.T) {
-	checkSampler := newCheckSampler("")
+	checkSampler := newCheckSampler()
 
 	mSample1 := metrics.MetricSample{
 		Name:       "my.metric.name",
@@ -134,7 +134,7 @@ func TestCheckRateSampling(t *testing.T) {
 }
 
 func TestHistogramIntervalSampling(t *testing.T) {
-	checkSampler := newCheckSampler("")
+	checkSampler := newCheckSampler()
 
 	mSample1 := metrics.MetricSample{
 		Name:       "my.metric.name",
@@ -189,36 +189,4 @@ func TestHistogramIntervalSampling(t *testing.T) {
 	}
 
 	assert.True(t, foundCount)
-}
-
-func TestCheckSamplerHostname(t *testing.T) {
-	checkSampler := newCheckSampler("my.test.hostname")
-
-	mSample1 := metrics.MetricSample{
-		Name:       "my.metric.name",
-		Value:      1,
-		Mtype:      metrics.GaugeType,
-		Tags:       []string{"foo", "bar"},
-		SampleRate: 1,
-		Timestamp:  12345.0,
-	}
-	mSample2 := metrics.MetricSample{
-		Name:       "my.metric.name",
-		Value:      1,
-		Mtype:      metrics.GaugeType,
-		Tags:       []string{"foo", "bar"},
-		Host:       "metric-hostname",
-		SampleRate: 1,
-		Timestamp:  12345,
-	}
-
-	checkSampler.addSample(&mSample1)
-	checkSampler.addSample(&mSample2)
-	checkSampler.commit(12346.0)
-	series := checkSampler.flush()
-
-	require.Len(t, series, 2)
-	actualHostnames := []string{series[0].Host, series[1].Host}
-	assert.Contains(t, actualHostnames, "my.test.hostname")
-	assert.Contains(t, actualHostnames, "metric-hostname")
 }

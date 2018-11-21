@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package scheduler
 
@@ -12,17 +12,22 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/DataDog/datadog-agent/pkg/util/log"
+
 	"github.com/DataDog/datadog-agent/pkg/collector/check"
-	log "github.com/cihub/seelog"
 )
 
 var (
-	minAllowedInterval = 1 * time.Second
-	schedulerStats     *expvar.Map
+	minAllowedInterval     = 1 * time.Second
+	schedulerExpvars       *expvar.Map
+	schedulerQueuesCount   = expvar.Int{}
+	schedulerChecksEntered = expvar.Int{}
 )
 
 func init() {
-	schedulerStats = expvar.NewMap("scheduler")
+	schedulerExpvars = expvar.NewMap("scheduler")
+	schedulerExpvars.Set("QueuesCount", &schedulerQueuesCount)
+	schedulerExpvars.Set("ChecksEntered", &schedulerChecksEntered)
 }
 
 // Scheduler keeps things rolling.
@@ -77,14 +82,14 @@ func (s *Scheduler) Enter(check check.Check) error {
 	if _, ok := s.jobQueues[check.Interval()]; !ok {
 		s.jobQueues[check.Interval()] = newJobQueue(check.Interval())
 		s.startQueue(s.jobQueues[check.Interval()])
-		schedulerStats.Add("QueuesCount", 1)
+		schedulerQueuesCount.Add(1)
 	}
 	s.jobQueues[check.Interval()].addJob(check)
 	// map each check to the Job Queue it was assigned to
 	s.checkToQueue[check.ID()] = s.jobQueues[check.Interval()]
 
-	schedulerStats.Add("ChecksEntered", 1)
-	schedulerStats.Set("Queues", expvar.Func(expQueues(s)))
+	schedulerChecksEntered.Add(1)
+	schedulerExpvars.Set("Queues", expvar.Func(expQueues(s)))
 	return nil
 }
 
@@ -93,6 +98,8 @@ func (s *Scheduler) Enter(check check.Check) error {
 func (s *Scheduler) Cancel(id check.ID) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	log.Infof("Unscheduling check %s", string(id))
 
 	if _, ok := s.checkToQueue[id]; !ok {
 		return nil
@@ -103,9 +110,10 @@ func (s *Scheduler) Cancel(id check.ID) error {
 	if err != nil {
 		return fmt.Errorf("unable to remove the Job from the queue: %s", err)
 	}
+	delete(s.checkToQueue, id)
 
-	schedulerStats.Add("ChecksEntered", -1)
-	schedulerStats.Set("Queues", expvar.Func(expQueues(s)))
+	schedulerChecksEntered.Add(-1)
+	schedulerExpvars.Set("Queues", expvar.Func(expQueues(s)))
 	return nil
 }
 
@@ -169,6 +177,15 @@ func (s *Scheduler) Stop() error {
 	}
 }
 
+// IsCheckScheduled returns whether a check is in the schedule or not
+func (s *Scheduler) IsCheckScheduled(id check.ID) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, found := s.checkToQueue[id]
+	return found
+}
+
 // stopQueues shuts down the timers for each active queue
 // Blocks until all the queues have fully stopped
 func (s *Scheduler) stopQueues() {
@@ -202,7 +219,7 @@ func (s *Scheduler) startQueues() {
 // startQueue starts a queue (non-blocking operation) if it's not running yet
 func (s *Scheduler) startQueue(q *jobQueue) {
 	if !q.running {
-		q.run(s.checksPipe)
+		q.run(s)
 		q.running = true
 	}
 }
@@ -222,7 +239,7 @@ func (s *Scheduler) enqueueOnce(check check.Check) {
 		}
 	}(s.cancelOneTime)
 
-	schedulerStats.Add("ChecksEntered", 1)
+	schedulerChecksEntered.Add(1)
 }
 
 // expQueues return a function to get the stats for the queues
@@ -230,12 +247,8 @@ func expQueues(s *Scheduler) func() interface{} {
 	return func() interface{} {
 		queues := make([]map[string]interface{}, 0)
 
-		for interval, queue := range s.jobQueues {
-			queueStats := map[string]interface{}{
-				"Interval": interval / time.Second,
-				"Size":     len(queue.jobs),
-			}
-			queues = append(queues, queueStats)
+		for _, queue := range s.jobQueues {
+			queues = append(queues, queue.stats())
 		}
 		return queues
 	}

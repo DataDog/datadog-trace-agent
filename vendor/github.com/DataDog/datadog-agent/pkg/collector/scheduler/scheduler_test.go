@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package scheduler
 
@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DataDog/datadog-agent/pkg/autodiscovery/integration"
 	"github.com/DataDog/datadog-agent/pkg/collector/check"
 	"github.com/stretchr/testify/assert"
 )
@@ -17,7 +18,8 @@ import (
 type TestCheck struct{ intl time.Duration }
 
 func (c *TestCheck) String() string                                     { return "TestCheck" }
-func (c *TestCheck) Configure(check.ConfigData, check.ConfigData) error { return nil }
+func (c *TestCheck) Version() string                                    { return "" }
+func (c *TestCheck) Configure(integration.Data, integration.Data) error { return nil }
 func (c *TestCheck) Interval() time.Duration                            { return c.intl }
 func (c *TestCheck) Run() error                                         { return nil }
 func (c *TestCheck) Stop()                                              {}
@@ -41,6 +43,17 @@ func consistently(f func() bool) bool {
 	return false
 }
 
+func consume(c chan check.Check, stop chan bool) {
+	for {
+		select {
+		case <-c:
+			continue
+		case <-stop:
+			return
+		}
+	}
+}
+
 func resetMinAllowedInterval() {
 	minAllowedInterval = initialMinAllowedInterval
 }
@@ -52,6 +65,7 @@ func getScheduler() *Scheduler {
 func TestNewScheduler(t *testing.T) {
 	c := make(chan<- check.Check)
 	s := NewScheduler(c)
+
 	assert.Equal(t, c, s.checksPipe)
 	assert.Equal(t, len(s.jobQueues), 0)
 	assert.Equal(t, s.running, uint32(0))
@@ -59,7 +73,12 @@ func TestNewScheduler(t *testing.T) {
 
 func TestEnter(t *testing.T) {
 	c := &TestCheck{}
-	s := getScheduler()
+	ch := make(chan check.Check)
+	stop := make(chan bool)
+	s := NewScheduler(ch)
+
+	// consume the enqueued checks
+	go consume(ch, stop)
 
 	// schedule passing a wrong interval value
 	c.intl = -1
@@ -76,32 +95,46 @@ func TestEnter(t *testing.T) {
 	c.intl = 1 * time.Second
 	s.Enter(c)
 	assert.Len(t, s.jobQueues, 1)
-	assert.Len(t, s.jobQueues[c.intl].jobs, 1)
+	assert.Len(t, s.jobQueues[c.intl].buckets, 1)
+	assert.Len(t, s.jobQueues[c.intl].buckets[0].jobs, 1)
 
 	// schedule another, same interval
 	c = &TestCheck{intl: c.intl}
 	s.Enter(c)
 	assert.Len(t, s.jobQueues, 1)
-	assert.Len(t, s.jobQueues[c.intl].jobs, 2)
+	assert.Len(t, s.jobQueues[c.intl].buckets, 1)
+	assert.Len(t, s.jobQueues[c.intl].buckets[0].jobs, 2)
 
 	// schedule again the previous plus another with different interval
 	s.Enter(c)
 	c = &TestCheck{intl: 20 * time.Second}
 	s.Enter(c)
 	assert.Len(t, s.jobQueues, 2)
-	assert.Len(t, s.jobQueues[1*time.Second].jobs, 3)
-	assert.Len(t, s.jobQueues[c.intl].jobs, 1)
+	assert.Len(t, s.jobQueues[1*time.Second].buckets[0].jobs, 3)
+	assert.Len(t, s.jobQueues[c.intl].buckets, 20)
+	assert.Len(t, s.jobQueues[c.intl].buckets[0].jobs, 1)
+
+	stop <- true
 }
 
 func TestCancel(t *testing.T) {
-	c := &TestCheck{intl: 1 * time.Second}
-	s := getScheduler()
+	c := make(chan check.Check)
+	stop := make(chan bool)
+	chk := &TestCheck{intl: 1 * time.Second}
+
+	// consume the enqueued checks
+	go consume(c, stop)
+	defer func() {
+		stop <- true
+	}()
+
+	s := NewScheduler(c)
 	defer s.Stop()
 
-	s.Enter(c)
+	s.Enter(chk)
 	s.Run()
-	s.Cancel(c.ID())
-	assert.Len(t, s.jobQueues[c.intl].jobs, 0)
+	s.Cancel(chk.ID())
+	assert.Len(t, s.jobQueues[chk.intl].buckets[0].jobs, 0)
 }
 
 func TestRun(t *testing.T) {
@@ -133,7 +166,13 @@ func TestStop(t *testing.T) {
 }
 
 func TestStopCancelsProducers(t *testing.T) {
-	s := getScheduler()
+	ch := make(chan check.Check)
+	stop := make(chan bool)
+	s := NewScheduler(ch)
+
+	// consume the enqueued checks
+	go consume(ch, stop)
+
 	minAllowedInterval = time.Millisecond // for the purpose of this test, so that the scheduler actually schedules the checks
 	defer resetMinAllowedInterval()
 
@@ -143,10 +182,13 @@ func TestStopCancelsProducers(t *testing.T) {
 	time.Sleep(2 * time.Millisecond) // wait for the scheduler to actually schedule the check
 
 	s.Stop()
+	// stop check consumer routine
+	stop <- true
 	// once the scheduler is stopped, it should be safe to close this channel. Otherwise, this should panic
 	close(s.checksPipe)
 	// sleep to make the runtime schedule the hanging producer goroutines, if there are any left
 	time.Sleep(time.Millisecond)
+
 }
 
 func TestTinyInterval(t *testing.T) {

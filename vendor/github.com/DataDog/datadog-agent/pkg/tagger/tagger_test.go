@@ -1,18 +1,21 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package tagger
 
 import (
+	"fmt"
 	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/DataDog/datadog-agent/pkg/errors"
 	"github.com/DataDog/datadog-agent/pkg/tagger/collectors"
+	"github.com/DataDog/datadog-agent/pkg/util/retry"
 )
 
 type DummyCollector struct {
@@ -63,6 +66,11 @@ func NewDummyFetcher() collectors.Collector {
 	return c
 }
 
+func NewDummyCollector() collectors.Collector {
+	c := new(DummyCollector)
+	return c
+}
+
 func TestInit(t *testing.T) {
 	catalog := collectors.Catalog{
 		"stream":  NewDummyStreamer,
@@ -71,10 +79,8 @@ func TestInit(t *testing.T) {
 	}
 	assert.Equal(t, 3, len(catalog))
 
-	tagger, err := newTagger()
-	assert.Nil(t, err)
-	err = tagger.Init(catalog)
-	assert.Nil(t, err)
+	tagger := newTagger()
+	tagger.Init(catalog)
 
 	assert.Equal(t, 3, len(tagger.fetchers))
 	assert.Equal(t, 1, len(tagger.streamers))
@@ -95,7 +101,7 @@ func TestInit(t *testing.T) {
 
 func TestFetchAllMiss(t *testing.T) {
 	catalog := collectors.Catalog{"stream": NewDummyStreamer, "pull": NewDummyPuller}
-	tagger, _ := newTagger()
+	tagger := newTagger()
 	tagger.Init(catalog)
 
 	streamer := tagger.streamers["stream"].(*DummyCollector)
@@ -107,7 +113,7 @@ func TestFetchAllMiss(t *testing.T) {
 	puller.On("Fetch", "entity_name").Return([]string{"low2"}, []string{}, nil)
 
 	tags, err := tagger.Tag("entity_name", false)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	sort.Strings(tags)
 	assert.Equal(t, []string{"low1", "low2"}, tags)
 
@@ -117,7 +123,7 @@ func TestFetchAllMiss(t *testing.T) {
 
 func TestFetchAllCached(t *testing.T) {
 	catalog := collectors.Catalog{"stream": NewDummyStreamer, "pull": NewDummyPuller}
-	tagger, _ := newTagger()
+	tagger := newTagger()
 	tagger.Init(catalog)
 
 	tagger.tagStore.processTagInfo(&collectors.TagInfo{
@@ -141,9 +147,15 @@ func TestFetchAllCached(t *testing.T) {
 	puller.On("Fetch", "entity_name").Return([]string{"low2"}, []string{}, nil)
 
 	tags, err := tagger.Tag("entity_name", true)
-	assert.Nil(t, err)
-	sort.Strings(tags)
-	assert.Equal(t, []string{"high", "low1", "low2"}, tags)
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []string{"high", "low1", "low2"}, tags)
+
+	streamer.AssertNotCalled(t, "Fetch", "entity_name")
+	puller.AssertNotCalled(t, "Fetch", "entity_name")
+
+	tags2, err := tagger.Tag("entity_name", false)
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []string{"low1", "low2"}, tags2)
 
 	streamer.AssertNotCalled(t, "Fetch", "entity_name")
 	puller.AssertNotCalled(t, "Fetch", "entity_name")
@@ -155,7 +167,7 @@ func TestFetchOneCached(t *testing.T) {
 		"pull":    NewDummyPuller,
 		"fetcher": NewDummyFetcher,
 	}
-	tagger, _ := newTagger()
+	tagger := newTagger()
 	tagger.Init(catalog)
 
 	tagger.tagStore.processTagInfo(&collectors.TagInfo{
@@ -177,9 +189,8 @@ func TestFetchOneCached(t *testing.T) {
 	fetcher.On("Fetch", "entity_name").Return([]string{"low3"}, []string{}, nil)
 
 	tags, err := tagger.Tag("entity_name", true)
-	assert.Nil(t, err)
-	sort.Strings(tags)
-	assert.Equal(t, []string{"low1", "low2", "low3"}, tags)
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []string{"low1", "low2", "low3"}, tags)
 
 	streamer.AssertNotCalled(t, "Fetch", "entity_name")
 	puller.AssertCalled(t, "Fetch", "entity_name")
@@ -190,7 +201,7 @@ func TestEmptyEntity(t *testing.T) {
 	catalog := collectors.Catalog{
 		"fetcher": NewDummyFetcher,
 	}
-	tagger, _ := newTagger()
+	tagger := newTagger()
 	tagger.Init(catalog)
 
 	tagger.tagStore.processTagInfo(&collectors.TagInfo{
@@ -203,4 +214,99 @@ func TestEmptyEntity(t *testing.T) {
 	assert.Nil(t, tags)
 	assert.NotNil(t, err)
 	assert.Contains(t, err.Error(), "empty entity ID")
+}
+
+func TestRetryCollector(t *testing.T) {
+	c := &DummyCollector{}
+	retryError := &retry.Error{
+		LogicError:    fmt.Errorf("testing"),
+		RessourceName: "testing",
+		RetryStatus:   retry.FailWillRetry,
+	}
+	c.On("Detect", mock.Anything).Return(collectors.NoCollection, retryError).Once()
+
+	catalog := collectors.Catalog{
+		"fetcher": func() collectors.Collector { return c },
+	}
+	tagger := newTagger()
+	tagger.Init(catalog)
+
+	assert.Len(t, tagger.candidates, 1)
+	assert.Len(t, tagger.fetchers, 0)
+	c.AssertNumberOfCalls(t, "Detect", 1)
+
+	// Keep trying
+	for i := 0; i < 10; i++ {
+		c.On("Detect", mock.Anything).Return(collectors.NoCollection, retryError).Once()
+		tagger.startCollectors()
+		assert.Len(t, tagger.candidates, 1)
+		assert.Len(t, tagger.fetchers, 0)
+	}
+	c.AssertNumberOfCalls(t, "Detect", 11)
+
+	// Okay, you win
+	c.On("Detect", mock.Anything).Return(collectors.FetchOnlyCollection, nil)
+	tagger.startCollectors()
+	assert.Len(t, tagger.candidates, 0)
+	assert.Len(t, tagger.fetchers, 1)
+	c.AssertNumberOfCalls(t, "Detect", 12)
+
+	// Don't try again
+	tagger.startCollectors()
+	c.AssertNumberOfCalls(t, "Detect", 12)
+}
+
+func TestErrNotFound(t *testing.T) {
+	c := &DummyCollector{}
+	c.On("Detect", mock.Anything).Return(collectors.FetchOnlyCollection, nil)
+
+	badErr := fmt.Errorf("test failure")
+	catalog := collectors.Catalog{
+		"fetcher": func() collectors.Collector { return c },
+	}
+	tagger := newTagger()
+	tagger.Init(catalog)
+
+	// Result should not be cached
+	c.On("Fetch", mock.Anything).Return([]string{}, []string{}, badErr).Once()
+	_, err := tagger.Tag("invalid", true)
+	assert.NoError(t, err)
+	c.AssertNumberOfCalls(t, "Fetch", 1)
+
+	// Nil result should be cached now
+	c.On("Fetch", mock.Anything).Return([]string{}, []string{}, errors.NewNotFound("")).Once()
+	_, err = tagger.Tag("invalid", true)
+	assert.NoError(t, err)
+	c.AssertNumberOfCalls(t, "Fetch", 2)
+
+	// Fetch will not be called again
+	c.On("Fetch", mock.Anything).Return([]string{}, []string{}, errors.NewNotFound("")).Once()
+	_, err = tagger.Tag("invalid", true)
+	assert.NoError(t, err)
+	c.AssertNumberOfCalls(t, "Fetch", 2)
+}
+
+func TestSafeCache(t *testing.T) {
+	catalog := collectors.Catalog{"pull": NewDummyPuller}
+	tagger := newTagger()
+	tagger.Init(catalog)
+
+	tagger.tagStore.processTagInfo(&collectors.TagInfo{
+		Entity:      "entity_name",
+		Source:      "pull",
+		LowCardTags: []string{"low1", "low2", "low3"},
+	})
+
+	// First lookup
+	tags, err := tagger.Tag("entity_name", true)
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []string{"low1", "low2", "low3"}, tags)
+
+	// Let's modify the return value
+	tags[0] = "nope"
+
+	// Make sure the cache is not affected
+	tags2, err := tagger.Tag("entity_name", true)
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []string{"low1", "low2", "low3"}, tags2)
 }

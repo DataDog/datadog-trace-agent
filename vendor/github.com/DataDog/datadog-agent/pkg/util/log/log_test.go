@@ -1,0 +1,220 @@
+package log
+
+import (
+	"bufio"
+	"bytes"
+	"strings"
+	"testing"
+
+	"github.com/cihub/seelog"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestBasicLogging(t *testing.T) {
+	var b bytes.Buffer
+	w := bufio.NewWriter(&b)
+
+	l, err := seelog.LoggerFromWriterWithMinLevelAndFormat(w, seelog.DebugLvl, "[%LEVEL] %FuncShort: %Msg")
+	assert.Nil(t, err)
+
+	SetupDatadogLogger(l, "debug")
+	assert.NotNil(t, logger)
+
+	Tracef("%s", "foo")
+	Debugf("%s", "foo")
+	Infof("%s", "foo")
+	Warnf("%s", "foo")
+	Errorf("%s", "foo")
+	Criticalf("%s", "foo")
+	w.Flush()
+
+	// Trace will not be logged
+	assert.Equal(t, strings.Count(b.String(), "foo"), 5)
+
+	Err := Error // Alias to avoid go-vet false positive
+
+	Trace("%s", "bar")
+	Debug("%s", "bar")
+	Info("%s", "bar")
+	Warn("%s", "bar")
+	Err("%s", "bar")
+	Critical("%s", "bar")
+	w.Flush()
+
+	// Trace will not be logged
+	assert.Equal(t, strings.Count(b.String(), "bar"), 5)
+}
+
+func TestLogBuffer(t *testing.T) {
+	// reset buffer state
+	logsBuffer = []func(){}
+	bufferLogsBeforeInit = true
+	logger = nil
+
+	var b bytes.Buffer
+	w := bufio.NewWriter(&b)
+
+	l, err := seelog.LoggerFromWriterWithMinLevelAndFormat(w, seelog.DebugLvl, "[%LEVEL] %FuncShort: %Msg")
+	assert.Nil(t, err)
+
+	Tracef("%s", "foo")
+	Debugf("%s", "foo")
+	Infof("%s", "foo")
+	Warnf("%s", "foo")
+	Errorf("%s", "foo")
+	Criticalf("%s", "foo")
+
+	SetupDatadogLogger(l, "debug")
+	assert.NotNil(t, logger)
+
+	w.Flush()
+
+	// Trace will not be logged, Error and Critical will directly be logged to Stderr
+	assert.Equal(t, strings.Count(b.String(), "foo"), 5)
+}
+
+func TestCredentialScrubbingLogging(t *testing.T) {
+	var b bytes.Buffer
+	w := bufio.NewWriter(&b)
+
+	l, err := seelog.LoggerFromWriterWithMinLevelAndFormat(w, seelog.DebugLvl, "[%LEVEL] %FuncShort: %Msg")
+	assert.Nil(t, err)
+
+	SetupDatadogLogger(l, "info")
+	assert.NotNil(t, logger)
+
+	Info("this is an API KEY: ", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	Infof("this is a credential encoding urI: %s", "http://user:password@host:port")
+	w.Flush()
+
+	assert.Equal(t, strings.Count(b.String(), "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), 0)
+	assert.Equal(t, strings.Count(b.String(), "http://user:password@host:port"), 0)
+	assert.Equal(t, strings.Count(b.String(), "***************************aaaaa"), 1)
+	assert.Equal(t, strings.Count(b.String(), "http://user:********@host:port"), 1)
+}
+
+func TestExtraLogging(t *testing.T) {
+	var a, b bytes.Buffer
+	w := bufio.NewWriter(&a)
+	wA := bufio.NewWriter(&b)
+
+	l, err := seelog.LoggerFromWriterWithMinLevelAndFormat(w, seelog.DebugLvl, "[%LEVEL] %FuncShort: %Msg")
+	assert.Nil(t, err)
+	lA, err := seelog.LoggerFromWriterWithMinLevelAndFormat(wA, seelog.DebugLvl, "[%LEVEL] %FuncShort: %Msg")
+	assert.Nil(t, err)
+
+	SetupDatadogLogger(l, "info")
+	assert.NotNil(t, logger)
+
+	err = RegisterAdditionalLogger("extra", lA)
+	assert.Nil(t, err)
+
+	Info("this is an API KEY: ", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	Infof("this is a credential encoding urI: %s", "http://user:password@host:port")
+	w.Flush()
+	wA.Flush()
+
+	assert.Equal(t, strings.Count(a.String(), "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), 0)
+	assert.Equal(t, strings.Count(a.String(), "http://user:password@host:port"), 0)
+	assert.Equal(t, strings.Count(a.String(), "***************************aaaaa"), 1)
+	assert.Equal(t, strings.Count(a.String(), "http://user:********@host:port"), 1)
+	assert.Equal(t, a.String(), a.String())
+}
+
+func TestFormatErrorfScrubbing(t *testing.T) {
+	err := formatErrorf("%s", "aaaaaaaaaaaaaaaaaaaaaaaaaaabaaaa")
+	assert.Equal(t, "***************************baaaa", err.Error())
+}
+
+func TestFormatErrorScrubbing(t *testing.T) {
+	err := formatError("aaaaaaaaaaaaaaaaaaaaaaaaaaabaaaa")
+	assert.Equal(t, "***************************baaaa", err.Error())
+}
+
+func TestWarnNotNil(t *testing.T) {
+	var b bytes.Buffer
+	w := bufio.NewWriter(&b)
+
+	assert.NotNil(t, Warn("test"))
+
+	l, _ := seelog.LoggerFromWriterWithMinLevelAndFormat(w, seelog.CriticalLvl, "[%LEVEL] %FuncShort: %Msg")
+	SetupDatadogLogger(l, "critical")
+
+	assert.NotNil(t, Warn("test"))
+
+	changeLogLevel("info")
+
+	assert.NotNil(t, Warn("test"))
+}
+
+func TestWarnfNotNil(t *testing.T) {
+	var b bytes.Buffer
+	w := bufio.NewWriter(&b)
+
+	assert.NotNil(t, Warn("test"))
+
+	l, _ := seelog.LoggerFromWriterWithMinLevelAndFormat(w, seelog.CriticalLvl, "[%LEVEL] %FuncShort: %Msg")
+	SetupDatadogLogger(l, "critical")
+
+	assert.NotNil(t, Warn("test"))
+
+	changeLogLevel("info")
+
+	assert.NotNil(t, Warn("test"))
+}
+
+func TestErrorNotNil(t *testing.T) {
+	var b bytes.Buffer
+	w := bufio.NewWriter(&b)
+
+	assert.NotNil(t, Error("test"))
+
+	l, _ := seelog.LoggerFromWriterWithMinLevelAndFormat(w, seelog.CriticalLvl, "[%LEVEL] %FuncShort: %Msg")
+	SetupDatadogLogger(l, "critical")
+
+	assert.NotNil(t, Error("test"))
+
+	changeLogLevel("info")
+
+	assert.NotNil(t, Error("test"))
+}
+
+func TestErrorfNotNil(t *testing.T) {
+	var b bytes.Buffer
+	w := bufio.NewWriter(&b)
+
+	assert.NotNil(t, Errorf("test"))
+
+	l, _ := seelog.LoggerFromWriterWithMinLevelAndFormat(w, seelog.CriticalLvl, "[%LEVEL] %FuncShort: %Msg")
+	SetupDatadogLogger(l, "critical")
+
+	assert.NotNil(t, Errorf("test"))
+
+	changeLogLevel("info")
+
+	assert.NotNil(t, Errorf("test"))
+}
+
+func TestCriticalNotNil(t *testing.T) {
+	var b bytes.Buffer
+	w := bufio.NewWriter(&b)
+
+	assert.NotNil(t, Critical("test"))
+
+	l, _ := seelog.LoggerFromWriterWithMinLevelAndFormat(w, seelog.InfoLvl, "[%LEVEL] %FuncShort: %Msg")
+	SetupDatadogLogger(l, "info")
+
+	assert.NotNil(t, Critical("test"))
+}
+
+func TestCriticalfNotNil(t *testing.T) {
+	var b bytes.Buffer
+	w := bufio.NewWriter(&b)
+
+	assert.NotNil(t, Criticalf("test"))
+
+	l, _ := seelog.LoggerFromWriterWithMinLevelAndFormat(w, seelog.InfoLvl, "[%LEVEL] %FuncShort: %Msg")
+	SetupDatadogLogger(l, "info")
+
+	assert.NotNil(t, Criticalf("test"))
+}

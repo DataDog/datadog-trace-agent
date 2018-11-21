@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package common
 
@@ -11,16 +11,16 @@ import (
 
 const (
 	// DefaultConfPath points to the folder containing datadog.yaml
-	DefaultConfPath = "/opt/datadog-agent/etc/datadog-agent"
+	DefaultConfPath = "/opt/datadog-agent/etc"
 	// DefaultLogFile points to the log file that will be used if not configured
 	DefaultLogFile = "/var/log/datadog/agent.log"
+	// DefaultDCALogFile points to the log file that will be used if not configured
+	DefaultDCALogFile = "/var/log/datadog/cluster-agent.log"
 )
 
 var (
 	// PyChecksPath holds the path to the python checks from integrations-core shipped with the agent
 	PyChecksPath = filepath.Join(_here, "..", "..", "checks.d")
-	// PySitePackages holds the path to the python checks from integrations-core installed via wheels
-	PySitePackages = filepath.Join(_here, "..", "..", "embedded", "lib", "python2.7", "site-packages")
 	// DistPath holds the path to the folder containing distribution files
 	distPath = filepath.Join(_here, "dist")
 )

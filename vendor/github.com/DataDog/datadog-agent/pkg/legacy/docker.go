@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 // +build docker
 
@@ -11,11 +11,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 
+	"github.com/DataDog/datadog-agent/pkg/autodiscovery/providers"
 	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/containers"
-	"github.com/DataDog/datadog-agent/pkg/collector/providers"
 	"github.com/DataDog/datadog-agent/pkg/config"
 
 	yaml "gopkg.in/yaml.v2"
@@ -27,7 +27,7 @@ const (
 		"docker.yaml.example for more information\n"
 	excludeIncludeBadFormat string = "\t- Warning: \"%s\" item wrongly formatted (should be 'tag:value'), got '%s'. Dropping it\n"
 
-	warningNewCheck string = "Warning: the new docker check includes a change in the exclude/include list that may impact your billing. Please check docs/beta/changes.md documentation to learn more."
+	warningNewCheck string = "Warning: the new docker check includes a change in the exclude/include list that may impact your billing. Please check docs/agent/changes.md#docker-check documentation to learn more."
 )
 
 func handleFilterList(input []string, name string) []string {
@@ -69,7 +69,7 @@ func ImportDockerConf(src, dst string, overwrite bool) error {
 	fmt.Printf("%s\n", warningNewCheck)
 
 	// read docker_daemon.yaml
-	c, err := providers.GetCheckConfigFromFile("docker_daemon", src)
+	c, err := providers.GetIntegrationConfigFromFile("docker_daemon", src)
 	if err != nil {
 		return fmt.Errorf("Could not load %s: %s", src, err)
 	}
@@ -81,8 +81,8 @@ func ImportDockerConf(src, dst string, overwrite bool) error {
 		}
 
 		if initConf.DockerRoot != "" {
-			config.Datadog.Set("container_cgroup_root", path.Join(initConf.DockerRoot, "sys", "fs", "cgroup"))
-			config.Datadog.Set("container_proc_root", path.Join(initConf.DockerRoot, "proc"))
+			config.Datadog.Set("container_cgroup_root", filepath.Join(initConf.DockerRoot, "sys", "fs", "cgroup"))
+			config.Datadog.Set("container_proc_root", filepath.Join(initConf.DockerRoot, "proc"))
 		}
 	}
 
@@ -99,7 +99,11 @@ func ImportDockerConf(src, dst string, overwrite bool) error {
 	}
 
 	// write docker.yaml
-	data, err := yaml.Marshal(dc)
+	newCfg := map[string][]*containers.DockerConfig{
+		"instances": {&dc},
+	}
+
+	data, err := yaml.Marshal(newCfg)
 	if err != nil {
 		return fmt.Errorf("Could not marshall final configuration for the new docker check: %s", err)
 	}
@@ -145,6 +149,6 @@ func ImportDockerConf(src, dst string, overwrite bool) error {
 		config.Datadog.Set("docker_labels_as_tags", dockerLabelAsTags)
 	}
 
-	fmt.Printf("Successfully move information needed from %s into the datadog.yaml (see 'Autodiscovery' section in datadog.yaml.example)\n\n", src)
+	fmt.Printf("Successfully imported the contents of %s into datadog.yaml (see 'Autodiscovery' section in datadog.yaml.example)\n\n", src)
 	return nil
 }

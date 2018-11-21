@@ -1,20 +1,18 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package aggregator
 
 import (
-	// stdlib
 	"sort"
 	"testing"
 
-	// 3p
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	// project
+	"github.com/DataDog/datadog-agent/pkg/aggregator/ckey"
 	"github.com/DataDog/datadog-agent/pkg/metrics"
 )
 
@@ -27,7 +25,7 @@ func (os OrderedSeries) Len() int {
 }
 
 func (os OrderedSeries) Less(i, j int) bool {
-	return os.series[i].ContextKey < os.series[j].ContextKey
+	return ckey.Compare(os.series[i].ContextKey, os.series[j].ContextKey) == -1
 }
 
 func (os OrderedSeries) Swap(i, j int) {
@@ -36,7 +34,7 @@ func (os OrderedSeries) Swap(i, j int) {
 
 // TimeSampler
 func TestCalculateBucketStart(t *testing.T) {
-	sampler := NewTimeSampler(10, "")
+	sampler := NewTimeSampler(10)
 
 	assert.Equal(t, int64(123450), sampler.calculateBucketStart(123456.5))
 	assert.Equal(t, int64(123460), sampler.calculateBucketStart(123460.5))
@@ -44,7 +42,7 @@ func TestCalculateBucketStart(t *testing.T) {
 }
 
 func TestBucketSampling(t *testing.T) {
-	sampler := NewTimeSampler(10, "")
+	sampler := NewTimeSampler(10)
 
 	mSample := metrics.MetricSample{
 		Name:       "my.metric.name",
@@ -75,7 +73,7 @@ func TestBucketSampling(t *testing.T) {
 }
 
 func TestContextSampling(t *testing.T) {
-	sampler := NewTimeSampler(10, "default-hostname")
+	sampler := NewTimeSampler(10)
 
 	mSample1 := metrics.MetricSample{
 		Name:       "my.metric.name1",
@@ -113,23 +111,23 @@ func TestContextSampling(t *testing.T) {
 		Name:     "my.metric.name1",
 		Points:   []metrics.Point{{Ts: 12340.0, Value: float64(1)}},
 		Tags:     []string{"bar", "foo"},
-		Host:     "default-hostname",
+		Host:     "",
 		MType:    metrics.APIGaugeType,
 		Interval: 10,
 	}
 	expectedSerie2 := &metrics.Serie{
-		Name:     "my.metric.name2",
-		Points:   []metrics.Point{{Ts: 12340.0, Value: float64(1)}},
-		Tags:     []string{"bar", "foo"},
-		Host:     "default-hostname",
-		MType:    metrics.APIGaugeType,
-		Interval: 10,
-	}
-	expectedSerie3 := &metrics.Serie{
 		Name:     "my.metric.name3",
 		Points:   []metrics.Point{{Ts: 12340.0, Value: float64(1)}},
 		Tags:     []string{"bar", "foo"},
 		Host:     "metric-hostname",
+		MType:    metrics.APIGaugeType,
+		Interval: 10,
+	}
+	expectedSerie3 := &metrics.Serie{
+		Name:     "my.metric.name2",
+		Points:   []metrics.Point{{Ts: 12340.0, Value: float64(1)}},
+		Tags:     []string{"bar", "foo"},
+		Host:     "",
 		MType:    metrics.APIGaugeType,
 		Interval: 10,
 	}
@@ -141,7 +139,7 @@ func TestContextSampling(t *testing.T) {
 }
 
 func TestCounterExpirySeconds(t *testing.T) {
-	sampler := NewTimeSampler(10, "default-hostname")
+	sampler := NewTimeSampler(10)
 
 	sampleCounter1 := &metrics.MetricSample{
 		Name:       "my.counter1",
@@ -150,7 +148,7 @@ func TestCounterExpirySeconds(t *testing.T) {
 		Tags:       []string{"foo", "bar"},
 		SampleRate: 1,
 	}
-	contextCounter1 := "my.counter1,bar,foo,"
+	contextCounter1 := generateContextKey(sampleCounter1)
 
 	sampleCounter2 := &metrics.MetricSample{
 		Name:       "my.counter2",
@@ -159,7 +157,7 @@ func TestCounterExpirySeconds(t *testing.T) {
 		Tags:       []string{"foo", "bar"},
 		SampleRate: 1,
 	}
-	contextCounter2 := "my.counter2,bar,foo,"
+	contextCounter2 := generateContextKey(sampleCounter2)
 
 	sampleGauge3 := &metrics.MetricSample{
 		Name:       "my.gauge",
@@ -185,7 +183,7 @@ func TestCounterExpirySeconds(t *testing.T) {
 		Name:     "my.counter1",
 		Points:   []metrics.Point{{Ts: 1000.0, Value: .1}},
 		Tags:     []string{"bar", "foo"},
-		Host:     "default-hostname",
+		Host:     "",
 		MType:    metrics.APIRateType,
 		Interval: 10,
 	}
@@ -194,7 +192,7 @@ func TestCounterExpirySeconds(t *testing.T) {
 		Name:     "my.counter2",
 		Points:   []metrics.Point{{Ts: 1000.0, Value: .2}},
 		Tags:     []string{"bar", "foo"},
-		Host:     "default-hostname",
+		Host:     "",
 		MType:    metrics.APIRateType,
 		Interval: 10,
 	}
@@ -227,7 +225,7 @@ func TestCounterExpirySeconds(t *testing.T) {
 		Name:     "my.counter1",
 		Points:   []metrics.Point{{Ts: 1010.0, Value: .1}, {Ts: 1020.0, Value: 0.0}, {Ts: 1030.0, Value: 0.0}},
 		Tags:     []string{"bar", "foo"},
-		Host:     "default-hostname",
+		Host:     "",
 		MType:    metrics.APIRateType,
 		Interval: 10,
 	}
@@ -236,7 +234,7 @@ func TestCounterExpirySeconds(t *testing.T) {
 		Name:     "my.counter2",
 		Points:   []metrics.Point{{Ts: 1010, Value: 0}, {Ts: 1020.0, Value: .2}, {Ts: 1030.0, Value: .2}},
 		Tags:     []string{"bar", "foo"},
-		Host:     "default-hostname",
+		Host:     "",
 		MType:    metrics.APIRateType,
 		Interval: 10,
 	}
@@ -266,107 +264,3 @@ func TestCounterExpirySeconds(t *testing.T) {
 	assert.Equal(t, 0, len(sampler.counterLastSampledByContext))
 	assert.Equal(t, 0, len(sampler.contextResolver.contextsByKey))
 }
-
-//func TestOne(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestFormatter(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestCounterNormalization(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestHistogramNormalization(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestCounter(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestSampledCounter(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestGauge(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestSets(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestStringSets(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestRate(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestRateErrors(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestGaugeSampleRate(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestHistogram(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestSampledHistogram(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestBatchSubmission(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestMonokeyBatchingNoTags(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestMonokeyBatchingWithTags(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestMonokeyBatchingWithTagsWithSampling(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestBadPacketsThrowErrors(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestMetricsExpiry(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestDiagnosticStats(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestHistogramCounter(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestEventTags(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestServiceCheckBasic(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestServiceCheckTags(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}
-//
-//func TestRecentPointThreshold(t *testing.T) {
-//	assert.Equal(t, 1, 1)
-//}

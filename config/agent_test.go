@@ -2,9 +2,12 @@ package config
 
 import (
 	"os"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -154,6 +157,12 @@ func TestFullIniConfig(t *testing.T) {
 }
 
 func TestFullYamlConfig(t *testing.T) {
+	origcfg := config.Datadog
+	config.Datadog = config.NewConfig("datadog", "DD", strings.NewReplacer(".", "_"))
+	defer func() {
+		config.Datadog = origcfg
+	}()
+
 	assert := assert.New(t)
 
 	c, err := loadFile("./testdata/full.yaml")
@@ -161,19 +170,57 @@ func TestFullYamlConfig(t *testing.T) {
 
 	assert.Equal("mymachine", c.Hostname)
 	assert.Equal("https://user:password@proxy_for_https:1234", c.ProxyURL.String())
-	assert.Equal(false, c.Enabled)
+	assert.True(c.SkipSSLValidation)
+	assert.Equal("debug", c.LogLevel)
+	assert.Equal(18125, c.StatsdPort)
+	assert.False(c.Enabled)
+	assert.Equal("abc", c.LogFilePath)
 	assert.Equal("test", c.DefaultEnv)
+	assert.Equal(123, c.ConnectionLimit)
 	assert.Equal(18126, c.ReceiverPort)
 	assert.Equal(0.5, c.ExtraSampleRate)
 	assert.Equal(5.0, c.MaxTPS)
 	assert.Equal(50.0, c.MaxEPS)
+	assert.Equal(0.005, c.MaxCPU)
+	assert.EqualValues(123.4, c.MaxMemory)
+	assert.Equal(12, c.MaxConnections)
 	assert.Equal("0.0.0.0", c.ReceiverHost)
-	assert.ElementsMatch([]*Endpoint{
+
+	noProxy := true
+	if _, ok := os.LookupEnv("NO_PROXY"); ok {
+		// Happens in CircleCI: if the enviornment variable is set,
+		// it will overwrite our loaded configuration and will cause
+		// this test to fail.
+		noProxy = false
+	}
+
+	assert.Equal([]*Endpoint{
 		{Host: "https://datadog.unittests", APIKey: "api_key_test"},
 		{Host: "https://my1.endpoint.com", APIKey: "apikey1"},
 		{Host: "https://my1.endpoint.com", APIKey: "apikey2"},
-		{Host: "https://my2.endpoint.eu", APIKey: "apikey3"},
+		{Host: "https://my2.endpoint.eu", APIKey: "apikey3", NoProxy: noProxy},
 	}, c.Endpoints)
+
+	assert.ElementsMatch([]*ReplaceRule{
+		{
+			Name:    "http.method",
+			Pattern: "\\?.*$",
+			Repl:    "GET",
+			Re:      regexp.MustCompile("\\?.*$"),
+		},
+		{
+			Name:    "http.url",
+			Pattern: "\\?.*$",
+			Repl:    "!",
+			Re:      regexp.MustCompile("\\?.*$"),
+		},
+		{
+			Name:    "error.stack",
+			Pattern: "(?s).*",
+			Repl:    "?",
+			Re:      regexp.MustCompile("(?s).*"),
+		},
+	}, c.ReplaceTags)
 
 	assert.EqualValues([]string{"/health", "/500"}, c.Ignore["resource"])
 
@@ -191,11 +238,17 @@ func TestFullYamlConfig(t *testing.T) {
 }
 
 func TestUndocumentedYamlConfig(t *testing.T) {
+	origcfg := config.Datadog
+	config.Datadog = config.NewConfig("datadog", "DD", strings.NewReplacer(".", "_"))
+	defer func() {
+		config.Datadog = origcfg
+	}()
 	assert := assert.New(t)
 
 	c, err := loadFile("./testdata/undocumented.yaml")
 	assert.NoError(err)
 
+	assert.Equal("/path/to/bin", c.DDAgentBin)
 	assert.Equal("thing", c.Hostname)
 	assert.Equal("apikey_12", c.Endpoints[0].APIKey)
 	assert.Equal(0.33, c.ExtraSampleRate)

@@ -1,7 +1,9 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
+
+// +build cpython
 
 // NOTICE: See TestMain function in `utils_test.go` for Python initialization
 package py
@@ -13,6 +15,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/aggregator/mocksender"
 	"github.com/DataDog/datadog-agent/pkg/collector/check"
 	"github.com/DataDog/datadog-agent/pkg/config"
+
 	python "github.com/sbinet/go-python"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -73,6 +76,27 @@ func TestRun(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestSubprocessRun(t *testing.T) {
+	check, _ := getCheckInstance("testsubprocess", "TestSubprocessCheck")
+	err := check.Run()
+	assert.Nil(t, err)
+}
+
+func TestSubprocessRunConcurrent(t *testing.T) {
+	instances := make([]*PythonCheck, 30)
+	for i := range instances {
+		check, _ := getCheckInstance("testsubprocess", "TestSubprocessCheck")
+		instances[i] = check
+	}
+
+	for _, check := range instances {
+		go func(c *PythonCheck) {
+			err := c.Run()
+			assert.Nil(t, err)
+		}(check)
+	}
+}
+
 func TestWarning(t *testing.T) {
 	check, _ := getCheckInstance("testwarnings", "TestCheck")
 	err := check.Run()
@@ -121,8 +145,7 @@ func TestInitNewSignatureCheck(t *testing.T) {
 func TestInitException(t *testing.T) {
 	_, err := getCheckInstance("init_exception", "TestCheck")
 
-	assert.Contains(t, err.Error(), "could not invoke python check constructor: ['Traceback (most recent call last):\\n")
-	assert.Contains(t, err.Error(), "raise RuntimeError(\"unexpected error\")\\n', 'RuntimeError: unexpected error\\n']")
+	assert.Regexp(t, "could not invoke python check constructor: Traceback \\(most recent call last\\):\n  File \"[\\S]+(\\/|\\\\)init_exception\\.py\", line 11, in __init__\n    raise RuntimeError\\(\"unexpected error\"\\)\nRuntimeError: unexpected error", err.Error())
 }
 
 func TestInitNoTracebackException(t *testing.T) {

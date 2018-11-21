@@ -1,43 +1,69 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package utils
 
 import (
 	"fmt"
+	"strings"
+
+	"github.com/DataDog/datadog-agent/pkg/config"
 )
 
 // TagList allows collector to incremental build a tag list
 // then export it easily to []string format
 type TagList struct {
-	lowCardTags  map[string]string
-	highCardTags map[string]string
+	lowCardTags  map[string]bool
+	highCardTags map[string]bool
+	splitList    map[string]string
 }
 
 // NewTagList creates a new object ready to use
 func NewTagList() *TagList {
 	return &TagList{
-		lowCardTags:  make(map[string]string),
-		highCardTags: make(map[string]string),
+		lowCardTags:  make(map[string]bool),
+		highCardTags: make(map[string]bool),
+		splitList:    config.Datadog.GetStringMapString("tag_value_split_separator"),
 	}
 }
 
-// AddHigh adds a new high cardinality tag to the list, or replace if name already exists.
+func addTags(target map[string]bool, name string, value string, splits map[string]string) {
+	if name == "" || value == "" {
+		return
+	}
+	sep, ok := splits[name]
+	if !ok {
+		target[fmt.Sprintf("%s:%s", name, value)] = true
+		return
+	}
+
+	for _, elt := range strings.Split(value, sep) {
+		target[fmt.Sprintf("%s:%s", name, elt)] = true
+	}
+}
+
+// AddHigh adds a new high cardinality tag to the map, or replace if already exists.
 // It will skip empty values/names, so it's safe to use without verifying the value is not empty.
 func (l *TagList) AddHigh(name string, value string) {
-	if len(name) > 0 && len(value) > 0 {
-		l.highCardTags[name] = value
-	}
+	addTags(l.highCardTags, name, value, l.splitList)
 }
 
-// AddLow adds a new low cardinality tag to the list, or replace if name already exists.
+// AddLow adds a new low cardinality tag to the list, or replace if already exists.
 // It will skip empty values/names, so it's safe to use without verifying the value is not empty.
 func (l *TagList) AddLow(name string, value string) {
-	if len(name) > 0 && len(value) > 0 {
-		l.lowCardTags[name] = value
+	addTags(l.lowCardTags, name, value, l.splitList)
+}
+
+// AddAuto determine the tag cardinality and will call the proper method AddLow or AddHigh
+// if the name value starts with '+' character
+func (l *TagList) AddAuto(name, value string) {
+	if strings.HasPrefix(name, "+") {
+		l.AddHigh(name[1:], value)
+		return
 	}
+	l.AddLow(name, value)
 }
 
 // Compute returns two string arrays in the format "tag:value"
@@ -47,14 +73,31 @@ func (l *TagList) Compute() ([]string, []string) {
 	high := make([]string, len(l.highCardTags))
 
 	index := 0
-	for k, v := range l.lowCardTags {
-		low[index] = fmt.Sprintf("%s:%s", k, v)
+	for tag := range l.lowCardTags {
+		low[index] = tag
 		index++
 	}
 	index = 0
-	for k, v := range l.highCardTags {
-		high[index] = fmt.Sprintf("%s:%s", k, v)
+	for tag := range l.highCardTags {
+		high[index] = tag
 		index++
 	}
 	return low, high
+}
+
+// Copy creates a deep copy of the taglist object for reuse
+func (l *TagList) Copy() *TagList {
+	return &TagList{
+		lowCardTags:  deepCopyMap(l.lowCardTags),
+		highCardTags: deepCopyMap(l.highCardTags),
+		splitList:    l.splitList, // constant, can be shared
+	}
+}
+
+func deepCopyMap(in map[string]bool) map[string]bool {
+	out := make(map[string]bool, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
 }

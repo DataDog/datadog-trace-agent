@@ -1,12 +1,11 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package docker
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -48,29 +47,14 @@ func (f *tempFolder) delete(fileName string) error {
 	return os.Remove(filepath.Join(f.RootPath, fileName))
 }
 
-type dummyCgroupStat map[string]uint64
-
-func (c dummyCgroupStat) String() string {
-
-	lines := make([]string, len(c))
-	var i int
-	for k, v := range c {
-		lines[i] = fmt.Sprintf("%s %d", k, v)
-		i++
+// detab removes whitespace from the front of a string on every line
+func detab(str string) string {
+	detabbed := make([]string, 0)
+	for _, l := range strings.Split(str, "\n") {
+		s := strings.TrimSpace(l)
+		if len(s) > 0 {
+			detabbed = append(detabbed, s)
+		}
 	}
-
-	return strings.Join(lines, "\n")
-}
-
-func newDummyContainerCgroup(rootPath string, targets ...string) *ContainerCgroup {
-	cgroup := &ContainerCgroup{
-		ContainerID: "dummy",
-		Mounts:      make(map[string]string),
-		Paths:       make(map[string]string),
-	}
-	for _, target := range targets {
-		cgroup.Mounts[target] = rootPath
-		cgroup.Paths[target] = target
-	}
-	return cgroup
+	return strings.Join(detabbed, "\n")
 }

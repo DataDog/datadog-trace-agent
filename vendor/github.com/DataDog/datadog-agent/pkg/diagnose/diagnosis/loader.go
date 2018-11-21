@@ -1,11 +1,11 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package diagnosis
 
-import log "github.com/cihub/seelog"
+import "github.com/DataDog/datadog-agent/pkg/util/log"
 
 // Catalog holds available diagnosis for detection and usage
 type Catalog map[string]Diagnosis

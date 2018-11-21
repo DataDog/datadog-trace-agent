@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package collectors
 
@@ -24,7 +24,6 @@ const (
 	PullCollection                            // Call regularly via the Pull method
 	StreamCollection                          // Will continuously feed updates on the channel from Steam() to Stop()
 	FetchOnlyCollection                       // Only call Fetch() on cache misses
-
 )
 
 // Collector retrieve entity tags from a given source and feeds
@@ -32,6 +31,16 @@ const (
 type Collector interface {
 	Detect(chan<- []*TagInfo) (CollectionMode, error)
 }
+
+// CollectorPriority helps resolving dupe tags from collectors
+type CollectorPriority int
+
+// List of collector priorities
+const (
+	NodeRuntime CollectorPriority = iota
+	NodeOrchestrator
+	ClusterOrchestrator
+)
 
 // Fetcher allows to fetch tags on-demand in case of cache miss
 type Fetcher interface {

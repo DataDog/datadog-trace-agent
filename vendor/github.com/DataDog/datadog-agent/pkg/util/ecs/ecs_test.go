@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 // +build docker
 
@@ -15,11 +15,16 @@ import (
 	"net/url"
 	"strconv"
 	"testing"
+	"time"
 
-	"github.com/DataDog/datadog-agent/pkg/config"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/network"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"time"
+
+	"github.com/DataDog/datadog-agent/pkg/config"
+	"github.com/DataDog/datadog-agent/pkg/util/cache"
+	"github.com/DataDog/datadog-agent/pkg/util/docker"
 )
 
 // dummyECS allows tests to mock a ECS's responses
@@ -44,6 +49,7 @@ func (d *dummyECS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}
 }
+
 func (d *dummyECS) Start() (*httptest.Server, int, error) {
 	ts := httptest.NewServer(d)
 	ecs_agent_url, err := url.Parse(ts.URL)
@@ -56,6 +62,7 @@ func (d *dummyECS) Start() (*httptest.Server, int, error) {
 	}
 	return ts, ecs_agent_port, nil
 }
+
 func TestLocateECSHTTP(t *testing.T) {
 	assert := assert.New(t)
 	ecsinterface, err := newDummyECS()
@@ -66,8 +73,8 @@ func TestLocateECSHTTP(t *testing.T) {
 
 	config.Datadog.SetDefault("ecs_agent_url", fmt.Sprintf("http://localhost:%d/", ecs_agent_port))
 
-	isInstance := IsInstance()
-	assert.True(isInstance)
+	util, err := GetUtil()
+	assert.Nil(err)
 	select {
 	case r := <-ecsinterface.Requests:
 		assert.Equal("GET", r.Method)
@@ -137,7 +144,7 @@ func TestLocateECSHTTP(t *testing.T) {
 	} {
 		t.Logf("test case %d", nb)
 		ecsinterface.TaskListJSON = tc.input
-		tasks, err := GetTasks()
+		tasks, err := util.GetTasks()
 		assert.Equal(tc.expected, tasks)
 		if tc.err == nil {
 			assert.Nil(err)
@@ -153,4 +160,30 @@ func TestLocateECSHTTP(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		assert.FailNow("Timeout on receive channel")
 	}
+}
+
+func TestGetAgentContainerURLS(t *testing.T) {
+	config.Datadog.SetDefault("ecs_agent_container_name", "ecs-agent-custom")
+	defer config.Datadog.SetDefault("ecs_agent_container_name", "ecs-agent")
+
+	// Setting mocked data in cache
+	nets := make(map[string]*network.EndpointSettings)
+	nets["bridge"] = &network.EndpointSettings{IPAddress: "172.17.0.2"}
+	nets["foo"] = &network.EndpointSettings{IPAddress: "172.17.0.3"}
+
+	co := types.ContainerJSON{
+		ContainerJSONBase: &types.ContainerJSONBase{},
+		NetworkSettings: &types.NetworkSettings{
+			Networks: nets,
+		},
+	}
+	docker.EnableTestingMode()
+	cacheKey := docker.GetInspectCacheKey("ecs-agent-custom", false)
+	cache.Cache.Set(cacheKey, co, 10*time.Second)
+
+	agentURLS, err := getAgentContainerURLS()
+	assert.NoError(t, err)
+	assert.Len(t, agentURLS, 2)
+	assert.Contains(t, agentURLS, "http://172.17.0.2:51678/")
+	assert.Contains(t, agentURLS, "http://172.17.0.3:51678/")
 }

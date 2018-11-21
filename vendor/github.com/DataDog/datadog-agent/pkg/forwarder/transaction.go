@@ -1,22 +1,85 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package forwarder
 
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"expvar"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"regexp"
+	"net/http/httptrace"
+	"strconv"
 	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/config"
-	log "github.com/cihub/seelog"
+	"github.com/DataDog/datadog-agent/pkg/util"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
+
+var (
+	transactionsRetryQueueSize     = expvar.Int{}
+	transactionsSuccessful         = expvar.Int{}
+	transactionsDroppedOnInput     = expvar.Int{}
+	transactionsErrors             = expvar.Int{}
+	transactionsErrorsByType       = expvar.Map{}
+	transactionsDNSErrors          = expvar.Int{}
+	transactionsTLSErrors          = expvar.Int{}
+	transactionsConnectionErrors   = expvar.Int{}
+	transactionsWroteRequestErrors = expvar.Int{}
+	transactionsSentRequestErrors  = expvar.Int{}
+	transactionsHTTPErrors         = expvar.Int{}
+	transactionsHTTPErrorsByCode   = expvar.Map{}
+)
+
+var trace = &httptrace.ClientTrace{
+	DNSDone: func(dnsInfo httptrace.DNSDoneInfo) {
+		if dnsInfo.Err != nil {
+			transactionsDNSErrors.Add(1)
+			log.Debugf("DNS Lookup failure: %s", dnsInfo.Err)
+		}
+	},
+	WroteRequest: func(wroteInfo httptrace.WroteRequestInfo) {
+		if wroteInfo.Err != nil {
+			transactionsWroteRequestErrors.Add(1)
+			log.Debugf("Request writing failure: %s", wroteInfo.Err)
+		}
+	},
+	ConnectDone: func(network, addr string, err error) {
+		if err != nil {
+			transactionsConnectionErrors.Add(1)
+			log.Debugf("Connection failure: %s", err)
+		}
+	},
+	TLSHandshakeDone: func(tlsState tls.ConnectionState, err error) {
+		if err != nil {
+			transactionsTLSErrors.Add(1)
+			log.Errorf("TLS Handshake failure: %s", err)
+		}
+	},
+}
+
+func initTransactionExpvars() {
+	transactionsErrorsByType.Init()
+	transactionsHTTPErrorsByCode.Init()
+	transactionsExpvars.Set("RetryQueueSize", &transactionsRetryQueueSize)
+	transactionsExpvars.Set("Success", &transactionsSuccessful)
+	transactionsExpvars.Set("DroppedOnInput", &transactionsDroppedOnInput)
+	transactionsExpvars.Set("HTTPErrors", &transactionsHTTPErrors)
+	transactionsExpvars.Set("HTTPErrorsByCode", &transactionsHTTPErrorsByCode)
+	transactionsExpvars.Set("Errors", &transactionsErrors)
+	transactionsExpvars.Set("ErrorsByType", &transactionsErrorsByType)
+	transactionsErrorsByType.Set("DNSErrors", &transactionsDNSErrors)
+	transactionsErrorsByType.Set("TLSErrors", &transactionsTLSErrors)
+	transactionsErrorsByType.Set("ConnectionErrors", &transactionsConnectionErrors)
+	transactionsErrorsByType.Set("WroteRequestErrors", &transactionsWroteRequestErrors)
+	transactionsErrorsByType.Set("SentRequestErrors", &transactionsSentRequestErrors)
+}
 
 // HTTPTransaction represents one Payload for one Endpoint on one Domain.
 type HTTPTransaction struct {
@@ -31,32 +94,23 @@ type HTTPTransaction struct {
 	// ErrorCount is the number of times this HTTPTransaction failed to be processed.
 	ErrorCount int
 
-	apiKeyStatusKey string
-	nextFlush       time.Time
-	createdAt       time.Time
+	createdAt time.Time
 }
 
-const (
-	apiKeyReplacement               = "api_key=*************************$1"
-	retryInterval     time.Duration = 20 * time.Second
-	maxRetryInterval  time.Duration = 90 * time.Second
-)
-
-var apiKeyRegExp = regexp.MustCompile("api_key=*\\w+(\\w{5})")
+// Transaction represents the task to process for a Worker.
+type Transaction interface {
+	Process(ctx context.Context, client *http.Client) error
+	GetCreatedAt() time.Time
+	GetTarget() string
+}
 
 // NewHTTPTransaction returns a new HTTPTransaction.
 func NewHTTPTransaction() *HTTPTransaction {
 	return &HTTPTransaction{
-		nextFlush:  time.Now(),
 		createdAt:  time.Now(),
 		ErrorCount: 0,
 		Headers:    make(http.Header),
 	}
-}
-
-// GetNextFlush returns the next time when this HTTPTransaction expect to be processed.
-func (t *HTTPTransaction) GetNextFlush() time.Time {
-	return t.nextFlush
 }
 
 // GetCreatedAt returns the creation time of the HTTPTransaction.
@@ -67,19 +121,20 @@ func (t *HTTPTransaction) GetCreatedAt() time.Time {
 // GetTarget return the url used by the transaction
 func (t *HTTPTransaction) GetTarget() string {
 	url := t.Domain + t.Endpoint
-	return apiKeyRegExp.ReplaceAllString(url, apiKeyReplacement) // sanitized url that can be logged
+	return util.SanitizeURL(url) // sanitized url that can be logged
 }
 
 // Process sends the Payload of the transaction to the right Endpoint and Domain.
 func (t *HTTPTransaction) Process(ctx context.Context, client *http.Client) error {
 	reader := bytes.NewReader(*t.Payload)
 	url := t.Domain + t.Endpoint
-	logURL := apiKeyRegExp.ReplaceAllString(url, apiKeyReplacement) // sanitized url that can be logged
+	logURL := util.SanitizeURL(url) // sanitized url that can be logged
 
 	req, err := http.NewRequest("POST", url, reader)
 	if err != nil {
-		log.Errorf("Could not create request for transaction to invalid URL '%s' (dropping transaction): %s", logURL, err)
-		transactionsExpvar.Add("Errors", 1)
+		log.Errorf("Could not create request for transaction to invalid URL %q (dropping transaction): %s", logURL, err)
+		transactionsErrors.Add(1)
+		transactionsSentRequestErrors.Add(1)
 		return nil
 	}
 	req = req.WithContext(ctx)
@@ -92,61 +147,58 @@ func (t *HTTPTransaction) Process(ctx context.Context, client *http.Client) erro
 			return nil
 		}
 		t.ErrorCount++
-		transactionsExpvar.Add("Errors", 1)
-		return fmt.Errorf("Error while sending transaction, rescheduling it: %s", apiKeyRegExp.ReplaceAllString(err.Error(), apiKeyReplacement))
+		transactionsErrors.Add(1)
+		return fmt.Errorf("error while sending transaction, rescheduling it: %s", util.SanitizeURL(err.Error()))
 	}
 	defer resp.Body.Close()
 
-	body, _ := ioutil.ReadAll(resp.Body)
-	if resp.StatusCode == 400 || resp.StatusCode == 404 || resp.StatusCode == 413 {
-		log.Errorf("Error code '%s' received while sending transaction to '%s': %s, dropping it", resp.Status, logURL, string(body))
-		transactionsExpvar.Add("Dropped", 1)
-		if apiKeyStatus.Get(t.apiKeyStatusKey) == nil {
-			apiKeyStatus.Set(t.apiKeyStatusKey, &apiKeyStatusUnknown)
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Errorf("Fail to read the response Body: %s", err)
+		return err
+	}
+
+	if resp.StatusCode >= 400 {
+		statusCode := strconv.Itoa(resp.StatusCode)
+		var codeCount *expvar.Int
+		if count := transactionsHTTPErrorsByCode.Get(statusCode); count == nil {
+			codeCount = &expvar.Int{}
+			transactionsHTTPErrorsByCode.Set(statusCode, codeCount)
+		} else {
+			codeCount = count.(*expvar.Int)
 		}
+		codeCount.Add(1)
+		transactionsHTTPErrors.Add(1)
+	}
+
+	if resp.StatusCode == 400 || resp.StatusCode == 404 || resp.StatusCode == 413 {
+		log.Errorf("Error code %q received while sending transaction to %q: %s, dropping it", resp.Status, logURL, string(body))
+		transactionsDropped.Add(1)
 		return nil
 	} else if resp.StatusCode == 403 {
 		log.Errorf("API Key invalid, dropping transaction for %s", logURL)
-		transactionsExpvar.Add("Dropped", 1)
-		apiKeyStatus.Set(t.apiKeyStatusKey, &apiKeyInvalid)
+		transactionsDropped.Add(1)
 		return nil
 	} else if resp.StatusCode > 400 {
 		t.ErrorCount++
-		transactionsExpvar.Add("Errors", 1)
-		if apiKeyStatus.Get(t.apiKeyStatusKey) == nil {
-			apiKeyStatus.Set(t.apiKeyStatusKey, &apiKeyStatusUnknown)
-		}
-		return fmt.Errorf("Error '%s' while sending transaction to '%s', rescheduling it", resp.Status, logURL)
+		transactionsErrors.Add(1)
+		return fmt.Errorf("error %q while sending transaction to %q, rescheduling it", resp.Status, logURL)
 	}
 
-	successfulTransactions.Add(1)
-	apiKeyStatus.Set(t.apiKeyStatusKey, &apiKeyValid)
+	transactionsSuccessful.Add(1)
 
 	loggingFrequency := config.Datadog.GetInt64("logging_frequency")
 
-	if successfulTransactions.Value() == 1 {
-		log.Infof("successfully posted payload to '%s', the agent will only log transaction success every 20 transactions", logURL, string(body))
-		log.Debugf("payload: %s", logURL, string(body))
-	} else if successfulTransactions.Value()%loggingFrequency == 0 {
-		log.Infof("successfully posted payload to '%s'", logURL, string(body))
-		log.Debugf("payload: %s", logURL, string(body))
-	} else {
-		log.Debugf("successfully posted payload to '%s': %s", logURL, string(body))
+	if transactionsSuccessful.Value() == 1 {
+		log.Infof("Successfully posted payload to %q, the agent will only log transaction success every %d transactions", logURL, loggingFrequency)
+		log.Debugf("Url: %q payload: %s", logURL, string(body))
+		return nil
 	}
-
+	if transactionsSuccessful.Value()%loggingFrequency == 0 {
+		log.Infof("Successfully posted payload to %q", logURL)
+		log.Debugf("Url: %q payload: %s", logURL, string(body))
+		return nil
+	}
+	log.Debugf("Successfully posted payload to %q: %s", logURL, string(body))
 	return nil
-}
-
-// Reschedule update nextFlush time according to the number of ErrorCount. This
-// will increase gaps between each retry as the ErrorCount increase.
-func (t *HTTPTransaction) Reschedule() {
-	if t.ErrorCount == 0 {
-		return
-	}
-
-	newInterval := time.Duration(t.ErrorCount) * retryInterval
-	if newInterval > maxRetryInterval {
-		newInterval = maxRetryInterval
-	}
-	t.nextFlush = time.Now().Add(newInterval)
 }

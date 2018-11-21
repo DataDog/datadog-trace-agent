@@ -1,13 +1,14 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package app
 
 import (
 	"fmt"
-	"syscall"
+	"runtime"
+	"strings"
 	"time"
 
 	_ "expvar" // Blank import used because this isn't directly used in this file
@@ -15,28 +16,32 @@ import (
 	_ "net/http/pprof" // Blank import used because this isn't directly used in this file
 
 	"os"
-	"os/signal"
+
+	"github.com/spf13/cobra"
 
 	"github.com/DataDog/datadog-agent/cmd/agent/api"
 	"github.com/DataDog/datadog-agent/cmd/agent/common"
-	"github.com/DataDog/datadog-agent/cmd/agent/common/signals"
 	"github.com/DataDog/datadog-agent/cmd/agent/gui"
 	"github.com/DataDog/datadog-agent/pkg/aggregator"
+	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/embed/jmx"
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/dogstatsd"
 	"github.com/DataDog/datadog-agent/pkg/forwarder"
+	"github.com/DataDog/datadog-agent/pkg/logs"
 	"github.com/DataDog/datadog-agent/pkg/metadata"
+	"github.com/DataDog/datadog-agent/pkg/metadata/host"
 	"github.com/DataDog/datadog-agent/pkg/pidfile"
 	"github.com/DataDog/datadog-agent/pkg/serializer"
+	"github.com/DataDog/datadog-agent/pkg/status/health"
 	"github.com/DataDog/datadog-agent/pkg/util"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/datadog-agent/pkg/version"
-	log "github.com/cihub/seelog"
-	"github.com/spf13/cobra"
 
 	// register core checks
+	_ "github.com/DataDog/datadog-agent/pkg/collector/corechecks/cluster"
 	_ "github.com/DataDog/datadog-agent/pkg/collector/corechecks/containers"
 	_ "github.com/DataDog/datadog-agent/pkg/collector/corechecks/embed"
-	_ "github.com/DataDog/datadog-agent/pkg/collector/corechecks/network"
+	_ "github.com/DataDog/datadog-agent/pkg/collector/corechecks/net"
 	_ "github.com/DataDog/datadog-agent/pkg/collector/corechecks/system"
 
 	// register metadata providers
@@ -46,24 +51,12 @@ import (
 
 var (
 	startCmd = &cobra.Command{
-		Use:   "start",
-		Short: "Start the Agent",
-		Long:  `Runs the agent in the foreground`,
-		RunE:  start,
+		Use:        "start",
+		Deprecated: "Use \"run\" instead to start the Agent",
+		RunE:       start,
 	}
+	overrideVars = map[string]string{}
 )
-
-var (
-	// flags variables
-	runForeground bool
-	pidfilePath   string
-)
-
-// run the host metadata collector every 14400 seconds (4 hours)
-const hostMetadataCollectorInterval = 14400
-
-// run the agent checks metadata collector every 600 seconds (10 minutes)
-const agentChecksMetadataCollectorInterval = 600
 
 func init() {
 	// attach the command to the root
@@ -75,40 +68,7 @@ func init() {
 
 // Start the main loop
 func start(cmd *cobra.Command, args []string) error {
-	defer func() {
-		StopAgent()
-	}()
-
-	// Setup a channel to catch OS signals
-	signalCh := make(chan os.Signal, 1)
-	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
-
-	// Make a channel to exit the function
-	stopCh := make(chan error)
-
-	go func() {
-		// Set up the signals async so we can Start the agent
-		select {
-		case <-signals.Stopper:
-			log.Info("Received stop command, shutting down...")
-			stopCh <- nil
-		case <-signals.ErrorStopper:
-			log.Critical("The Agent has encountered an error, shutting down...")
-			stopCh <- fmt.Errorf("shutting down because of an error")
-		case sig := <-signalCh:
-			log.Infof("Received signal '%s', shutting down...", sig)
-			stopCh <- nil
-		}
-	}()
-
-	if err := StartAgent(); err != nil {
-		return err
-	}
-
-	select {
-	case err := <-stopCh:
-		return err
-	}
+	return run(cmd, args)
 }
 
 // StartAgent Initializes the agent process
@@ -117,32 +77,59 @@ func StartAgent() error {
 	// Global Agent configuration
 	err := common.SetupConfig(confFilePath)
 	if err != nil {
+		log.Errorf("Failed to setup config %v", err)
 		return fmt.Errorf("unable to set up global agent configuration: %v", err)
+	}
+	// if we're on android, allow some of the settings to be overridden
+	// by the android service (variables to be passedin via Intents)
+	if runtime.GOOS == "android" {
+		log.Debugf("OS is android, checking OS vars")
+		if overrideVars != nil && len(overrideVars) != 0 {
+			if val, ok := overrideVars["apikey"]; ok {
+				config.Datadog.Set("api_key", val)
+			}
+			if val, ok := overrideVars["hostname"]; ok {
+				config.Datadog.Set("hostname", val)
+			}
+			if val, ok := overrideVars["tags"]; ok {
+				config.Datadog.Set("tags", strings.Split(val, ","))
+			}
+		}
 	}
 
 	// Setup logger
-	syslogURI := config.GetSyslogURI()
-	logFile := config.Datadog.GetString("log_file")
-	if logFile == "" {
-		logFile = common.DefaultLogFile
-	}
+	if runtime.GOOS != "android" {
+		syslogURI := config.GetSyslogURI()
+		logFile := config.Datadog.GetString("log_file")
+		if logFile == "" {
+			logFile = common.DefaultLogFile
+		}
 
-	if config.Datadog.GetBool("disable_file_logging") {
-		// this will prevent any logging on file
-		logFile = ""
-	}
+		if config.Datadog.GetBool("disable_file_logging") {
+			// this will prevent any logging on file
+			logFile = ""
+		}
 
-	err = config.SetupLogger(
-		config.Datadog.GetString("log_level"),
-		logFile,
-		syslogURI,
-		config.Datadog.GetBool("syslog_rfc"),
-		config.Datadog.GetBool("syslog_tls"),
-		config.Datadog.GetString("syslog_pem"),
-		config.Datadog.GetBool("log_to_console"),
-	)
+		err = config.SetupLogger(
+			config.Datadog.GetString("log_level"),
+			logFile,
+			syslogURI,
+			config.Datadog.GetBool("syslog_rfc"),
+			config.Datadog.GetBool("log_to_console"),
+			config.Datadog.GetBool("log_format_json"),
+		)
+	} else {
+		err = config.SetupLogger(
+			config.Datadog.GetString("log_level"),
+			"", // no log file on android
+			"", // no syslog on android,
+			false,
+			true,  // always log to console
+			false, // not in json
+		)
+	}
 	if err != nil {
-		return log.Errorf("Error while setting up logging, exiting: %v", err)
+		return fmt.Errorf("Error while setting up logging, exiting: %v", err)
 	}
 
 	log.Infof("Starting Datadog Agent v%v", version.AgentVersion)
@@ -165,9 +152,18 @@ func StartAgent() error {
 	}
 	log.Infof("Hostname is: %s", hostname)
 
+	// HACK: init host metadata module (CPU) early to avoid any
+	//       COM threading model conflict with the python checks
+	err = host.InitHostMetadata()
+	if err != nil {
+		log.Errorf("Unable to initialize host metadata: %v", err)
+	}
+
 	// start the cmd HTTP server
-	if err = api.StartServer(); err != nil {
-		return log.Errorf("Error while starting api server, exiting: %v", err)
+	if runtime.GOOS != "android" {
+		if err = api.StartServer(); err != nil {
+			return log.Errorf("Error while starting api server, exiting: %v", err)
+		}
 	}
 
 	// start the GUI server
@@ -189,8 +185,8 @@ func StartAgent() error {
 	log.Debugf("Forwarder started")
 
 	// setup the aggregator
-	s := &serializer.Serializer{Forwarder: common.Forwarder}
-	agg := aggregator.InitAggregator(s, hostname)
+	s := serializer.NewSerializer(common.Forwarder)
+	agg := aggregator.InitAggregator(s, hostname, "agent")
 	agg.AddAgentStartupEvent(version.AgentVersion)
 
 	// start dogstatsd
@@ -203,6 +199,19 @@ func StartAgent() error {
 	}
 	log.Debugf("statsd started")
 
+	// start logs-agent
+	if config.Datadog.GetBool("logs_enabled") || config.Datadog.GetBool("log_enabled") {
+		if config.Datadog.GetBool("log_enabled") {
+			log.Warn(`"log_enabled" is deprecated, use "logs_enabled" instead`)
+		}
+		err := logs.Start()
+		if err != nil {
+			log.Error("Could not start logs-agent: ", err)
+		}
+	} else {
+		log.Info("logs-agent disabled")
+	}
+
 	// create and setup the Autoconfig instance
 	common.SetupAutoConfig(config.Datadog.GetString("confd_path"))
 	// start the autoconfig, this will immediately run any configured check
@@ -210,37 +219,63 @@ func StartAgent() error {
 
 	// setup the metadata collector, this needs a working Python env to function
 	if config.Datadog.GetBool("enable_metadata_collection") {
-		common.MetadataScheduler = metadata.NewScheduler(s, hostname)
-		var C []config.MetadataProviders
-		err = config.Datadog.UnmarshalKey("metadata_providers", &C)
-		if err == nil {
-			log.Debugf("Adding configured providers to the metadata collector")
-			for _, c := range C {
-				if c.Name == "host" || c.Name == "agent_checks" {
-					continue
-				}
-				intl := c.Interval * time.Second
-				err = common.MetadataScheduler.AddCollector(c.Name, intl)
-				if err != nil {
-					log.Errorf("Unable to add '%s' metadata provider: %v", c.Name, err)
-				} else {
-					log.Infof("Scheduled metadata provider '%v' to run every %v", c.Name, intl)
-				}
-			}
-		} else {
-			log.Errorf("Unable to parse metadata_providers config: %v", err)
-		}
-		// Should be always true, except in some edge cases (multiple agents per host)
-		err = common.MetadataScheduler.AddCollector("host", hostMetadataCollectorInterval*time.Second)
+		err = setupMetadataCollection(s, hostname)
 		if err != nil {
-			return log.Error("Host metadata is supposed to be always available in the catalog!")
-		}
-		err = common.MetadataScheduler.AddCollector("agent_checks", agentChecksMetadataCollectorInterval*time.Second)
-		if err != nil {
-			return log.Error("Agent Checks metadata is supposed to be always available in the catalog!")
+			return err
 		}
 	} else {
 		log.Warnf("Metadata collection disabled, only do that if another agent/dogstatsd is running on this host")
+	}
+
+	// start dependent services
+	startDependentServices()
+	return nil
+}
+
+// setupMetadataCollection initializes the metadata scheduler and its collectors based on the config
+func setupMetadataCollection(s *serializer.Serializer, hostname string) error {
+	addDefaultResourcesCollector := true
+	common.MetadataScheduler = metadata.NewScheduler(s, hostname)
+	var C []config.MetadataProviders
+	err := config.Datadog.UnmarshalKey("metadata_providers", &C)
+	if err == nil {
+		log.Debugf("Adding configured providers to the metadata collector")
+		for _, c := range C {
+			if c.Name == "host" || c.Name == "agent_checks" {
+				continue
+			}
+			if c.Name == "resources" {
+				addDefaultResourcesCollector = false
+			}
+			if c.Interval == 0 {
+				log.Infof("Interval of metadata provider '%v' set to 0, skipping provider", c.Name)
+				continue
+			}
+			intl := c.Interval * time.Second
+			err = common.MetadataScheduler.AddCollector(c.Name, intl)
+			if err != nil {
+				log.Errorf("Unable to add '%s' metadata provider: %v", c.Name, err)
+			} else {
+				log.Infof("Scheduled metadata provider '%v' to run every %v", c.Name, intl)
+			}
+		}
+	} else {
+		log.Errorf("Unable to parse metadata_providers config: %v", err)
+	}
+	// Should be always true, except in some edge cases (multiple agents per host)
+	err = common.MetadataScheduler.AddCollector("host", hostMetadataCollectorInterval*time.Second)
+	if err != nil {
+		return log.Error("Host metadata is supposed to be always available in the catalog!")
+	}
+	err = common.MetadataScheduler.AddCollector("agent_checks", agentChecksMetadataCollectorInterval*time.Second)
+	if err != nil {
+		return log.Error("Agent Checks metadata is supposed to be always available in the catalog!")
+	}
+	if addDefaultResourcesCollector && runtime.GOOS == "linux" {
+		err = common.MetadataScheduler.AddCollector("resources", defaultResourcesMetadataCollectorInterval*time.Second)
+		if err != nil {
+			log.Warn("Could not add resources metadata provider: ", err)
+		}
 	}
 
 	return nil
@@ -248,6 +283,15 @@ func StartAgent() error {
 
 // StopAgent Tears down the agent process
 func StopAgent() {
+	// retrieve the agent health before stopping the components
+	// GetStatusNonBlocking has a 100ms timeout to avoid blocking
+	health, err := health.GetStatusNonBlocking()
+	if err != nil {
+		log.Warnf("Agent health unknown: %s", err)
+	} else if len(health.Unhealthy) > 0 {
+		log.Warnf("Some components were unhealthy: %v", health.Unhealthy)
+	}
+
 	// gracefully shut down any component
 	if common.DSD != nil {
 		common.DSD.Stop()
@@ -259,11 +303,21 @@ func StopAgent() {
 		common.MetadataScheduler.Stop()
 	}
 	api.StopServer()
+	jmx.StopJmxfetch()
 	if common.Forwarder != nil {
 		common.Forwarder.Stop()
 	}
+	logs.Stop()
 	gui.StopGUIServer()
 	os.Remove(pidfilePath)
 	log.Info("See ya!")
 	log.Flush()
+}
+
+// SetOverrides provides an externally accessible method for
+// overriding config variables.  Used by Android to set
+// the various config options from intent extras
+func SetOverrides(vars map[string]string) {
+	confFilePath = "datadog.yaml"
+	overrideVars = vars
 }

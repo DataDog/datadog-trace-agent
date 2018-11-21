@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package forwarder
 
@@ -50,26 +50,19 @@ func TestWorkerStart(t *testing.T) {
 	mock2.On("Process", w.Client).Return(nil).Times(1)
 	mock2.On("GetTarget").Return("").Times(1)
 
-	dummy := newTestTransaction()
-	dummy.On("Process", w.Client).Return(nil).Times(2)
-	dummy.On("GetTarget").Return("").Times(2)
-
 	w.Start()
 
 	highPrio <- mock
-	// since highPrio and lowPrio have no buffering the worker won't take another Transaction until it has processed the first one
-	highPrio <- dummy
+	<-mock.processed
 
 	mock.AssertExpectations(t)
 	mock.AssertNumberOfCalls(t, "Process", 1)
-	mock.AssertNumberOfCalls(t, "Reschedule", 0)
 
 	lowPrio <- mock2
-	lowPrio <- dummy
+	<-mock2.processed
 
 	mock2.AssertExpectations(t)
 	mock2.AssertNumberOfCalls(t, "Process", 1)
-	mock2.AssertNumberOfCalls(t, "Reschedule", 0)
 
 	w.Stop()
 }
@@ -82,7 +75,6 @@ func TestWorkerRetry(t *testing.T) {
 
 	mock := newTestTransaction()
 	mock.On("Process", w.Client).Return(fmt.Errorf("some kind of error")).Times(1)
-	mock.On("Reschedule").Return(nil).Times(1)
 	mock.On("GetTarget").Return("error_url").Times(1)
 
 	w.Start()
@@ -92,7 +84,6 @@ func TestWorkerRetry(t *testing.T) {
 	mock.AssertExpectations(t)
 	mock.AssertNumberOfCalls(t, "Process", 1)
 	mock.AssertNumberOfCalls(t, "GetTarget", 1)
-	mock.AssertNumberOfCalls(t, "Reschedule", 1)
 	assert.Equal(t, mock, retryTransaction)
 	assert.True(t, w.blockedList.isBlock("error_url"))
 }
@@ -104,10 +95,9 @@ func TestWorkerRetryBlockedTransaction(t *testing.T) {
 	w := NewWorker(highPrio, lowPrio, requeue, newBlockedEndpoints())
 
 	mock := newTestTransaction()
-	mock.On("Reschedule").Return(nil).Times(1)
 	mock.On("GetTarget").Return("error_url").Times(1)
 
-	w.blockedList.block("error_url")
+	w.blockedList.close("error_url")
 	w.Start()
 	highPrio <- mock
 	retryTransaction := <-requeue
@@ -115,7 +105,6 @@ func TestWorkerRetryBlockedTransaction(t *testing.T) {
 	mock.AssertExpectations(t)
 	mock.AssertNumberOfCalls(t, "Process", 0)
 	mock.AssertNumberOfCalls(t, "GetTarget", 1)
-	mock.AssertNumberOfCalls(t, "Reschedule", 1)
 	assert.Equal(t, mock, retryTransaction)
 	assert.True(t, w.blockedList.isBlock("error_url"))
 }

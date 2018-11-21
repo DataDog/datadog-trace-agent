@@ -1,7 +1,9 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
+
+// +build cpython
 
 package py
 
@@ -10,10 +12,13 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
+
+	python "github.com/sbinet/go-python"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/DataDog/datadog-agent/pkg/aggregator"
-	"github.com/sbinet/go-python"
-	"github.com/stretchr/testify/assert"
 )
 
 // Setup the test module
@@ -31,8 +36,8 @@ func TestMain(m *testing.M) {
 	state := Initialize(rootDir, testsDir, distDir)
 
 	// testing this package needs an inited aggregator
-	// to work properly
-	aggregator.InitAggregator(nil, "")
+	// to work properly.
+	aggregator.InitAggregatorWithFlushInterval(nil, "", "", time.Hour)
 
 	ret := m.Run()
 
@@ -71,15 +76,24 @@ func TestFindSubclassOf(t *testing.T) {
 
 	// Foo in bar module, get Bar
 	sclass, err = findSubclassOf(fooClass, barModule, gstate)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 	assert.Equal(t, 1, sclass.RichCompareBool(barClass, python.Py_EQ))
+
+	// Multiple inheritance test
+	multiBaseModule := python.PyImport_ImportModuleNoBlock("testcheck_multi_base")
+	baseCheckClass := multiBaseModule.GetAttrString("BaseClass")
+	multiModule := python.PyImport_ImportModuleNoBlock("testcheck_multi")
+	derivedCheckClass := multiModule.GetAttrString("DerivedCheck")
+	sclass, err = findSubclassOf(baseCheckClass, multiModule, gstate)
+	require.Nil(t, err)
+	assert.Equal(t, 1, sclass.RichCompareBool(derivedCheckClass, python.Py_EQ))
 }
 
 func TestSubprocessBindings(t *testing.T) {
 	gstate := newStickyLock()
 	defer gstate.unlock()
 
-	utilModule := python.PyImport_ImportModuleNoBlock("util")
+	utilModule := python.PyImport_ImportModuleNoBlock("_util")
 	assert.NotNil(t, utilModule)
 	defer utilModule.DecRef()
 

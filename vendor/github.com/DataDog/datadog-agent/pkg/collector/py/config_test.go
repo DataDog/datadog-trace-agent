@@ -1,7 +1,9 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
+
+// +build cpython
 
 // NOTICE: See TestMain function in `utils_test.go` for Python initialization
 package py
@@ -12,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-agent/pkg/collector/check"
+	"github.com/DataDog/datadog-agent/pkg/autodiscovery/integration"
 	"github.com/mitchellh/reflectwalk"
 	"github.com/sbinet/go-python"
 	"github.com/stretchr/testify/assert"
@@ -29,7 +31,7 @@ func TestToPython(t *testing.T) {
 		t.Fatalf("Expected empty error message, found: %s", err)
 	}
 
-	c := make(check.ConfigRawMap)
+	c := make(integration.RawMap)
 
 	err = yaml.Unmarshal(yamlFile, &c)
 	if err != nil {

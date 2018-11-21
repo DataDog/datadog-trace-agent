@@ -1,17 +1,52 @@
-=========
+{{/*
+NOTE: Changes made to this template should be reflected on the following templates, if applicable:
+* cmd/agent/gui/views/templates/generalStatus.tmpl
+* Dockerfiles/cluster-agent/dist/templates/forwarder.tmpl
+*/}}=========
 Forwarder
 =========
-{{- if .Transactions -}}
-{{- range $key, $value := .Transactions}}
-  {{$key}}: {{$value}}
-{{- end -}}
+{{ if .Transactions }}
+  {{- range $key, $value := .Transactions }}
+    {{- if and (ne $key "Errors") (ne $key "ErrorsByType") (ne $key "HTTPErrors") (ne $key "HTTPErrorsByCode")}}
+  {{$key}}: {{humanize $value}}
+    {{- end}}
+  {{- end}}
+  {{- if .Transactions.DroppedOnInput }}
 
+  Warning: the forwarder dropped transactions because all workers were busy.
+  You should review your network performance, and tune the forwarder_num_workers
+  and forwarder_timeout options.
+  {{- end}}
+  {{- if .Transactions.Errors }}
+
+  Transaction Errors
+  ==================
+    Total number: {{.Transactions.Errors}}
+    Errors By Type:
+          {{- range $type, $count := .Transactions.ErrorsByType }}
+            {{- if $count }}
+      {{$type}}: {{$count}}
+            {{- end}}
+          {{- end}}
+  {{- end}}
+  {{- if .Transactions.HTTPErrors }}
+
+  HTTP Errors
+  ==================
+    Total number: {{.Transactions.HTTPErrors}}
+    HTTP Errors By Code:
+      {{- range $code, $count := .Transactions.HTTPErrorsByCode }}
+      {{$code}}: {{$count}}
+      {{- end}}
+  {{- end}}
 {{- end}}
-{{- if .APIKeyStatus}}
+
+{{- if .APIKeyStatus }}
 
   API Keys status
-  ---------------
-  {{- range $key, $value := .APIKeyStatus}}
+  ===============
+  {{- range $key, $value := .APIKeyStatus }}
     {{$key}}: {{$value}}
-  {{- end -}}
+  {{- end }}
 {{- end}}
+

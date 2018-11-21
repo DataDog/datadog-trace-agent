@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package corechecks
 
@@ -9,9 +9,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/DataDog/datadog-agent/pkg/autodiscovery/integration"
 	"github.com/DataDog/datadog-agent/pkg/collector/check"
 	"github.com/DataDog/datadog-agent/pkg/collector/loaders"
-	log "github.com/cihub/seelog"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
 // CheckFactory factory function type to instantiate checks
@@ -23,6 +24,16 @@ var catalog = make(map[string]CheckFactory)
 // RegisterCheck adds a check to the catalog
 func RegisterCheck(name string, c CheckFactory) {
 	catalog[name] = c
+}
+
+// GetRegisteredFactoryKeys get the keys for all registered factories
+func GetRegisteredFactoryKeys() []string {
+	factoryKeys := []string{}
+	for name := range catalog {
+		factoryKeys = append(factoryKeys, name)
+	}
+
+	return factoryKeys
 }
 
 // GetCheckFactory grabs factory for specific check
@@ -43,11 +54,11 @@ func NewGoCheckLoader() (*GoCheckLoader, error) {
 }
 
 // Load returns a list of checks, one for every configuration instance found in `config`
-func (gl *GoCheckLoader) Load(config check.Config) ([]check.Check, error) {
+func (gl *GoCheckLoader) Load(config integration.Config) ([]check.Check, error) {
 	checks := []check.Check{}
 
 	// If JMX check, just skip - coincidence
-	if check.IsConfigJMX(config.Name, config.InitConfig) {
+	if check.IsJMXConfig(config.Name, config.InitConfig) {
 		return checks, fmt.Errorf("check %s appears to be a JMX check - skipping", config.Name)
 	}
 

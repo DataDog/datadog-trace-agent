@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package metrics
 
@@ -132,4 +132,12 @@ func (sc ServiceChecks) SplitPayload(times int) ([]marshaler.Marshaler, error) {
 		n += batchSize
 	}
 	return splitPayloads, nil
+}
+
+func (sc ServiceCheck) String() string {
+	s, err := json.Marshal(sc)
+	if err != nil {
+		return ""
+	}
+	return string(s)
 }

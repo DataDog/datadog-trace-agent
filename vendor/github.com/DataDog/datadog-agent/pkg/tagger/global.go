@@ -1,38 +1,61 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package tagger
 
 import (
-	log "github.com/cihub/seelog"
+	"sync"
 
+	"github.com/DataDog/datadog-agent/cmd/agent/api/response"
+	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/tagger/collectors"
 )
 
 // defaultTagger is the shared tagger instance backing the global Tag and Init functions
 var defaultTagger *Tagger
+var initOnce sync.Once
+
+// fullCardinality caches the value of the full_cardinality_taggin option
+var fullCardinality bool
 
 // Init must be called once config is available, call it in your cmd
+// defaultTagger.Init cannot fail for now, keeping the `error` for API stability
 func Init() error {
-	return defaultTagger.Init(collectors.DefaultCatalog)
+	initOnce.Do(func() {
+		fullCardinality = config.Datadog.GetBool("full_cardinality_tagging")
+		defaultTagger.Init(collectors.DefaultCatalog)
+	})
+	return nil
 }
 
-// Tag queries the defaulttagger to get entity tags from cache or sources
+// Tag queries the defaultTagger to get entity tags from cache or sources
 func Tag(entity string, highCard bool) ([]string, error) {
 	return defaultTagger.Tag(entity, highCard)
 }
 
-// Stop queues a stop signal to the defaulttagger
+// Stop queues a stop signal to the defaultTagger
 func Stop() error {
 	return defaultTagger.Stop()
 }
 
+// IsFullCardinality returns the full_cardinality_tagging option
+// this caches the call to viper, that would lookup and parse envvars
+func IsFullCardinality() bool {
+	return fullCardinality
+}
+
+// List the content of the defaulTagger
+func List(highCard bool) response.TaggerListResponse {
+	return defaultTagger.List(highCard)
+}
+
+// GetEntityHash returns the hash for the tags associated with the given entity
+func GetEntityHash(entity string) string {
+	return defaultTagger.GetEntityHash(entity)
+}
+
 func init() {
-	tagger, err := newTagger()
-	if err != nil {
-		log.Errorf("tagger initialisation failed: %s", err)
-	}
-	defaultTagger = tagger
+	defaultTagger = newTagger()
 }

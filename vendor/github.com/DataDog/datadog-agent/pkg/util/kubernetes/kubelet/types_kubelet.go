@@ -1,11 +1,13 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 // +build kubelet
 
 package kubelet
+
+import "time"
 
 // Pod contains fields for unmarshalling a Pod
 type Pod struct {
@@ -40,16 +42,16 @@ type PodOwner struct {
 // Spec contains fields for unmarshalling a Pod.Spec
 type Spec struct {
 	HostNetwork bool            `json:"hostNetwork,omitempty"`
-	Hostname    string          `json:"hostname,omitempty"` // TODO: does it exist?
 	NodeName    string          `json:"nodeName,omitempty"`
 	Containers  []ContainerSpec `json:"containers,omitempty"`
 }
 
 // ContainerSpec contains fields for unmarshalling a Pod.Spec.Containers
 type ContainerSpec struct {
-	Name  string              `json:"name"`
-	Image string              `json:"image,omitempty"`
-	Ports []ContainerPortSpec `json:"ports,omitempty"`
+	Name           string              `json:"name"`
+	Image          string              `json:"image,omitempty"`
+	Ports          []ContainerPortSpec `json:"ports,omitempty"`
+	ReadinessProbe *ContainerProbe     `json:"readinessProbe,omitempty"`
 }
 
 // ContainerSpec contains fields for unmarshalling a Pod.Spec.Containers.Ports
@@ -60,16 +62,56 @@ type ContainerPortSpec struct {
 	Protocol      string `json:"protocol"`
 }
 
+// ContainerProbe contains fields for unmarshalling a Pod.Spec.Containers.ReadinessProbe
+type ContainerProbe struct {
+	InitialDelaySeconds int `json:"initialDelaySeconds"`
+}
+
 // Status contains fields for unmarshalling a Pod.Status
 type Status struct {
+	Phase      string            `json:"phase,omitempty"`
 	HostIP     string            `json:"hostIP,omitempty"`
 	PodIP      string            `json:"podIP,omitempty"`
 	Containers []ContainerStatus `json:"containerStatuses,omitempty"`
+	Conditions []Conditions      `json:"conditions,omitempty"`
+}
+
+// Conditions contains fields for unmarshalling a Pod.Status.Conditions
+type Conditions struct {
+	Type   string `json:"type,omitempty"`
+	Status string `json:"status,omitempty"`
 }
 
 // ContainerStatus contains fields for unmarshalling a Pod.Status.Containers
 type ContainerStatus struct {
-	Name  string `json:"name,omitempty"`
-	Image string `json:"image,omitempty"`
-	ID    string `json:"containerID,omitempty"`
+	Name  string         `json:"name"`
+	Image string         `json:"image"`
+	ID    string         `json:"containerID"`
+	Ready bool           `json:"ready"`
+	State ContainerState `json:"state"`
+}
+
+// ContainerState holds a possible state of container.
+// Only one of its members may be specified.
+// If none of them is specified, the default one is ContainerStateWaiting.
+type ContainerState struct {
+	Waiting    *ContainerStateWaiting    `json:"waiting,omitempty"`
+	Running    *ContainerStateRunning    `json:"running,omitempty"`
+	Terminated *ContainerStateTerminated `json:"terminated,omitempty"`
+}
+
+// ContainerStateWaiting is a waiting state of a container.
+type ContainerStateWaiting struct {
+	Reason string `json:"reason"`
+}
+
+// ContainerStateRunning is a running state of a container.
+type ContainerStateRunning struct {
+	StartedAt time.Time `json:"startedAt"`
+}
+
+// ContainerStateTerminated is a terminated state of a container.
+type ContainerStateTerminated struct {
+	ExitCode  int32     `json:"exitCode"`
+	StartedAt time.Time `json:"startedAt"`
 }

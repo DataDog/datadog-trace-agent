@@ -1,7 +1,9 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
+
+// +build cpython
 
 package py
 
@@ -14,7 +16,7 @@ import (
 
 	"github.com/sbinet/go-python"
 
-	log "github.com/cihub/seelog"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
 // #include <Python.h>
@@ -41,24 +43,12 @@ type stickyLock struct {
 	locked uint32 // Flag set to 1 if the lock is locked, 0 otherwise
 }
 
-//PythonStatsEntry are entries for specific object type memory usage
-type PythonStatsEntry struct {
-	Reference string
-	NObjects  int
-	Size      int
-}
-
-//PythonStats contains python memory statistics
-type PythonStats struct {
-	Type     string
-	NObjects int
-	Size     int
-	Entries  []*PythonStatsEntry
-}
-
 const (
-	pyMemModule      = "utils.py_mem"
-	pyMemSummaryFunc = "get_mem_stats"
+	pyMemModule           = "utils.py_mem"
+	pyMemSummaryFunc      = "get_mem_stats"
+	pyPkgModule           = "utils.py_packages"
+	pyPsutilProcPath      = "psutil.PROCFS_PATH"
+	pyIntegrationListFunc = "get_datadog_wheels"
 )
 
 // newStickyLock register the current thread with the interpreter and locks
@@ -111,17 +101,20 @@ func (sl *stickyLock) getPythonError() (string, error) {
 	if ptraceback != nil && ptraceback.GetCPointer() != nil {
 		// There's a traceback, try to format it nicely
 		traceback := python.PyImport_ImportModule("traceback")
+		defer traceback.DecRef()
 		formatExcFn := traceback.GetAttrString("format_exception")
 		if formatExcFn != nil {
 			defer formatExcFn.DecRef()
 			pyFormattedExc := formatExcFn.CallFunction(ptype, pvalue, ptraceback)
 			if pyFormattedExc != nil {
 				defer pyFormattedExc.DecRef()
-				pyStringExc := pyFormattedExc.Str()
-				if pyStringExc != nil {
-					defer pyStringExc.DecRef()
-					return python.PyString_AsString(pyStringExc), nil
+
+				tracebackString := ""
+				// "format_exception" return a list of strings (one per line)
+				for i := 0; i < python.PyList_Size(pyFormattedExc); i++ {
+					tracebackString = tracebackString + python.PyString_AsString(python.PyList_GetItem(pyFormattedExc, i))
 				}
+				return tracebackString, nil
 			}
 		}
 
@@ -150,7 +143,9 @@ func (sl *stickyLock) getPythonError() (string, error) {
 }
 
 // Search in module for a class deriving from baseClass and return the first match if any.
-// Notice: the passed `stickyLock` must be locked
+// Notice: classes that have been derived will be ignored, i.e. this function only
+// returns leaves of the hierarchy tree.
+// Notice: the passed `stickyLock` must be locked.
 func findSubclassOf(base, module *python.PyObject, gstate *stickyLock) (*python.PyObject, error) {
 	if base == nil || module == nil {
 		return nil, fmt.Errorf("both base class and module must be not nil")
@@ -177,24 +172,55 @@ func findSubclassOf(base, module *python.PyObject, gstate *stickyLock) (*python.
 			pyErr, err := gstate.getPythonError()
 
 			if err != nil {
-				return nil, fmt.Errorf("An error occurred while searching for the AgentCheck class and couldn't be formatted: %v", err)
+				return nil, fmt.Errorf("An error occurred while searching for the base class and couldn't be formatted: %v", err)
 			}
 			return nil, errors.New(pyErr)
 		}
 
+		// not a class, ignore
 		if !python.PyType_Check(class) {
-			// ignore this item
 			class.DecRef()
 			continue
 		}
 
-		// IsSubclass returns success if class is the same, we need to go deeper
-		if class.IsSubclass(base) == 1 && class.RichCompareBool(base, python.Py_EQ) != 1 {
-			return class, nil
+		// this is an unrelated class, ignore
+		if class.IsSubclass(base) != 1 {
+			class.DecRef()
+			continue
 		}
+
+		// `class` is actually `base` itself, ignore
+		if class.RichCompareBool(base, python.Py_EQ) == 1 {
+			class.DecRef()
+			continue
+		}
+
+		// does `class` have subclasses?
+		subclasses := class.CallMethod("__subclasses__")
+		if subclasses == nil {
+			pyErr, err := gstate.getPythonError()
+
+			if err != nil {
+				return nil, fmt.Errorf("An error occurred while checking for subclasses and couldn't be formatted: %v", err)
+			}
+			return nil, errors.New(pyErr)
+		}
+
+		subclassesCount := python.PyList_GET_SIZE(subclasses)
+		subclasses.DecRef()
+
+		// `class` has subclasses but checks are supposed to have none, ignore
+		if subclassesCount > 0 {
+			class.DecRef()
+			continue
+		}
+
+		// got it, return the check class
+		return class, nil
 	}
+
 	return nil, fmt.Errorf("cannot find a subclass of %s in module %s",
-		python.PyString_AS_STRING(base.Str()), python.PyString_AS_STRING(base.Str()))
+		python.PyString_AS_STRING(base.Str()), python.PyString_AS_STRING(module.Str()))
 }
 
 // Get the rightmost component of a module path like foo.bar.baz
@@ -379,4 +405,87 @@ func GetPythonInterpreterMemoryUsage() ([]*PythonStats, error) {
 	}
 
 	return myPythonStats, nil
+}
+
+// GetPythonIntegrationList collects python datadog installed integrations list
+func GetPythonIntegrationList() ([]string, error) {
+	glock := newStickyLock()
+	defer glock.unlock()
+
+	pkgModule := python.PyImport_ImportModule(pyPkgModule)
+	if pkgModule == nil {
+		return nil, fmt.Errorf("Unable to import Python module: %s", pyPkgModule)
+	}
+	defer pkgModule.DecRef()
+
+	pkgLister := pkgModule.GetAttrString(pyIntegrationListFunc)
+	if pkgLister == nil {
+		pyErr, err := glock.getPythonError()
+
+		if err != nil {
+			return nil, fmt.Errorf("An error occurred while grabbing the python datadog integration list: %v", err)
+		}
+		return nil, errors.New(pyErr)
+	}
+	defer pkgLister.DecRef()
+
+	args := python.PyTuple_New(0)
+	kwargs := python.PyDict_New()
+	defer args.DecRef()
+	defer kwargs.DecRef()
+
+	packages := pkgLister.Call(args, kwargs)
+	if packages == nil {
+		pyErr, err := glock.getPythonError()
+
+		if err != nil {
+			return nil, fmt.Errorf("An error occurred compiling the list of python integrations: %v", err)
+		}
+		return nil, errors.New(pyErr)
+	}
+	defer packages.DecRef()
+
+	ddPythonPackages := []string{}
+	for i := 0; i < python.PyList_Size(packages); i++ {
+		pkgName := python.PyString_AsString(python.PyList_GetItem(packages, i))
+		if pkgName == "checks_base" {
+			continue
+		}
+		ddPythonPackages = append(ddPythonPackages, pkgName)
+	}
+
+	return ddPythonPackages, nil
+}
+
+// SetPythonPsutilProcPath sets python psutil.PROCFS_PATH
+func SetPythonPsutilProcPath(procPath string) error {
+	glock := newStickyLock()
+	defer glock.unlock()
+
+	ns := strings.Split(pyPsutilProcPath, ".")
+	pyPsutilModule := ns[0]
+	psutilModule := python.PyImport_ImportModule(pyPsutilModule)
+	if psutilModule == nil {
+		pyErr, err := glock.getPythonError()
+
+		if err != nil {
+			return fmt.Errorf("Error importing python psutil module: %v", err)
+		}
+		return errors.New(pyErr)
+	}
+	defer psutilModule.DecRef()
+
+	pyProcPath := python.PyString_FromString(procPath)
+	defer pyProcPath.DecRef()
+
+	ret := psutilModule.SetAttrString(ns[1], pyProcPath)
+	if ret == -1 {
+		pyErr, err := glock.getPythonError()
+
+		if err != nil {
+			return fmt.Errorf("An error setting the psutil procfs path: %v", err)
+		}
+		return errors.New(pyErr)
+	}
+	return nil
 }

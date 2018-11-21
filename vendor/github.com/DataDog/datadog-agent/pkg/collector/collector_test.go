@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package collector
 
@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DataDog/datadog-agent/pkg/autodiscovery/integration"
 	"github.com/DataDog/datadog-agent/pkg/collector/check"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -23,7 +24,7 @@ type TestCheck struct {
 }
 
 func (c *TestCheck) Stop()                                     { c.stop <- true }
-func (c *TestCheck) Configure(a, b check.ConfigData) error     { return nil }
+func (c *TestCheck) Configure(a, b integration.Data) error     { return nil }
 func (c *TestCheck) Interval() time.Duration                   { return 1 * time.Minute }
 func (c *TestCheck) Run() error                                { <-c.stop; return nil }
 func (c *TestCheck) GetWarnings() []error                      { return []error{} }
@@ -39,6 +40,10 @@ func (c *TestCheck) String() string {
 		return c.name
 	}
 	return "TestCheck"
+}
+
+func (c *TestCheck) Version() string {
+	return ""
 }
 
 func NewCheck() *TestCheck { return &TestCheck{stop: make(chan bool)} }
@@ -98,7 +103,7 @@ func (suite *CollectorTestSuite) TestRunCheck() {
 
 func (suite *CollectorTestSuite) TestReloadCheck() {
 	ch := NewCheck()
-	empty := check.ConfigData{}
+	empty := integration.Data{}
 
 	// schedule a check
 	_, err := suite.c.RunCheck(ch)

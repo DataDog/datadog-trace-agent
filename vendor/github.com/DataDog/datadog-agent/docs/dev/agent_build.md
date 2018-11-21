@@ -16,7 +16,7 @@ invoke agent.build --build-include=zstd,etcd,cpython
 Conversely, if you want to exclude something:
 
 ```
-invoke agent.build --build-exclude=snmp,cpython
+invoke agent.build --build-exclude=snmp,systemd,cpython
 ```
 
 This is the complete list of the available components:
@@ -35,9 +35,10 @@ This is the complete list of the available components:
 * `snmp`: build the SNMP check.
 * `zk`: enable Zookeeper as a configuration store.
 * `zstd`: use Zstandard instead of Zlib.
+* `systemd`: enable systemd journal log collection
 
 Please note you might need to provide some extra dependencies in your dev
-enviroment to build certain bits (see [development enviroment][dev-env]).
+environment to build certain bits (see [development environment][dev-env]).
 
 ## Additional details
 

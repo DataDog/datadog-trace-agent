@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package main
 
@@ -36,7 +36,7 @@ func main() {
 
 	if *conf != "" {
 		config.Datadog.SetConfigFile(*conf)
-		confErr := config.Datadog.ReadInConfig()
+		confErr := config.Load()
 		if confErr != nil {
 			fmt.Printf("unable to parse Datadog config file, running with env variables: %s", confErr)
 		}

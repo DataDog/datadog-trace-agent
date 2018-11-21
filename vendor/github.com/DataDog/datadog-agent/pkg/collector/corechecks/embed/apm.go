@@ -1,9 +1,11 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 // +build apm
+// +build !windows
+// +build !linux
 
 package embed
 
@@ -12,21 +14,20 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path"
 	"sync/atomic"
 	"time"
 
+	"github.com/DataDog/datadog-agent/pkg/autodiscovery/integration"
 	"github.com/DataDog/datadog-agent/pkg/collector/check"
 	core "github.com/DataDog/datadog-agent/pkg/collector/corechecks"
 	"github.com/DataDog/datadog-agent/pkg/config"
 
-	log "github.com/cihub/seelog"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 	yaml "gopkg.in/yaml.v2"
 )
 
 type apmCheckConf struct {
-	BinPath  string `yaml:"bin_path,omitempty"`
-	ConfPath string `yaml:"conf_path,omitempty"`
+	BinPath string `yaml:"bin_path,omitempty"`
 }
 
 // APMCheck keeps track of the running command
@@ -40,6 +41,10 @@ type APMCheck struct {
 
 func (c *APMCheck) String() string {
 	return "APM Agent"
+}
+
+func (c *APMCheck) Version() string {
+	return ""
 }
 
 // Run executes the check with retries
@@ -122,7 +127,7 @@ func (c *APMCheck) run() error {
 }
 
 // Configure the APMCheck
-func (c *APMCheck) Configure(data check.ConfigData, initConfig check.ConfigData) error {
+func (c *APMCheck) Configure(data integration.Data, initConfig integration.Data) error {
 	// handle the case when apm agent is disabled via the old `datadog.conf` file
 	if enabled := config.Datadog.GetBool("apm_enabled"); !enabled {
 		return fmt.Errorf("APM agent disabled through main configuration file")
@@ -151,18 +156,13 @@ func (c *APMCheck) Configure(data check.ConfigData, initConfig check.ConfigData)
 		c.binPath = defaultBinPath
 	}
 
-	// let the trace-agent use its own config file provided by the Agent package
-	// if we haven't found one in the apm.yaml check config
-	configFile := checkConf.ConfPath
-	if configFile == "" {
-		configFile = path.Join(config.FileUsedDir(), "trace-agent.conf")
-	}
+	configFile := config.Datadog.ConfigFileUsed()
 
 	c.commandOpts = []string{}
 
-	// if the trace-agent.conf file is available, use it
+	// explicitly provide to the trace-agent the agent configuration file
 	if _, err := os.Stat(configFile); !os.IsNotExist(err) {
-		c.commandOpts = append(c.commandOpts, fmt.Sprintf("-ddconfig=%s", configFile))
+		c.commandOpts = append(c.commandOpts, fmt.Sprintf("-config=%s", configFile))
 	}
 
 	return nil

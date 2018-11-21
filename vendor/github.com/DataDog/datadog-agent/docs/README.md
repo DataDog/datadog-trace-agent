@@ -2,23 +2,17 @@
 
 This directory contains docs, guides and resources to better use this repo.
 
-## Informations regarding the BETA
+## TOC
 
-**Important:** [This section][beta] of the docs will be updated regularly to
-reflect the current state of the Beta.
+ * [Datadog Agent](agent/README.md) user documentation.
+ * [Developer Guide](dev/README.md): new users and contributors are encouraged
+ to build the Datadog Agent themselves and should start reading this guide.
+ * [DogStatsD](dogstatsd/README.md) user documentation.
+ * [Datadog Cluster Agent](cluster-agent/README.md) user documentation.
+ * [Proposals](proposals/README.md): design docs and proposals.
 
-## Developer Guide
+The Docker images have their own additional documentation:
 
-New users and contributors are encouraged to build the Datadog Agent themselves
-and should start reading the [Developer Guide][developer-guide]
-
-
-## Check Guide
-
-To learn how to write new checks for the Agent please read the [Check Guide][checks-api].
-
-
-
-[developer-guide]: dev/README.md
-[checks-api]: dev/checks/README.md
-[beta]: beta/README.md
+* [datadog/agent](../Dockerfiles/agent/README.md)
+* [datadog/dogstatsd](../Dockerfiles/dogstatsd/alpine/README.md)
+* [datadog/cluster-agent](../Dockerfiles/cluster-agent/README.md)

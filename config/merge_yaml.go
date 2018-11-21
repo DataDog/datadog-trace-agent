@@ -3,122 +3,68 @@ package config
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"regexp"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-trace-agent/osutil"
 	"github.com/DataDog/datadog-trace-agent/writer/backoff"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	log "github.com/cihub/seelog"
-	"gopkg.in/yaml.v2"
 )
 
 // apiEndpointPrefix is the URL prefix prepended to the default site value from YamlAgentConfig.
 const apiEndpointPrefix = "https://trace.agent."
 
-// YamlAgentConfig is a structure used for marshaling the datadog.yaml configuration
-// available in Agent versions >= 6
-type YamlAgentConfig struct {
-	APIKey            string `yaml:"api_key"`
-	HostName          string `yaml:"hostname"`
-	LogLevel          string `yaml:"log_level"`
-	Site              string `yaml:"site"`
-	Proxy             proxy  `yaml:"proxy"`
-	SkipSSLValidation *bool  `yaml:"skip_ssl_validation"`
-
-	StatsdPort int `yaml:"dogstatsd_port"`
-
-	TraceAgent traceAgent `yaml:"apm_config"`
-}
-
-type proxy struct {
-	HTTP    string   `yaml:"http"`
-	HTTPS   string   `yaml:"https"`
-	NoProxy []string `yaml:"no_proxy"`
-}
-
-type traceAgent struct {
-	Enabled             *bool               `yaml:"enabled"`
-	Endpoint            string              `yaml:"apm_dd_url"`
-	AdditionalEndpoints map[string][]string `yaml:"additional_endpoints"`
-	Env                 string              `yaml:"env"`
-	ExtraSampleRate     float64             `yaml:"extra_sample_rate"`
-	MaxTracesPerSecond  float64             `yaml:"max_traces_per_second"`
-	MaxEventsPerSecond  float64             `yaml:"max_events_per_second"`
-	IgnoreResources     []string            `yaml:"ignore_resources"`
-	LogFilePath         string              `yaml:"log_file"`
-	ReplaceTags         []*ReplaceRule      `yaml:"replace_tags"`
-	ReceiverPort        int                 `yaml:"receiver_port"`
-	ConnectionLimit     int                 `yaml:"connection_limit"`
-	APMNonLocalTraffic  *bool               `yaml:"apm_non_local_traffic"`
-
-	Obfuscation *ObfuscationConfig `yaml:"obfuscation"`
-
-	WatchdogMaxMemory float64 `yaml:"max_memory"`
-	WatchdogMaxCPUPct float64 `yaml:"max_cpu_percent"`
-	WatchdogMaxConns  int     `yaml:"max_connections"`
-
-	TraceWriter   traceWriter   `yaml:"trace_writer"`
-	ServiceWriter serviceWriter `yaml:"service_writer"`
-	StatsWriter   statsWriter   `yaml:"stats_writer"`
-
-	AnalyzedRateByServiceLegacy map[string]float64 `yaml:"analyzed_rate_by_service"`
-	AnalyzedSpans               map[string]float64 `yaml:"analyzed_spans"`
-
-	DDAgentBin string `yaml:"dd_agent_bin"`
-}
-
 // ObfuscationConfig holds the configuration for obfuscating sensitive data
 // for various span types.
 type ObfuscationConfig struct {
 	// ES holds the obfuscation configuration for ElasticSearch bodies.
-	ES JSONObfuscationConfig `yaml:"elasticsearch"`
+	ES JSONObfuscationConfig `mapstructure:"elasticsearch"`
 
 	// Mongo holds the obfuscation configuration for MongoDB queries.
-	Mongo JSONObfuscationConfig `yaml:"mongodb"`
+	Mongo JSONObfuscationConfig `mapstructure:"mongodb"`
 
 	// HTTP holds the obfuscation settings for HTTP URLs.
-	HTTP HTTPObfuscationConfig `yaml:"http"`
+	HTTP HTTPObfuscationConfig `mapstructure:"http"`
 
 	// RemoveStackTraces specifies whether stack traces should be removed.
 	// More specifically "error.stack" tag values will be cleared.
-	RemoveStackTraces bool `yaml:"remove_stack_traces"`
+	RemoveStackTraces bool `mapstructure:"remove_stack_traces"`
 
 	// Redis holds the configuration for obfuscating the "redis.raw_command" tag
 	// for spans of type "redis".
-	Redis Enablable `yaml:"redis"`
+	Redis Enablable `mapstructure:"redis"`
 
 	// Memcached holds the configuration for obfuscating the "memcached.command" tag
 	// for spans of type "memcached".
-	Memcached Enablable `yaml:"memcached"`
+	Memcached Enablable `mapstructure:"memcached"`
 }
 
 // HTTPObfuscationConfig holds the configuration settings for HTTP obfuscation.
 type HTTPObfuscationConfig struct {
 	// RemoveQueryStrings determines query strings to be removed from HTTP URLs.
-	RemoveQueryString bool `yaml:"remove_query_string"`
+	RemoveQueryString bool `mapstructure:"remove_query_string"`
 
 	// RemovePathDigits determines digits in path segments to be obfuscated.
-	RemovePathDigits bool `yaml:"remove_paths_with_digits"`
+	RemovePathDigits bool `mapstructure:"remove_paths_with_digits"`
 }
 
 // Enablable can represent any option that has an "enabled" boolean sub-field.
 type Enablable struct {
-	Enabled bool `yaml:"enabled"`
+	Enabled bool `mapstructure:"enabled"`
 }
 
 // JSONObfuscationConfig holds the obfuscation configuration for sensitive
 // data found in JSON objects.
 type JSONObfuscationConfig struct {
 	// Enabled will specify whether obfuscation should be enabled.
-	Enabled bool `yaml:"enabled"`
+	Enabled bool `mapstructure:"enabled"`
 
 	// KeepValues will specify a set of keys for which their values will
 	// not be obfuscated.
-	KeepValues []string `yaml:"keep_values"`
+	KeepValues []string `mapstructure:"keep_values"`
 }
 
 type ReplaceRule struct {
@@ -126,93 +72,79 @@ type ReplaceRule struct {
 	// some exceptions apply such as:
 	// • "resource.name" will target the resource
 	// • "*" will target all tags and the resource
-	Name string `yaml:"name"`
+	Name string `mapstructure:"name"`
 
 	// Pattern specifies the regexp pattern to be used when replacing. It must compile.
-	Pattern string `yaml:"pattern"`
+	Pattern string `mapstructure:"pattern"`
 
 	// Re holds the compiled Pattern and is only used internally.
-	Re *regexp.Regexp `yaml:"-"`
+	Re *regexp.Regexp `mapstructure:"-"`
 
 	// Repl specifies the replacement string to be used when Pattern matches.
-	Repl string `yaml:"repl"`
+	Repl string `mapstructure:"repl"`
 }
 
 type traceWriter struct {
-	MaxSpansPerPayload     int                    `yaml:"max_spans_per_payload"`
-	FlushPeriod            int                    `yaml:"flush_period_seconds"`
-	UpdateInfoPeriod       int                    `yaml:"update_info_period_seconds"`
-	QueueablePayloadSender queueablePayloadSender `yaml:"queue"`
+	MaxSpansPerPayload     int                    `mapstructure:"max_spans_per_payload"`
+	FlushPeriod            int                    `mapstructure:"flush_period_seconds"`
+	UpdateInfoPeriod       int                    `mapstructure:"update_info_period_seconds"`
+	QueueablePayloadSender queueablePayloadSender `mapstructure:"queue"`
 }
 
 type serviceWriter struct {
-	UpdateInfoPeriod       int                    `yaml:"update_info_period_seconds"`
-	FlushPeriod            int                    `yaml:"flush_period_seconds"`
-	QueueablePayloadSender queueablePayloadSender `yaml:"queue"`
+	UpdateInfoPeriod       int                    `mapstructure:"update_info_period_seconds"`
+	FlushPeriod            int                    `mapstructure:"flush_period_seconds"`
+	QueueablePayloadSender queueablePayloadSender `mapstructure:"queue"`
 }
 
 type statsWriter struct {
-	MaxEntriesPerPayload   int                    `yaml:"max_entries_per_payload"`
-	UpdateInfoPeriod       int                    `yaml:"update_info_period_seconds"`
-	QueueablePayloadSender queueablePayloadSender `yaml:"queue"`
+	MaxEntriesPerPayload   int                    `mapstructure:"max_entries_per_payload"`
+	UpdateInfoPeriod       int                    `mapstructure:"update_info_period_seconds"`
+	QueueablePayloadSender queueablePayloadSender `mapstructure:"queue"`
 }
 
 type queueablePayloadSender struct {
-	MaxAge            int   `yaml:"max_age_seconds"`
-	MaxQueuedBytes    int64 `yaml:"max_bytes"`
-	MaxQueuedPayloads int   `yaml:"max_payloads"`
-	BackoffDuration   int   `yaml:"exp_backoff_max_duration_seconds"`
-	BackoffBase       int   `yaml:"exp_backoff_base_milliseconds"`
-	BackoffGrowth     int   `yaml:"exp_backoff_growth_base"`
+	MaxAge            int   `mapstructure:"max_age_seconds"`
+	MaxQueuedBytes    int64 `mapstructure:"max_bytes"`
+	MaxQueuedPayloads int   `mapstructure:"max_payloads"`
+	BackoffDuration   int   `mapstructure:"exp_backoff_max_duration_seconds"`
+	BackoffBase       int   `mapstructure:"exp_backoff_base_milliseconds"`
+	BackoffGrowth     int   `mapstructure:"exp_backoff_growth_base"`
 }
 
-// newYamlFromBytes returns a new YamlAgentConfig for the provided byte array.
-func newYamlFromBytes(bytes []byte) (*YamlAgentConfig, error) {
-	var yamlConf YamlAgentConfig
-
-	if err := yaml.Unmarshal(bytes, &yamlConf); err != nil {
-		return nil, fmt.Errorf("failed to parse yaml configuration: %s", err)
+func (c *AgentConfig) loadYamlConfig(path string) error {
+	config.Datadog.SetConfigFile(path)
+	if err := config.Load(); err != nil {
+		return err
 	}
-	return &yamlConf, nil
-}
 
-// NewYamlIfExists returns a new YamlAgentConfig if the given configPath is exists.
-func NewYaml(configPath string) (*YamlAgentConfig, error) {
-	fileContent, err := ioutil.ReadFile(configPath)
-	if err != nil {
-		return nil, err
-	}
-	return newYamlFromBytes(fileContent)
-}
-
-func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 	if len(c.Endpoints) == 0 {
 		c.Endpoints = []*Endpoint{{}}
 	}
+	if config.Datadog.IsSet("api_key") {
+		c.Endpoints[0].APIKey = config.Datadog.GetString("api_key")
+	}
+	if config.Datadog.IsSet("hostname") {
+		c.Hostname = config.Datadog.GetString("hostname")
+	}
+	if config.Datadog.IsSet("log_level") {
+		c.LogLevel = config.Datadog.GetString("log_level")
+	}
+	if config.Datadog.IsSet("dogstatsd_port") {
+		c.StatsdPort = config.Datadog.GetInt("dogstatsd_port")
+	}
 
-	if yc.APIKey != "" {
-		c.Endpoints[0].APIKey = yc.APIKey
+	site := config.Datadog.GetString("site")
+	if site != "" {
+		c.Endpoints[0].Host = apiEndpointPrefix + site
 	}
-	if yc.HostName != "" {
-		c.Hostname = yc.HostName
-	}
-	if yc.LogLevel != "" {
-		c.LogLevel = yc.LogLevel
-	}
-	if yc.StatsdPort > 0 {
-		c.StatsdPort = yc.StatsdPort
-	}
-
-	if yc.Site != "" {
-		c.Endpoints[0].Host = apiEndpointPrefix + yc.Site
-	}
-	if host := yc.TraceAgent.Endpoint; host != "" {
+	if host := config.Datadog.GetString("apm_config.apm_dd_url"); host != "" {
 		c.Endpoints[0].Host = host
-		if yc.Site != "" {
+		if site != "" {
 			log.Infof("'site' and 'apm_dd_url' are both set, using endpoint: %q", host)
 		}
 	}
-	for url, keys := range yc.TraceAgent.AdditionalEndpoints {
+	for url, keys := range config.Datadog.GetStringMapStringSlice("apm_config.additional_endpoints") {
 		if len(keys) == 0 {
 			log.Errorf("'additional_endpoints' entries must have at least one API key present")
 			continue
@@ -222,121 +154,136 @@ func (c *AgentConfig) loadYamlConfig(yc *YamlAgentConfig) {
 		}
 	}
 
-	noProxy := make(map[string]bool, len(yc.Proxy.NoProxy))
-	for _, host := range yc.Proxy.NoProxy {
+	proxyList := config.Datadog.GetStringSlice("proxy.no_proxy")
+	noProxy := make(map[string]bool, len(proxyList))
+	for _, host := range proxyList {
 		// map of hosts that need to be skipped by proxy
 		noProxy[host] = true
 	}
 	for _, e := range c.Endpoints {
 		e.NoProxy = noProxy[e.Host]
 	}
-
-	if yc.Proxy.HTTPS != "" {
-		url, err := url.Parse(yc.Proxy.HTTPS)
+	if addr := config.Datadog.GetString("proxy.https"); addr != "" {
+		url, err := url.Parse(addr)
 		if err == nil {
 			c.ProxyURL = url
 		} else {
 			log.Errorf("Failed to parse proxy URL from proxy.https configuration: %s", err)
 		}
 	}
-	if yc.SkipSSLValidation != nil {
-		c.SkipSSLValidation = *yc.SkipSSLValidation
+
+	if config.Datadog.IsSet("skip_ssl_validation") {
+		c.SkipSSLValidation = config.Datadog.GetBool("skip_ssl_validation")
+	}
+	if config.Datadog.IsSet("apm_config.enabled") {
+		c.Enabled = config.Datadog.GetBool("apm_config.enabled")
+	}
+	if config.Datadog.IsSet("apm_config.log_file") {
+		c.LogFilePath = config.Datadog.GetString("apm_config.log_file")
+	}
+	if config.Datadog.IsSet("apm_config.env") {
+		c.DefaultEnv = config.Datadog.GetString("apm_config.env")
+	}
+	if config.Datadog.IsSet("apm_config.receiver_port") {
+		c.ReceiverPort = config.Datadog.GetInt("apm_config.receiver_port")
+	}
+	if config.Datadog.IsSet("apm_config.connection_limit") {
+		c.ConnectionLimit = config.Datadog.GetInt("apm_config.connection_limit")
+	}
+	if config.Datadog.IsSet("apm_config.extra_sample_rate") {
+		c.ExtraSampleRate = config.Datadog.GetFloat64("apm_config.extra_sample_rate")
+	}
+	if config.Datadog.IsSet("apm_config.max_events_per_second") {
+		c.MaxEPS = config.Datadog.GetFloat64("apm_config.max_events_per_second")
+	}
+	if config.Datadog.IsSet("apm_config.max_traces_per_second") {
+		c.MaxTPS = config.Datadog.GetFloat64("apm_config.max_traces_per_second")
+	}
+	if config.Datadog.IsSet("apm_config.ignore_resources") {
+		c.Ignore["resource"] = config.Datadog.GetStringSlice("apm_config.ignore_resources")
 	}
 
-	if yc.TraceAgent.Enabled != nil {
-		c.Enabled = *yc.TraceAgent.Enabled
-	}
-
-	if yc.TraceAgent.LogFilePath != "" {
-		c.LogFilePath = yc.TraceAgent.LogFilePath
-	}
-
-	if yc.TraceAgent.Env != "" {
-		c.DefaultEnv = model.NormalizeTag(yc.TraceAgent.Env)
-	}
-
-	if yc.TraceAgent.ReceiverPort > 0 {
-		c.ReceiverPort = yc.TraceAgent.ReceiverPort
-	}
-
-	if yc.TraceAgent.ConnectionLimit > 0 {
-		c.ConnectionLimit = yc.TraceAgent.ConnectionLimit
-	}
-
-	if yc.TraceAgent.ExtraSampleRate > 0 {
-		c.ExtraSampleRate = yc.TraceAgent.ExtraSampleRate
-	}
-	if yc.TraceAgent.MaxTracesPerSecond > 0 {
-		c.MaxTPS = yc.TraceAgent.MaxTracesPerSecond
-	}
-	if yc.TraceAgent.MaxEventsPerSecond > 0 {
-		c.MaxEPS = yc.TraceAgent.MaxEventsPerSecond
-	}
-
-	if len(yc.TraceAgent.IgnoreResources) > 0 {
-		c.Ignore["resource"] = yc.TraceAgent.IgnoreResources
-	}
-
-	if rt := yc.TraceAgent.ReplaceTags; rt != nil {
-		err := compileReplaceRules(rt)
-		if err != nil {
-			osutil.Exitf("replace_tags: %s", err)
+	if config.Datadog.IsSet("apm_config.replace_tags") {
+		rt := make([]*ReplaceRule, 0)
+		err := config.Datadog.UnmarshalKey("apm_config.replace_tags", &rt)
+		if err == nil {
+			err := compileReplaceRules(rt)
+			if err != nil {
+				osutil.Exitf("replace_tags: %s", err)
+			}
+			c.ReplaceTags = rt
 		}
-		c.ReplaceTags = rt
 	}
 
-	if yc.TraceAgent.APMNonLocalTraffic != nil && *yc.TraceAgent.APMNonLocalTraffic {
-		c.ReceiverHost = "0.0.0.0"
+	if config.Datadog.IsSet("apm_config.apm_non_local_traffic") {
+		if config.Datadog.GetBool("apm_config.apm_non_local_traffic") {
+			c.ReceiverHost = "0.0.0.0"
+		}
 	}
 
-	if o := yc.TraceAgent.Obfuscation; o != nil {
-		c.Obfuscation = o
-
-		if c.Obfuscation.RemoveStackTraces {
-			c.addReplaceRule("error.stack", `(?s).*`, "?")
+	if config.Datadog.IsSet("apm_config.obfuscation") {
+		var o ObfuscationConfig
+		err := config.Datadog.UnmarshalKey("apm_config.obfuscation", &o)
+		if err == nil {
+			c.Obfuscation = &o
+			if c.Obfuscation.RemoveStackTraces {
+				c.addReplaceRule("error.stack", `(?s).*`, "?")
+			}
 		}
 	}
 
 	// undocumented
-	if yc.TraceAgent.WatchdogMaxCPUPct > 0 {
-		c.MaxCPU = yc.TraceAgent.WatchdogMaxCPUPct / 100
+	if config.Datadog.IsSet("apm_config.max_cpu_percent") {
+		c.MaxCPU = config.Datadog.GetFloat64("apm_config.max_cpu_percent") / 100
 	}
-	if yc.TraceAgent.WatchdogMaxMemory > 0 {
-		c.MaxMemory = yc.TraceAgent.WatchdogMaxMemory
+	if config.Datadog.IsSet("apm_config.max_memory") {
+		c.MaxMemory = config.Datadog.GetFloat64("apm_config.max_memory")
 	}
-	if yc.TraceAgent.WatchdogMaxConns > 0 {
-		c.MaxConnections = yc.TraceAgent.WatchdogMaxConns
+	if config.Datadog.IsSet("apm_config.max_connections") {
+		c.MaxConnections = config.Datadog.GetInt("apm_config.max_connections")
 	}
 
 	// undocumented
-	c.ServiceWriterConfig = readServiceWriterConfigYaml(yc.TraceAgent.ServiceWriter)
-	c.StatsWriterConfig = readStatsWriterConfigYaml(yc.TraceAgent.StatsWriter)
-	c.TraceWriterConfig = readTraceWriterConfigYaml(yc.TraceAgent.TraceWriter)
+	c.ServiceWriterConfig = readServiceWriterConfigYaml()
+	c.StatsWriterConfig = readStatsWriterConfigYaml()
+	c.TraceWriterConfig = readTraceWriterConfigYaml()
 
 	// undocumented deprecated
-	c.AnalyzedRateByServiceLegacy = yc.TraceAgent.AnalyzedRateByServiceLegacy
-	if len(yc.TraceAgent.AnalyzedRateByServiceLegacy) > 0 {
-		log.Warn("analyzed_rate_by_service is deprecated, please use analyzed_spans instead")
+	if config.Datadog.IsSet("apm_config.analyzed_rate_by_service") {
+		rateByService := make(map[string]float64)
+		if err := config.Datadog.UnmarshalKey("apm_config.analyzed_rate_by_service", &rateByService); err == nil {
+			c.AnalyzedRateByServiceLegacy = rateByService
+			if len(rateByService) > 0 {
+				log.Warn("analyzed_rate_by_service is deprecated, please use analyzed_spans instead")
+			}
+		}
 	}
 	// undocumeted
-	for key, rate := range yc.TraceAgent.AnalyzedSpans {
-		serviceName, operationName, err := parseServiceAndOp(key)
-		if err != nil {
-			log.Errorf("Error when parsing names", err)
-			continue
-		}
+	if config.Datadog.IsSet("apm_config.analyzed_spans") {
+		rateBySpan := make(map[string]float64)
+		if err := config.Datadog.UnmarshalKey("apm_config.analyzed_spans", &rateBySpan); err == nil {
+			for key, rate := range rateBySpan {
+				serviceName, operationName, err := parseServiceAndOp(key)
+				if err != nil {
+					log.Errorf("Error when parsing names", err)
+					continue
+				}
 
-		if _, ok := c.AnalyzedSpansByService[serviceName]; !ok {
-			c.AnalyzedSpansByService[serviceName] = make(map[string]float64)
+				if _, ok := c.AnalyzedSpansByService[serviceName]; !ok {
+					c.AnalyzedSpansByService[serviceName] = make(map[string]float64)
+				}
+				c.AnalyzedSpansByService[serviceName][operationName] = rate
+			}
 		}
-		c.AnalyzedSpansByService[serviceName][operationName] = rate
 	}
 
 	// undocumented
 	c.DDAgentBin = defaultDDAgentBin
-	if yc.TraceAgent.DDAgentBin != "" {
-		c.DDAgentBin = yc.TraceAgent.DDAgentBin
+	if config.Datadog.IsSet("apm_config.dd_agent_bin") {
+		c.DDAgentBin = config.Datadog.GetString("apm_config.dd_agent_bin")
 	}
+
+	return nil
 }
 
 // addReplaceRule adds the specified replace rule to the agent configuration. If the pattern fails
@@ -354,52 +301,54 @@ func (c *AgentConfig) addReplaceRule(tag, pattern, repl string) {
 	})
 }
 
-func readServiceWriterConfigYaml(yc serviceWriter) writerconfig.ServiceWriterConfig {
+func readServiceWriterConfigYaml() writerconfig.ServiceWriterConfig {
+	w := serviceWriter{}
 	c := writerconfig.DefaultServiceWriterConfig()
 
-	if yc.FlushPeriod > 0 {
-		c.FlushPeriod = getDuration(yc.FlushPeriod)
+	if err := config.Datadog.UnmarshalKey("apm_config.service_writer", &w); err == nil {
+		if w.FlushPeriod > 0 {
+			c.FlushPeriod = getDuration(w.FlushPeriod)
+		}
+		if w.UpdateInfoPeriod > 0 {
+			c.UpdateInfoPeriod = getDuration(w.UpdateInfoPeriod)
+		}
+		c.SenderConfig = readQueueablePayloadSenderConfigYaml(w.QueueablePayloadSender)
 	}
-
-	if yc.UpdateInfoPeriod > 0 {
-		c.UpdateInfoPeriod = getDuration(yc.UpdateInfoPeriod)
-	}
-
-	c.SenderConfig = readQueueablePayloadSenderConfigYaml(yc.QueueablePayloadSender)
 	return c
 }
 
-func readStatsWriterConfigYaml(yc statsWriter) writerconfig.StatsWriterConfig {
+func readStatsWriterConfigYaml() writerconfig.StatsWriterConfig {
+	w := statsWriter{}
 	c := writerconfig.DefaultStatsWriterConfig()
 
-	if yc.MaxEntriesPerPayload > 0 {
-		c.MaxEntriesPerPayload = yc.MaxEntriesPerPayload
+	if err := config.Datadog.UnmarshalKey("apm_config.stats_writer", &w); err == nil {
+		if w.MaxEntriesPerPayload > 0 {
+			c.MaxEntriesPerPayload = w.MaxEntriesPerPayload
+		}
+		if w.UpdateInfoPeriod > 0 {
+			c.UpdateInfoPeriod = getDuration(w.UpdateInfoPeriod)
+		}
+		c.SenderConfig = readQueueablePayloadSenderConfigYaml(w.QueueablePayloadSender)
 	}
-
-	if yc.UpdateInfoPeriod > 0 {
-		c.UpdateInfoPeriod = getDuration(yc.UpdateInfoPeriod)
-	}
-
-	c.SenderConfig = readQueueablePayloadSenderConfigYaml(yc.QueueablePayloadSender)
-
 	return c
 }
 
-func readTraceWriterConfigYaml(yc traceWriter) writerconfig.TraceWriterConfig {
+func readTraceWriterConfigYaml() writerconfig.TraceWriterConfig {
+	w := traceWriter{}
 	c := writerconfig.DefaultTraceWriterConfig()
 
-	if yc.MaxSpansPerPayload > 0 {
-		c.MaxSpansPerPayload = yc.MaxSpansPerPayload
+	if err := config.Datadog.UnmarshalKey("apm_config.trace_writer", &w); err == nil {
+		if w.MaxSpansPerPayload > 0 {
+			c.MaxSpansPerPayload = w.MaxSpansPerPayload
+		}
+		if w.FlushPeriod > 0 {
+			c.FlushPeriod = getDuration(w.FlushPeriod)
+		}
+		if w.UpdateInfoPeriod > 0 {
+			c.UpdateInfoPeriod = getDuration(w.UpdateInfoPeriod)
+		}
+		c.SenderConfig = readQueueablePayloadSenderConfigYaml(w.QueueablePayloadSender)
 	}
-	if yc.FlushPeriod > 0 {
-		c.FlushPeriod = getDuration(yc.FlushPeriod)
-	}
-	if yc.UpdateInfoPeriod > 0 {
-		c.UpdateInfoPeriod = getDuration(yc.UpdateInfoPeriod)
-	}
-
-	c.SenderConfig = readQueueablePayloadSenderConfigYaml(yc.QueueablePayloadSender)
-
 	return c
 }
 

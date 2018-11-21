@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 // Package agent implements the api endpoints for the `/agent` prefix.
 // This group of endpoints is meant to provide high-level functionalities
@@ -13,16 +13,14 @@ package agent
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
-	log "github.com/cihub/seelog"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 
-	apiutil "github.com/DataDog/datadog-agent/pkg/api/util"
-	"github.com/DataDog/datadog-agent/pkg/collector/check"
-	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/embed"
+	"github.com/DataDog/datadog-agent/pkg/autodiscovery/integration"
+	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/embed/jmx"
 	"github.com/DataDog/datadog-agent/pkg/status"
 	"github.com/DataDog/datadog-agent/pkg/util"
 
@@ -30,19 +28,13 @@ import (
 )
 
 func getJMXConfigs(w http.ResponseWriter, r *http.Request) {
-	var err error
-
-	if err := apiutil.Validate(w, r); err != nil {
-		return
-	}
-
 	var ts int
 	queries := r.URL.Query()
 	if timestamps, ok := queries["timestamp"]; ok {
 		ts, _ = strconv.Atoi(timestamps[0])
 	}
 
-	if int64(ts) > embed.JMXConfigCache.GetModified() {
+	if int64(ts) > jmx.GetScheduledConfigsModificationTimestamp() {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
@@ -51,28 +43,11 @@ func getJMXConfigs(w http.ResponseWriter, r *http.Request) {
 	log.Debugf("Getting latest JMX Configs as of: %#v", ts)
 
 	j := map[string]interface{}{}
-	configs := map[string]check.ConfigJSONMap{}
+	configs := map[string]integration.JSONMap{}
 
-	configItems := embed.JMXConfigCache.Items()
-	for name, config := range configItems {
-		m, ok := config.(map[string]interface{})
-		if !ok {
-			err = fmt.Errorf("wrong type in cache")
-			log.Errorf("%s", err.Error())
-			http.Error(w, err.Error(), 500)
-			return
-		}
-
-		cfg, ok := m["config"].(check.Config)
-		if !ok {
-			err = fmt.Errorf("wrong type for config")
-			log.Errorf("%s", err.Error())
-			http.Error(w, err.Error(), 500)
-			return
-		}
-
-		var rawInitConfig check.ConfigRawMap
-		err = yaml.Unmarshal(cfg.InitConfig, &rawInitConfig)
+	for name, config := range jmx.GetScheduledConfigs() {
+		var rawInitConfig integration.RawMap
+		err := yaml.Unmarshal(config.InitConfig, &rawInitConfig)
 		if err != nil {
 			log.Errorf("unable to parse JMX configuration: %s", err)
 			http.Error(w, err.Error(), 500)
@@ -81,21 +56,22 @@ func getJMXConfigs(w http.ResponseWriter, r *http.Request) {
 
 		c := map[string]interface{}{}
 		c["init_config"] = util.GetJSONSerializableMap(rawInitConfig)
-		instances := []check.ConfigJSONMap{}
-		for _, instance := range cfg.Instances {
-			var rawInstanceConfig check.ConfigJSONMap
-			err = yaml.Unmarshal(instance, &rawInstanceConfig)
+		instances := []integration.JSONMap{}
+		for _, instance := range config.Instances {
+			var rawInstanceConfig integration.JSONMap
+			err := yaml.Unmarshal(instance, &rawInstanceConfig)
 			if err != nil {
 				log.Errorf("unable to parse JMX configuration: %s", err)
 				http.Error(w, err.Error(), 500)
 				return
 			}
-			instances = append(instances, util.GetJSONSerializableMap(rawInstanceConfig).(check.ConfigJSONMap))
+			instances = append(instances, util.GetJSONSerializableMap(rawInstanceConfig).(integration.JSONMap))
 		}
 
 		c["instances"] = instances
-		configs[name] = c
+		c["check_name"] = config.Name
 
+		configs[name] = c
 	}
 	j["configs"] = configs
 	j["timestamp"] = time.Now().Unix()
@@ -109,10 +85,6 @@ func getJMXConfigs(w http.ResponseWriter, r *http.Request) {
 }
 
 func setJMXStatus(w http.ResponseWriter, r *http.Request) {
-	if err := apiutil.Validate(w, r); err != nil {
-		return
-	}
-
 	decoder := json.NewDecoder(r.Body)
 
 	var jmxStatus status.JMXStatus

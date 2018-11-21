@@ -1,7 +1,7 @@
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
-// Copyright 2017 Datadog, Inc.
+// Copyright 2018 Datadog, Inc.
 
 package app
 
@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/DataDog/datadog-agent/cmd/agent/common"
+	"github.com/DataDog/datadog-agent/pkg/api/util"
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/spf13/cobra"
 )
@@ -33,10 +34,10 @@ var listCheckCommand = &cobra.Command{
 
 // query for the version
 func doListChecks() error {
-	c := common.GetClient(false) // FIX: get certificates right then make this true
+	c := util.GetClient(false) // FIX: get certificates right then make this true
 	urlstr := fmt.Sprintf("https://localhost:%v/check/", config.Datadog.GetInt("cmd_port"))
 
-	body, e := common.DoGet(c, urlstr)
+	body, e := util.DoGet(c, urlstr)
 	if e != nil {
 		fmt.Printf("Error getting version string: %s\n", e)
 		return e
