@@ -194,7 +194,7 @@ func TestFullYamlConfig(t *testing.T) {
 		noProxy = false
 	}
 
-	assert.Equal([]*Endpoint{
+	assert.ElementsMatch([]*Endpoint{
 		{Host: "https://datadog.unittests", APIKey: "api_key_test"},
 		{Host: "https://my1.endpoint.com", APIKey: "apikey1"},
 		{Host: "https://my1.endpoint.com", APIKey: "apikey2"},
