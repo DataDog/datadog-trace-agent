@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/config"
+	"github.com/DataDog/datadog-trace-agent/writer/backoff"
+	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -148,12 +150,87 @@ func TestFullIniConfig(t *testing.T) {
 	assert.Equal(false, c.Enabled)
 	assert.Equal("test", c.DefaultEnv)
 	assert.Equal(18126, c.ReceiverPort)
+	assert.Equal(18125, c.StatsdPort)
 	assert.Equal(0.5, c.ExtraSampleRate)
 	assert.Equal(5.0, c.MaxTPS)
 	assert.Equal(50.0, c.MaxEPS)
 	assert.Equal("0.0.0.0", c.ReceiverHost)
+	assert.Equal("0.0.0.0", c.StatsdHost)
+	assert.Equal("/path/to/file", c.LogFilePath)
+	assert.Equal("debug", c.LogLevel)
+	assert.False(c.LogThrottlingEnabled)
+	assert.True(c.SkipSSLValidation)
 
+	assert.Equal(map[string]float64{
+		"service1": 1.1,
+		"service2": 1.2,
+	}, c.AnalyzedRateByServiceLegacy)
+
+	assert.Equal(map[string]map[string]float64{
+		"service3": map[string]float64{
+			"op3": 1.3,
+		},
+		"service4": map[string]float64{
+			"op4": 1.4,
+			"op5": 1.5,
+		},
+	}, c.AnalyzedSpansByService)
+
+	assert.Equal(5*time.Second, c.BucketInterval)
+	assert.Equal([]string{"http.status_code", "a", "b", "c"}, c.ExtraAggregators)
+	assert.Equal(2000, c.ConnectionLimit)
+	assert.Equal(4, c.ReceiverTimeout)
+	assert.Equal(1234.5, c.MaxMemory)
+	assert.Equal(.85, c.MaxCPU)
+	assert.Equal(40, c.MaxConnections)
+	assert.Equal(5*time.Second, c.WatchdogInterval)
 	assert.EqualValues([]string{"/health", "/500"}, c.Ignore["resource"])
+
+	assert.Equal(writerconfig.ServiceWriterConfig{
+		FlushPeriod:      time.Second,
+		UpdateInfoPeriod: time.Second,
+		SenderConfig: writerconfig.QueuablePayloadSenderConf{
+			MaxAge:            time.Second,
+			MaxQueuedBytes:    456,
+			MaxQueuedPayloads: 4,
+			ExponentialBackoff: backoff.ExponentialConfig{
+				MaxDuration: 4 * time.Second,
+				GrowthBase:  2,
+				Base:        1000000,
+			},
+		},
+	}, c.ServiceWriterConfig)
+
+	assert.Equal(writerconfig.StatsWriterConfig{
+		MaxEntriesPerPayload: 10,
+		UpdateInfoPeriod:     2 * time.Second,
+		SenderConfig: writerconfig.QueuablePayloadSenderConf{
+			MaxAge:            time.Second,
+			MaxQueuedBytes:    456,
+			MaxQueuedPayloads: 4,
+			ExponentialBackoff: backoff.ExponentialConfig{
+				MaxDuration: 4 * time.Second,
+				GrowthBase:  2,
+				Base:        1000000,
+			},
+		},
+	}, c.StatsWriterConfig)
+
+	assert.Equal(writerconfig.TraceWriterConfig{
+		MaxSpansPerPayload: 100,
+		FlushPeriod:        3 * time.Second,
+		UpdateInfoPeriod:   2 * time.Second,
+		SenderConfig: writerconfig.QueuablePayloadSenderConf{
+			MaxAge:            time.Second,
+			MaxQueuedBytes:    456,
+			MaxQueuedPayloads: 4,
+			ExponentialBackoff: backoff.ExponentialConfig{
+				MaxDuration: 4 * time.Second,
+				GrowthBase:  2,
+				Base:        1000000,
+			},
+		},
+	}, c.TraceWriterConfig)
 }
 
 func TestFullYamlConfig(t *testing.T) {
