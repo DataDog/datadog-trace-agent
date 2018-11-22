@@ -1,10 +1,12 @@
 package config
 
 import (
+	"encoding/csv"
 	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/config"
@@ -112,12 +114,7 @@ type queueablePayloadSender struct {
 	BackoffGrowth     int   `mapstructure:"exp_backoff_growth_base"`
 }
 
-func (c *AgentConfig) loadYamlConfig(path string) error {
-	config.Datadog.SetConfigFile(path)
-	if err := config.Load(); err != nil {
-		return err
-	}
-
+func (c *AgentConfig) applyConfig() error {
 	if len(c.Endpoints) == 0 {
 		c.Endpoints = []*Endpoint{{}}
 	}
@@ -256,34 +253,35 @@ func (c *AgentConfig) loadYamlConfig(path string) error {
 	// undocumented deprecated
 	if config.Datadog.IsSet("apm_config.analyzed_rate_by_service") {
 		rateByService := make(map[string]float64)
-		if err := config.Datadog.UnmarshalKey("apm_config.analyzed_rate_by_service", &rateByService); err == nil {
-			c.AnalyzedRateByServiceLegacy = rateByService
-			if len(rateByService) > 0 {
-				log.Warn("analyzed_rate_by_service is deprecated, please use analyzed_spans instead")
-			}
+		if err := config.Datadog.UnmarshalKey("apm_config.analyzed_rate_by_service", &rateByService); err != nil {
+			return err
+		}
+		c.AnalyzedRateByServiceLegacy = rateByService
+		if len(rateByService) > 0 {
+			log.Warn("analyzed_rate_by_service is deprecated, please use analyzed_spans instead")
 		}
 	}
 	// undocumeted
 	if config.Datadog.IsSet("apm_config.analyzed_spans") {
 		rateBySpan := make(map[string]float64)
-		if err := config.Datadog.UnmarshalKey("apm_config.analyzed_spans", &rateBySpan); err == nil {
-			for key, rate := range rateBySpan {
-				serviceName, operationName, err := parseServiceAndOp(key)
-				if err != nil {
-					log.Errorf("Error when parsing names", err)
-					continue
-				}
-
-				if _, ok := c.AnalyzedSpansByService[serviceName]; !ok {
-					c.AnalyzedSpansByService[serviceName] = make(map[string]float64)
-				}
-				c.AnalyzedSpansByService[serviceName][operationName] = rate
+		if err := config.Datadog.UnmarshalKey("apm_config.analyzed_spans", &rateBySpan); err != nil {
+			return err
+		}
+		for key, rate := range rateBySpan {
+			serviceName, operationName, err := parseServiceAndOp(key)
+			if err != nil {
+				log.Errorf("Error when parsing names", err)
+				continue
 			}
+
+			if _, ok := c.AnalyzedSpansByService[serviceName]; !ok {
+				c.AnalyzedSpansByService[serviceName] = make(map[string]float64)
+			}
+			c.AnalyzedSpansByService[serviceName][operationName] = rate
 		}
 	}
 
 	// undocumented
-	c.DDAgentBin = defaultDDAgentBin
 	if config.Datadog.IsSet("apm_config.dd_agent_bin") {
 		c.DDAgentBin = config.Datadog.GetString("apm_config.dd_agent_bin")
 	}
@@ -302,8 +300,12 @@ func (c *AgentConfig) loadDeprecatedValues() error {
 	if cfg.IsSet("apm_config.log_level") {
 		c.LogLevel = config.Datadog.GetString("apm_config.log_level")
 	}
-	if v := cfg.GetStringSlice("apm_config.extra_aggregators"); len(v) > 0 {
-		c.ExtraAggregators = append(c.ExtraAggregators, v...)
+	if v := cfg.GetString("apm_config.extra_aggregators"); len(v) > 0 {
+		aggs, err := splitString(v, ',')
+		if err != nil {
+			return err
+		}
+		c.ExtraAggregators = append(c.ExtraAggregators, aggs...)
 	}
 	if !cfg.GetBool("apm_config.log_throttling") {
 		c.LogThrottlingEnabled = false
@@ -446,4 +448,21 @@ func compileReplaceRules(rules []*ReplaceRule) error {
 // getDuration returns the duration of the provided value in seconds
 func getDuration(seconds int) time.Duration {
 	return time.Duration(seconds) * time.Second
+}
+
+func parseServiceAndOp(name string) (string, string, error) {
+	splits := strings.Split(name, "|")
+	if len(splits) != 2 {
+		return "", "", fmt.Errorf("Bad format for operation name and service name in: %s, it should have format: service_name|operation_name", name)
+	}
+	return splits[0], splits[1], nil
+}
+
+func splitString(s string, sep rune) ([]string, error) {
+	r := csv.NewReader(strings.NewReader(s))
+	r.TrimLeadingSpace = true
+	r.LazyQuotes = true
+	r.Comma = sep
+
+	return r.Read()
 }
