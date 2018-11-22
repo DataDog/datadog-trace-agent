@@ -1,0 +1,12 @@
+# files
+.DS_Store
+.vscode
+*.cov
+*.pyc
+*.swp
+*.exe
+*.syso
+*.log
+
+# jetbrains IDE directory
+/.idea/

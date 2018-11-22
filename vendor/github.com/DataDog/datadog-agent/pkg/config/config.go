@@ -114,6 +114,7 @@ func initConfig(config Config) {
 	config.BindEnvAndSetDefault("check_runners", int64(4))
 	config.BindEnvAndSetDefault("auth_token_file_path", "")
 	config.BindEnvAndSetDefault("bind_host", "localhost")
+	config.BindEnvAndSetDefault("health_port", int64(0))
 
 	// if/when the default is changed to true, make the default platform
 	// dependent; default should remain false on Windows to maintain backward
@@ -249,6 +250,7 @@ func initConfig(config Config) {
 	config.BindEnvAndSetDefault("cluster_agent.auth_token", "")
 	config.BindEnvAndSetDefault("cluster_agent.url", "")
 	config.BindEnvAndSetDefault("cluster_agent.kubernetes_service_name", "datadog-cluster-agent")
+	config.BindEnvAndSetDefault("metrics_port", "5000")
 
 	// ECS
 	config.BindEnvAndSetDefault("ecs_agent_url", "") // Will be autodetected
@@ -283,8 +285,6 @@ func initConfig(config Config) {
 	config.BindEnvAndSetDefault("log_enabled", false) // deprecated, use logs_enabled instead
 	// collect all logs from all containers:
 	config.BindEnvAndSetDefault("logs_config.container_collect_all", false)
-	// collect all logs forwarded by TCP on a specific port:
-	config.BindEnvAndSetDefault("logs_config.tcp_forward_port", -1)
 	// add a socks5 proxy:
 	config.BindEnvAndSetDefault("logs_config.socks5_proxy_address", "")
 	// send the logs to a proxy:
@@ -318,17 +318,20 @@ func initConfig(config Config) {
 	config.BindEnvAndSetDefault("hpa_watcher_polling_freq", 10)
 	config.BindEnvAndSetDefault("hpa_watcher_gc_period", 60*5) // 5 minutes
 	config.BindEnvAndSetDefault("external_metrics_provider.enabled", false)
+	config.BindEnvAndSetDefault("external_metrics_provider.port", 443)
 	config.BindEnvAndSetDefault("hpa_configmap_name", "datadog-custom-metrics")
-	config.BindEnvAndSetDefault("external_metrics_provider.refresh_period", 30)
-	config.BindEnvAndSetDefault("external_metrics_provider.batch_window", 10)            // value in seconds. Frequency of batch calls to the configmap persistent store (GlobalStore)
-	config.BindEnvAndSetDefault("external_metrics_provider.max_age", 90)                 // value in seconds. 3 cycles from the HPA controller is enough to consider a metric stale
+	config.BindEnvAndSetDefault("external_metrics_provider.refresh_period", 30)          // value in seconds. Frequency of batch calls to the ConfigMap persistent store (GlobalStore) by the Leader.
+	config.BindEnvAndSetDefault("external_metrics_provider.batch_window", 10)            // value in seconds. Batch the events from the Autoscalers informer to push updates to the ConfigMap (GlobalStore)
+	config.BindEnvAndSetDefault("external_metrics_provider.max_age", 120)                // value in seconds. 4 cycles from the HPA controller (up to Kubernetes 1.11) is enough to consider a metric stale
 	config.BindEnvAndSetDefault("external_metrics.aggregator", "avg")                    // aggregator used for the external metrics. Choose from [avg,sum,max,min]
-	config.BindEnvAndSetDefault("external_metrics_provider.bucket_size", 60*5)           // Window of the metric from Datadog
+	config.BindEnvAndSetDefault("external_metrics_provider.bucket_size", 60*5)           // Window to query to get the metric from Datadog.
+	config.BindEnvAndSetDefault("external_metrics_provider.rollup", 30)                  // Bucket size to circumvent time aggregation side effects.
 	config.BindEnvAndSetDefault("kubernetes_informers_resync_period", 60*5)              // value in seconds. Default to 5 minutes
 	config.BindEnvAndSetDefault("kubernetes_informers_restclient_timeout", 60)           // value in seconds
 	config.BindEnvAndSetDefault("external_metrics_provider.local_copy_refresh_rate", 30) // value in seconds
 	// Cluster check Autodiscovery
 	config.BindEnvAndSetDefault("cluster_checks.enabled", false)
+	config.BindEnvAndSetDefault("cluster_checks.node_expiration_timeout", 30) // value in seconds
 
 	setAssetFs(config)
 }

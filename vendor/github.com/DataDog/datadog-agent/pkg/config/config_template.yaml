@@ -127,6 +127,11 @@ api_key:
 # Default is '5002' on Windows and macOS ; turned off on Linux
 # GUI_port: -1
 
+# The agent can expose its health check on a dedicated http port.
+# This is useful for orchestrators that support http probes.
+# Default is 0 (disabled), set a valid port number (eg. 5555) to enable.
+# health_port: 0
+
 # The `check_runners` refers to the number of concurrent check runners available
 # for check instance execution. The scheduler will attempt to spread the
 # instances over the collection interval and will _at most_ be running the
@@ -475,6 +480,20 @@ api_key:
 # ad_config_poll_interval: 10
 #
 {{ end -}}
+{{- if .ClusterChecks }}
+# Cluster check dispatching
+#
+# The cluster-agent is able to autodiscover cluster resources and dispatch checks on
+# the node-agents (provided the clustercheck config provider is enabled on them).
+#
+# cluster_checks:
+#   Set to true to enable the dispatching logic on the leader cluster-agent.
+#   enabled: "true"
+#   Node-agents that have not queried the cluster-agent for 30 seconds will be deleted,
+#   and their checks re-dispatched to other nodes. This delay is configurable here.
+#   node_expiration_timeout: 30
+#
+{{ end -}}
 {{- if .DockerTagging }}
 # Docker tag extraction
 #
@@ -641,6 +660,18 @@ api_key:
 #   dd_agent_bin:
 #   Overrides of the environment we pass to fetch the hostname. The default is usually fine.
 #   dd_agent_env:
+{{ end -}}
+
+{{- if .NetworkTracer }}
+# Network tracer specific settings
+#
+# network_tracer_config:
+#   A boolean indicating the enabled state of the network tracer.
+#   enabled: true
+#   The full path to the location of the unix socket where network traces will be accessed
+#   nettracer_socket: /opt/datadog-agent/run/nettracer.sock
+#   The full path to the file where network-tracer logs will be written.
+#   log_file: /var/log/datadog/network-tracer.log
 {{ end -}}
 
 {{- if .TraceAgent }}
