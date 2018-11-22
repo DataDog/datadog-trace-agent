@@ -4,14 +4,15 @@ package cpu
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"os/exec"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/shirou/gopsutil/internal/common"
+	"golang.org/x/sys/unix"
 )
 
 // sys/sched.h
@@ -26,9 +27,9 @@ const (
 
 // sys/sysctl.h
 const (
-	CTLKern          = 1  // "high kernel": proc, limits
-	KernCptime	 = 40 // KERN_CPTIME
-	KernCptime2      = 71 // KERN_CPTIME2
+	CTLKern     = 1  // "high kernel": proc, limits
+	KernCptime  = 40 // KERN_CPTIME
+	KernCptime2 = 71 // KERN_CPTIME2
 )
 
 var ClocksPerSec = float64(128)
@@ -49,6 +50,10 @@ func init() {
 }
 
 func Times(percpu bool) ([]TimesStat, error) {
+	return TimesWithContext(context.Background(), percpu)
+}
+
+func TimesWithContext(ctx context.Context, percpu bool) ([]TimesStat, error) {
 	var ret []TimesStat
 
 	var ncpu int
@@ -79,7 +84,7 @@ func Times(percpu bool) ([]TimesStat, error) {
 		c := TimesStat{
 			User:   float64(cpuTimes[CPUser]) / ClocksPerSec,
 			Nice:   float64(cpuTimes[CPNice]) / ClocksPerSec,
-			System: float64(cpuTimes[CPSys])  / ClocksPerSec,
+			System: float64(cpuTimes[CPSys]) / ClocksPerSec,
 			Idle:   float64(cpuTimes[CPIdle]) / ClocksPerSec,
 			Irq:    float64(cpuTimes[CPIntr]) / ClocksPerSec,
 		}
@@ -96,11 +101,15 @@ func Times(percpu bool) ([]TimesStat, error) {
 
 // Returns only one (minimal) CPUInfoStat on OpenBSD
 func Info() ([]InfoStat, error) {
+	return InfoWithContext(context.Background())
+}
+
+func InfoWithContext(ctx context.Context) ([]InfoStat, error) {
 	var ret []InfoStat
 
 	c := InfoStat{}
 
-	v, err := syscall.Sysctl("hw.model")
+	v, err := unix.Sysctl("hw.model")
 	if err != nil {
 		return nil, err
 	}

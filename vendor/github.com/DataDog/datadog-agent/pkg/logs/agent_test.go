@@ -15,10 +15,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
+	coreConfig "github.com/DataDog/datadog-agent/pkg/config"
+	"github.com/DataDog/datadog-agent/pkg/logs/client"
+	"github.com/DataDog/datadog-agent/pkg/logs/client/mock"
+
 	"github.com/DataDog/datadog-agent/pkg/logs/config"
 	"github.com/DataDog/datadog-agent/pkg/logs/metrics"
-	"github.com/DataDog/datadog-agent/pkg/logs/sender"
-	"github.com/DataDog/datadog-agent/pkg/logs/sender/mock"
 	"github.com/DataDog/datadog-agent/pkg/logs/service"
 )
 
@@ -52,9 +54,9 @@ func (suite *AgentTestSuite) SetupTest() {
 	}
 	suite.source = config.NewLogSource("", &logConfig)
 
-	config.LogsAgent.Set("logs_config.run_path", suite.testDir)
+	coreConfig.Datadog.Set("logs_config.run_path", suite.testDir)
 	// Shorter grace period for tests.
-	config.LogsAgent.Set("logs_config.stop_grace_period", 1)
+	coreConfig.Datadog.Set("logs_config.stop_grace_period", 1)
 }
 
 func (suite *AgentTestSuite) TearDownTest() {
@@ -65,9 +67,10 @@ func (suite *AgentTestSuite) TearDownTest() {
 	metrics.LogsProcessed.Set(0)
 	metrics.LogsSent.Set(0)
 	metrics.DestinationErrors.Set(0)
+	metrics.DestinationLogsDropped.Init()
 }
 
-func createAgent(endpoints *config.Endpoints) (*Agent, *config.LogSources, *service.Services) {
+func createAgent(endpoints *client.Endpoints) (*Agent, *config.LogSources, *service.Services) {
 	// setup the sources and the services
 	sources := config.NewLogSources()
 	services := service.NewServices()
@@ -81,8 +84,8 @@ func (suite *AgentTestSuite) TestAgent() {
 	l := mock.NewMockLogsIntake(suite.T())
 	defer l.Close()
 
-	endpoint := sender.AddrToEndPoint(l.Addr())
-	endpoints := config.NewEndpoints(endpoint, nil)
+	endpoint := client.AddrToEndPoint(l.Addr())
+	endpoints := client.NewEndpoints(endpoint, nil)
 
 	agent, sources, _ := createAgent(endpoints)
 
@@ -91,6 +94,7 @@ func (suite *AgentTestSuite) TestAgent() {
 	assert.Equal(suite.T(), zero, metrics.LogsProcessed.Value())
 	assert.Equal(suite.T(), zero, metrics.LogsSent.Value())
 	assert.Equal(suite.T(), zero, metrics.DestinationErrors.Value())
+	assert.Equal(suite.T(), "{}", metrics.DestinationLogsDropped.String())
 
 	agent.Start()
 	sources.AddSource(suite.source)
@@ -109,8 +113,8 @@ func (suite *AgentTestSuite) TestAgent() {
 }
 
 func (suite *AgentTestSuite) TestAgentStopsWithWrongBackend() {
-	endpoint := config.Endpoint{Host: "fake:", Port: 0}
-	endpoints := config.NewEndpoints(endpoint, nil)
+	endpoint := client.Endpoint{Host: "fake:", Port: 0}
+	endpoints := client.NewEndpoints(endpoint, nil)
 
 	agent, sources, _ := createAgent(endpoints)
 
@@ -123,7 +127,32 @@ func (suite *AgentTestSuite) TestAgentStopsWithWrongBackend() {
 	assert.Equal(suite.T(), suite.fakeLogs, metrics.LogsDecoded.Value())
 	assert.Equal(suite.T(), suite.fakeLogs, metrics.LogsProcessed.Value())
 	assert.Equal(suite.T(), int64(0), metrics.LogsSent.Value())
+	assert.Equal(suite.T(), "{}", metrics.DestinationLogsDropped.String())
 	assert.True(suite.T(), metrics.DestinationErrors.Value() > 0)
+}
+
+func (suite *AgentTestSuite) TestAgentStopsWithWrongAdditionalBackend() {
+	l := mock.NewMockLogsIntake(suite.T())
+	defer l.Close()
+
+	endpoint := client.AddrToEndPoint(l.Addr())
+	additionalEndpoint := client.Endpoint{Host: "still_fake", Port: 0}
+
+	endpoints := client.NewEndpoints(endpoint, []client.Endpoint{additionalEndpoint})
+
+	agent, sources, _ := createAgent(endpoints)
+
+	agent.Start()
+	sources.AddSource(suite.source)
+	// Give the tailer some time to start its job.
+	time.Sleep(10 * time.Millisecond)
+	agent.Stop()
+
+	assert.Equal(suite.T(), suite.fakeLogs, metrics.LogsDecoded.Value())
+	assert.Equal(suite.T(), suite.fakeLogs, metrics.LogsProcessed.Value())
+	assert.Equal(suite.T(), int64(2), metrics.LogsSent.Value())
+	assert.Equal(suite.T(), int64(0), metrics.DestinationErrors.Value())
+	assert.Equal(suite.T(), "{\"still_fake\": 0}", metrics.DestinationLogsDropped.String())
 }
 
 func TestAgentTestSuite(t *testing.T) {
