@@ -205,7 +205,7 @@ func (c *AgentConfig) acquireHostname() error {
 // and a valid configuration can be returned based on defaults and environment variables. If a
 // valid configuration can not be obtained, an error is returned.
 func Load(path string) (*AgentConfig, error) {
-	cfg, err := loadConfig(path)
+	cfg, err := prepareConfig(path)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return nil, err
@@ -213,12 +213,12 @@ func Load(path string) (*AgentConfig, error) {
 	} else {
 		log.Infof("Loaded configuration: %s", cfg.ConfigPath)
 	}
-	cfg.applyConfig()
+	cfg.applyDatadogConfig()
 	cfg.loadEnv()
 	return cfg, cfg.validate()
 }
 
-func loadConfig(path string) (*AgentConfig, error) {
+func prepareConfig(path string) (*AgentConfig, error) {
 	cfgPath := path
 	if cfgPath == flags.DefaultConfigPath && !osutil.Exists(cfgPath) && osutil.Exists(agent5Config) {
 		// attempting to load inexistent default path, but found existing Agent 5
