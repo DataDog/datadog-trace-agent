@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"os"
 	"regexp"
 	"runtime"
 	"strings"
@@ -367,6 +368,9 @@ func TestSampling(t *testing.T) {
 }
 
 func TestEventProcessorFromConf(t *testing.T) {
+	if _, ok := os.LookupEnv("INTEGRATION"); !ok {
+		t.Skip("set INTEGRATION environment variable to run")
+	}
 	if testing.Short() {
 		return
 	}
@@ -413,8 +417,8 @@ func TestEventProcessorFromConf(t *testing.T) {
 }
 
 func TestEventProcessorFromConfLegacy(t *testing.T) {
-	if testing.Short() {
-		return
+	if _, ok := os.LookupEnv("INTEGRATION"); !ok {
+		t.Skip("set INTEGRATION environment variable to run")
 	}
 
 	testMaxEPS := 100.
@@ -438,7 +442,7 @@ func TestEventProcessorFromConfLegacy(t *testing.T) {
 		{name: "metrics/overrides/legacy", intakeSPS: 100, serviceName: "serviceC", opName: "opC", extractionRate: 1, priority: model.PriorityNone, expectedEPS: 100, deltaPct: 0.1, duration: 10 * time.Second},
 	} {
 		testEventProcessorFromConf(t, &config.AgentConfig{
-			MaxEPS:                      testMaxEPS,
+			MaxEPS: testMaxEPS,
 			AnalyzedRateByServiceLegacy: rateByService,
 		}, testCase)
 	}
