@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/rand"
 	"strings"
 	"testing"
 	"time"
@@ -215,6 +216,7 @@ func TestStatsWriter_BuildPayloads(t *testing.T) {
 	})
 
 	t.Run("common case, with duplicate entries", func(t *testing.T) {
+		rand.Seed(55)
 		assert := assert.New(t)
 
 		sw, _, _, _ := testStatsWriter()
@@ -278,6 +280,7 @@ func TestStatsWriter_BuildPayloads(t *testing.T) {
 	})
 
 	t.Run("no need for split", func(t *testing.T) {
+		rand.Seed(1)
 		assert := assert.New(t)
 
 		sw, _, _, _ := testStatsWriter()
