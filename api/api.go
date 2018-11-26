@@ -62,7 +62,7 @@ type HTTPReceiver struct {
 
 	services chan model.ServicesMetadata
 	conf     *config.AgentConfig
-	dynConf  *config.DynamicConfig
+	dynConf  *sampler.DynamicConfig
 	server   *http.Server
 
 	maxRequestBodyLength int64
@@ -71,7 +71,7 @@ type HTTPReceiver struct {
 
 // NewHTTPReceiver returns a pointer to a new HTTPReceiver
 func NewHTTPReceiver(
-	conf *config.AgentConfig, dynConf *config.DynamicConfig, out chan model.Trace, services chan model.ServicesMetadata,
+	conf *config.AgentConfig, dynConf *sampler.DynamicConfig, out chan model.Trace, services chan model.ServicesMetadata,
 ) *HTTPReceiver {
 	// use buffered channels so that handlers are not waiting on downstream processing
 	return &HTTPReceiver{

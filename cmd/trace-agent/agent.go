@@ -47,7 +47,7 @@ type Agent struct {
 
 	// config
 	conf    *config.AgentConfig
-	dynConf *config.DynamicConfig
+	dynConf *sampler.DynamicConfig
 
 	// Used to synchronize on a clean exit
 	ctx context.Context
@@ -56,7 +56,7 @@ type Agent struct {
 // NewAgent returns a new Agent object, ready to be started. It takes a context
 // which may be cancelled in order to gracefully stop the agent.
 func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
-	dynConf := config.NewDynamicConfig()
+	dynConf := sampler.NewDynamicConfig()
 
 	// inter-component channels
 	rawTraceChan := make(chan model.Trace, 5000) // about 1000 traces/sec for 5 sec, TODO: move to *model.Trace

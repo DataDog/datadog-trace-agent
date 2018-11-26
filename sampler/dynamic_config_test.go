@@ -1,4 +1,4 @@
-package config
+package sampler
 
 import (
 	"sync"

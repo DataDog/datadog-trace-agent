@@ -17,7 +17,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
 )
 
@@ -33,7 +32,7 @@ type PriorityEngine struct {
 	// Sampler is the underlying sampler used by this engine, sharing logic among various engines.
 	Sampler *Sampler
 
-	rateByService *config.RateByService
+	rateByService *RateByService
 	catalog       serviceKeyCatalog
 	catalogMu     sync.Mutex
 
@@ -41,7 +40,7 @@ type PriorityEngine struct {
 }
 
 // NewPriorityEngine returns an initialized Sampler
-func NewPriorityEngine(extraRate float64, maxTPS float64, rateByService *config.RateByService) *PriorityEngine {
+func NewPriorityEngine(extraRate float64, maxTPS float64, rateByService *RateByService) *PriorityEngine {
 	s := &PriorityEngine{
 		Sampler:       newSampler(extraRate, maxTPS),
 		rateByService: rateByService,

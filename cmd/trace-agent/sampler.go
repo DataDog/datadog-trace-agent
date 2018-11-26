@@ -44,7 +44,7 @@ func NewErrorsSampler(conf *config.AgentConfig) *Sampler {
 }
 
 // NewPrioritySampler creates a new empty distributed sampler ready to be started
-func NewPrioritySampler(conf *config.AgentConfig, dynConf *config.DynamicConfig) *Sampler {
+func NewPrioritySampler(conf *config.AgentConfig, dynConf *sampler.DynamicConfig) *Sampler {
 	return &Sampler{
 		engine: sampler.NewPriorityEngine(conf.ExtraSampleRate, conf.MaxTPS, &dynConf.RateByService),
 	}
