@@ -58,8 +58,8 @@ func TestConfigHostname(t *testing.T) {
 		defer cleanConfig()()
 		// hostname from env
 		assert := assert.New(t)
-		err := os.Setenv(envHostname, "onlyenv")
-		defer os.Unsetenv(envHostname)
+		err := os.Setenv("DD_HOSTNAME", "onlyenv")
+		defer os.Unsetenv("DD_HOSTNAME")
 		assert.NoError(err)
 		cfg, err := Load("./testdata/multi_api_keys.ini")
 		assert.NoError(err)
@@ -70,8 +70,8 @@ func TestConfigHostname(t *testing.T) {
 		defer cleanConfig()()
 		// hostname from file, overwritten from env
 		assert := assert.New(t)
-		err := os.Setenv(envHostname, "envoverride")
-		defer os.Unsetenv(envHostname)
+		err := os.Setenv("DD_HOSTNAME", "envoverride")
+		defer os.Unsetenv("DD_HOSTNAME")
 		assert.NoError(err)
 		cfg, err := Load("./testdata/full.yaml")
 		assert.NoError(err)
@@ -112,17 +112,6 @@ func TestDefaultConfig(t *testing.T) {
 	assert.Equal("INFO", c.LogLevel)
 	assert.Equal(true, c.Enabled)
 
-}
-
-func TestOnlyEnvConfig(t *testing.T) {
-	// setting an API Key should be enough to generate valid config
-	os.Setenv("DD_API_KEY", "apikey_from_env")
-
-	c := New()
-	c.loadEnv()
-	assert.Equal(t, "apikey_from_env", c.Endpoints[0].APIKey)
-
-	os.Setenv("DD_API_KEY", "")
 }
 
 func TestOnlyDDAgentConfig(t *testing.T) {
@@ -416,31 +405,4 @@ func TestUndocumentedIni(t *testing.T) {
 	assert.Equal(0.8, c.AnalyzedSpansByService["web"]["http.request"])
 	assert.Equal(0.9, c.AnalyzedSpansByService["web"]["django.request"])
 	assert.Equal(0.05, c.AnalyzedSpansByService["db"]["intake"])
-}
-
-func TestAnalyzedSpansEnvConfig(t *testing.T) {
-	assert := assert.New(t)
-	os.Setenv("DD_APM_ANALYZED_SPANS", "service1|operation1=0.5,service2|operation2=1,service1|operation3=0")
-	defer os.Unsetenv("DD_APM_ANALYZED_SPANS")
-
-	c := New()
-	c.loadEnv()
-
-	assert.Len(c.AnalyzedSpansByService, 2)
-	assert.Len(c.AnalyzedSpansByService["service1"], 2)
-	assert.Len(c.AnalyzedSpansByService["service2"], 1)
-	assert.Equal(0.5, c.AnalyzedSpansByService["service1"]["operation1"], 0.5)
-	assert.Equal(float64(0), c.AnalyzedSpansByService["service1"]["operation3"])
-	assert.Equal(float64(1), c.AnalyzedSpansByService["service2"]["operation2"])
-}
-
-func TestMaxEPSEnvConfig(t *testing.T) {
-	assert := assert.New(t)
-	os.Setenv("DD_MAX_EPS", "500.5")
-	defer os.Unsetenv("DD_MAX_EPS")
-
-	c := New()
-	c.loadEnv()
-
-	assert.EqualValues(500.5, c.MaxEPS)
 }
