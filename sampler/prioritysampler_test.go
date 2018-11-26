@@ -134,6 +134,7 @@ func TestPrioritySampleTracerWeight(t *testing.T) {
 }
 
 func TestMaxTPSByService(t *testing.T) {
+	rand.Seed(1)
 	// Test the "effectiveness" of the maxTPS option.
 	assert := assert.New(t)
 	s := getTestPriorityEngine()
