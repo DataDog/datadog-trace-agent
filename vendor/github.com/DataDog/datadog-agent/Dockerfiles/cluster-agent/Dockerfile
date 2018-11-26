@@ -33,6 +33,27 @@ RUN apt-get update \
 
 COPY --from=builder /output /
 
+# Allow running as an unprivileged user:
+# - General case is the dd-agent user
+# - OpenShift uses a random UID in the root group
+#
+# Containerd does not preserve permissions when mounting a volume on top
+# of an empty folder. Creating .placeholder files as a workaround.
+#
+RUN adduser --system --no-create-home --disabled-password --ingroup root dd-agent \
+ && mkdir -p /var/log/datadog/ \
+ && touch /var/log/datadog/.placeholder \
+ && touch /tmp/.placeholder \
+ && chown -R dd-agent:root /etc/datadog-agent/ /var/log/datadog/ /tmp/ \
+ && chmod g+r,g+w,g+X -R /etc/datadog-agent/ /var/log/datadog/ /tmp/
+
+# Incompatible with the custom metrics API on port 443
+# Set DD_EXTERNAL_METRICS_PROVIDER_PORT to a higher value to run as non-root
+# USER dd-agent
+
+# Leave following directories RW to allow use of readonly rootfs
+VOLUME ["/etc/datadog-agent", "/var/log/datadog", "/tmp"]
+
 ENTRYPOINT ["/entrypoint.sh"]
 
 # No docker healthcheck, use a HTTP check

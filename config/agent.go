@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DataDog/datadog-agent/pkg/config"
+	"github.com/DataDog/datadog-agent/pkg/config/legacy"
 	"github.com/DataDog/datadog-trace-agent/flags"
 	"github.com/DataDog/datadog-trace-agent/osutil"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
@@ -144,20 +146,10 @@ func New() *AgentConfig {
 		MaxConnections:   200, // in practice, rarely goes over 20
 		WatchdogInterval: time.Minute,
 
-		Ignore:                      make(map[string][]string),
+		Ignore: make(map[string][]string),
 		AnalyzedRateByServiceLegacy: make(map[string]float64),
 		AnalyzedSpansByService:      make(map[string]map[string]float64),
 	}
-}
-
-// LoadIni reads the contents of the given INI file into the config.
-func (c *AgentConfig) LoadIni(path string) error {
-	conf, err := NewIni(path)
-	if err != nil {
-		return err
-	}
-	c.loadIniConfig(conf)
-	return nil
 }
 
 // Validate validates if the current configuration is good for the agent to start with.
@@ -213,7 +205,7 @@ func (c *AgentConfig) acquireHostname() error {
 // and a valid configuration can be returned based on defaults and environment variables. If a
 // valid configuration can not be obtained, an error is returned.
 func Load(path string) (*AgentConfig, error) {
-	cfg, err := loadFile(path)
+	cfg, err := prepareConfig(path)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return nil, err
@@ -221,11 +213,12 @@ func Load(path string) (*AgentConfig, error) {
 	} else {
 		log.Infof("Loaded configuration: %s", cfg.ConfigPath)
 	}
+	cfg.applyDatadogConfig()
 	cfg.loadEnv()
 	return cfg, cfg.validate()
 }
 
-func loadFile(path string) (*AgentConfig, error) {
+func prepareConfig(path string) (*AgentConfig, error) {
 	cfgPath := path
 	if cfgPath == flags.DefaultConfigPath && !osutil.Exists(cfgPath) && osutil.Exists(agent5Config) {
 		// attempting to load inexistent default path, but found existing Agent 5
@@ -236,13 +229,19 @@ func loadFile(path string) (*AgentConfig, error) {
 	cfg := New()
 	switch filepath.Ext(cfgPath) {
 	case ".ini", ".conf":
-		if err := cfg.LoadIni(cfgPath); err != nil {
+		ac, err := legacy.GetAgentConfig(cfgPath)
+		if err != nil {
+			return cfg, err
+		}
+		if err := legacy.FromAgentConfig(ac); err != nil {
 			return cfg, err
 		}
 	case ".yaml":
-		if err := cfg.loadYamlConfig(cfgPath); err != nil {
+		config.Datadog.SetConfigFile(cfgPath)
+		if err := config.Load(); err != nil {
 			return cfg, err
 		}
+		cfg.DDAgentBin = defaultDDAgentBin
 	default:
 		return cfg, errors.New("unrecognised file extension (need .yaml, .ini or .conf)")
 	}

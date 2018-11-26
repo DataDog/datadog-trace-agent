@@ -8,11 +8,20 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/config"
+	"github.com/DataDog/datadog-trace-agent/writer/backoff"
+	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
 	"github.com/stretchr/testify/assert"
 )
 
+func cleanConfig() func() {
+	oldConfig := config.Datadog
+	config.Datadog = config.NewConfig("datadog", "DD", strings.NewReplacer(".", "_"))
+	return func() { config.Datadog = oldConfig }
+}
+
 func TestConfigHostname(t *testing.T) {
 	t.Run("nothing", func(t *testing.T) {
+		defer cleanConfig()()
 		assert := assert.New(t)
 		fallbackHostnameFunc = func() (string, error) {
 			return "", nil
@@ -25,6 +34,7 @@ func TestConfigHostname(t *testing.T) {
 	})
 
 	t.Run("fallback", func(t *testing.T) {
+		defer cleanConfig()()
 		host, err := os.Hostname()
 		if err != nil || host == "" {
 			// can't say
@@ -37,6 +47,7 @@ func TestConfigHostname(t *testing.T) {
 	})
 
 	t.Run("file", func(t *testing.T) {
+		defer cleanConfig()()
 		assert := assert.New(t)
 		cfg, err := Load("./testdata/full.yaml")
 		assert.NoError(err)
@@ -44,6 +55,7 @@ func TestConfigHostname(t *testing.T) {
 	})
 
 	t.Run("env", func(t *testing.T) {
+		defer cleanConfig()()
 		// hostname from env
 		assert := assert.New(t)
 		err := os.Setenv(envHostname, "onlyenv")
@@ -55,6 +67,7 @@ func TestConfigHostname(t *testing.T) {
 	})
 
 	t.Run("file+env", func(t *testing.T) {
+		defer cleanConfig()()
 		// hostname from file, overwritten from env
 		assert := assert.New(t)
 		err := os.Setenv(envHostname, "envoverride")
@@ -77,6 +90,7 @@ func TestSite(t *testing.T) {
 		"override": {"./testdata/site_override.yaml", "some.other.datadoghq.eu"},
 	} {
 		t.Run(name, func(t *testing.T) {
+			defer cleanConfig()()
 			cfg, err := Load(tt.file)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.url, cfg.Endpoints[0].Host)
@@ -112,10 +126,12 @@ func TestOnlyEnvConfig(t *testing.T) {
 }
 
 func TestOnlyDDAgentConfig(t *testing.T) {
+	defer cleanConfig()()
 	assert := assert.New(t)
 
-	c, err := loadFile("./testdata/no_apm_config.ini")
+	c, err := prepareConfig("./testdata/no_apm_config.ini")
 	assert.NoError(err)
+	assert.NoError(c.applyDatadogConfig())
 
 	assert.Equal("thing", c.Hostname)
 	assert.Equal("apikey_12", c.Endpoints[0].APIKey)
@@ -125,21 +141,25 @@ func TestOnlyDDAgentConfig(t *testing.T) {
 }
 
 func TestDDAgentMultiAPIKeys(t *testing.T) {
+	defer cleanConfig()()
 	// old feature Datadog Agent feature, got dropped since
 	// TODO: at some point, expire this case
 	assert := assert.New(t)
 
-	c, err := loadFile("./testdata/multi_api_keys.ini")
+	c, err := prepareConfig("./testdata/multi_api_keys.ini")
 	assert.NoError(err)
+	assert.NoError(c.applyDatadogConfig())
 
 	assert.Equal("foo", c.Endpoints[0].APIKey)
 }
 
 func TestFullIniConfig(t *testing.T) {
+	defer cleanConfig()()
 	assert := assert.New(t)
 
-	c, err := loadFile("./testdata/full.ini")
+	c, err := prepareConfig("./testdata/full.ini")
 	assert.NoError(err)
+	assert.NoError(c.applyDatadogConfig())
 
 	assert.Equal("api_key_test", c.Endpoints[0].APIKey)
 	assert.Equal("mymachine", c.Hostname)
@@ -148,15 +168,91 @@ func TestFullIniConfig(t *testing.T) {
 	assert.Equal(false, c.Enabled)
 	assert.Equal("test", c.DefaultEnv)
 	assert.Equal(18126, c.ReceiverPort)
+	assert.Equal(18125, c.StatsdPort)
 	assert.Equal(0.5, c.ExtraSampleRate)
 	assert.Equal(5.0, c.MaxTPS)
 	assert.Equal(50.0, c.MaxEPS)
 	assert.Equal("0.0.0.0", c.ReceiverHost)
+	assert.Equal("host.ip", c.StatsdHost)
+	assert.Equal("/path/to/file", c.LogFilePath)
+	assert.Equal("debug", c.LogLevel)
+	assert.False(c.LogThrottlingEnabled)
+	assert.True(c.SkipSSLValidation)
 
+	assert.Equal(map[string]float64{
+		"service1": 1.1,
+		"service2": 1.2,
+	}, c.AnalyzedRateByServiceLegacy)
+
+	assert.Equal(map[string]map[string]float64{
+		"service3": map[string]float64{
+			"op3": 1.3,
+		},
+		"service4": map[string]float64{
+			"op4": 1.4,
+			"op5": 1.5,
+		},
+	}, c.AnalyzedSpansByService)
+
+	assert.Equal(5*time.Second, c.BucketInterval)
+	assert.Equal([]string{"http.status_code", "a", "b", "c"}, c.ExtraAggregators)
+	assert.Equal(2000, c.ConnectionLimit)
+	assert.Equal(4, c.ReceiverTimeout)
+	assert.Equal(1234.5, c.MaxMemory)
+	assert.Equal(.85, c.MaxCPU)
+	assert.Equal(40, c.MaxConnections)
+	assert.Equal(5*time.Second, c.WatchdogInterval)
 	assert.EqualValues([]string{"/health", "/500"}, c.Ignore["resource"])
+
+	assert.Equal(writerconfig.ServiceWriterConfig{
+		FlushPeriod:      time.Second,
+		UpdateInfoPeriod: time.Second,
+		SenderConfig: writerconfig.QueuablePayloadSenderConf{
+			MaxAge:            time.Second,
+			MaxQueuedBytes:    456,
+			MaxQueuedPayloads: 4,
+			ExponentialBackoff: backoff.ExponentialConfig{
+				MaxDuration: 4 * time.Second,
+				GrowthBase:  2,
+				Base:        1000000,
+			},
+		},
+	}, c.ServiceWriterConfig)
+
+	assert.Equal(writerconfig.StatsWriterConfig{
+		MaxEntriesPerPayload: 10,
+		UpdateInfoPeriod:     2 * time.Second,
+		SenderConfig: writerconfig.QueuablePayloadSenderConf{
+			MaxAge:            time.Second,
+			MaxQueuedBytes:    456,
+			MaxQueuedPayloads: 4,
+			ExponentialBackoff: backoff.ExponentialConfig{
+				MaxDuration: 4 * time.Second,
+				GrowthBase:  2,
+				Base:        1000000,
+			},
+		},
+	}, c.StatsWriterConfig)
+
+	assert.Equal(writerconfig.TraceWriterConfig{
+		MaxSpansPerPayload: 100,
+		FlushPeriod:        3 * time.Second,
+		UpdateInfoPeriod:   2 * time.Second,
+		SenderConfig: writerconfig.QueuablePayloadSenderConf{
+			MaxAge:            time.Second,
+			MaxQueuedBytes:    456,
+			MaxQueuedPayloads: 4,
+			ExponentialBackoff: backoff.ExponentialConfig{
+				MaxDuration: 4 * time.Second,
+				GrowthBase:  2,
+				Base:        1000000,
+			},
+		},
+	}, c.TraceWriterConfig)
 }
 
 func TestFullYamlConfig(t *testing.T) {
+	defer cleanConfig()()
 	origcfg := config.Datadog
 	config.Datadog = config.NewConfig("datadog", "DD", strings.NewReplacer(".", "_"))
 	defer func() {
@@ -165,8 +261,9 @@ func TestFullYamlConfig(t *testing.T) {
 
 	assert := assert.New(t)
 
-	c, err := loadFile("./testdata/full.yaml")
+	c, err := prepareConfig("./testdata/full.yaml")
 	assert.NoError(err)
+	assert.NoError(c.applyDatadogConfig())
 
 	assert.Equal("mymachine", c.Hostname)
 	assert.Equal("https://user:password@proxy_for_https:1234", c.ProxyURL.String())
@@ -194,7 +291,7 @@ func TestFullYamlConfig(t *testing.T) {
 		noProxy = false
 	}
 
-	assert.Equal([]*Endpoint{
+	assert.ElementsMatch([]*Endpoint{
 		{Host: "https://datadog.unittests", APIKey: "api_key_test"},
 		{Host: "https://my1.endpoint.com", APIKey: "apikey1"},
 		{Host: "https://my1.endpoint.com", APIKey: "apikey2"},
@@ -238,6 +335,7 @@ func TestFullYamlConfig(t *testing.T) {
 }
 
 func TestUndocumentedYamlConfig(t *testing.T) {
+	defer cleanConfig()()
 	origcfg := config.Datadog
 	config.Datadog = config.NewConfig("datadog", "DD", strings.NewReplacer(".", "_"))
 	defer func() {
@@ -245,8 +343,9 @@ func TestUndocumentedYamlConfig(t *testing.T) {
 	}()
 	assert := assert.New(t)
 
-	c, err := loadFile("./testdata/undocumented.yaml")
+	c, err := prepareConfig("./testdata/undocumented.yaml")
 	assert.NoError(err)
+	assert.NoError(c.applyDatadogConfig())
 
 	assert.Equal("/path/to/bin", c.DDAgentBin)
 	assert.Equal("thing", c.Hostname)
@@ -291,25 +390,6 @@ func TestUndocumentedYamlConfig(t *testing.T) {
 	assert.Equal(0.05, c.AnalyzedSpansByService["db"]["intake"])
 }
 
-func TestConfigNewIfExists(t *testing.T) {
-	// The file does not exist: no error returned
-	conf, err := NewIni("/does-not-exist")
-	assert.True(t, os.IsNotExist(err))
-	assert.Nil(t, conf)
-
-	// The file exists but cannot be read for another reason: an error is
-	// returned.
-	filename := "/tmp/trace-agent-test-config.ini"
-	os.Remove(filename)
-	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0200) // write only
-	assert.Nil(t, err)
-	f.Close()
-	conf, err = NewIni(filename)
-	assert.NotNil(t, err)
-	assert.Nil(t, conf)
-	os.Remove(filename)
-}
-
 func TestAcquireHostname(t *testing.T) {
 	c := New()
 	err := c.acquireHostname()
@@ -319,10 +399,12 @@ func TestAcquireHostname(t *testing.T) {
 }
 
 func TestUndocumentedIni(t *testing.T) {
+	defer cleanConfig()()
 	assert := assert.New(t)
 
-	c, err := loadFile("./testdata/undocumented.ini")
+	c, err := prepareConfig("./testdata/undocumented.ini")
 	assert.NoError(err)
+	assert.NoError(c.applyDatadogConfig())
 
 	// analysis legacy
 	assert.Equal(0.8, c.AnalyzedRateByServiceLegacy["web"])
@@ -331,7 +413,7 @@ func TestUndocumentedIni(t *testing.T) {
 	assert.Len(c.AnalyzedSpansByService, 2)
 	assert.Len(c.AnalyzedSpansByService["web"], 2)
 	assert.Len(c.AnalyzedSpansByService["db"], 1)
-	assert.Equal(0.8, c.AnalyzedSpansByService["web"]["request"])
+	assert.Equal(0.8, c.AnalyzedSpansByService["web"]["http.request"])
 	assert.Equal(0.9, c.AnalyzedSpansByService["web"]["django.request"])
 	assert.Equal(0.05, c.AnalyzedSpansByService["db"]["intake"])
 }

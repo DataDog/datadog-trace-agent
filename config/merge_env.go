@@ -90,7 +90,9 @@ func (c *AgentConfig) loadEnv() {
 	}
 
 	if v := os.Getenv(envIgnoreResources); v != "" {
-		c.Ignore["resource"], _ = splitString(v, ',')
+		if r, err := splitString(v, ','); err == nil {
+			c.Ignore["resource"] = r
+		}
 	}
 
 	if v := os.Getenv(envDogstatsdPort); v != "" {
