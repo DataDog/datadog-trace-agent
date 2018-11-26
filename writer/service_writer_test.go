@@ -3,6 +3,7 @@ package writer
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"strings"
 	"testing"
 	"time"
@@ -74,6 +75,7 @@ func TestServiceWriter_ServiceHandling(t *testing.T) {
 }
 
 func TestServiceWriter_UpdateInfoHandling(t *testing.T) {
+	rand.Seed(1)
 	assert := assert.New(t)
 
 	// Given a service writer, its incoming channel and the endpoint that receives the payloads

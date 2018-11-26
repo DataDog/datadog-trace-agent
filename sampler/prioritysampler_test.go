@@ -7,7 +7,6 @@ import (
 
 	log "github.com/cihub/seelog"
 
-	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -25,7 +24,7 @@ func getTestPriorityEngine() *PriorityEngine {
 	extraRate := 1.0
 	maxTPS := 0.0
 
-	rateByService := config.RateByService{}
+	rateByService := RateByService{}
 	return NewPriorityEngine(extraRate, maxTPS, &rateByService)
 }
 
@@ -134,6 +133,7 @@ func TestPrioritySampleTracerWeight(t *testing.T) {
 }
 
 func TestMaxTPSByService(t *testing.T) {
+	rand.Seed(1)
 	// Test the "effectiveness" of the maxTPS option.
 	assert := assert.New(t)
 	s := getTestPriorityEngine()

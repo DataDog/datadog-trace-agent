@@ -6,8 +6,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 )
 
@@ -61,7 +61,7 @@ func HTTPOK(w http.ResponseWriter) {
 }
 
 // HTTPRateByService outputs, as a JSON, the recommended sampling rates for all services.
-func HTTPRateByService(w http.ResponseWriter, dynConf *config.DynamicConfig) {
+func HTTPRateByService(w http.ResponseWriter, dynConf *sampler.DynamicConfig) {
 	w.WriteHeader(http.StatusOK)
 	response := traceResponse{
 		Rates: dynConf.RateByService.GetAll(), // this is thread-safe
