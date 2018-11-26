@@ -67,6 +67,7 @@ func TestStatsWriter_StatHandling(t *testing.T) {
 }
 
 func TestStatsWriter_UpdateInfoHandling(t *testing.T) {
+	rand.Seed(1)
 	assert := assert.New(t)
 
 	// Given a stats writer, its incoming channel and the endpoint that receives the payloads
