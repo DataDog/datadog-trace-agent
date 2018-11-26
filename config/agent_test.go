@@ -129,9 +129,9 @@ func TestOnlyDDAgentConfig(t *testing.T) {
 	defer cleanConfig()()
 	assert := assert.New(t)
 
-	c, err := loadConfig("./testdata/no_apm_config.ini")
+	c, err := prepareConfig("./testdata/no_apm_config.ini")
 	assert.NoError(err)
-	assert.NoError(c.applyConfig())
+	assert.NoError(c.applyDatadogConfig())
 
 	assert.Equal("thing", c.Hostname)
 	assert.Equal("apikey_12", c.Endpoints[0].APIKey)
@@ -146,9 +146,9 @@ func TestDDAgentMultiAPIKeys(t *testing.T) {
 	// TODO: at some point, expire this case
 	assert := assert.New(t)
 
-	c, err := loadConfig("./testdata/multi_api_keys.ini")
+	c, err := prepareConfig("./testdata/multi_api_keys.ini")
 	assert.NoError(err)
-	assert.NoError(c.applyConfig())
+	assert.NoError(c.applyDatadogConfig())
 
 	assert.Equal("foo", c.Endpoints[0].APIKey)
 }
@@ -157,9 +157,9 @@ func TestFullIniConfig(t *testing.T) {
 	defer cleanConfig()()
 	assert := assert.New(t)
 
-	c, err := loadConfig("./testdata/full.ini")
+	c, err := prepareConfig("./testdata/full.ini")
 	assert.NoError(err)
-	assert.NoError(c.applyConfig())
+	assert.NoError(c.applyDatadogConfig())
 
 	assert.Equal("api_key_test", c.Endpoints[0].APIKey)
 	assert.Equal("mymachine", c.Hostname)
@@ -261,9 +261,9 @@ func TestFullYamlConfig(t *testing.T) {
 
 	assert := assert.New(t)
 
-	c, err := loadConfig("./testdata/full.yaml")
+	c, err := prepareConfig("./testdata/full.yaml")
 	assert.NoError(err)
-	assert.NoError(c.applyConfig())
+	assert.NoError(c.applyDatadogConfig())
 
 	assert.Equal("mymachine", c.Hostname)
 	assert.Equal("https://user:password@proxy_for_https:1234", c.ProxyURL.String())
@@ -343,9 +343,9 @@ func TestUndocumentedYamlConfig(t *testing.T) {
 	}()
 	assert := assert.New(t)
 
-	c, err := loadConfig("./testdata/undocumented.yaml")
+	c, err := prepareConfig("./testdata/undocumented.yaml")
 	assert.NoError(err)
-	assert.NoError(c.applyConfig())
+	assert.NoError(c.applyDatadogConfig())
 
 	assert.Equal("/path/to/bin", c.DDAgentBin)
 	assert.Equal("thing", c.Hostname)
@@ -402,9 +402,9 @@ func TestUndocumentedIni(t *testing.T) {
 	defer cleanConfig()()
 	assert := assert.New(t)
 
-	c, err := loadConfig("./testdata/undocumented.ini")
+	c, err := prepareConfig("./testdata/undocumented.ini")
 	assert.NoError(err)
-	assert.NoError(c.applyConfig())
+	assert.NoError(c.applyDatadogConfig())
 
 	// analysis legacy
 	assert.Equal(0.8, c.AnalyzedRateByServiceLegacy["web"])

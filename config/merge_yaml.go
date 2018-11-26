@@ -114,7 +114,7 @@ type queueablePayloadSender struct {
 	BackoffGrowth     int   `mapstructure:"exp_backoff_growth_base"`
 }
 
-func (c *AgentConfig) applyConfig() error {
+func (c *AgentConfig) applyDatadogConfig() error {
 	if len(c.Endpoints) == 0 {
 		c.Endpoints = []*Endpoint{{}}
 	}
