@@ -4,8 +4,14 @@ import (
 	"os"
 	"testing"
 
+	log "github.com/cihub/seelog"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestMain(m *testing.M) {
+	log.UseLogger(log.Disabled)
+	os.Exit(m.Run())
+}
 
 func TestLoadEnv(t *testing.T) {
 	for _, ext := range []string{"yaml", "ini"} {
