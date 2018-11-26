@@ -7,63 +7,198 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestAnalyzedSpansEnvConfigParsing(t *testing.T) {
-	assert := assert.New(t)
+func TestLoadEnv(t *testing.T) {
+	for _, ext := range []string{"yaml", "ini"} {
+		t.Run(ext, func(t *testing.T) {
+			env := "DD_API_KEY"
+			t.Run(env, func(t *testing.T) {
+				assert := assert.New(t)
+				err := os.Setenv(env, "123")
+				assert.NoError(err)
+				defer os.Unsetenv(env)
+				cfg, err := Load("./testdata/full." + ext)
+				assert.NoError(err)
+				assert.Equal("123", cfg.Endpoints[0].APIKey)
+			})
 
-	t.Run("valid", func(t *testing.T) {
-		a, err := parseAnalyzedSpans("service|operation=1")
-		assert.Nil(err)
-		assert.Len(a, 1)
-		assert.Len(a["service"], 1)
-		assert.Equal(float64(1), a["service"]["operation"])
+			env = "DD_SITE"
+			t.Run(env, func(t *testing.T) {
+				assert := assert.New(t)
+				err := os.Setenv(env, "my-site.com")
+				assert.NoError(err)
+				defer os.Unsetenv(env)
+				cfg, err := Load("./testdata/undocumented." + ext)
+				assert.NoError(err)
+				assert.Equal(apiEndpointPrefix+"my-site.com", cfg.Endpoints[0].Host)
+			})
 
-		a, err = parseAnalyzedSpans("service|operation=0.01")
-		assert.Nil(err)
-		assert.Len(a, 1)
-		assert.Len(a["service"], 1)
-		assert.Equal(0.01, a["service"]["operation"])
+			env = "DD_APM_ENABLED"
+			t.Run(env, func(t *testing.T) {
+				assert := assert.New(t)
+				err := os.Setenv(env, "true")
+				assert.NoError(err)
+				defer os.Unsetenv(env)
+				cfg, err := Load("./testdata/full." + ext)
+				assert.NoError(err)
+				assert.True(cfg.Enabled)
+			})
 
-		a, err = parseAnalyzedSpans("service|operation=1,service2|operation2=1")
-		assert.Nil(err)
-		assert.Len(a, 2)
-		assert.Len(a["service"], 1)
-		assert.Equal(float64(1), a["service"]["operation"])
-		assert.Equal(float64(1), a["service2"]["operation2"])
+			env = "DD_APM_DD_URL"
+			t.Run(env, func(t *testing.T) {
+				assert := assert.New(t)
+				err := os.Setenv(env, "my-site.com")
+				assert.NoError(err)
+				defer os.Unsetenv(env)
+				cfg, err := Load("./testdata/full." + ext)
+				assert.NoError(err)
+				assert.Equal("my-site.com", cfg.Endpoints[0].Host)
+			})
 
-		a, err = parseAnalyzedSpans("")
-		assert.Nil(err)
-		assert.Len(a, 0)
-	})
+			env = "HTTPS_PROXY"
+			t.Run(env, func(t *testing.T) {
+				assert := assert.New(t)
+				err := os.Setenv(env, "my-proxy.url")
+				assert.NoError(err)
+				defer os.Unsetenv(env)
+				cfg, err := Load("./testdata/full." + ext)
+				assert.NoError(err)
+				assert.Equal("my-proxy.url", cfg.ProxyURL.String())
+			})
 
-	t.Run("errors", func(t *testing.T) {
-		_, err := parseAnalyzedSpans("service|operation=")
-		assert.NotNil(err)
+			env = "DD_PROXY_HTTPS"
+			t.Run(env, func(t *testing.T) {
+				assert := assert.New(t)
+				err := os.Setenv(env, "my-proxy.url")
+				assert.NoError(err)
+				defer os.Unsetenv(env)
+				cfg, err := Load("./testdata/full." + ext)
+				assert.NoError(err)
+				assert.Equal("my-proxy.url", cfg.ProxyURL.String())
+			})
 
-		_, err = parseAnalyzedSpans("serviceoperation=1")
-		assert.NotNil(err)
+			env = "DD_HOSTNAME"
+			t.Run(env, func(t *testing.T) {
+				assert := assert.New(t)
+				err := os.Setenv(env, "local.host")
+				assert.NoError(err)
+				defer os.Unsetenv(env)
+				cfg, err := Load("./testdata/full." + ext)
+				assert.NoError(err)
+				assert.Equal("local.host", cfg.Hostname)
+			})
 
-		_, err = parseAnalyzedSpans("service|operation=1,")
-		assert.NotNil(err)
-	})
-}
+			env = "DD_BIND_HOST"
+			t.Run(env, func(t *testing.T) {
+				assert := assert.New(t)
+				err := os.Setenv(env, "bindhost.com")
+				assert.NoError(err)
+				defer os.Unsetenv(env)
+				cfg, err := Load("./testdata/full." + ext)
+				assert.NoError(err)
+				assert.Equal("bindhost.com", cfg.StatsdHost)
+			})
 
-func TestLoadEnvMaxTPS(t *testing.T) {
-	assert := assert.New(t)
+			env = "DD_RECEIVER_PORT"
+			t.Run(env, func(t *testing.T) {
+				assert := assert.New(t)
+				err := os.Setenv(env, "1234")
+				assert.NoError(err)
+				defer os.Unsetenv(env)
+				cfg, err := Load("./testdata/full." + ext)
+				assert.NoError(err)
+				assert.Equal(1234, cfg.ReceiverPort)
+			})
 
-	t.Run("default", func(t *testing.T) {
-		ac := New()
-		ac.loadEnv()
-		assert.EqualValues(10.0, ac.MaxTPS)
-	})
+			env = "DD_DOGSTATSD_PORT"
+			t.Run(env, func(t *testing.T) {
+				assert := assert.New(t)
+				err := os.Setenv(env, "4321")
+				assert.NoError(err)
+				defer os.Unsetenv(env)
+				cfg, err := Load("./testdata/full." + ext)
+				assert.NoError(err)
+				assert.Equal(4321, cfg.StatsdPort)
+			})
 
-	t.Run("env", func(t *testing.T) {
-		if err := os.Setenv("DD_MAX_TPS", "123.4"); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Unsetenv("DD_MAX_TPS")
+			env = "DD_APM_NON_LOCAL_TRAFFIC"
+			t.Run(env, func(t *testing.T) {
+				assert := assert.New(t)
+				err := os.Setenv(env, "true")
+				assert.NoError(err)
+				defer os.Unsetenv(env)
+				cfg, err := Load("./testdata/undocumented." + ext)
+				assert.NoError(err)
+				assert.Equal("0.0.0.0", cfg.ReceiverHost)
+			})
 
-		ac := New()
-		ac.loadEnv()
-		assert.EqualValues(123.4, ac.MaxTPS)
-	})
+			env = "DD_IGNORE_RESOURCE"
+			t.Run(env, func(t *testing.T) {
+				assert := assert.New(t)
+				err := os.Setenv(env, "1,2,3")
+				assert.NoError(err)
+				defer os.Unsetenv(env)
+				cfg, err := Load("./testdata/full." + ext)
+				assert.NoError(err)
+				assert.Equal([]string{"1", "2", "3"}, cfg.Ignore["resource"])
+			})
+
+			env = "DD_LOG_LEVEL"
+			t.Run(env, func(t *testing.T) {
+				assert := assert.New(t)
+				err := os.Setenv(env, "warn")
+				assert.NoError(err)
+				defer os.Unsetenv(env)
+				cfg, err := Load("./testdata/full." + ext)
+				assert.NoError(err)
+				assert.Equal("warn", cfg.LogLevel)
+			})
+
+			env = "DD_APM_ANALYZED_SPANS"
+			t.Run(env, func(t *testing.T) {
+				assert := assert.New(t)
+				err := os.Setenv(env, "web|http.request=1,db|sql.query=0.5")
+				assert.NoError(err)
+				defer os.Unsetenv(env)
+				cfg, err := Load("./testdata/full." + ext)
+				assert.NoError(err)
+				assert.Equal(map[string]map[string]float64{
+					"web": map[string]float64{"http.request": 1},
+					"db":  map[string]float64{"sql.query": 0.5},
+				}, cfg.AnalyzedSpansByService)
+			})
+
+			env = "DD_CONNECTION_LIMIT"
+			t.Run(env, func(t *testing.T) {
+				assert := assert.New(t)
+				err := os.Setenv(env, "50")
+				assert.NoError(err)
+				defer os.Unsetenv(env)
+				cfg, err := Load("./testdata/full." + ext)
+				assert.NoError(err)
+				assert.Equal(50, cfg.ConnectionLimit)
+			})
+
+			env = "DD_MAX_TPS"
+			t.Run(env, func(t *testing.T) {
+				assert := assert.New(t)
+				err := os.Setenv(env, "6")
+				assert.NoError(err)
+				defer os.Unsetenv(env)
+				cfg, err := Load("./testdata/full." + ext)
+				assert.NoError(err)
+				assert.Equal(6., cfg.MaxTPS)
+			})
+
+			env = "DD_MAX_EPS"
+			t.Run(env, func(t *testing.T) {
+				assert := assert.New(t)
+				err := os.Setenv(env, "7")
+				assert.NoError(err)
+				defer os.Unsetenv(env)
+				cfg, err := Load("./testdata/full." + ext)
+				assert.NoError(err)
+				assert.Equal(7., cfg.MaxEPS)
+			})
+		})
+	}
 }

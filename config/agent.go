@@ -213,8 +213,8 @@ func Load(path string) (*AgentConfig, error) {
 	} else {
 		log.Infof("Loaded configuration: %s", cfg.ConfigPath)
 	}
+	applyEnv()
 	cfg.applyDatadogConfig()
-	cfg.loadEnv()
 	return cfg, cfg.validate()
 }
 
