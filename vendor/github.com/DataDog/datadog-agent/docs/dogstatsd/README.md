@@ -1,3 +1,0 @@
-# DogStatsD
-
-TODO
