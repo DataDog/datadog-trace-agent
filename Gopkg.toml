@@ -37,3 +37,5 @@
   name = "github.com/gogo/protobuf"
   revision = "d76fbc1373015ced59b43ac267f28d546b955683"
 
+[prune]
+  unused-packages = true
