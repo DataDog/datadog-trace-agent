@@ -6,7 +6,7 @@ import (
 	"context"
 	_ "net/http/pprof"
 
-	"github.com/DataDog/datadog-trace-agent/watchdog"
+	"github.com/DataDog/datadog-trace-agent/internal/watchdog"
 )
 
 // main is the main application entry point

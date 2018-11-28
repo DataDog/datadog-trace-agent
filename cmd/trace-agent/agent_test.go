@@ -12,16 +12,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/agent"
-	"github.com/DataDog/datadog-trace-agent/event"
+	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/event"
 	log "github.com/cihub/seelog"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/obfuscate"
-	"github.com/DataDog/datadog-trace-agent/sampler"
-	"github.com/DataDog/datadog-trace-agent/testutil"
+	"github.com/DataDog/datadog-trace-agent/internal/config"
+	"github.com/DataDog/datadog-trace-agent/internal/info"
+	"github.com/DataDog/datadog-trace-agent/internal/obfuscate"
+	"github.com/DataDog/datadog-trace-agent/internal/sampler"
+	"github.com/DataDog/datadog-trace-agent/internal/testutil"
 )
 
 type mockSamplerEngine struct {

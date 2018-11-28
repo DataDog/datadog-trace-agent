@@ -4,8 +4,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/agent"
-	"github.com/DataDog/datadog-trace-agent/watchdog"
+	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/watchdog"
 	log "github.com/cihub/seelog"
 )
 

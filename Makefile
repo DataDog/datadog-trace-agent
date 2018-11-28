@@ -17,7 +17,7 @@ VERSION_PATCH := $(if $(VERSION_PATCH),$(VERSION_PATCH), 0)
 
 install:
 	# generate versioning information and installing the binary.
-	go generate ./info
+	go generate ./internal/info
 	go install ./cmd/trace-agent
 
 binaries:
@@ -37,7 +37,7 @@ ci:
 	# will no longer cross-compile due to cgo:
 	# GOOS=windows go build ./cmd/trace-agent # ensure windows builds
 	go get -u golang.org/x/lint/golint
-	golint -set_exit_status=1 ./cmd/trace-agent ./filters ./api ./testutil ./info ./quantile ./obfuscate ./sampler ./statsd ./watchdog ./writer ./flags ./osutil
+	golint -set_exit_status=1 ./cmd/trace-agent ./internal/filters ./internal/api ./internal/testutil ./internal/info ./internal/quantile ./internal/obfuscate ./internal/sampler ./internal/statsd ./internal/watchdog ./internal/writer ./internal/flags ./internal/osutil
 	INTEGRATION=1 go test -v -race ./...
 
 windows:

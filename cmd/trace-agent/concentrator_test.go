@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/agent"
 	"github.com/stretchr/testify/assert"
 )
 
