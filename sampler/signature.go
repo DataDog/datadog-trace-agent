@@ -4,7 +4,7 @@ import (
 	"hash/fnv"
 	"sort"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 )
 
 // Signature is a simple representation of trace, used to identify simlar traces
@@ -23,7 +23,7 @@ func sortHashes(hashes []spanHash)         { sort.Sort(spanHashSlice(hashes)) }
 // computeSignatureWithRootAndEnv generates the signature of a trace knowing its root
 // Signature based on the hash of (env, service, name, resource, is_error) for the root, plus the set of
 // (env, service, name, is_error) of each span.
-func computeSignatureWithRootAndEnv(trace model.Trace, root *model.Span, env string) Signature {
+func computeSignatureWithRootAndEnv(trace agent.Trace, root *agent.Span, env string) Signature {
 	rootHash := computeRootHash(*root, env)
 	spanHashes := make([]spanHash, 0, len(trace))
 
@@ -50,11 +50,11 @@ func computeSignatureWithRootAndEnv(trace model.Trace, root *model.Span, env str
 // information such as service and env, this is typically used by distributed
 // sampling based on priority, and used as a key to store the desired rate
 // for a given service,env tuple.
-func computeServiceSignature(root *model.Span, env string) Signature {
+func computeServiceSignature(root *agent.Span, env string) Signature {
 	return Signature(computeServiceHash(*root, env))
 }
 
-func computeSpanHash(span *model.Span, env string) spanHash {
+func computeSpanHash(span *agent.Span, env string) spanHash {
 	h := fnv.New32a()
 	h.Write([]byte(env))
 	h.Write([]byte(span.Service))
@@ -64,7 +64,7 @@ func computeSpanHash(span *model.Span, env string) spanHash {
 	return spanHash(h.Sum32())
 }
 
-func computeRootHash(span model.Span, env string) spanHash {
+func computeRootHash(span agent.Span, env string) spanHash {
 	h := fnv.New32a()
 	h.Write([]byte(env))
 	h.Write([]byte(span.Service))
@@ -75,7 +75,7 @@ func computeRootHash(span model.Span, env string) spanHash {
 	return spanHash(h.Sum32())
 }
 
-func computeServiceHash(span model.Span, env string) spanHash {
+func computeServiceHash(span agent.Span, env string) spanHash {
 	h := fnv.New32a()
 	h.Write([]byte(span.Service))
 	h.Write([]byte{','})

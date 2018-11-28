@@ -7,9 +7,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
@@ -25,9 +25,9 @@ const pathTraces = "/api/v0.2/traces"
 // empty Trace but non-empty Events. This happens when events are extracted from a trace that wasn't sampled.
 type TracePackage struct {
 	// Trace will contain a trace if it was sampled or be empty if it wasn't.
-	Trace model.Trace
+	Trace agent.Trace
 	// Events contains all APMEvents extracted from a trace. If no events were extracted, it will be empty.
-	Events []*model.Event
+	Events []*agent.Event
 }
 
 // Empty returns true if this TracePackage has no data.
@@ -43,8 +43,8 @@ type TraceWriter struct {
 	conf     writerconfig.TraceWriterConfig
 	in       <-chan *TracePackage
 
-	traces        []*model.APITrace
-	events        []*model.Span
+	traces        []*agent.APITrace
+	events        []*agent.Span
 	spansInBuffer int
 
 	sender payloadSender
@@ -63,8 +63,8 @@ func NewTraceWriter(conf *config.AgentConfig, in <-chan *TracePackage) *TraceWri
 		hostName: conf.Hostname,
 		env:      conf.DefaultEnv,
 
-		traces: []*model.APITrace{},
-		events: []*model.Span{},
+		traces: []*agent.APITrace{},
+		events: []*agent.Span{},
 
 		in: in,
 
@@ -173,7 +173,7 @@ func (w *TraceWriter) handleSampledTrace(sampledTrace *TracePackage) {
 	}
 }
 
-func (w *TraceWriter) appendTrace(trace model.Trace) {
+func (w *TraceWriter) appendTrace(trace agent.Trace) {
 	numSpans := len(trace)
 
 	if numSpans == 0 {
@@ -186,7 +186,7 @@ func (w *TraceWriter) appendTrace(trace model.Trace) {
 	w.spansInBuffer += numSpans
 }
 
-func (w *TraceWriter) appendEvents(events []*model.Event) {
+func (w *TraceWriter) appendEvents(events []*agent.Event) {
 	for _, event := range events {
 		log.Tracef("Handling new APM event: %v", event)
 		w.events = append(w.events, event.Span)
@@ -213,7 +213,7 @@ func (w *TraceWriter) flush() {
 	atomic.AddInt64(&w.stats.Events, int64(numEvents))
 	atomic.AddInt64(&w.stats.Spans, int64(w.spansInBuffer))
 
-	tracePayload := model.TracePayload{
+	tracePayload := agent.TracePayload{
 		HostName:     w.hostName,
 		Env:          w.env,
 		Traces:       w.traces,

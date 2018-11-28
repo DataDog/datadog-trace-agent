@@ -6,7 +6,7 @@ package main
 import (
 	"testing"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/testutil"
 )
 
@@ -15,7 +15,7 @@ const (
 )
 
 func BenchmarkHandleSpanRandom(b *testing.B) {
-	sb := model.NewStatsRawBucket(0, 1e9)
+	sb := agent.NewStatsRawBucket(0, 1e9)
 	aggr := []string{}
 
 	b.ResetTimer()
@@ -24,7 +24,7 @@ func BenchmarkHandleSpanRandom(b *testing.B) {
 		trace := testutil.RandomTrace(10, 8)
 		root := trace.GetRoot()
 		trace.ComputeTopLevel()
-		wt := model.NewWeightedTrace(trace, root)
+		wt := agent.NewWeightedTrace(trace, root)
 		for _, span := range wt {
 			sb.HandleSpan(span, defaultEnv, aggr, nil)
 		}

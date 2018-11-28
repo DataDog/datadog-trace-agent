@@ -4,15 +4,15 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 )
 
-func createTestSpansWithEventRate(eventRate float64) []*model.WeightedSpan {
-	spans := make([]*model.WeightedSpan, 1000)
+func createTestSpansWithEventRate(eventRate float64) []*agent.WeightedSpan {
+	spans := make([]*agent.WeightedSpan, 1000)
 	for i, _ := range spans {
-		spans[i] = &model.WeightedSpan{Span: &model.Span{TraceID: rand.Uint64(), Service: "test", Name: "test"}}
+		spans[i] = &agent.WeightedSpan{Span: &agent.Span{TraceID: rand.Uint64(), Service: "test", Name: "test"}}
 		if eventRate >= 0 {
-			spans[i].SetMetric(model.KeySamplingRateEventExtraction, eventRate)
+			spans[i].SetMetric(agent.KeySamplingRateEventExtraction, eventRate)
 		}
 	}
 	return spans

@@ -16,9 +16,9 @@ import (
 	log "github.com/cihub/seelog"
 	"github.com/tinylib/msgp/msgp"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/osutil"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/statsd"
@@ -58,9 +58,9 @@ const (
 type HTTPReceiver struct {
 	Stats      *info.ReceiverStats
 	PreSampler *sampler.PreSampler
-	Out        chan model.Trace
+	Out        chan agent.Trace
 
-	services chan model.ServicesMetadata
+	services chan agent.ServicesMetadata
 	conf     *config.AgentConfig
 	dynConf  *sampler.DynamicConfig
 	server   *http.Server
@@ -71,7 +71,7 @@ type HTTPReceiver struct {
 
 // NewHTTPReceiver returns a pointer to a new HTTPReceiver
 func NewHTTPReceiver(
-	conf *config.AgentConfig, dynConf *sampler.DynamicConfig, out chan model.Trace, services chan model.ServicesMetadata,
+	conf *config.AgentConfig, dynConf *sampler.DynamicConfig, out chan agent.Trace, services chan agent.ServicesMetadata,
 ) *HTTPReceiver {
 	// use buffered channels so that handlers are not waiting on downstream processing
 	return &HTTPReceiver{
@@ -160,7 +160,7 @@ func (r *HTTPReceiver) Stop() error {
 
 func (r *HTTPReceiver) httpHandle(fn http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		req.Body = model.NewLimitedReader(req.Body, r.maxRequestBodyLength)
+		req.Body = agent.NewLimitedReader(req.Body, r.maxRequestBodyLength)
 		defer req.Body.Close()
 
 		fn(w, req)
@@ -223,7 +223,7 @@ func (r *HTTPReceiver) handleTraces(v Version, w http.ResponseWriter, req *http.
 	// We get the address of the struct holding the stats associated to the tags
 	ts := r.Stats.GetTagStats(tags)
 
-	bytesRead := req.Body.(*model.LimitedReader).Count
+	bytesRead := req.Body.(*agent.LimitedReader).Count
 	if bytesRead > 0 {
 		atomic.AddInt64(&ts.TracesBytes, int64(bytesRead))
 	}
@@ -235,7 +235,7 @@ func (r *HTTPReceiver) handleTraces(v Version, w http.ResponseWriter, req *http.
 		atomic.AddInt64(&ts.TracesReceived, 1)
 		atomic.AddInt64(&ts.SpansReceived, int64(spans))
 
-		normTrace, err := model.NormalizeTrace(traces[i])
+		normTrace, err := agent.NormalizeTrace(traces[i])
 		if err != nil {
 			atomic.AddInt64(&ts.TracesDropped, 1)
 			atomic.AddInt64(&ts.SpansDropped, int64(spans))
@@ -267,7 +267,7 @@ func (r *HTTPReceiver) handleTraces(v Version, w http.ResponseWriter, req *http.
 
 // handleServices handle a request with a list of several services
 func (r *HTTPReceiver) handleServices(v Version, w http.ResponseWriter, req *http.Request) {
-	var servicesMeta model.ServicesMetadata
+	var servicesMeta agent.ServicesMetadata
 
 	contentType := req.Header.Get("Content-Type")
 	if err := decodeReceiverPayload(req.Body, &servicesMeta, v, contentType); err != nil {
@@ -291,7 +291,7 @@ func (r *HTTPReceiver) handleServices(v Version, w http.ResponseWriter, req *htt
 
 	atomic.AddInt64(&ts.ServicesReceived, int64(len(servicesMeta)))
 
-	bytesRead := req.Body.(*model.LimitedReader).Count
+	bytesRead := req.Body.(*agent.LimitedReader).Count
 	if bytesRead > 0 {
 		atomic.AddInt64(&ts.ServicesBytes, int64(bytesRead))
 	}
@@ -354,8 +354,8 @@ func (r *HTTPReceiver) Languages() string {
 	return strings.Join(str, "|")
 }
 
-func getTraces(v Version, w http.ResponseWriter, req *http.Request) (model.Traces, bool) {
-	var traces model.Traces
+func getTraces(v Version, w http.ResponseWriter, req *http.Request) (agent.Traces, bool) {
+	var traces agent.Traces
 	contentType := req.Header.Get("Content-Type")
 
 	switch v {
@@ -370,13 +370,13 @@ func getTraces(v Version, w http.ResponseWriter, req *http.Request) (model.Trace
 		}
 
 		// in v01 we actually get spans that we have to transform in traces
-		var spans []model.Span
+		var spans []agent.Span
 		if err := json.NewDecoder(req.Body).Decode(&spans); err != nil {
 			log.Errorf("cannot decode %s traces payload: %v", v, err)
 			HTTPDecodingError(err, []string{tagTraceHandler, fmt.Sprintf("v:%s", v)}, w)
 			return nil, false
 		}
-		traces = model.TracesFromSpans(spans)
+		traces = agent.TracesFromSpans(spans)
 	case v02:
 		fallthrough
 	case v03:

@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,30 +13,30 @@ func TestProcessor(t *testing.T) {
 		name                 string
 		extractorRates       []float64
 		samplerRate          float64
-		priority             model.SamplingPriority
+		priority             agent.SamplingPriority
 		expectedExtractedPct float64
 		expectedSampledPct   float64
 		deltaPct             float64
 	}{
 		// Name: <extraction rates>/<maxEPSSampler rate>/<priority>
-		{"none/1/none", nil, 1, model.PriorityNone, 0, 0, 0},
+		{"none/1/none", nil, 1, agent.PriorityNone, 0, 0, 0},
 
 		// Test Extractors
-		{"0/1/none", []float64{0}, 1, model.PriorityNone, 0, 0, 0},
-		{"0.5/1/none", []float64{0.5}, 1, model.PriorityNone, 0.5, 1, 0.1},
-		{"-1,0.8/1/none", []float64{-1, 0.8}, 1, model.PriorityNone, 0.8, 1, 0.1},
-		{"-1,-1,-0.8/1/none", []float64{-1, -1, 0.8}, 1, model.PriorityNone, 0.8, 1, 0.1},
+		{"0/1/none", []float64{0}, 1, agent.PriorityNone, 0, 0, 0},
+		{"0.5/1/none", []float64{0.5}, 1, agent.PriorityNone, 0.5, 1, 0.1},
+		{"-1,0.8/1/none", []float64{-1, 0.8}, 1, agent.PriorityNone, 0.8, 1, 0.1},
+		{"-1,-1,-0.8/1/none", []float64{-1, -1, 0.8}, 1, agent.PriorityNone, 0.8, 1, 0.1},
 
 		// Test MaxEPS sampler
-		{"1/0/none", []float64{1}, 0, model.PriorityNone, 1, 0, 0},
-		{"1/0.5/none", []float64{1}, 0.5, model.PriorityNone, 1, 0.5, 0.1},
-		{"1/1/none", []float64{1}, 1, model.PriorityNone, 1, 1, 0},
+		{"1/0/none", []float64{1}, 0, agent.PriorityNone, 1, 0, 0},
+		{"1/0.5/none", []float64{1}, 0.5, agent.PriorityNone, 1, 0.5, 0.1},
+		{"1/1/none", []float64{1}, 1, agent.PriorityNone, 1, 1, 0},
 
 		// Test Extractor and Sampler combinations
-		{"-1,0.8/0.8/none", []float64{-1, 0.8}, 0.8, model.PriorityNone, 0.8, 0.8, 0.1},
-		{"-1,0.8/0.8/autokeep", []float64{-1, 0.8}, 0.8, model.PriorityAutoKeep, 0.8, 0.8, 0.1},
+		{"-1,0.8/0.8/none", []float64{-1, 0.8}, 0.8, agent.PriorityNone, 0.8, 0.8, 0.1},
+		{"-1,0.8/0.8/autokeep", []float64{-1, 0.8}, 0.8, agent.PriorityAutoKeep, 0.8, 0.8, 0.1},
 		// Test userkeep bypass of max eps
-		{"-1,0.8/0.8/userkeep", []float64{-1, 0.8}, 0.8, model.PriorityUserKeep, 0.8, 1, 0.1},
+		{"-1,0.8/0.8/userkeep", []float64{-1, 0.8}, 0.8, agent.PriorityUserKeep, 0.8, 1, 0.1},
 	}
 
 	testClientSampleRate := 0.3
@@ -55,11 +55,11 @@ func TestProcessor(t *testing.T) {
 			p := newProcessor(extractors, sampler)
 
 			testSpans := createTestSpans("test", "test")
-			testTrace := model.ProcessedTrace{WeightedTrace: testSpans}
+			testTrace := agent.ProcessedTrace{WeightedTrace: testSpans}
 			testTrace.Root = testSpans[0].Span
 			testTrace.Root.SetPreSampleRate(testPreSampleRate)
 			testTrace.Root.SetClientTraceSampleRate(testClientSampleRate)
-			if test.priority != model.PriorityNone {
+			if test.priority != agent.PriorityNone {
 				testTrace.Root.SetSamplingPriority(test.priority)
 			}
 
@@ -79,7 +79,7 @@ func TestProcessor(t *testing.T) {
 			assert.EqualValues(1, sampler.StopCalls)
 
 			expectedSampleCalls := extracted
-			if test.priority == model.PriorityUserKeep {
+			if test.priority == agent.PriorityUserKeep {
 				expectedSampleCalls = 0
 			}
 			assert.EqualValues(expectedSampleCalls, sampler.SampleCalls)
@@ -92,7 +92,7 @@ func TestProcessor(t *testing.T) {
 
 				priority, ok := event.Span.GetSamplingPriority()
 				if !ok {
-					priority = model.PriorityNone
+					priority = agent.PriorityNone
 				}
 				assert.EqualValues(test.priority, priority)
 			}
@@ -104,12 +104,12 @@ type MockExtractor struct {
 	Rate float64
 }
 
-func (e *MockExtractor) Extract(s *model.WeightedSpan, priority model.SamplingPriority) (*model.Event, float64, bool) {
+func (e *MockExtractor) Extract(s *agent.WeightedSpan, priority agent.SamplingPriority) (*agent.Event, float64, bool) {
 	if e.Rate < 0 {
 		return nil, 0, false
 	}
 
-	return &model.Event{
+	return &agent.Event{
 		Span:     s.Span,
 		Priority: priority,
 	}, e.Rate, true
@@ -131,7 +131,7 @@ func (s *MockEventSampler) Stop() {
 	s.StopCalls++
 }
 
-func (s *MockEventSampler) Sample(event *model.Event) (bool, float64) {
+func (s *MockEventSampler) Sample(event *agent.Event) (bool, float64) {
 	s.SampleCalls++
 
 	return rand.Float64() < s.Rate, s.Rate

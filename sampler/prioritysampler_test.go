@@ -7,7 +7,7 @@ import (
 
 	log "github.com/cihub/seelog"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,14 +28,14 @@ func getTestPriorityEngine() *PriorityEngine {
 	return NewPriorityEngine(extraRate, maxTPS, &rateByService)
 }
 
-func getTestTraceWithService(t *testing.T, service string, s *PriorityEngine) (model.Trace, *model.Span) {
+func getTestTraceWithService(t *testing.T, service string, s *PriorityEngine) (agent.Trace, *agent.Span) {
 	tID := randomTraceID()
-	trace := model.Trace{
-		&model.Span{TraceID: tID, SpanID: 1, ParentID: 0, Start: 42, Duration: 1000000, Service: service, Type: "web", Meta: map[string]string{"env": defaultEnv}},
-		&model.Span{TraceID: tID, SpanID: 2, ParentID: 1, Start: 100, Duration: 200000, Service: service, Type: "sql"},
+	trace := agent.Trace{
+		&agent.Span{TraceID: tID, SpanID: 1, ParentID: 0, Start: 42, Duration: 1000000, Service: service, Type: "web", Meta: map[string]string{"env": defaultEnv}},
+		&agent.Span{TraceID: tID, SpanID: 2, ParentID: 1, Start: 100, Duration: 200000, Service: service, Type: "sql"},
 	}
 	r := rand.Float64()
-	priority := model.PriorityAutoDrop
+	priority := agent.PriorityAutoDrop
 	rates := s.getRateByService()
 	key := byServiceKey(trace[0].Service, defaultEnv)
 	var rate float64
@@ -45,7 +45,7 @@ func getTestTraceWithService(t *testing.T, service string, s *PriorityEngine) (m
 		rate = 1
 	}
 	if r <= rate {
-		priority = model.PriorityAutoKeep
+		priority = agent.PriorityAutoKeep
 	}
 	trace[0].SetSamplingPriority(priority)
 	return trace, trace[0]
@@ -104,14 +104,14 @@ func TestPrioritySample(t *testing.T) {
 	s = getTestPriorityEngine()
 	trace, root = getTestTraceWithService(t, "my-service", s)
 
-	root.SetSamplingPriority(model.PriorityUserKeep)
+	root.SetSamplingPriority(agent.PriorityUserKeep)
 	sampled, rate = s.Sample(trace, root, env)
 	assert.True(sampled, "trace with high priority is kept")
 	assert.Equal(1.0, rate, "sampling all traces")
 	assert.Equal(0.0, s.Sampler.Backend.GetTotalScore(), "sampling a high priority trace should *NOT* increase total score")
 	assert.Equal(0.0, s.Sampler.Backend.GetSampledScore(), "sampling a high priority trace should *NOT* increase sampled score")
 
-	delete(root.Metrics, model.SamplingPriorityKey)
+	delete(root.Metrics, agent.SamplingPriorityKey)
 	sampled, _ = s.Sample(trace, root, env)
 	assert.False(sampled, "this should not happen but a trace without priority sampling set should be dropped")
 }
@@ -125,7 +125,7 @@ func TestPrioritySampleTracerWeight(t *testing.T) {
 	clientRate := 0.33
 	for i := 0; i < 10; i++ {
 		trace, root := getTestTraceWithService(t, "my-service", s)
-		root.SetSamplingPriority(model.SamplingPriority(i % 2))
+		root.SetSamplingPriority(agent.SamplingPriority(i % 2))
 		root.Metrics[SamplingPriorityRateKey] = clientRate
 		_, rate := s.Sample(trace, root, env)
 		assert.Equal(clientRate, rate)

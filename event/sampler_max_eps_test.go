@@ -3,7 +3,7 @@ package event
 import (
 	"testing"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/testutil"
 	"github.com/stretchr/testify/assert"
 )
@@ -11,7 +11,7 @@ import (
 func TestMaxEPSSampler(t *testing.T) {
 	for _, testCase := range []struct {
 		name               string
-		events             []*model.Event
+		events             []*agent.Event
 		maxEPS             float64
 		pastEPS            float64
 		expectedSampleRate float64
@@ -48,7 +48,7 @@ func TestMaxEPSSampler(t *testing.T) {
 			nonUserKeep := 0
 
 			for _, event := range testCase.events {
-				if event.Priority != model.PriorityUserKeep {
+				if event.Priority != agent.PriorityUserKeep {
 					nonUserKeep++
 				}
 			}
@@ -59,10 +59,10 @@ func TestMaxEPSSampler(t *testing.T) {
 	}
 }
 
-func generateTestEvents(numEvents int) []*model.Event {
-	testEvents := make([]*model.Event, numEvents)
+func generateTestEvents(numEvents int) []*agent.Event {
+	testEvents := make([]*agent.Event, numEvents)
 	for i, _ := range testEvents {
-		testEvents[i] = &model.Event{
+		testEvents[i] = &agent.Event{
 			Span: testutil.RandomSpan(),
 		}
 	}

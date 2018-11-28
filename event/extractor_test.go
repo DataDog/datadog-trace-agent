@@ -3,14 +3,14 @@ package event
 import (
 	"testing"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/stretchr/testify/assert"
 )
 
 type extractorTestCase struct {
 	name                   string
-	spans                  []*model.WeightedSpan
-	priority               model.SamplingPriority
+	spans                  []*agent.WeightedSpan
+	priority               agent.SamplingPriority
 	expectedExtractionRate float64
 }
 

@@ -14,7 +14,7 @@
 package sampler
 
 import (
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 )
 
 // ScoreEngine is the main component of the sampling logic
@@ -56,7 +56,7 @@ func (s *ScoreEngine) Stop() {
 	s.Sampler.Stop()
 }
 
-func applySampleRate(root *model.Span, rate float64) bool {
+func applySampleRate(root *agent.Span, rate float64) bool {
 	initialRate := root.GetSampleRate()
 	newRate := initialRate * rate
 	traceID := root.TraceID
@@ -64,7 +64,7 @@ func applySampleRate(root *model.Span, rate float64) bool {
 }
 
 // Sample counts an incoming trace and tells if it is a sample which has to be kept
-func (s *ScoreEngine) Sample(trace model.Trace, root *model.Span, env string) (sampled bool, rate float64) {
+func (s *ScoreEngine) Sample(trace agent.Trace, root *agent.Span, env string) (sampled bool, rate float64) {
 	// Extra safety, just in case one trace is empty
 	if len(trace) == 0 {
 		return false, 0

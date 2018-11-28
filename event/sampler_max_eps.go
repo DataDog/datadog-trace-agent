@@ -5,7 +5,7 @@ import (
 
 	log "github.com/cihub/seelog"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 )
@@ -65,7 +65,7 @@ func (s *maxEPSSampler) Stop() {
 
 // Sample determines whether or not we should sample the provided event in order to ensure no more than maxEPS events
 // are sampled every second.
-func (s *maxEPSSampler) Sample(event *model.Event) (sampled bool, rate float64) {
+func (s *maxEPSSampler) Sample(event *agent.Event) (sampled bool, rate float64) {
 	// Count that we saw a new event
 	s.rateCounter.Count()
 	rate = 1.0

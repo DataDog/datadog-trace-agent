@@ -4,12 +4,12 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 )
 
 // obfuscateHTTP obfuscates query strings and path segments containing digits in the span's
 // "http.url" tag, when one or both of these options are enabled.
-func (o *Obfuscator) obfuscateHTTP(span *model.Span) {
+func (o *Obfuscator) obfuscateHTTP(span *agent.Span) {
 	if span.Meta == nil {
 		return
 	}

@@ -1,7 +1,7 @@
 package sampler
 
 import (
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 )
 
 const defaultServiceRateKey = "service:,env:"
@@ -16,7 +16,7 @@ func newServiceKeyCatalog() serviceKeyCatalog {
 	return serviceKeyCatalog(make(map[string]Signature))
 }
 
-func (cat serviceKeyCatalog) register(root *model.Span, env string, sig Signature) {
+func (cat serviceKeyCatalog) register(root *agent.Span, env string, sig Signature) {
 	map[string]Signature(cat)[byServiceKey(root.Service, env)] = sig
 }
 

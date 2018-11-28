@@ -3,7 +3,7 @@ package filters
 import (
 	"regexp"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 
 	log "github.com/cihub/seelog"
 )
@@ -15,7 +15,7 @@ type Blacklister struct {
 }
 
 // Allows returns true if the Blacklister permits this span.
-func (f *Blacklister) Allows(span *model.Span) bool {
+func (f *Blacklister) Allows(span *agent.Span) bool {
 	for _, entry := range f.list {
 		if entry.MatchString(span.Resource) {
 			return false
