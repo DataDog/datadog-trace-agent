@@ -5,8 +5,8 @@ package obfuscate
 import (
 	"bytes"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/model"
 )
 
 // Obfuscator quantizes and obfuscates spans. The obfuscator is not safe for
@@ -38,7 +38,7 @@ func NewObfuscator(cfg *config.ObfuscationConfig) *Obfuscator {
 
 // Obfuscate may obfuscate span's properties based on its type and on the Obfuscator's
 // configuration.
-func (o *Obfuscator) Obfuscate(span *model.Span) {
+func (o *Obfuscator) Obfuscate(span *agent.Span) {
 	switch span.Type {
 	case "sql", "cassandra":
 		o.obfuscateSQL(span)

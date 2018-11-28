@@ -7,12 +7,12 @@ import (
 
 	log "github.com/cihub/seelog"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/api"
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/event"
 	"github.com/DataDog/datadog-trace-agent/filters"
 	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/obfuscate"
 	"github.com/DataDog/datadog-trace-agent/osutil"
 	"github.com/DataDog/datadog-trace-agent/sampler"
@@ -59,11 +59,11 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	dynConf := sampler.NewDynamicConfig()
 
 	// inter-component channels
-	rawTraceChan := make(chan model.Trace, 5000) // about 1000 traces/sec for 5 sec, TODO: move to *model.Trace
+	rawTraceChan := make(chan agent.Trace, 5000) // about 1000 traces/sec for 5 sec, TODO: move to *model.Trace
 	tracePkgChan := make(chan *writer.TracePackage)
-	statsChan := make(chan []model.StatsBucket)
-	serviceChan := make(chan model.ServicesMetadata, 50)
-	filteredServiceChan := make(chan model.ServicesMetadata, 50)
+	statsChan := make(chan []agent.StatsBucket)
+	serviceChan := make(chan agent.ServicesMetadata, 50)
+	filteredServiceChan := make(chan agent.ServicesMetadata, 50)
 
 	// create components
 	r := api.NewHTTPReceiver(conf, dynConf, rawTraceChan, serviceChan)
@@ -157,7 +157,7 @@ func (a *Agent) Run() {
 
 // Process is the default work unit that receives a trace, transforms it and
 // passes it downstream.
-func (a *Agent) Process(t model.Trace) {
+func (a *Agent) Process(t agent.Trace) {
 	if len(t) == 0 {
 		log.Debugf("skipping received empty trace")
 		return
@@ -216,16 +216,16 @@ func (a *Agent) Process(t model.Trace) {
 	t.ComputeTopLevel()
 
 	subtraces := t.ExtractTopLevelSubtraces(root)
-	sublayers := make(map[*model.Span][]model.SublayerValue)
+	sublayers := make(map[*agent.Span][]agent.SublayerValue)
 	for _, subtrace := range subtraces {
-		subtraceSublayers := model.ComputeSublayers(subtrace.Trace)
+		subtraceSublayers := agent.ComputeSublayers(subtrace.Trace)
 		sublayers[subtrace.Root] = subtraceSublayers
-		model.SetSublayersOnSpan(subtrace.Root, subtraceSublayers)
+		agent.SetSublayersOnSpan(subtrace.Root, subtraceSublayers)
 	}
 
-	pt := model.ProcessedTrace{
+	pt := agent.ProcessedTrace{
 		Trace:         t,
-		WeightedTrace: model.NewWeightedTrace(t, root),
+		WeightedTrace: agent.NewWeightedTrace(t, root),
 		Root:          root,
 		Env:           a.conf.DefaultEnv,
 		Sublayers:     sublayers,
@@ -240,7 +240,7 @@ func (a *Agent) Process(t model.Trace) {
 		a.ServiceExtractor.Process(pt.WeightedTrace)
 	}()
 
-	go func(pt model.ProcessedTrace) {
+	go func(pt agent.ProcessedTrace) {
 		defer watchdog.LogOnPanic()
 		// Everything is sent to concentrator for stats, regardless of sampling.
 		a.Concentrator.Add(pt)
@@ -251,7 +251,7 @@ func (a *Agent) Process(t model.Trace) {
 		return
 	}
 	// Run both full trace sampling and transaction extraction in another goroutine.
-	go func(pt model.ProcessedTrace) {
+	go func(pt agent.ProcessedTrace) {
 		defer watchdog.LogOnPanic()
 
 		tracePkg := writer.TracePackage{}
@@ -277,7 +277,7 @@ func (a *Agent) Process(t model.Trace) {
 	}(pt)
 }
 
-func (a *Agent) sample(pt model.ProcessedTrace) (sampled bool, rate float64) {
+func (a *Agent) sample(pt agent.ProcessedTrace) (sampled bool, rate float64) {
 	var sampledPriority, sampledScore bool
 	var ratePriority, rateScore float64
 
@@ -327,7 +327,7 @@ func (a *Agent) watchdog() {
 	info.UpdatePreSampler(*preSamplerStats)
 }
 
-func traceContainsError(trace model.Trace) bool {
+func traceContainsError(trace agent.Trace) bool {
 	for _, span := range trace {
 		if span.Error != 0 {
 			return true

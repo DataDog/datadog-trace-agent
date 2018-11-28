@@ -1,7 +1,7 @@
 package testutil
 
 import (
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 )
 
@@ -17,7 +17,7 @@ func NewMockEngine(wantSampled bool, wantRate float64) *MockEngine {
 }
 
 // Sample returns a constant rate
-func (e *MockEngine) Sample(_ model.Trace, _ *model.Span, _ string) (bool, float64) {
+func (e *MockEngine) Sample(_ agent.Trace, _ *agent.Span, _ string) (bool, float64) {
 	return e.wantSampled, e.wantRate
 }
 

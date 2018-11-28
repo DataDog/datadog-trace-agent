@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 	log "github.com/cihub/seelog"
 	"github.com/stretchr/testify/assert"
 )
@@ -74,7 +74,7 @@ func TestAddSampleRate(t *testing.T) {
 	assert := assert.New(t)
 	tID := randomTraceID()
 
-	root := model.Span{TraceID: tID, SpanID: 1, ParentID: 0, Start: 123, Duration: 100000, Service: "mcnulty", Type: "web"}
+	root := agent.Span{TraceID: tID, SpanID: 1, ParentID: 0, Start: 123, Duration: 100000, Service: "mcnulty", Type: "web"}
 
 	root.UpdateSampleRate(0.4)
 	assert.Equal(0.4, root.Metrics["_sample_rate"], "sample rate should be 40%%")

@@ -1,7 +1,7 @@
 package event
 
 import (
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/sampler"
 )
 
@@ -45,14 +45,14 @@ func (p *Processor) Stop() {
 
 // Process takes a processed trace, extracts events from it and samples them, returning a collection of
 // sampled events along with the total count of extracted events.
-func (p *Processor) Process(t model.ProcessedTrace) (events []*model.Event, numExtracted int64) {
+func (p *Processor) Process(t agent.ProcessedTrace) (events []*agent.Event, numExtracted int64) {
 	if len(p.extractors) == 0 {
 		return
 	}
 
 	priority, hasPriority := t.GetSamplingPriority()
 	if !hasPriority {
-		priority = model.PriorityNone
+		priority = agent.PriorityNone
 	}
 
 	clientSampleRate := t.Root.GetClientSampleRate()
@@ -91,7 +91,7 @@ func (p *Processor) Process(t model.ProcessedTrace) (events []*model.Event, numE
 	return
 }
 
-func (p *Processor) extract(span *model.WeightedSpan, priority model.SamplingPriority) (*model.Event, float64, bool) {
+func (p *Processor) extract(span *agent.WeightedSpan, priority agent.SamplingPriority) (*agent.Event, float64, bool) {
 	for _, extractor := range p.extractors {
 		if event, rate, ok := extractor.Extract(span, priority); ok {
 			return event, rate, ok
@@ -100,12 +100,12 @@ func (p *Processor) extract(span *model.WeightedSpan, priority model.SamplingPri
 	return nil, 0, false
 }
 
-func (p *Processor) extractionSample(event *model.Event, extractionRate float64) bool {
+func (p *Processor) extractionSample(event *agent.Event, extractionRate float64) bool {
 	return sampler.SampleByRate(event.Span.TraceID, extractionRate)
 }
 
-func (p *Processor) maxEPSSample(event *model.Event) (sampled bool, rate float64) {
-	if event.Priority == model.PriorityUserKeep {
+func (p *Processor) maxEPSSample(event *agent.Event) (sampled bool, rate float64) {
+	if event.Priority == agent.PriorityUserKeep {
 		return true, 1
 	}
 	return p.maxEPSSampler.Sample(event)
@@ -113,6 +113,6 @@ func (p *Processor) maxEPSSample(event *model.Event) (sampled bool, rate float64
 
 type eventSampler interface {
 	Start()
-	Sample(event *model.Event) (sampled bool, rate float64)
+	Sample(event *agent.Event) (sampled bool, rate float64)
 	Stop()
 }

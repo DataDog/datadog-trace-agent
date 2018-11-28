@@ -17,7 +17,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/watchdog"
 )
 
@@ -52,7 +52,7 @@ type Engine interface {
 	// Stop the sampler.
 	Stop()
 	// Sample a trace.
-	Sample(trace model.Trace, root *model.Span, env string) (sampled bool, samplingRate float64)
+	Sample(trace agent.Trace, root *agent.Span, env string) (sampled bool, samplingRate float64)
 	// GetState returns information about the sampler.
 	GetState() interface{}
 	// GetType returns the type of the sampler.
@@ -146,7 +146,7 @@ func (s *Sampler) RunAdjustScoring() {
 }
 
 // GetSampleRate returns the sample rate to apply to a trace.
-func (s *Sampler) GetSampleRate(trace model.Trace, root *model.Span, signature Signature) float64 {
+func (s *Sampler) GetSampleRate(trace agent.Trace, root *agent.Span, signature Signature) float64 {
 	rate := s.GetSignatureSampleRate(signature) * s.extraRate
 
 	return rate

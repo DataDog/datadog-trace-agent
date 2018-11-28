@@ -6,14 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/stretchr/testify/assert"
 )
 
 var testBucketInterval = time.Duration(2 * time.Second).Nanoseconds()
 
 func NewTestConcentrator() *Concentrator {
-	statsChan := make(chan []model.StatsBucket)
+	statsChan := make(chan []agent.StatsBucket)
 	return NewConcentrator([]string{}, time.Second.Nanoseconds(), statsChan)
 }
 
@@ -24,11 +24,11 @@ func getTsInBucket(alignedNow int64, bsize int64, offset int64) int64 {
 
 // testSpan avoids typo and inconsistency in test spans (typical pitfall: duration, start time,
 // and end time are aligned, and end time is the one that needs to be aligned
-func testSpan(spanID uint64, parentID uint64, duration, offset int64, service, resource string, err int32) *model.Span {
-	now := model.Now()
+func testSpan(spanID uint64, parentID uint64, duration, offset int64, service, resource string, err int32) *agent.Span {
+	now := agent.Now()
 	alignedNow := now - now%testBucketInterval
 
-	return &model.Span{
+	return &agent.Span{
 		SpanID:   spanID,
 		ParentID: parentID,
 		Duration: duration,
@@ -45,12 +45,12 @@ func testSpan(spanID uint64, parentID uint64, duration, offset int64, service, r
 // time before its start
 func TestConcentratorOldestTs(t *testing.T) {
 	assert := assert.New(t)
-	statsChan := make(chan []model.StatsBucket)
+	statsChan := make(chan []agent.StatsBucket)
 
-	now := model.Now()
+	now := agent.Now()
 
 	// Build that simply have spans spread over time windows.
-	trace := model.Trace{
+	trace := agent.Trace{
 		testSpan(1, 0, 50, 5, "A1", "resource1", 0),
 		testSpan(1, 0, 40, 4, "A1", "resource1", 0),
 		testSpan(1, 0, 30, 3, "A1", "resource1", 0),
@@ -60,9 +60,9 @@ func TestConcentratorOldestTs(t *testing.T) {
 	}
 
 	trace.ComputeTopLevel()
-	wt := model.NewWeightedTrace(trace, trace.GetRoot())
+	wt := agent.NewWeightedTrace(trace, trace.GetRoot())
 
-	testTrace := model.ProcessedTrace{
+	testTrace := agent.ProcessedTrace{
 		Env:           "none",
 		Trace:         trace,
 		WeightedTrace: wt,
@@ -150,10 +150,10 @@ func TestConcentratorOldestTs(t *testing.T) {
 // time bucket they end up.
 func TestConcentratorStatsTotals(t *testing.T) {
 	assert := assert.New(t)
-	statsChan := make(chan []model.StatsBucket)
+	statsChan := make(chan []agent.StatsBucket)
 	c := NewConcentrator([]string{}, testBucketInterval, statsChan)
 
-	now := model.Now()
+	now := agent.Now()
 	alignedNow := alignTs(now, c.bsize)
 
 	// update oldestTs as it running for quite some time, to avoid the fact that at startup
@@ -161,7 +161,7 @@ func TestConcentratorStatsTotals(t *testing.T) {
 	c.oldestTs = alignedNow - int64(c.bufferLen)*c.bsize
 
 	// Build that simply have spans spread over time windows.
-	trace := model.Trace{
+	trace := agent.Trace{
 		testSpan(1, 0, 50, 5, "A1", "resource1", 0),
 		testSpan(1, 0, 40, 4, "A1", "resource1", 0),
 		testSpan(1, 0, 30, 3, "A1", "resource1", 0),
@@ -171,9 +171,9 @@ func TestConcentratorStatsTotals(t *testing.T) {
 	}
 
 	trace.ComputeTopLevel()
-	wt := model.NewWeightedTrace(trace, trace.GetRoot())
+	wt := agent.NewWeightedTrace(trace, trace.GetRoot())
 
-	testTrace := model.ProcessedTrace{
+	testTrace := agent.ProcessedTrace{
 		Env:           "none",
 		Trace:         trace,
 		WeightedTrace: wt,
@@ -209,10 +209,10 @@ func TestConcentratorStatsTotals(t *testing.T) {
 // TestConcentratorStatsCounts tests exhaustively each stats bucket, over multiple time buckets.
 func TestConcentratorStatsCounts(t *testing.T) {
 	assert := assert.New(t)
-	statsChan := make(chan []model.StatsBucket)
+	statsChan := make(chan []agent.StatsBucket)
 	c := NewConcentrator([]string{}, testBucketInterval, statsChan)
 
-	now := model.Now()
+	now := agent.Now()
 	alignedNow := alignTs(now, c.bsize)
 
 	// update oldestTs as it running for quite some time, to avoid the fact that at startup
@@ -220,7 +220,7 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	c.oldestTs = alignedNow - int64(c.bufferLen)*c.bsize
 
 	// Build a trace with stats which should cover 3 time buckets.
-	trace := model.Trace{
+	trace := agent.Trace{
 		// more than 2 buckets old, should be added to the 2 bucket-old, first flush.
 		testSpan(1, 0, 111, 10, "A1", "resource1", 0),
 		testSpan(1, 0, 222, 3, "A1", "resource1", 0),
@@ -277,9 +277,9 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	expectedCountValByKeyByTime[alignedNow+testBucketInterval] = map[string]int64{}
 
 	trace.ComputeTopLevel()
-	wt := model.NewWeightedTrace(trace, trace.GetRoot())
+	wt := agent.NewWeightedTrace(trace, trace.GetRoot())
 
-	testTrace := model.ProcessedTrace{
+	testTrace := agent.ProcessedTrace{
 		Env:           "none",
 		Trace:         trace,
 		WeightedTrace: wt,
@@ -302,7 +302,7 @@ func TestConcentratorStatsCounts(t *testing.T) {
 				t.FailNow()
 			}
 
-			receivedBuckets := []model.StatsBucket{stats[0]}
+			receivedBuckets := []agent.StatsBucket{stats[0]}
 
 			assert.Equal(expectedFlushedTs, receivedBuckets[0].Start)
 
@@ -333,13 +333,13 @@ func TestConcentratorStatsCounts(t *testing.T) {
 // TestConcentratorSublayersStatsCounts tests exhaustively the sublayer stats of a single time window.
 func TestConcentratorSublayersStatsCounts(t *testing.T) {
 	assert := assert.New(t)
-	statsChan := make(chan []model.StatsBucket)
+	statsChan := make(chan []agent.StatsBucket)
 	c := NewConcentrator([]string{}, testBucketInterval, statsChan)
 
-	now := model.Now()
+	now := agent.Now()
 	alignedNow := now - now%c.bsize
 
-	trace := model.Trace{
+	trace := agent.Trace{
 		// first bucket
 		testSpan(1, 0, 2000, 0, "A1", "resource1", 0),
 		testSpan(2, 1, 1000, 0, "A2", "resource2", 0),
@@ -349,16 +349,16 @@ func TestConcentratorSublayersStatsCounts(t *testing.T) {
 		testSpan(6, 2, 30, 0, "A3", "resource6", 0),
 	}
 	trace.ComputeTopLevel()
-	wt := model.NewWeightedTrace(trace, trace.GetRoot())
+	wt := agent.NewWeightedTrace(trace, trace.GetRoot())
 
 	subtraces := trace.ExtractTopLevelSubtraces(trace.GetRoot())
-	sublayers := make(map[*model.Span][]model.SublayerValue)
+	sublayers := make(map[*agent.Span][]agent.SublayerValue)
 	for _, subtrace := range subtraces {
-		subtraceSublayers := model.ComputeSublayers(subtrace.Trace)
+		subtraceSublayers := agent.ComputeSublayers(subtrace.Trace)
 		sublayers[subtrace.Root] = subtraceSublayers
 	}
 
-	testTrace := model.ProcessedTrace{
+	testTrace := agent.ProcessedTrace{
 		Env:           "none",
 		Trace:         trace,
 		WeightedTrace: wt,
@@ -374,7 +374,7 @@ func TestConcentratorSublayersStatsCounts(t *testing.T) {
 
 	assert.Equal(alignedNow, stats[0].Start)
 
-	var receivedCounts map[string]model.Count
+	var receivedCounts map[string]agent.Count
 
 	// Start with the first/older bucket
 	receivedCounts = stats[0].Counts

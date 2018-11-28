@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 )
 
 const (
@@ -86,7 +86,7 @@ func (s *PriorityEngine) Stop() {
 }
 
 // Sample counts an incoming trace and returns the trace sampling decision and the applied sampling rate
-func (s *PriorityEngine) Sample(trace model.Trace, root *model.Span, env string) (sampled bool, rate float64) {
+func (s *PriorityEngine) Sample(trace agent.Trace, root *agent.Span, env string) (sampled bool, rate float64) {
 	// Extra safety, just in case one trace is empty
 	if len(trace) == 0 {
 		return false, 0

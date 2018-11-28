@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/testutil"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
@@ -243,13 +243,13 @@ func TestTraceWriter(t *testing.T) {
 }
 
 func calculateTracePayloadSize(sampledTraces []*TracePackage) int64 {
-	apiTraces := make([]*model.APITrace, len(sampledTraces))
+	apiTraces := make([]*agent.APITrace, len(sampledTraces))
 
 	for i, trace := range sampledTraces {
 		apiTraces[i] = trace.Trace.APITrace()
 	}
 
-	tracePayload := model.TracePayload{
+	tracePayload := agent.TracePayload{
 		HostName: testHostName,
 		Env:      testEnv,
 		Traces:   apiTraces,
@@ -277,8 +277,8 @@ func calculateTracePayloadSize(sampledTraces []*TracePackage) int64 {
 func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expectedHeaders map[string]string,
 	sampledTraces []*TracePackage, payloads []*payload) {
 
-	var expectedTraces []model.Trace
-	var expectedEvents []*model.Event
+	var expectedTraces []agent.Trace
+	var expectedEvents []*agent.Event
 
 	for _, sampledTrace := range sampledTraces {
 		expectedTraces = append(expectedTraces, sampledTrace.Trace)
@@ -294,7 +294,7 @@ func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expecte
 	for _, payload := range payloads {
 		assert.Equal(expectedHeaders, payload.headers, "Payload headers should match expectation")
 
-		var tracePayload model.TracePayload
+		var tracePayload agent.TracePayload
 		payloadBuffer := bytes.NewBuffer(payload.bytes)
 		gz, err := gzip.NewReader(payloadBuffer)
 		assert.NoError(err, "Gzip reader should work correctly")
@@ -362,10 +362,10 @@ func randomTracePackage(numSpans, numEvents int) *TracePackage {
 
 	trace := testutil.GetTestTrace(1, numSpans, true)[0]
 
-	events := make([]*model.Event, 0, numEvents)
+	events := make([]*agent.Event, 0, numEvents)
 
 	for _, span := range trace[:numEvents] {
-		events = append(events, &model.Event{Span: span})
+		events = append(events, &agent.Event{Span: span})
 	}
 
 	return &TracePackage{

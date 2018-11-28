@@ -1,22 +1,22 @@
 package main
 
 import (
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 )
 
 // TraceServiceExtractor extracts service metadata from top-level spans
 type TraceServiceExtractor struct {
-	outServices chan<- model.ServicesMetadata
+	outServices chan<- agent.ServicesMetadata
 }
 
 // NewTraceServiceExtractor returns a new TraceServiceExtractor
-func NewTraceServiceExtractor(out chan<- model.ServicesMetadata) *TraceServiceExtractor {
+func NewTraceServiceExtractor(out chan<- agent.ServicesMetadata) *TraceServiceExtractor {
 	return &TraceServiceExtractor{out}
 }
 
 // Process extracts service metadata from top-level spans and sends it downstream
-func (ts *TraceServiceExtractor) Process(t model.WeightedTrace) {
-	meta := make(model.ServicesMetadata)
+func (ts *TraceServiceExtractor) Process(t agent.WeightedTrace) {
+	meta := make(agent.ServicesMetadata)
 
 	for _, s := range t {
 		if !s.TopLevel {
@@ -28,7 +28,7 @@ func (ts *TraceServiceExtractor) Process(t model.WeightedTrace) {
 		}
 
 		if v := s.Type; len(v) > 0 {
-			meta[s.Service] = map[string]string{model.AppType: v}
+			meta[s.Service] = map[string]string{agent.AppType: v}
 		}
 	}
 

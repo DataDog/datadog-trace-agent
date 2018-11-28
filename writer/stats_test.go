@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/agent"
 	"github.com/DataDog/datadog-trace-agent/config"
 	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/model"
 	"github.com/DataDog/datadog-trace-agent/statsd"
 	"github.com/DataDog/datadog-trace-agent/testutil"
 	writerconfig "github.com/DataDog/datadog-trace-agent/writer/config"
@@ -29,12 +29,12 @@ func TestStatsWriter_StatHandling(t *testing.T) {
 	statsWriter.Start()
 
 	// Given 2 slices of 3 test buckets
-	testStats1 := []model.StatsBucket{
+	testStats1 := []agent.StatsBucket{
 		testutil.RandomStatsBucket(3),
 		testutil.RandomStatsBucket(3),
 		testutil.RandomStatsBucket(3),
 	}
-	testStats2 := []model.StatsBucket{
+	testStats2 := []agent.StatsBucket{
 		testutil.RandomStatsBucket(3),
 		testutil.RandomStatsBucket(3),
 		testutil.RandomStatsBucket(3),
@@ -84,7 +84,7 @@ func TestStatsWriter_UpdateInfoHandling(t *testing.T) {
 
 	// When sending 1 payload with 3 buckets
 	expectedNumPayloads++
-	payload1Buckets := []model.StatsBucket{
+	payload1Buckets := []agent.StatsBucket{
 		testutil.RandomStatsBucket(5),
 		testutil.RandomStatsBucket(5),
 		testutil.RandomStatsBucket(5),
@@ -95,7 +95,7 @@ func TestStatsWriter_UpdateInfoHandling(t *testing.T) {
 
 	// And another one with another 3 buckets
 	expectedNumPayloads++
-	payload2Buckets := []model.StatsBucket{
+	payload2Buckets := []agent.StatsBucket{
 		testutil.RandomStatsBucket(5),
 		testutil.RandomStatsBucket(5),
 		testutil.RandomStatsBucket(5),
@@ -110,7 +110,7 @@ func TestStatsWriter_UpdateInfoHandling(t *testing.T) {
 	// And then sending a third payload with other 3 buckets with an errored out endpoint
 	testEndpoint.SetError(fmt.Errorf("non retriable error"))
 	expectedNumErrors++
-	payload3Buckets := []model.StatsBucket{
+	payload3Buckets := []agent.StatsBucket{
 		testutil.RandomStatsBucket(5),
 		testutil.RandomStatsBucket(5),
 		testutil.RandomStatsBucket(5),
@@ -128,7 +128,7 @@ func TestStatsWriter_UpdateInfoHandling(t *testing.T) {
 		endpoint: testEndpoint,
 	})
 	expectedMinNumRetries++
-	payload4Buckets := []model.StatsBucket{
+	payload4Buckets := []agent.StatsBucket{
 		testutil.RandomStatsBucket(5),
 		testutil.RandomStatsBucket(5),
 		testutil.RandomStatsBucket(5),
@@ -182,7 +182,7 @@ func TestStatsWriter_BuildPayloads(t *testing.T) {
 		// This gives us a total of 45 entries. 3 per span, 5
 		// spans per stat bucket. Each buckets have the same
 		// time window (start: 0, duration 1e9).
-		stats := []model.StatsBucket{
+		stats := []agent.StatsBucket{
 			testutil.RandomStatsBucket(5),
 			testutil.RandomStatsBucket(5),
 			testutil.RandomStatsBucket(5),
@@ -225,7 +225,7 @@ func TestStatsWriter_BuildPayloads(t *testing.T) {
 		// This gives us a total of 45 entries. 3 per span, 5
 		// spans per stat bucket. Each buckets have the same
 		// time window (start: 0, duration 1e9).
-		stats := []model.StatsBucket{
+		stats := []agent.StatsBucket{
 			testutil.RandomStatsBucket(5),
 			testutil.RandomStatsBucket(5),
 			testutil.RandomStatsBucket(5),
@@ -290,7 +290,7 @@ func TestStatsWriter_BuildPayloads(t *testing.T) {
 		// This gives us a tota of 45 entries. 3 per span, 5 spans per
 		// stat bucket. Each buckets have the same time window (start:
 		// 0, duration 1e9).
-		stats := []model.StatsBucket{
+		stats := []agent.StatsBucket{
 			testutil.RandomStatsBucket(5),
 			testutil.RandomStatsBucket(5),
 			testutil.RandomStatsBucket(5),
@@ -309,7 +309,7 @@ func TestStatsWriter_BuildPayloads(t *testing.T) {
 	})
 }
 
-func removeDuplicateEntries(stats []model.StatsBucket) int {
+func removeDuplicateEntries(stats []agent.StatsBucket) int {
 	nbEntries := 0
 	entries := make(map[string]struct{}, 45)
 	for _, s := range stats {
@@ -325,7 +325,7 @@ func removeDuplicateEntries(stats []model.StatsBucket) int {
 	return nbEntries
 }
 
-func countsByEntries(stats []model.StatsBucket) map[string]float64 {
+func countsByEntries(stats []agent.StatsBucket) map[string]float64 {
 	counts := make(map[string]float64)
 	for _, s := range stats {
 		for k, c := range s.Counts {
@@ -341,7 +341,7 @@ func countsByEntries(stats []model.StatsBucket) map[string]float64 {
 	return counts
 }
 
-func assertCountByEntries(assert *assert.Assertions, expectedCounts map[string]float64, payloads []*model.StatsPayload) {
+func assertCountByEntries(assert *assert.Assertions, expectedCounts map[string]float64, payloads []*agent.StatsPayload) {
 	actualCounts := make(map[string]float64)
 	for _, p := range payloads {
 		for _, s := range p.Stats {
@@ -359,19 +359,19 @@ func assertCountByEntries(assert *assert.Assertions, expectedCounts map[string]f
 	assert.Equal(expectedCounts, actualCounts)
 }
 
-func calculateStatPayloadSize(buckets []model.StatsBucket) int64 {
-	statsPayload := &model.StatsPayload{
+func calculateStatPayloadSize(buckets []agent.StatsBucket) int64 {
+	statsPayload := &agent.StatsPayload{
 		HostName: testHostName,
 		Env:      testEnv,
 		Stats:    buckets,
 	}
 
-	data, _ := model.EncodeStatsPayload(statsPayload)
+	data, _ := agent.EncodeStatsPayload(statsPayload)
 	return int64(len(data))
 }
 
-func assertStatsPayload(assert *assert.Assertions, headers map[string]string, buckets []model.StatsBucket, p *payload) {
-	statsPayload := model.StatsPayload{}
+func assertStatsPayload(assert *assert.Assertions, headers map[string]string, buckets []agent.StatsBucket, p *payload) {
+	statsPayload := agent.StatsPayload{}
 
 	reader := bytes.NewBuffer(p.bytes)
 	gzipReader, err := gzip.NewReader(reader)
@@ -388,8 +388,8 @@ func assertStatsPayload(assert *assert.Assertions, headers map[string]string, bu
 	assert.Equal(buckets, statsPayload.Stats, "Stat buckets should match expectation")
 }
 
-func testStatsWriter() (*StatsWriter, chan []model.StatsBucket, *testEndpoint, *testutil.TestStatsClient) {
-	statsChannel := make(chan []model.StatsBucket)
+func testStatsWriter() (*StatsWriter, chan []agent.StatsBucket, *testEndpoint, *testutil.TestStatsClient) {
+	statsChannel := make(chan []agent.StatsBucket)
 	conf := &config.AgentConfig{
 		Hostname:          testHostName,
 		DefaultEnv:        testEnv,

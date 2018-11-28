@@ -4,13 +4,13 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/DataDog/datadog-trace-agent/model"
+	"github.com/DataDog/datadog-trace-agent/agent"
 )
 
-func createTestSpans(serviceName string, operationName string) []*model.WeightedSpan {
-	spans := make([]*model.WeightedSpan, 1000)
+func createTestSpans(serviceName string, operationName string) []*agent.WeightedSpan {
+	spans := make([]*agent.WeightedSpan, 1000)
 	for i, _ := range spans {
-		spans[i] = &model.WeightedSpan{Span: &model.Span{TraceID: rand.Uint64(), Service: serviceName, Name: operationName}}
+		spans[i] = &agent.WeightedSpan{Span: &agent.Span{TraceID: rand.Uint64(), Service: serviceName, Name: operationName}}
 	}
 	return spans
 }
