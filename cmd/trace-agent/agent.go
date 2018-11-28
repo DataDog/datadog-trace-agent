@@ -7,18 +7,18 @@ import (
 
 	log "github.com/cihub/seelog"
 
-	"github.com/DataDog/datadog-trace-agent/agent"
-	"github.com/DataDog/datadog-trace-agent/api"
-	"github.com/DataDog/datadog-trace-agent/config"
-	"github.com/DataDog/datadog-trace-agent/event"
-	"github.com/DataDog/datadog-trace-agent/filters"
-	"github.com/DataDog/datadog-trace-agent/info"
-	"github.com/DataDog/datadog-trace-agent/obfuscate"
-	"github.com/DataDog/datadog-trace-agent/osutil"
-	"github.com/DataDog/datadog-trace-agent/sampler"
-	"github.com/DataDog/datadog-trace-agent/statsd"
-	"github.com/DataDog/datadog-trace-agent/watchdog"
-	"github.com/DataDog/datadog-trace-agent/writer"
+	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/api"
+	"github.com/DataDog/datadog-trace-agent/internal/config"
+	"github.com/DataDog/datadog-trace-agent/internal/event"
+	"github.com/DataDog/datadog-trace-agent/internal/filters"
+	"github.com/DataDog/datadog-trace-agent/internal/info"
+	"github.com/DataDog/datadog-trace-agent/internal/obfuscate"
+	"github.com/DataDog/datadog-trace-agent/internal/osutil"
+	"github.com/DataDog/datadog-trace-agent/internal/sampler"
+	"github.com/DataDog/datadog-trace-agent/internal/statsd"
+	"github.com/DataDog/datadog-trace-agent/internal/watchdog"
+	"github.com/DataDog/datadog-trace-agent/internal/writer"
 )
 
 const processStatsInterval = time.Minute
