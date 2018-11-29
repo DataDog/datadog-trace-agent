@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
-	"github.com/DataDog/datadog-trace-agent/test"
 )
 
 // The below example shows a common use-case scenario for the runner.
@@ -29,12 +28,11 @@ func Example() {
 	}
 
 	// Post a payload.
-	payload := test.TraceList{
-		test.Trace{test.NewSpan(nil)},
-		test.Trace{test.NewSpan(nil)},
+	payload := agent.Traces{
+		agent.Trace{NewSpan(nil)},
+		agent.Trace{NewSpan(nil)},
 	}
-	err := runner.Post(payload)
-	if err != nil {
+	if err := runner.Post(payload); err != nil {
 		log.Fatal(err)
 	}
 

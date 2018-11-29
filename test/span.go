@@ -1,6 +1,3 @@
-//go:generate msgp -marshal=false -o=span_msgp.go -tests=false
-//msgp:ignore SpanOpts
-
 package test
 
 import (
@@ -8,41 +5,15 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/tinylib/msgp/msgp"
-)
-
-var (
-	_ msgp.Encodable = (*TraceList)(nil)
-	_ msgp.Encodable = (*Trace)(nil)
-	_ msgp.Encodable = (*Span)(nil)
-)
-
-type (
-	Trace     []*Span
-	TraceList []Trace
+	"github.com/DataDog/datadog-trace-agent/internal/agent"
 )
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-type Span struct {
-	SpanID   uint64             `msg:"span_id"`
-	TraceID  uint64             `msg:"trace_id"`
-	ParentID uint64             `msg:"parent_id"`
-	Start    int64              `msg:"start"`
-	Duration int64              `msg:"duration"`
-	Meta     map[string]string  `msg:"meta,omitempty"`
-	Metrics  map[string]float64 `msg:"metrics,omitempty"`
-	Error    int32              `msg:"error"`
-	Name     string             `msg:"name"`
-	Service  string             `msg:"service"`
-	Resource string             `msg:"resource"`
-	Type     string             `msg:"type"`
-}
-
 type SpanOpts struct {
-	Parent *Span
+	Parent *agent.Span
 
 	Name     string
 	Service  string
@@ -54,7 +25,7 @@ type SpanOpts struct {
 	Error    int32                  // 1 or 0
 }
 
-func NewSpan(opts *SpanOpts) *Span {
+func NewSpan(opts *SpanOpts) *agent.Span {
 	if opts == nil {
 		opts = &SpanOpts{}
 	}
@@ -102,7 +73,7 @@ func NewSpan(opts *SpanOpts) *Span {
 		service = randString(services)
 	}
 
-	span := &Span{
+	span := &agent.Span{
 		TraceID:  traceID,
 		SpanID:   spanID,
 		ParentID: parentID,

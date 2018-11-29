@@ -57,7 +57,7 @@ func (s *Runner) Out() <-chan interface{} { return s.out }
 
 // Post posts the given list of traces to the trace agent. Before posting, agent must
 // be started. You can start an agent using RunAgent.
-func (s *Runner) Post(traceList TraceList) error {
+func (s *Runner) Post(traceList agent.Traces) error {
 	s.mu.RLock()
 	if s.pid == 0 {
 		defer s.mu.RUnlock()

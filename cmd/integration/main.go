@@ -27,16 +27,15 @@ func main() {
 		log.Fatal(err)
 	}
 
-	traceList := test.TraceList{
-		test.Trace{test.NewSpan(nil)},
-		test.Trace{test.NewSpan(nil)},
-		test.Trace{test.NewSpan(nil)},
-		test.Trace{test.NewSpan(nil)},
+	traceList := agent.Traces{
+		agent.Trace{test.NewSpan(nil)},
+		agent.Trace{test.NewSpan(nil)},
+		agent.Trace{test.NewSpan(nil)},
+		agent.Trace{test.NewSpan(nil)},
 	}
 	for i := 0; i < 10; i++ {
 		go func() {
-			err := r.Post(traceList)
-			if err != nil {
+			if err := r.Post(traceList); err != nil {
 				log.Fatal(err)
 			}
 		}()
@@ -52,7 +51,7 @@ func main() {
 	for p := range r.Out() {
 		switch v := p.(type) {
 		case agent.TracePayload:
-			fmt.Println("OK traces: ", len(v.Traces))
+			fmt.Printf("OK traces (host:%q, count:%d)\n", v.HostName, len(v.Traces))
 			if err := r.Shutdown(time.Second); err != nil {
 				log.Fatal(err)
 			}
