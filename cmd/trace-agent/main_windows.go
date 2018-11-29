@@ -11,8 +11,8 @@ import (
 
 	_ "net/http/pprof"
 
-	"github.com/DataDog/datadog-trace-agent/flags"
-	"github.com/DataDog/datadog-trace-agent/watchdog"
+	"github.com/DataDog/datadog-trace-agent/internal/flags"
+	"github.com/DataDog/datadog-trace-agent/internal/watchdog"
 	log "github.com/cihub/seelog"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
