@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,7 +23,7 @@ func (s *Runner) RunAgent(conf []byte) error {
 	}
 	cfgPath, err := s.createConfigFile(conf)
 	if err != nil {
-		log.Fatalf("runner: error creating config: %v", err)
+		s.fatalf("runner: error creating config: %v", err)
 	}
 	exit := s.runAgentConf(cfgPath)
 	for {
@@ -33,7 +32,9 @@ func (s *Runner) RunAgent(conf []byte) error {
 			return fmt.Errorf("runner: got %q, output was:\n----\n%s----\n", err, s.log.String())
 		default:
 			if strings.Contains(s.log.String(), "listening for traces at") {
-				log.Println("runner: agent started")
+				if s.Verbose {
+					s.print("runner: agent started")
+				}
 				return nil
 			}
 		}
@@ -55,13 +56,18 @@ func (s *Runner) StopAgent() {
 		return
 	}
 	if err := proc.Kill(); err != nil {
-		log.Println("couldn't kill running agent: ", err)
+		if s.Verbose {
+			s.printf("couldn't kill running agent: ", err)
+		}
 	}
 	proc.Wait()
 	s.log.Reset()
 }
 
 func (s *Runner) runAgentConf(path string) <-chan error {
+	if _, err := exec.LookPath("trace-agent"); err != nil {
+		s.fatal(err)
+	}
 	s.StopAgent()
 	cmd := exec.Command("trace-agent", "-config", path)
 	s.log.Reset()
@@ -73,16 +79,15 @@ func (s *Runner) runAgentConf(path string) <-chan error {
 	s.pid = cmd.Process.Pid
 	s.mu.Unlock()
 
-	// We use a buffered channel because we only try receiving on it while
-	// waiting for a start and shouldn't block afterwards; if it fails, it's
-	// fine because posting to the agent will also fail.
-	ch := make(chan error, 1)
+	ch := make(chan error, 1) // don't block
 	go func() {
 		ch <- cmd.Wait()
 		s.mu.Lock()
 		s.pid = 0
 		s.mu.Unlock()
-		log.Println("runner: agent stopped")
+		if s.Verbose {
+			s.print("runner: agent stopped")
+		}
 	}()
 	return ch
 }
@@ -100,6 +105,9 @@ func (s *Runner) createConfigFile(conf []byte) (string, error) {
 		s.agentPort = v.GetInt("apm_config.receiver_port")
 	}
 	v.Set("apm_config.apm_dd_url", "http://"+s.srv.Addr)
+	if !v.IsSet("api_key") {
+		v.Set("api_key", "testing123")
+	}
 	if !v.IsSet("apm_config.trace_writer.flush_period_seconds") {
 		v.Set("apm_config.trace_writer.flush_period_seconds", 1)
 	}

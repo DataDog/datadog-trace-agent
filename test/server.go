@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"testing"
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
@@ -28,8 +28,18 @@ const defaultBackendAddress = "localhost:8888"
 const defaultChannelSize = 100
 
 // Runner can start an agent instance using a custom configuration, send payloads
-// to it and act as a fake backend.
+// to it and act as a fake backend. A runner is ready to use as is. To use it,
+// first call Start, then RunAgent, and then Post to send payloads. Use the channel
+// provided by Out to assert output.
 type Runner struct {
+	// T will be used to fail or log in tests, if provided.
+	// Otherwise the log package will be used.
+	T *testing.T
+
+	// Verbose will make the runner logs more verbosely, such as agent
+	// starts and stops.
+	Verbose bool
+
 	// ChannelSize specifies the size of the buffered "out" channel
 	// which receives any payloads sent by the trace-agent to the
 	// fake backend.
@@ -132,15 +142,14 @@ func (s *Runner) startBackend() error {
 
 func (s *Runner) handleHealth(w http.ResponseWriter, req *http.Request) {
 	if _, err := fmt.Fprintf(w, "OK"); err != nil {
-		log.Println("error serving healthcheck: ", err)
+		s.fatal("error serving healthcheck: ", err)
 	}
 }
 
 func (s *Runner) handleStats(w http.ResponseWriter, req *http.Request) {
 	var payload agent.StatsPayload
 	if err := readJSONRequest(req, &payload); err != nil {
-		log.Println("error reading proto request: ", err)
-		return
+		s.fatal("error reading proto request: ", err)
 	}
 	s.out <- payload
 }
@@ -148,8 +157,7 @@ func (s *Runner) handleStats(w http.ResponseWriter, req *http.Request) {
 func (s *Runner) handleTraces(w http.ResponseWriter, req *http.Request) {
 	var payload agent.TracePayload
 	if err := readProtoRequest(req, &payload); err != nil {
-		log.Println("error reading proto request: ", err)
-		return
+		s.fatal("error reading proto request: ", err)
 	}
 	s.out <- payload
 }
