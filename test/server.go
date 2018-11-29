@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strconv"
 	"sync"
 	"sync/atomic"
-	"testing"
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
@@ -32,10 +32,6 @@ const defaultChannelSize = 100
 // first call Start, then RunAgent, and then Post to send payloads. Use the channel
 // provided by Out to assert output.
 type Runner struct {
-	// T will be used to fail or log in tests, if provided.
-	// Otherwise the log package will be used.
-	T *testing.T
-
 	// Verbose will make the runner logs more verbosely, such as agent
 	// starts and stops.
 	Verbose bool
@@ -132,8 +128,8 @@ func (s *Runner) startBackend() error {
 		case <-timeout:
 			return errors.New("timeout out waiting for startup")
 		default:
-			_, err := http.Get(fmt.Sprintf("http://%s/_health", s.srv.Addr))
-			if err == nil {
+			resp, _ := http.Get(fmt.Sprintf("http://%s/_health", s.srv.Addr))
+			if resp.StatusCode == http.StatusOK {
 				return nil
 			}
 		}
@@ -141,15 +137,13 @@ func (s *Runner) startBackend() error {
 }
 
 func (s *Runner) handleHealth(w http.ResponseWriter, req *http.Request) {
-	if _, err := fmt.Fprintf(w, "OK"); err != nil {
-		s.fatal("error serving healthcheck: ", err)
-	}
+	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Runner) handleStats(w http.ResponseWriter, req *http.Request) {
 	var payload agent.StatsPayload
 	if err := readJSONRequest(req, &payload); err != nil {
-		s.fatal("error reading proto request: ", err)
+		log.Println("server: error reading stats: ", err)
 	}
 	s.out <- payload
 }
@@ -157,7 +151,7 @@ func (s *Runner) handleStats(w http.ResponseWriter, req *http.Request) {
 func (s *Runner) handleTraces(w http.ResponseWriter, req *http.Request) {
 	var payload agent.TracePayload
 	if err := readProtoRequest(req, &payload); err != nil {
-		s.fatal("error reading proto request: ", err)
+		log.Println("server: error reading traces: ", err)
 	}
 	s.out <- payload
 }

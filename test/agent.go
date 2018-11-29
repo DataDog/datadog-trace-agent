@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,9 +22,12 @@ func (s *Runner) RunAgent(conf []byte) error {
 	if atomic.LoadUint64(&s.started) == 0 {
 		return errors.New("runner: server not started (call Start first)")
 	}
+	if _, err := exec.LookPath("trace-agent"); err != nil {
+		return err
+	}
 	cfgPath, err := s.createConfigFile(conf)
 	if err != nil {
-		s.fatalf("runner: error creating config: %v", err)
+		return fmt.Errorf("runner: error creating config: %v", err)
 	}
 	exit := s.runAgentConf(cfgPath)
 	for {
@@ -33,7 +37,7 @@ func (s *Runner) RunAgent(conf []byte) error {
 		default:
 			if strings.Contains(s.log.String(), "listening for traces at") {
 				if s.Verbose {
-					s.print("runner: agent started")
+					log.Print("runner: agent started")
 				}
 				return nil
 			}
@@ -57,7 +61,7 @@ func (s *Runner) StopAgent() {
 	}
 	if err := proc.Kill(); err != nil {
 		if s.Verbose {
-			s.printf("couldn't kill running agent: ", err)
+			log.Print("couldn't kill running agent: ", err)
 		}
 	}
 	proc.Wait()
@@ -65,9 +69,6 @@ func (s *Runner) StopAgent() {
 }
 
 func (s *Runner) runAgentConf(path string) <-chan error {
-	if _, err := exec.LookPath("trace-agent"); err != nil {
-		s.fatal(err)
-	}
 	s.StopAgent()
 	cmd := exec.Command("trace-agent", "-config", path)
 	s.log.Reset()
@@ -86,7 +87,7 @@ func (s *Runner) runAgentConf(path string) <-chan error {
 		s.pid = 0
 		s.mu.Unlock()
 		if s.Verbose {
-			s.print("runner: agent stopped")
+			log.Print("runner: agent stopped")
 		}
 	}()
 	return ch

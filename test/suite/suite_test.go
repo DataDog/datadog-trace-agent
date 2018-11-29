@@ -9,13 +9,17 @@ import (
 )
 
 func TestHostname(t *testing.T) {
-	var r test.Runner
+	r := test.Runner{}
 	if err := r.Start(); err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		if err := r.Shutdown(time.Second); err != nil {
+			t.Log("shutdown: trace-agent might still be running: ", err)
+		}
+	}()
 
 	t.Run("from-config", func(t *testing.T) {
-		r.T = t
 		if err := r.RunAgent([]byte(`hostname: asdq`)); err != nil {
 			t.Fatal(err)
 		}
@@ -48,7 +52,6 @@ func TestHostname(t *testing.T) {
 	})
 
 	t.Run("no-config", func(t *testing.T) {
-		r.T = t
 		if err := r.RunAgent([]byte(``)); err != nil {
 			t.Fatal(err)
 		}
@@ -75,8 +78,4 @@ func TestHostname(t *testing.T) {
 			break
 		}
 	})
-
-	if err := r.Shutdown(time.Second); err != nil {
-		t.Fatal(err)
-	}
 }
