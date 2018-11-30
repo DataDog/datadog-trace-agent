@@ -12,6 +12,7 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+// SpanOpts defines a span's properties.
 type SpanOpts struct {
 	Parent *agent.Span
 
@@ -25,6 +26,7 @@ type SpanOpts struct {
 	Error    int32                  // 1 or 0
 }
 
+// NewSpan creates a new span using the given opts.
 func NewSpan(opts *SpanOpts) *agent.Span {
 	if opts == nil {
 		opts = &SpanOpts{}

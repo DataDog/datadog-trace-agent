@@ -33,7 +33,7 @@ func (s *Runner) RunAgent(conf []byte) error {
 	for {
 		select {
 		case err := <-exit:
-			return fmt.Errorf("runner: got %q, output was:\n----\n%s----\n", err, s.log.String())
+			return fmt.Errorf("runner: got %q, output was:\n----\n%s----", err, s.log.String())
 		default:
 			if strings.Contains(s.log.String(), "listening for traces at") {
 				if s.Verbose {

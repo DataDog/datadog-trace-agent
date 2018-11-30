@@ -36,8 +36,8 @@ ci:
 	# task used by CI
 	go install ./cmd/trace-agent
 	go get -u golang.org/x/lint/golint
-	golint -set_exit_status=1 ./cmd/trace-agent ./internal/filters ./internal/api ./internal/testutil ./internal/info ./internal/quantile ./internal/obfuscate ./internal/sampler ./internal/statsd ./internal/watchdog ./internal/writer ./internal/flags ./internal/osutil
-	INTEGRATION=1 go test -v -race ./...
+	golint -set_exit_status=1 ./test ./cmd/trace-agent ./internal/filters ./internal/api ./internal/testutil ./internal/info ./internal/quantile ./internal/obfuscate ./internal/sampler ./internal/statsd ./internal/watchdog ./internal/writer ./internal/flags ./internal/osutil
+	go test -v -race ./...
 
 windows:
 	# pre-packages resources needed for the windows release
