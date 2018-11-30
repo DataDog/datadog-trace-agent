@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/testutil"
 	"github.com/DataDog/datadog-trace-agent/test"
 )
 
@@ -26,10 +27,10 @@ func TestHostname(t *testing.T) {
 		defer r.StopAgent()
 
 		traceList := agent.Traces{
-			agent.Trace{test.NewSpan(nil)},
-			agent.Trace{test.NewSpan(nil)},
-			agent.Trace{test.NewSpan(nil)},
-			agent.Trace{test.NewSpan(nil)},
+			agent.Trace{testutil.RandomSpan()},
+			agent.Trace{testutil.RandomSpan()},
+			agent.Trace{testutil.RandomSpan()},
+			agent.Trace{testutil.RandomSpan()},
 		}
 		for i := 0; i < 10; i++ {
 			go func() {
@@ -42,6 +43,9 @@ func TestHostname(t *testing.T) {
 		for p := range r.Out() {
 			switch v := p.(type) {
 			case agent.TracePayload:
+				if n := len(v.Traces); n != 40 {
+					t.Fatalf("expected %d traces, got %d", len(traceList), n)
+				}
 				if v.HostName != "asdq" {
 					t.Fatalf("bad hostname, wanted %q, got %q", "asdq", v.HostName)
 				}
@@ -59,8 +63,8 @@ func TestHostname(t *testing.T) {
 		defer r.StopAgent()
 
 		traceList := agent.Traces{
-			agent.Trace{test.NewSpan(nil)},
-			agent.Trace{test.NewSpan(nil)},
+			agent.Trace{testutil.RandomSpan()},
+			agent.Trace{testutil.RandomSpan()},
 		}
 		for i := 0; i < 10; i++ {
 			go func() {
@@ -73,6 +77,9 @@ func TestHostname(t *testing.T) {
 		for p := range r.Out() {
 			switch v := p.(type) {
 			case agent.TracePayload:
+				if n := len(v.Traces); n != 20 {
+					t.Fatalf("expected %d traces, got %d", len(traceList), n)
+				}
 				if v.HostName == "" {
 					t.Fatal("got empty hostname")
 				}

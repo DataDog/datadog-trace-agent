@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/testutil"
 )
 
 // The below example shows a common use-case scenario for the runner.
@@ -29,8 +30,8 @@ func Example() {
 
 	// Post a payload.
 	payload := agent.Traces{
-		agent.Trace{NewSpan(nil)},
-		agent.Trace{NewSpan(nil)},
+		agent.Trace{testutil.RandomSpan()},
+		agent.Trace{testutil.RandomSpan()},
 	}
 	if err := runner.Post(payload); err != nil {
 		log.Fatal(err)
