@@ -119,7 +119,11 @@ func (s *Runner) startBackend() error {
 		Addr:    defaultBackendAddress,
 		Handler: mux,
 	}
-	go s.srv.ListenAndServe()
+	go func() {
+		if err := s.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+	}()
 	atomic.StoreUint64(&s.started, 1)
 
 	timeout := time.After(5 * time.Second)
@@ -128,10 +132,11 @@ func (s *Runner) startBackend() error {
 		case <-timeout:
 			return errors.New("timeout out waiting for startup")
 		default:
-			resp, _ := http.Get(fmt.Sprintf("http://%s/_health", s.srv.Addr))
-			if resp.StatusCode == http.StatusOK {
+			resp, err := http.Get(fmt.Sprintf("http://%s/_health", s.srv.Addr))
+			if err == nil && resp.StatusCode == http.StatusOK {
 				return nil
 			}
+			time.Sleep(5 * time.Millisecond)
 		}
 	}
 }

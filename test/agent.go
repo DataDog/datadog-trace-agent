@@ -65,7 +65,6 @@ func (s *Runner) StopAgent() {
 		}
 	}
 	proc.Wait()
-	s.log.Reset()
 }
 
 func (s *Runner) runAgentConf(path string) <-chan error {

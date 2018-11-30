@@ -23,6 +23,7 @@ func TestHostname(t *testing.T) {
 		if err := r.RunAgent([]byte(`hostname: asdq`)); err != nil {
 			t.Fatal(err)
 		}
+		defer r.StopAgent()
 
 		traceList := agent.Traces{
 			agent.Trace{test.NewSpan(nil)},
@@ -55,6 +56,7 @@ func TestHostname(t *testing.T) {
 		if err := r.RunAgent([]byte(``)); err != nil {
 			t.Fatal(err)
 		}
+		defer r.StopAgent()
 
 		traceList := agent.Traces{
 			agent.Trace{test.NewSpan(nil)},
@@ -71,7 +73,9 @@ func TestHostname(t *testing.T) {
 		for p := range r.Out() {
 			switch v := p.(type) {
 			case agent.TracePayload:
-				t.Logf("OK traces (host:%q, count:%d)\n", v.HostName, len(v.Traces))
+				if v.HostName == "" {
+					t.Fatal("got empty hostname")
+				}
 			case agent.StatsPayload:
 				continue
 			}
