@@ -1,6 +1,8 @@
 package test
 
-import "sync"
+import (
+	"sync"
+)
 
 const defaultBufferSize = 1e9 // 1M
 
@@ -37,19 +39,18 @@ func (sb *safeBuffer) String() string {
 func (sb *safeBuffer) Write(p []byte) (int, error) {
 	sb.mu.Lock()
 	defer sb.mu.Unlock()
-	if len(p) >= len(sb.b) {
+	n := len(p)
+	if n >= len(sb.b) {
 		// p is bigger than the whole buffer; we store only
-		// the last len(sb.b) bytes.
-		n := copy(sb.b, p[len(p)-len(sb.b):])
-		sb.off = n
+		// the last len(sb.b) bytes
+		sb.off = copy(sb.b, p[n-len(sb.b):])
 		return n, nil
 	}
-	if n := len(p); n > len(sb.b)-sb.off {
-		// make space in the buffer
+	if n > len(sb.b)-sb.off {
+		// shift to make space in the buffer
 		copy(sb.b, sb.b[n-(len(sb.b)-sb.off):sb.off])
 		sb.off = len(sb.b) - n
 	}
-	n := copy(sb.b[sb.off:], p)
-	sb.off += n
+	sb.off += copy(sb.b[sb.off:], p)
 	return n, nil
 }
