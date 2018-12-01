@@ -2,7 +2,6 @@ package test
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -10,18 +9,33 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
+	"sync"
 
 	"github.com/spf13/viper"
 	yaml "gopkg.in/yaml.v2"
 )
 
-// RunAgent runs the agent using a given yaml config. If an agent is already running,
-// it will be killed.
-func (s *Runner) RunAgent(conf []byte) error {
-	if atomic.LoadUint64(&s.started) == 0 {
-		return errors.New("runner: server not started (call Start first)")
+type agentRunner struct {
+	mu  sync.RWMutex // guards pid
+	pid int          // agent pid, if running
+
+	port    int         // agent port
+	log     *safeBuffer // agent log
+	ddURL   string      // backend address
+	verbose bool
+}
+
+func newAgentRunner(ddURL string, verbose bool) *agentRunner {
+	return &agentRunner{
+		ddURL:   ddURL,
+		log:     newSafeBuffer(),
+		verbose: verbose,
 	}
+}
+
+// Run runs the agent using a given yaml config. If an agent is already running,
+// it will be killed.
+func (s *agentRunner) Run(conf []byte) error {
 	if _, err := exec.LookPath("trace-agent"); err != nil {
 		return err
 	}
@@ -29,14 +43,14 @@ func (s *Runner) RunAgent(conf []byte) error {
 	if err != nil {
 		return fmt.Errorf("runner: error creating config: %v", err)
 	}
-	exit := s.runAgentConf(cfgPath)
+	exit := s.runAgentConfig(cfgPath)
 	for {
 		select {
 		case err := <-exit:
 			return fmt.Errorf("runner: got %q, output was:\n----\n%s----", err, s.log.String())
 		default:
 			if strings.Contains(s.log.String(), "listening for traces at") {
-				if s.Verbose {
+				if s.verbose {
 					log.Print("runner: agent started")
 				}
 				return nil
@@ -45,30 +59,40 @@ func (s *Runner) RunAgent(conf []byte) error {
 	}
 }
 
-// Logtail returns up to 1MB of tail from the running trace-agent log.
-func (s *Runner) Logtail() string { return s.log.String() }
+// Log returns the tail of the agent log (up to 1M).
+func (s *agentRunner) Log() string { return s.log.String() }
 
-// StopAgent stops a running trace-agent.
-func (s *Runner) StopAgent() {
+// PID returns the process ID of the trace-agent. If the trace-agent is not running
+// as a child process of this program, it will be 0.
+func (s *agentRunner) PID() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if s.pid == 0 {
+	return s.pid
+}
+
+// Addr returns the address of the trace agent receiver.
+func (s *agentRunner) Addr() string { return fmt.Sprintf("localhost:%d", s.port) }
+
+// Kill stops a running trace-agent, if it was started by this process.
+func (s *agentRunner) Kill() {
+	pid := s.PID()
+	if pid == 0 {
 		return
 	}
-	proc, err := os.FindProcess(s.pid)
+	proc, err := os.FindProcess(pid)
 	if err != nil {
 		return
 	}
 	if err := proc.Kill(); err != nil {
-		if s.Verbose {
+		if s.verbose {
 			log.Print("couldn't kill running agent: ", err)
 		}
 	}
 	proc.Wait()
 }
 
-func (s *Runner) runAgentConf(path string) <-chan error {
-	s.StopAgent()
+func (s *agentRunner) runAgentConfig(path string) <-chan error {
+	s.Kill()
 	cmd := exec.Command("trace-agent", "-config", path)
 	s.log.Reset()
 	cmd.Stdout = s.log
@@ -85,7 +109,7 @@ func (s *Runner) runAgentConf(path string) <-chan error {
 		s.mu.Lock()
 		s.pid = 0
 		s.mu.Unlock()
-		if s.Verbose {
+		if s.verbose {
 			log.Print("runner: agent stopped")
 		}
 	}()
@@ -94,17 +118,17 @@ func (s *Runner) runAgentConf(path string) <-chan error {
 
 // createConfigFile creates a config file from the given config, altering the
 // apm_config.apm_dd_url and log_level values and returns the full path.
-func (s *Runner) createConfigFile(conf []byte) (string, error) {
+func (s *agentRunner) createConfigFile(conf []byte) (string, error) {
 	v := viper.New()
 	v.SetConfigType("yaml")
 	if err := v.ReadConfig(bytes.NewReader(conf)); err != nil {
 		return "", err
 	}
-	s.agentPort = 8126
+	s.port = 8126
 	if v.IsSet("apm_config.receiver_port") {
-		s.agentPort = v.GetInt("apm_config.receiver_port")
+		s.port = v.GetInt("apm_config.receiver_port")
 	}
-	v.Set("apm_config.apm_dd_url", "http://"+s.srv.Addr)
+	v.Set("apm_config.apm_dd_url", "http://"+s.ddURL)
 	if !v.IsSet("api_key") {
 		v.Set("api_key", "testing123")
 	}

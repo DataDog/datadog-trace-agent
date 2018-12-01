@@ -24,7 +24,7 @@ func TestHostname(t *testing.T) {
 		if err := r.RunAgent([]byte(`hostname: asdq`)); err != nil {
 			t.Fatal(err)
 		}
-		defer r.StopAgent()
+		defer r.KillAgent()
 
 		traceList := agent.Traces{
 			agent.Trace{testutil.RandomSpan()},
@@ -60,7 +60,7 @@ func TestHostname(t *testing.T) {
 		if err := r.RunAgent([]byte(``)); err != nil {
 			t.Fatal(err)
 		}
-		defer r.StopAgent()
+		defer r.KillAgent()
 
 		traceList := agent.Traces{
 			agent.Trace{testutil.RandomSpan()},
