@@ -22,6 +22,11 @@ var (
 )
 
 // Count represents one specific "metric" we track for a given tagset
+// A count keeps track of the total for a metric during a given time in a certain dimension.
+// By default we keep count of "hits", "errors" and "durations". Others can be added
+// (from the Metrics map in a span), but they have to be enabled manually.
+//
+// Example: hits between X and X+5s for service:dogweb and resource:dash.list
 type Count struct {
 	Key     string `json:"key"`
 	Name    string `json:"name"`    // the name of the trace/spans we count (was a member of TagSet)
@@ -34,6 +39,12 @@ type Count struct {
 }
 
 // Distribution represents a true image of the spectrum of values, allowing arbitrary quantile queries
+// A distribution works the same way Counts do, but instead of accumulating values it keeps a sense of
+// the repartition of the values. It uses the Greenwald-Khanna online summary algorithm.
+//
+// A distribution can answer to an arbitrary quantile query within a given epsilon. For each "range" of
+// values in our pseudo-histogram we keep a trace ID (a sample) so that we can give the user an example
+// of a trace for a given quantile query.
 type Distribution struct {
 	Key     string `json:"key"`
 	Name    string `json:"name"`    // the name of the trace/spans we count (was a member of TagSet)

@@ -36,7 +36,20 @@ func NewTagFromString(raw string) Tag {
 	return Tag{name, val}
 }
 
-// TagSet is an ordered and unique combination of tags
+// TagSet is a combination of given tags, it is equivalent to contexts that we use for metrics.
+// Although we choose a different terminology here to avoid confusion, and tag sets do not have
+// a notion of activeness over time. A tag can be:
+//   • one of the fixed ones we defined in the span structure: service, resource and host
+//   • one of the arbitrary metadata key included in the span (it needs to be turned on manually)
+//
+// When we track statistics by tag sets, we basically track every tag combination we're interested
+// in to create dimensions, for instance:
+//   • (service)
+//   • (service, environment)
+//   • (service, host)
+//   • (service, resource, environment)
+//   • (service, resource)
+//   • ..
 type TagSet []Tag
 
 // NewTagSetFromString returns a new TagSet from a raw string
