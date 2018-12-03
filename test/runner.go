@@ -16,18 +16,17 @@ import (
 var ErrNotStarted = errors.New("runner: not started")
 
 // Runner can start an agent instance using a custom configuration, send payloads
-// to it and act as a fake backend. A runner is ready to use as is. To use it,
-// first call Start, then RunAgent, and then Post to send payloads. Use the channel
-// provided by Out to assert output.
+// to it and act as a fake backend. Call Start first to initiate the fake backend,
+// then RunAgent to start agent instances. Post may be used to send payloads to the
+// agent and Out to receive its output.
 type Runner struct {
-	// Verbose will make the runner logs more verbosely, such as agent
-	// starts and stops.
+	// Verbose will make the runner output more verbose, more specifically
+	// around operations regarding the trace-agent process.
 	Verbose bool
 
-	// ChannelSize specifies the size of the buffered "out" channel
-	// which receives any payloads sent by the trace-agent to the
-	// fake backend.
-	// Defaults to 100.
+	// ChannelSize specifies the size of the payload buffer of the fake backend.
+	// If reached, HTTP handlers will block until payloads are received from
+	// the out channel. It defaults to 100.
 	ChannelSize int
 
 	agent   *agentRunner
@@ -37,17 +36,26 @@ type Runner struct {
 // Start initializes the runner and starts the fake backend.
 func (s *Runner) Start() error {
 	s.backend = newFakeBackend(s.ChannelSize)
-	s.agent = newAgentRunner(s.backend.srv.Addr, s.Verbose)
+	agent, err := newAgentRunner(s.backend.srv.Addr, s.Verbose)
+	if err != nil {
+		return err
+	}
+	s.agent = agent
 	return s.backend.Start()
 }
 
-// Shutdown stops any running agent and shutsdown the fake backend.
+// Shutdown stops any running agent and shuts down the fake backend.
 func (s *Runner) Shutdown(wait time.Duration) error {
 	if s.agent == nil || s.backend == nil {
 		return ErrNotStarted
 	}
 	s.agent.Kill()
-	return s.backend.Shutdown(wait)
+	if err := s.backend.Shutdown(wait); err != nil {
+		return err
+	}
+	s.agent = nil
+	s.backend = nil
+	return nil
 }
 
 // RunAgent starts an agent instance using the given YAML configuration.

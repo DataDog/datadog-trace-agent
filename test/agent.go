@@ -2,6 +2,7 @@ package test
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -10,10 +11,14 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/spf13/viper"
 	yaml "gopkg.in/yaml.v2"
 )
+
+// ErrNotInstalled is returned when the trace-agent can not be found in $PATH.
+var ErrNotInstalled = errors.New("agent: trace-agent not found in $PATH")
 
 type agentRunner struct {
 	mu  sync.RWMutex // guards pid
@@ -21,40 +26,58 @@ type agentRunner struct {
 
 	port    int         // agent port
 	log     *safeBuffer // agent log
-	ddURL   string      // backend address
+	ddAddr  string      // Datadog API address (host:port)
 	verbose bool
 }
 
-func newAgentRunner(ddURL string, verbose bool) *agentRunner {
+func newAgentRunner(ddAddr string, verbose bool) (*agentRunner, error) {
+	if _, err := exec.LookPath("trace-agent"); err != nil {
+		// trace-agent not in $PATH, try to install
+		if verbose {
+			log.Print("agent: trace-agent not found, trying to install...")
+		}
+		err := exec.Command("go", "install", "github.com/DataDog/datadog-trace-agent/cmd/trace-agent").Run()
+		if err != nil {
+			return nil, ErrNotInstalled
+		}
+		if _, err := exec.LookPath("trace-agent"); err != nil {
+			// still not in $PATH, fail
+			if verbose {
+				log.Print("trace-agent installed but not found in $PATH")
+			}
+			return nil, ErrNotInstalled
+		}
+	}
 	return &agentRunner{
-		ddURL:   ddURL,
+		ddAddr:  ddAddr,
 		log:     newSafeBuffer(),
 		verbose: verbose,
-	}
+	}, nil
 }
 
 // Run runs the agent using a given yaml config. If an agent is already running,
 // it will be killed.
 func (s *agentRunner) Run(conf []byte) error {
-	if _, err := exec.LookPath("trace-agent"); err != nil {
-		return err
-	}
 	cfgPath, err := s.createConfigFile(conf)
 	if err != nil {
-		return fmt.Errorf("runner: error creating config: %v", err)
+		return fmt.Errorf("agent: error creating config: %v", err)
 	}
+	timeout := time.After(5 * time.Second)
 	exit := s.runAgentConfig(cfgPath)
 	for {
 		select {
 		case err := <-exit:
-			return fmt.Errorf("runner: got %q, output was:\n----\n%s----", err, s.log.String())
+			return fmt.Errorf("agent: %v, log output:\n%s", err, s.Log())
+		case <-timeout:
+			return fmt.Errorf("agent: timed out waiting for start, log:\n%s", s.Log())
 		default:
 			if strings.Contains(s.log.String(), "listening for traces at") {
 				if s.verbose {
-					log.Print("runner: agent started")
+					log.Print("agent: listening for traces")
 				}
 				return nil
 			}
+			time.Sleep(5 * time.Millisecond)
 		}
 	}
 }
@@ -106,11 +129,12 @@ func (s *agentRunner) runAgentConfig(path string) <-chan error {
 	ch := make(chan error, 1) // don't block
 	go func() {
 		ch <- cmd.Wait()
+		os.Remove(path)
 		s.mu.Lock()
 		s.pid = 0
 		s.mu.Unlock()
 		if s.verbose {
-			log.Print("runner: agent stopped")
+			log.Print("agent: killed")
 		}
 	}()
 	return ch
@@ -128,7 +152,7 @@ func (s *agentRunner) createConfigFile(conf []byte) (string, error) {
 	if v.IsSet("apm_config.receiver_port") {
 		s.port = v.GetInt("apm_config.receiver_port")
 	}
-	v.Set("apm_config.apm_dd_url", "http://"+s.ddURL)
+	v.Set("apm_config.apm_dd_url", "http://"+s.ddAddr)
 	if !v.IsSet("api_key") {
 		v.Set("api_key", "testing123")
 	}

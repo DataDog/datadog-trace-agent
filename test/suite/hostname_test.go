@@ -26,34 +26,18 @@ func TestHostname(t *testing.T) {
 		}
 		defer r.KillAgent()
 
-		traceList := agent.Traces{
-			agent.Trace{testutil.RandomSpan()},
-			agent.Trace{testutil.RandomSpan()},
-			agent.Trace{testutil.RandomSpan()},
-			agent.Trace{testutil.RandomSpan()},
+		payload := agent.Traces{agent.Trace{testutil.RandomSpan()}}
+		if err := r.Post(payload); err != nil {
+			t.Fatal(err)
 		}
-		for i := 0; i < 10; i++ {
-			go func() {
-				if err := r.Post(traceList); err != nil {
-					t.Fatal(err)
-				}
-			}()
-		}
-
-		for p := range r.Out() {
-			switch v := p.(type) {
-			case agent.TracePayload:
-				if n := len(v.Traces); n != 40 {
-					t.Fatalf("expected %d traces, got %d", len(traceList), n)
-				}
-				if v.HostName != "asdq" {
-					t.Fatalf("bad hostname, wanted %q, got %q", "asdq", v.HostName)
-				}
-			case agent.StatsPayload:
-				continue
+		waitForTrace(t, r.Out(), func(v agent.TracePayload) {
+			if n := len(v.Traces); n != 1 {
+				t.Fatalf("expected %d traces, got %d", len(payload), n)
 			}
-			break
-		}
+			if v.HostName == "" {
+				t.Fatal("got empty hostname")
+			}
+		})
 	})
 
 	t.Run("no-config", func(t *testing.T) {
@@ -62,31 +46,39 @@ func TestHostname(t *testing.T) {
 		}
 		defer r.KillAgent()
 
-		traceList := agent.Traces{
-			agent.Trace{testutil.RandomSpan()},
-			agent.Trace{testutil.RandomSpan()},
+		payload := agent.Traces{agent.Trace{testutil.RandomSpan()}}
+		if err := r.Post(payload); err != nil {
+			t.Fatal(err)
 		}
-		for i := 0; i < 10; i++ {
-			go func() {
-				if err := r.Post(traceList); err != nil {
-					t.Fatal(err)
-				}
-			}()
-		}
-
-		for p := range r.Out() {
-			switch v := p.(type) {
-			case agent.TracePayload:
-				if n := len(v.Traces); n != 20 {
-					t.Fatalf("expected %d traces, got %d", len(traceList), n)
-				}
-				if v.HostName == "" {
-					t.Fatal("got empty hostname")
-				}
-			case agent.StatsPayload:
-				continue
+		waitForTrace(t, r.Out(), func(v agent.TracePayload) {
+			if n := len(v.Traces); n != 1 {
+				t.Fatalf("expected %d traces, got %d", len(payload), n)
 			}
-			break
-		}
+			if v.HostName == "" {
+				t.Fatal("got empty hostname")
+			}
+		})
 	})
+}
+
+// waitForTrace waits on the out channel until it times out or receives an agent.TracePayload.
+// If the latter happens it will call fn.
+func waitForTrace(t *testing.T, out <-chan interface{}, fn func(agent.TracePayload)) {
+	waitForTraceTimeout(t, out, 3*time.Second, fn)
+}
+
+// waitForTraceTimeout behaves like waitForTrace but allows a customizable wait time.
+func waitForTraceTimeout(t *testing.T, out <-chan interface{}, wait time.Duration, fn func(agent.TracePayload)) {
+	timeout := time.After(wait)
+	for {
+		select {
+		case p := <-out:
+			if v, ok := p.(agent.TracePayload); ok {
+				fn(v)
+				return
+			}
+		case <-timeout:
+			t.Fatal("timed out")
+		}
+	}
 }

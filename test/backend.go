@@ -38,14 +38,16 @@ func newFakeBackend(channelSize int) *fakeBackend {
 	}
 	fb := fakeBackend{
 		out: make(chan interface{}, size),
-		srv: http.Server{Addr: defaultBackendAddress},
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v0.2/traces", fb.handleTraces)
 	mux.HandleFunc("/api/v0.2/stats", fb.handleStats)
 	mux.HandleFunc("/_health", fb.handleHealth)
-	fb.srv.Handler = mux
 
+	fb.srv = http.Server{
+		Addr:    defaultBackendAddress,
+		Handler: mux,
+	}
 	return &fb
 }
 
@@ -58,7 +60,7 @@ func (s *fakeBackend) Start() error {
 		atomic.StoreUint64(&s.started, 1)
 		defer atomic.StoreUint64(&s.started, 0)
 		if err := s.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatal(err)
+			log.Fatalf("server: %v", err)
 		}
 	}()
 
@@ -66,7 +68,7 @@ func (s *fakeBackend) Start() error {
 	for {
 		select {
 		case <-timeout:
-			return errors.New("timeout out waiting for startup")
+			return errors.New("server: timed out out waiting for start")
 		default:
 			resp, err := http.Get(fmt.Sprintf("http://%s/_health", s.srv.Addr))
 			if err == nil && resp.StatusCode == http.StatusOK {
@@ -108,21 +110,21 @@ func (s *fakeBackend) handleTraces(w http.ResponseWriter, req *http.Request) {
 }
 
 func readJSONRequest(req *http.Request, v interface{}) error {
-	r, err := readCloserFromRequest(req)
+	rc, err := readCloserFromRequest(req)
 	if err != nil {
 		return err
 	}
-	defer r.Close()
-	return json.NewDecoder(r).Decode(v)
+	defer rc.Close()
+	return json.NewDecoder(rc).Decode(v)
 }
 
 func readProtoRequest(req *http.Request, msg proto.Message) error {
-	r, err := readCloserFromRequest(req)
+	rc, err := readCloserFromRequest(req)
 	if err != nil {
 		return err
 	}
-	slurp, err := ioutil.ReadAll(r)
-	defer r.Close()
+	slurp, err := ioutil.ReadAll(rc)
+	defer rc.Close()
 	if err != nil {
 		return err
 	}
@@ -130,7 +132,7 @@ func readProtoRequest(req *http.Request, msg proto.Message) error {
 }
 
 func readCloserFromRequest(req *http.Request) (io.ReadCloser, error) {
-	r := struct {
+	rc := struct {
 		io.Reader
 		io.Closer
 	}{
@@ -143,7 +145,7 @@ func readCloserFromRequest(req *http.Request) (io.ReadCloser, error) {
 			return nil, err
 		}
 		defer gz.Close()
-		r.Reader = gz
+		rc.Reader = gz
 	}
-	return r, nil
+	return rc, nil
 }
