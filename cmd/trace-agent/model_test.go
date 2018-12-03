@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
-	"github.com/DataDog/datadog-trace-agent/internal/testutil"
+	"github.com/DataDog/datadog-trace-agent/internal/test/testutil"
 )
 
 const (

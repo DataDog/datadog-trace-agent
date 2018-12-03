@@ -1,12 +1,12 @@
-package main
+package testsuite
 
 import (
 	"testing"
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
-	"github.com/DataDog/datadog-trace-agent/internal/testutil"
-	"github.com/DataDog/datadog-trace-agent/test"
+	"github.com/DataDog/datadog-trace-agent/internal/test"
+	"github.com/DataDog/datadog-trace-agent/internal/test/testutil"
 )
 
 func TestHostname(t *testing.T) {

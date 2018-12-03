@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/internal/statsd"
-	"github.com/DataDog/datadog-trace-agent/internal/testutil"
+	"github.com/DataDog/datadog-trace-agent/internal/test/testutil"
 	"github.com/DataDog/datadog-trace-agent/internal/writer/config"
 	"github.com/stretchr/testify/assert"
 )

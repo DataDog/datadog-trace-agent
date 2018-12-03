@@ -19,7 +19,7 @@ agent/agent
 *.coverage
 prof*
 *test
-!/test
+!/internal/test
 
 /cmd/trace-agent/windows_resources/trace-agent-msg.rc
 /cmd/trace-agent/windows_resources/*.bin

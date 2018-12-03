@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
-	"github.com/DataDog/datadog-trace-agent/internal/testutil"
+	"github.com/DataDog/datadog-trace-agent/internal/test/testutil"
 )
 
 // The below example shows a common use-case scenario for the runner.
