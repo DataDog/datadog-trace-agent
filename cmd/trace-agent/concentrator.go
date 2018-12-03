@@ -50,7 +50,7 @@ func NewConcentrator(aggregators []string, bsize int64, out chan []agent.StatsBu
 		buckets:     make(map[int64]*agent.StatsRawBucket),
 		// At start, only allow stats for the current time bucket. Ensure we don't
 		// override buckets which could have been sent before an Agent restart.
-		oldestTs: alignTs(agent.Now(), bsize),
+		oldestTs: alignTs(time.Now().UnixNano(), bsize),
 		// TODO: Move to configuration.
 		bufferLen: defaultBufferLen,
 
@@ -103,7 +103,7 @@ func (c *Concentrator) Stop() {
 
 // Add appends to the proper stats bucket this trace's statistics
 func (c *Concentrator) Add(t agent.ProcessedTrace) {
-	c.addNow(t, agent.Now())
+	c.addNow(t, time.Now().UnixNano())
 }
 
 func (c *Concentrator) addNow(t agent.ProcessedTrace, now int64) {
@@ -136,7 +136,7 @@ func (c *Concentrator) addNow(t agent.ProcessedTrace, now int64) {
 
 // Flush deletes and returns complete statistic buckets
 func (c *Concentrator) Flush() []agent.StatsBucket {
-	return c.flushNow(agent.Now())
+	return c.flushNow(time.Now().UnixNano())
 }
 
 func (c *Concentrator) flushNow(now int64) []agent.StatsBucket {
