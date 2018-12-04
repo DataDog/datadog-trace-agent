@@ -31,6 +31,7 @@ func TestHostname(t *testing.T) {
 			defer r.KillAgent()
 
 			payload := agent.Traces{agent.Trace{testutil.RandomSpan()}}
+			payload[0][0].Metrics[agent.SamplingPriorityKey] = 2
 			if err := r.Post(payload); err != nil {
 				t.Fatal(err)
 			}
@@ -60,6 +61,7 @@ func TestHostname(t *testing.T) {
 		defer r.KillAgent()
 
 		payload := agent.Traces{agent.Trace{testutil.RandomSpan()}}
+		payload[0][0].Metrics[agent.SamplingPriorityKey] = 2
 		if err := r.Post(payload); err != nil {
 			t.Fatal(err)
 		}
