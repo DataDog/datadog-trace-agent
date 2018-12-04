@@ -1,6 +1,7 @@
 package testsuite
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -16,32 +17,44 @@ func TestHostname(t *testing.T) {
 	}
 	defer func() {
 		if err := r.Shutdown(time.Second); err != nil {
-			t.Log("shutdown: trace-agent might still be running: ", err)
+			t.Log("shutdown: ", err)
 		}
 	}()
 
-	t.Run("from-config", func(t *testing.T) {
-		if err := r.RunAgent([]byte(`hostname: asdq`)); err != nil {
-			t.Fatal(err)
-		}
-		defer r.KillAgent()
+	// testHostname returns a test which asserts that for the given agent conf, the
+	// expectedHostname is sent to the backend.
+	testHostname := func(conf []byte, expectedHostname string) func(*testing.T) {
+		return func(t *testing.T) {
+			if err := r.RunAgent(conf); err != nil {
+				t.Fatal(err)
+			}
+			defer r.KillAgent()
 
-		payload := agent.Traces{agent.Trace{testutil.RandomSpan()}}
-		if err := r.Post(payload); err != nil {
-			t.Fatal(err)
+			payload := agent.Traces{agent.Trace{testutil.RandomSpan()}}
+			if err := r.Post(payload); err != nil {
+				t.Fatal(err)
+			}
+			waitForTrace(t, r.Out(), func(v agent.TracePayload) {
+				if n := len(v.Traces); n != 1 {
+					t.Fatalf("expected %d traces, got %d", len(payload), n)
+				}
+				if v.HostName != expectedHostname {
+					t.Fatalf("expected %q, got %q", expectedHostname, v.HostName)
+				}
+			})
 		}
-		waitForTrace(t, r.Out(), func(v agent.TracePayload) {
-			if n := len(v.Traces); n != 1 {
-				t.Fatalf("expected %d traces, got %d", len(payload), n)
-			}
-			if v.HostName == "" {
-				t.Fatal("got empty hostname")
-			}
-		})
+	}
+
+	t.Run("from-config", testHostname([]byte(`hostname: asdq`), "asdq"))
+
+	t.Run("env", func(t *testing.T) {
+		os.Setenv("DD_HOSTNAME", "my-env-host")
+		defer os.Unsetenv("DD_HOSTNAME")
+		testHostname([]byte(`hostname: my-host`), "my-env-host")(t)
 	})
 
-	t.Run("no-config", func(t *testing.T) {
-		if err := r.RunAgent([]byte(``)); err != nil {
+	t.Run("auto", func(t *testing.T) {
+		if err := r.RunAgent(nil); err != nil {
 			t.Fatal(err)
 		}
 		defer r.KillAgent()
@@ -55,7 +68,7 @@ func TestHostname(t *testing.T) {
 				t.Fatalf("expected %d traces, got %d", len(payload), n)
 			}
 			if v.HostName == "" {
-				t.Fatal("got empty hostname")
+				t.Fatal("hostname detection failed")
 			}
 		})
 	})
