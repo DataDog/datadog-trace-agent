@@ -109,7 +109,7 @@ func (s *PriorityEngine) Sample(trace agent.Trace, root *agent.Span, env string)
 		return sampled, 1
 	}
 
-	signature := computeServiceSignature(root, env)
+	signature := ServiceSignature{root.Service, env}.Hash()
 	s.catalogMu.Lock()
 	s.catalog.register(root, env, signature)
 	s.catalogMu.Unlock()

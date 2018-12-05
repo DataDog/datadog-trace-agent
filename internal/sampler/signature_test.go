@@ -70,7 +70,7 @@ func TestSignatureDifferentRoot(t *testing.T) {
 func testComputeServiceSignature(trace agent.Trace) Signature {
 	root := trace.GetRoot()
 	env := trace.GetEnv()
-	return computeServiceSignature(root, env)
+	return ServiceSignature{root.Service, env}.Hash()
 }
 
 func TestServiceSignatureSimilar(t *testing.T) {

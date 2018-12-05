@@ -28,12 +28,12 @@ func TestServiceKeyCatalogRegister(t *testing.T) {
 	s := getTestPriorityEngine()
 
 	_, root1 := getTestTraceWithService(t, "service1", s)
-	sig1 := computeServiceSignature(root1, defaultEnv)
+	sig1 := ServiceSignature{root1.Service, defaultEnv}.Hash()
 	cat.register(root1, defaultEnv, sig1)
 	assert.Equal(map[string]Signature{"service:service1,env:none": sig1}, map[string]Signature(cat))
 
 	_, root2 := getTestTraceWithService(t, "service2", s)
-	sig2 := computeServiceSignature(root2, defaultEnv)
+	sig2 := ServiceSignature{root2.Service, defaultEnv}.Hash()
 	cat.register(root2, defaultEnv, sig2)
 	assert.Equal(map[string]Signature{
 		"service:service1,env:none": sig1,
@@ -48,10 +48,10 @@ func TestServiceKeyCatalogGetRateByService(t *testing.T) {
 	s := getTestPriorityEngine()
 
 	_, root1 := getTestTraceWithService(t, "service1", s)
-	sig1 := computeServiceSignature(root1, defaultEnv)
+	sig1 := ServiceSignature{root1.Service, defaultEnv}.Hash()
 	cat.register(root1, defaultEnv, sig1)
 	_, root2 := getTestTraceWithService(t, "service2", s)
-	sig2 := computeServiceSignature(root2, defaultEnv)
+	sig2 := ServiceSignature{root2.Service, defaultEnv}.Hash()
 	cat.register(root2, defaultEnv, sig2)
 
 	rates := map[Signature]float64{
