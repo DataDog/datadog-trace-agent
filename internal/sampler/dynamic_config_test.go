@@ -142,6 +142,19 @@ func benchRBSGetAll(sigs map[ServiceSignature]float64) func(*testing.B) {
 	}
 }
 
+func benchRBSSetAll(sigs map[ServiceSignature]float64) func(*testing.B) {
+	return func(b *testing.B) {
+		rbs := &RateByService{defaultEnv: "test"}
+
+		b.ResetTimer()
+		b.ReportAllocs()
+
+		for i := 0; i < b.N; i++ {
+			rbs.SetAll(sigs)
+		}
+	}
+}
+
 func BenchmarkRateByService(b *testing.B) {
 	sigs := map[ServiceSignature]float64{
 		ServiceSignature{}:                 0.2,
@@ -151,17 +164,36 @@ func BenchmarkRateByService(b *testing.B) {
 		ServiceSignature{"five", "test"}:   0.8,
 		ServiceSignature{"six", "staging"}: 0.9,
 	}
-	for i := 1; i <= len(sigs); i++ {
-		// take first i elements
-		testSigs := make(map[ServiceSignature]float64, i)
-		var j int
-		for k, v := range sigs {
-			j++
-			testSigs[k] = v
-			if j == i {
-				break
+
+	b.Run("GetAll", func(b *testing.B) {
+		for i := 1; i <= len(sigs); i++ {
+			// take first i elements
+			testSigs := make(map[ServiceSignature]float64, i)
+			var j int
+			for k, v := range sigs {
+				j++
+				testSigs[k] = v
+				if j == i {
+					break
+				}
 			}
+			b.Run(strconv.Itoa(i), benchRBSGetAll(testSigs))
 		}
-		b.Run(strconv.Itoa(i), benchRBSGetAll(testSigs))
-	}
+	})
+
+	b.Run("SetAll", func(b *testing.B) {
+		for i := 1; i <= len(sigs); i++ {
+			// take first i elements
+			testSigs := make(map[ServiceSignature]float64, i)
+			var j int
+			for k, v := range sigs {
+				j++
+				testSigs[k] = v
+				if j == i {
+					break
+				}
+			}
+			b.Run(strconv.Itoa(i), benchRBSSetAll(testSigs))
+		}
+	})
 }

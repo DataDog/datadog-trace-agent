@@ -25,7 +25,7 @@ type RateByService struct {
 	defaultEnv string // env. to use for service defaults
 
 	mu    sync.RWMutex // guards rates
-	rates map[ServiceSignature]float64
+	rates map[string]float64
 }
 
 // SetAll the sampling rate for all services. If a service/env is not
@@ -35,13 +35,10 @@ func (rbs *RateByService) SetAll(rates map[ServiceSignature]float64) {
 	defer rbs.mu.Unlock()
 
 	if rbs.rates == nil {
-		rbs.rates = make(map[ServiceSignature]float64, len(rates))
+		rbs.rates = make(map[string]float64, len(rates))
 	}
 	for k := range rbs.rates {
-		if _, ok := rates[k]; !ok {
-			// delete outdated key
-			delete(rbs.rates, k)
-		}
+		delete(rbs.rates, k)
 	}
 	for k, v := range rates {
 		if v < 0 {
@@ -50,11 +47,11 @@ func (rbs *RateByService) SetAll(rates map[ServiceSignature]float64) {
 		if v > 1 {
 			v = 1
 		}
-		rbs.rates[k] = v
+		rbs.rates[k.String()] = v
 		if k.Env == rbs.defaultEnv {
 			// if this is the default env, then this is also the
 			// service's default rate unbound to any env.
-			rbs.rates[ServiceSignature{Name: k.Name}] = v
+			rbs.rates[ServiceSignature{Name: k.Name}.String()] = v
 		}
 	}
 }
@@ -66,7 +63,7 @@ func (rbs *RateByService) GetAll() map[string]float64 {
 
 	ret := make(map[string]float64, len(rbs.rates))
 	for k, v := range rbs.rates {
-		ret[k.String()] = v
+		ret[k] = v
 	}
 
 	return ret
