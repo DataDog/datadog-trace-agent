@@ -30,18 +30,18 @@ func applyEnv() {
 		"HTTPS_PROXY":              "proxy.https",
 		"DD_PROXY_HTTPS":           "proxy.https",
 	} {
-		if v, ok := os.LookupEnv(envKey); ok {
+		if v := os.Getenv(envKey); v != "" {
 			config.Datadog.Set(cfgKey, v)
 		}
 	}
-	if v, ok := os.LookupEnv("DD_IGNORE_RESOURCE"); ok {
+	if v := os.Getenv("DD_IGNORE_RESOURCE"); v != "" {
 		if r, err := splitString(v, ','); err != nil {
 			log.Warn("%q value not loaded: %v", "DD_IGNORE_RESOURCE", err)
 		} else {
 			config.Datadog.Set("apm_config.ignore_resources", r)
 		}
 	}
-	if v, ok := os.LookupEnv("DD_APM_ANALYZED_SPANS"); ok {
+	if v := os.Getenv("DD_APM_ANALYZED_SPANS"); v != "" {
 		analyzedSpans, err := parseAnalyzedSpans(v)
 		if err == nil {
 			config.Datadog.Set("apm_config.analyzed_spans", analyzedSpans)
