@@ -36,8 +36,8 @@ func getTestTraceWithService(t *testing.T, service string, s *PriorityEngine) (a
 	}
 	r := rand.Float64()
 	priority := agent.PriorityAutoDrop
-	rates := s.getRateByService()
-	key := byServiceKey(trace[0].Service, defaultEnv)
+	rates := s.ratesByService()
+	key := ServiceSignature{trace[0].Service, defaultEnv}
 	var rate float64
 	if r, ok := rates[key]; ok {
 		rate = r

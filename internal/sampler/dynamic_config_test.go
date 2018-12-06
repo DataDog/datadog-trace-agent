@@ -1,6 +1,7 @@
 package sampler
 
 import (
+	"strconv"
 	"sync"
 	"testing"
 
@@ -13,30 +14,65 @@ func TestNewDynamicConfig(t *testing.T) {
 	dc := NewDynamicConfig()
 	assert.NotNil(dc)
 
-	rates := map[string]float64{"service:myservice,env:myenv": 0.5}
+	rates := map[ServiceSignature]float64{
+		ServiceSignature{"myservice", "myenv"}: 0.5,
+	}
 
 	// Not doing a complete test of the different components of dynamic config,
 	// but still assessing it can do the bare minimum once initialized.
 	dc.RateByService.SetAll(rates)
 	rbs := dc.RateByService.GetAll()
-	assert.Equal(rates, rbs)
+	assert.Equal(map[string]float64{"service:myservice,env:myenv": 0.5}, rbs)
 }
 
 func TestRateByServiceGetSet(t *testing.T) {
-	assert := assert.New(t)
-
 	var rbc RateByService
-	testCases := []map[string]float64{
-		{"service:,env:": 0.1},
-		{"service:,env:": 0.3, "service:mcnulty,env:dev": 0.7, "service:postgres,env:dev": 0.2},
-		{"service:,env:": 1},
-		{},
-		{"service:,env:": 0.2},
-	}
-
-	for _, tc := range testCases {
-		rbc.SetAll(tc)
-		assert.Equal(tc, rbc.GetAll())
+	for i, tc := range []struct {
+		in  map[ServiceSignature]float64
+		out map[string]float64
+	}{
+		{
+			in: map[ServiceSignature]float64{
+				ServiceSignature{}: 0.1,
+			},
+			out: map[string]float64{
+				"service:,env:": 0.1,
+			},
+		},
+		{
+			in: map[ServiceSignature]float64{
+				ServiceSignature{}:                  0.3,
+				ServiceSignature{"mcnulty", "dev"}:  0.2,
+				ServiceSignature{"postgres", "dev"}: 0.1,
+			},
+			out: map[string]float64{
+				"service:,env:":            0.3,
+				"service:mcnulty,env:dev":  0.2,
+				"service:postgres,env:dev": 0.1,
+			},
+		},
+		{
+			in: map[ServiceSignature]float64{
+				ServiceSignature{}: 1,
+			},
+			out: map[string]float64{
+				"service:,env:": 1,
+			},
+		},
+		{
+			out: map[string]float64{},
+		},
+		{
+			in: map[ServiceSignature]float64{
+				ServiceSignature{}: 0.2,
+			},
+			out: map[string]float64{
+				"service:,env:": 0.2,
+			},
+		},
+	} {
+		rbc.SetAll(tc.in)
+		assert.Equal(t, tc.out, rbc.GetAll(), strconv.Itoa(i))
 	}
 }
 
@@ -44,7 +80,10 @@ func TestRateByServiceLimits(t *testing.T) {
 	assert := assert.New(t)
 
 	var rbc RateByService
-	rbc.SetAll(map[string]float64{"service:high,env:": 2, "service:low,env:": -1})
+	rbc.SetAll(map[ServiceSignature]float64{
+		ServiceSignature{"high", ""}: 2,
+		ServiceSignature{"low", ""}:  -1,
+	})
 	assert.Equal(map[string]float64{"service:high,env:": 1, "service:low,env:": 0}, rbc.GetAll())
 }
 
@@ -57,11 +96,11 @@ func TestRateByServiceConcurrency(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	rbc.SetAll(map[string]float64{"service:mcnulty,env:test": 1})
+	rbc.SetAll(map[ServiceSignature]float64{ServiceSignature{"mcnulty", "test"}: 1})
 	go func() {
 		for i := 0; i < n; i++ {
 			rate := float64(i) / float64(n)
-			rbc.SetAll(map[string]float64{"service:mcnulty,env:test": rate})
+			rbc.SetAll(map[ServiceSignature]float64{ServiceSignature{"mcnulty", "test"}: rate})
 		}
 		wg.Done()
 	}()

@@ -1,6 +1,7 @@
 package sampler
 
 import (
+	"fmt"
 	"hash/fnv"
 	"sort"
 
@@ -60,6 +61,10 @@ func (s ServiceSignature) Hash() Signature {
 	h.Write([]byte{','})
 	h.Write([]byte(s.Env))
 	return Signature(h.Sum32())
+}
+
+func (s ServiceSignature) String() string {
+	return fmt.Sprintf("service:%s,env:%s", s.Name, s.Env)
 }
 
 func computeSpanHash(span *agent.Span, env string) spanHash {

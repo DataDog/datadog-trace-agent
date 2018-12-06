@@ -22,21 +22,22 @@ func NewDynamicConfig() *DynamicConfig {
 // RateByService stores the sampling rate per service. It is thread-safe, so
 // one can read/write on it concurrently, using getters and setters.
 type RateByService struct {
-	rates map[string]float64
+	rates map[ServiceSignature]float64
 	mutex sync.RWMutex
 }
 
 // SetAll the sampling rate for all services. If a service/env is not
 // in the map, then the entry is removed.
-func (rbs *RateByService) SetAll(rates map[string]float64) {
+func (rbs *RateByService) SetAll(rates map[ServiceSignature]float64) {
 	rbs.mutex.Lock()
 	defer rbs.mutex.Unlock()
 
 	if rbs.rates == nil {
-		rbs.rates = make(map[string]float64, len(rates))
+		rbs.rates = make(map[ServiceSignature]float64, len(rates))
 	}
 	for k := range rbs.rates {
 		if _, ok := rates[k]; !ok {
+			// delete outdated key
 			delete(rbs.rates, k)
 		}
 	}
@@ -58,7 +59,7 @@ func (rbs *RateByService) GetAll() map[string]float64 {
 
 	ret := make(map[string]float64, len(rbs.rates))
 	for k, v := range rbs.rates {
-		ret[k] = v
+		ret[k.String()] = v
 	}
 
 	return ret
