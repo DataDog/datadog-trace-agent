@@ -126,3 +126,42 @@ func TestRateByServiceConcurrency(t *testing.T) {
 		wg.Done()
 	}()
 }
+
+func benchRBSGetAll(sigs map[ServiceSignature]float64) func(*testing.B) {
+	all := make(map[string]float64)
+	return func(b *testing.B) {
+		rbs := &RateByService{defaultEnv: "test"}
+		rbs.SetAll(sigs)
+
+		b.ResetTimer()
+		b.ReportAllocs()
+
+		for i := 0; i < b.N; i++ {
+			all = rbs.GetAll()
+		}
+	}
+}
+
+func BenchmarkRateByService(b *testing.B) {
+	sigs := map[ServiceSignature]float64{
+		ServiceSignature{}:                 0.2,
+		ServiceSignature{"two", "test"}:    0.4,
+		ServiceSignature{"three", "test"}:  0.33,
+		ServiceSignature{"one", "prod"}:    0.12,
+		ServiceSignature{"five", "test"}:   0.8,
+		ServiceSignature{"six", "staging"}: 0.9,
+	}
+	for i := 1; i <= len(sigs); i++ {
+		// take first i elements
+		testSigs := make(map[ServiceSignature]float64, i)
+		var j int
+		for k, v := range sigs {
+			j++
+			testSigs[k] = v
+			if j == i {
+				break
+			}
+		}
+		b.Run(strconv.Itoa(i), benchRBSGetAll(testSigs))
+	}
+}
