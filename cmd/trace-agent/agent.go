@@ -56,7 +56,7 @@ type Agent struct {
 // NewAgent returns a new Agent object, ready to be started. It takes a context
 // which may be cancelled in order to gracefully stop the agent.
 func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
-	dynConf := sampler.NewDynamicConfig()
+	dynConf := sampler.NewDynamicConfig(conf.DefaultEnv)
 
 	// inter-component channels
 	rawTraceChan := make(chan agent.Trace, 5000) // about 1000 traces/sec for 5 sec, TODO: move to *model.Trace

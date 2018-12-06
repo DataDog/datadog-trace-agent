@@ -12,25 +12,27 @@ type DynamicConfig struct {
 	RateByService RateByService
 }
 
-// NewDynamicConfig creates a new dynamic config object.
-func NewDynamicConfig() *DynamicConfig {
-	// Not much logic here now, as RateByService is fine with
-	// being used unintialized, but external packages should use this.
-	return &DynamicConfig{}
+// NewDynamicConfig creates a new dynamic config object which maps service signatures
+// to their corresponding sampling rates. Each service will have a default assigned
+// matching the service rate of the specified env.
+func NewDynamicConfig(env string) *DynamicConfig {
+	return &DynamicConfig{RateByService: RateByService{defaultEnv: env}}
 }
 
 // RateByService stores the sampling rate per service. It is thread-safe, so
 // one can read/write on it concurrently, using getters and setters.
 type RateByService struct {
+	defaultEnv string // env. to use for service defaults
+
+	mu    sync.RWMutex // guards rates
 	rates map[ServiceSignature]float64
-	mutex sync.RWMutex
 }
 
 // SetAll the sampling rate for all services. If a service/env is not
 // in the map, then the entry is removed.
 func (rbs *RateByService) SetAll(rates map[ServiceSignature]float64) {
-	rbs.mutex.Lock()
-	defer rbs.mutex.Unlock()
+	rbs.mu.Lock()
+	defer rbs.mu.Unlock()
 
 	if rbs.rates == nil {
 		rbs.rates = make(map[ServiceSignature]float64, len(rates))
@@ -49,13 +51,18 @@ func (rbs *RateByService) SetAll(rates map[ServiceSignature]float64) {
 			v = 1
 		}
 		rbs.rates[k] = v
+		if k.Env == rbs.defaultEnv {
+			// if this is the default env, then this is also the
+			// service's default rate unbound to any env.
+			rbs.rates[ServiceSignature{Name: k.Name}] = v
+		}
 	}
 }
 
 // GetAll returns all sampling rates for all services.
 func (rbs *RateByService) GetAll() map[string]float64 {
-	rbs.mutex.RLock()
-	defer rbs.mutex.RUnlock()
+	rbs.mu.RLock()
+	defer rbs.mu.RUnlock()
 
 	ret := make(map[string]float64, len(rbs.rates))
 	for k, v := range rbs.rates {

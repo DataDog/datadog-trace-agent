@@ -11,7 +11,7 @@ import (
 func TestNewDynamicConfig(t *testing.T) {
 	assert := assert.New(t)
 
-	dc := NewDynamicConfig()
+	dc := NewDynamicConfig("none")
 	assert.NotNil(dc)
 
 	rates := map[ServiceSignature]float64{
@@ -85,6 +85,19 @@ func TestRateByServiceLimits(t *testing.T) {
 		ServiceSignature{"low", ""}:  -1,
 	})
 	assert.Equal(map[string]float64{"service:high,env:": 1, "service:low,env:": 0}, rbc.GetAll())
+}
+
+func TestRateByServiceDefaults(t *testing.T) {
+	rbc := RateByService{defaultEnv: "test"}
+	rbc.SetAll(map[ServiceSignature]float64{
+		ServiceSignature{"one", "prod"}: 0.5,
+		ServiceSignature{"two", "test"}: 0.4,
+	})
+	assert.Equal(t, map[string]float64{
+		"service:one,env:prod": 0.5,
+		"service:two,env:test": 0.4,
+		"service:two,env:":     0.4,
+	}, rbc.GetAll())
 }
 
 func TestRateByServiceConcurrency(t *testing.T) {
