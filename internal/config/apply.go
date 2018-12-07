@@ -88,7 +88,7 @@ type ReplaceRule struct {
 
 type traceWriter struct {
 	MaxSpansPerPayload     int                    `mapstructure:"max_spans_per_payload"`
-	FlushPeriod            int                    `mapstructure:"flush_period_seconds"`
+	FlushPeriod            float64                `mapstructure:"flush_period_seconds"`
 	UpdateInfoPeriod       int                    `mapstructure:"update_info_period_seconds"`
 	QueueablePayloadSender queueablePayloadSender `mapstructure:"queue"`
 }
@@ -380,7 +380,7 @@ func readTraceWriterConfigYaml() writerconfig.TraceWriterConfig {
 			c.MaxSpansPerPayload = w.MaxSpansPerPayload
 		}
 		if w.FlushPeriod > 0 {
-			c.FlushPeriod = getDuration(w.FlushPeriod)
+			c.FlushPeriod = time.Duration(w.FlushPeriod*1000) * time.Millisecond
 		}
 		if w.UpdateInfoPeriod > 0 {
 			c.UpdateInfoPeriod = getDuration(w.UpdateInfoPeriod)
