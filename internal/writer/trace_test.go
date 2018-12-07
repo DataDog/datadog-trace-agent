@@ -13,7 +13,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/internal/config"
 	"github.com/DataDog/datadog-trace-agent/internal/info"
 	"github.com/DataDog/datadog-trace-agent/internal/statsd"
-	"github.com/DataDog/datadog-trace-agent/internal/testutil"
+	"github.com/DataDog/datadog-trace-agent/internal/test/testutil"
 	writerconfig "github.com/DataDog/datadog-trace-agent/internal/writer/config"
 	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"

@@ -2,7 +2,6 @@ package agent
 
 import (
 	"encoding/json"
-	"net/http"
 )
 
 //go:generate msgp -marshal=false
@@ -29,14 +28,4 @@ func (s1 ServicesMetadata) Merge(s2 ServicesMetadata) {
 // Hence watch for GlobalAgentPayloadVersion's value.
 func EncodeServicesPayload(sm ServicesMetadata) ([]byte, error) {
 	return json.Marshal(sm)
-}
-
-// SetServicesPayloadHeaders takes a Header struct and adds the appropriate
-// header keys for the API to be able to decode the services metadata.
-func SetServicesPayloadHeaders(h http.Header) {
-	switch GlobalAgentPayloadVersion {
-	case AgentPayloadV01:
-		h.Set("Content-Type", "application/json")
-	default:
-	}
 }
