@@ -17,7 +17,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/internal/config"
 	"github.com/DataDog/datadog-trace-agent/internal/info"
 	"github.com/DataDog/datadog-trace-agent/internal/sampler"
-	"github.com/DataDog/datadog-trace-agent/internal/testutil"
+	"github.com/DataDog/datadog-trace-agent/internal/test/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/tinylib/msgp/msgp"
 )
