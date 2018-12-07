@@ -160,7 +160,7 @@ func (r *HTTPReceiver) Stop() error {
 
 func (r *HTTPReceiver) httpHandle(fn http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		req.Body = agent.NewLimitedReader(req.Body, r.maxRequestBodyLength)
+		req.Body = NewLimitedReader(req.Body, r.maxRequestBodyLength)
 		defer req.Body.Close()
 
 		fn(w, req)
@@ -223,7 +223,7 @@ func (r *HTTPReceiver) handleTraces(v Version, w http.ResponseWriter, req *http.
 	// We get the address of the struct holding the stats associated to the tags
 	ts := r.Stats.GetTagStats(tags)
 
-	bytesRead := req.Body.(*agent.LimitedReader).Count
+	bytesRead := req.Body.(*LimitedReader).Count
 	if bytesRead > 0 {
 		atomic.AddInt64(&ts.TracesBytes, int64(bytesRead))
 	}
@@ -291,7 +291,7 @@ func (r *HTTPReceiver) handleServices(v Version, w http.ResponseWriter, req *htt
 
 	atomic.AddInt64(&ts.ServicesReceived, int64(len(servicesMeta)))
 
-	bytesRead := req.Body.(*agent.LimitedReader).Count
+	bytesRead := req.Body.(*LimitedReader).Count
 	if bytesRead > 0 {
 		atomic.AddInt64(&ts.ServicesBytes, int64(bytesRead))
 	}
@@ -376,7 +376,7 @@ func getTraces(v Version, w http.ResponseWriter, req *http.Request) (agent.Trace
 			HTTPDecodingError(err, []string{tagTraceHandler, fmt.Sprintf("v:%s", v)}, w)
 			return nil, false
 		}
-		traces = agent.TracesFromSpans(spans)
+		traces = tracesFromSpans(spans)
 	case v02:
 		fallthrough
 	case v03:
@@ -410,4 +410,17 @@ func decodeReceiverPayload(r io.Reader, dest msgp.Decodable, v Version, contentT
 	default:
 		panic(fmt.Sprintf("unhandled content type %q", contentType))
 	}
+}
+
+func tracesFromSpans(spans []agent.Span) agent.Traces {
+	traces := agent.Traces{}
+	byID := make(map[uint64][]*agent.Span)
+	for _, s := range spans {
+		byID[s.TraceID] = append(byID[s.TraceID], &s)
+	}
+	for _, t := range byID {
+		traces = append(traces, t)
+	}
+
+	return traces
 }

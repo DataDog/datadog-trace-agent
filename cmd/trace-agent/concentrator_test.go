@@ -25,7 +25,7 @@ func getTsInBucket(alignedNow int64, bsize int64, offset int64) int64 {
 // testSpan avoids typo and inconsistency in test spans (typical pitfall: duration, start time,
 // and end time are aligned, and end time is the one that needs to be aligned
 func testSpan(spanID uint64, parentID uint64, duration, offset int64, service, resource string, err int32) *agent.Span {
-	now := agent.Now()
+	now := time.Now().UnixNano()
 	alignedNow := now - now%testBucketInterval
 
 	return &agent.Span{
@@ -47,7 +47,7 @@ func TestConcentratorOldestTs(t *testing.T) {
 	assert := assert.New(t)
 	statsChan := make(chan []agent.StatsBucket)
 
-	now := agent.Now()
+	now := time.Now().UnixNano()
 
 	// Build that simply have spans spread over time windows.
 	trace := agent.Trace{
@@ -153,7 +153,7 @@ func TestConcentratorStatsTotals(t *testing.T) {
 	statsChan := make(chan []agent.StatsBucket)
 	c := NewConcentrator([]string{}, testBucketInterval, statsChan)
 
-	now := agent.Now()
+	now := time.Now().UnixNano()
 	alignedNow := alignTs(now, c.bsize)
 
 	// update oldestTs as it running for quite some time, to avoid the fact that at startup
@@ -212,7 +212,7 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	statsChan := make(chan []agent.StatsBucket)
 	c := NewConcentrator([]string{}, testBucketInterval, statsChan)
 
-	now := agent.Now()
+	now := time.Now().UnixNano()
 	alignedNow := alignTs(now, c.bsize)
 
 	// update oldestTs as it running for quite some time, to avoid the fact that at startup
@@ -336,7 +336,7 @@ func TestConcentratorSublayersStatsCounts(t *testing.T) {
 	statsChan := make(chan []agent.StatsBucket)
 	c := NewConcentrator([]string{}, testBucketInterval, statsChan)
 
-	now := agent.Now()
+	now := time.Now().UnixNano()
 	alignedNow := now - now%c.bsize
 
 	trace := agent.Trace{

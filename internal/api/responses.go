@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/DataDog/datadog-trace-agent/internal/agent"
 	"github.com/DataDog/datadog-trace-agent/internal/sampler"
 	"github.com/DataDog/datadog-trace-agent/internal/statsd"
 )
@@ -35,7 +34,7 @@ func HTTPDecodingError(err error, tags []string, w http.ResponseWriter) {
 	errtag := "decoding-error"
 	msg := err.Error()
 
-	if err == agent.ErrLimitedReaderLimitReached {
+	if err == ErrLimitedReaderLimitReached {
 		status = http.StatusRequestEntityTooLarge
 		errtag := "payload-too-large"
 		msg = errtag
