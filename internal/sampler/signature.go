@@ -7,7 +7,8 @@ import (
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
 )
 
-// Signature is a simple representation of trace, used to identify simlar traces
+// Signature is a hash representation of trace or a service, used to identify
+// simlar signatures.
 type Signature uint64
 
 // spanHash is the type of the hashes used during the computation of a signature
@@ -46,12 +47,23 @@ func computeSignatureWithRootAndEnv(trace agent.Trace, root *agent.Span, env str
 	return Signature(traceHash)
 }
 
-// computeServiceSignature generates the signature of a trace with minimal
-// information such as service and env, this is typically used by distributed
-// sampling based on priority, and used as a key to store the desired rate
-// for a given service,env tuple.
-func computeServiceSignature(root *agent.Span, env string) Signature {
-	return Signature(computeServiceHash(*root, env))
+// ServiceSignature represents a unique way to identify a service.
+type ServiceSignature struct{ Name, Env string }
+
+// Hash generates the signature of a trace with minimal information such as
+// service and env, this is typically used by distributed sampling based on
+// priority, and used as a key to store the desired rate for a given
+// service,env tuple.
+func (s ServiceSignature) Hash() Signature {
+	h := fnv.New32a()
+	h.Write([]byte(s.Name))
+	h.Write([]byte{','})
+	h.Write([]byte(s.Env))
+	return Signature(h.Sum32())
+}
+
+func (s ServiceSignature) String() string {
+	return "service:" + s.Name + ",env:" + s.Env
 }
 
 func computeSpanHash(span *agent.Span, env string) spanHash {
@@ -71,15 +83,6 @@ func computeRootHash(span agent.Span, env string) spanHash {
 	h.Write([]byte(span.Name))
 	h.Write([]byte(span.Resource))
 	h.Write([]byte{byte(span.Error)})
-
-	return spanHash(h.Sum32())
-}
-
-func computeServiceHash(span agent.Span, env string) spanHash {
-	h := fnv.New32a()
-	h.Write([]byte(span.Service))
-	h.Write([]byte{','})
-	h.Write([]byte(env))
 
 	return spanHash(h.Sum32())
 }

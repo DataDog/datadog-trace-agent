@@ -6,53 +6,54 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestByServiceKey(t *testing.T) {
+func TestServiceSignatureString(t *testing.T) {
 	assert := assert.New(t)
 
-	assert.Equal(defaultServiceRateKey, byServiceKey("", ""))
-	assert.Equal("service:mcnulty,env:test", byServiceKey("mcnulty", "test"))
+	assert.Equal(defaultServiceRateKey, ServiceSignature{}.String())
+	assert.Equal("service:mcnulty,env:test", ServiceSignature{"mcnulty", "test"}.String())
 }
 
-func TestNewServiceKeyCatalog(t *testing.T) {
-	assert := assert.New(t)
-
-	cat := newServiceKeyCatalog()
-	assert.NotNil(cat)
-	assert.Equal(map[string]Signature{}, map[string]Signature(cat))
+func TestNewServiceLookup(t *testing.T) {
+	cat := newServiceLookup()
+	assert.NotNil(t, cat.lookup)
 }
 
 func TestServiceKeyCatalogRegister(t *testing.T) {
 	assert := assert.New(t)
 
-	cat := newServiceKeyCatalog()
+	cat := newServiceLookup()
 	s := getTestPriorityEngine()
 
 	_, root1 := getTestTraceWithService(t, "service1", s)
-	sig1 := computeServiceSignature(root1, defaultEnv)
-	cat.register(root1, defaultEnv, sig1)
-	assert.Equal(map[string]Signature{"service:service1,env:none": sig1}, map[string]Signature(cat))
+	sig1 := cat.register(ServiceSignature{root1.Service, defaultEnv})
+	assert.Equal(
+		map[ServiceSignature]Signature{
+			ServiceSignature{"service1", "none"}: sig1,
+		},
+		cat.lookup,
+	)
 
 	_, root2 := getTestTraceWithService(t, "service2", s)
-	sig2 := computeServiceSignature(root2, defaultEnv)
-	cat.register(root2, defaultEnv, sig2)
-	assert.Equal(map[string]Signature{
-		"service:service1,env:none": sig1,
-		"service:service2,env:none": sig2,
-	}, map[string]Signature(cat))
+	sig2 := cat.register(ServiceSignature{root2.Service, defaultEnv})
+	assert.Equal(
+		map[ServiceSignature]Signature{
+			ServiceSignature{"service1", "none"}: sig1,
+			ServiceSignature{"service2", "none"}: sig2,
+		},
+		cat.lookup,
+	)
 }
 
-func TestServiceKeyCatalogGetRateByService(t *testing.T) {
+func TestServiceKeyCatalogRatesByService(t *testing.T) {
 	assert := assert.New(t)
 
-	cat := newServiceKeyCatalog()
+	cat := newServiceLookup()
 	s := getTestPriorityEngine()
 
 	_, root1 := getTestTraceWithService(t, "service1", s)
-	sig1 := computeServiceSignature(root1, defaultEnv)
-	cat.register(root1, defaultEnv, sig1)
+	sig1 := cat.register(ServiceSignature{root1.Service, defaultEnv})
 	_, root2 := getTestTraceWithService(t, "service2", s)
-	sig2 := computeServiceSignature(root2, defaultEnv)
-	cat.register(root2, defaultEnv, sig2)
+	sig2 := cat.register(ServiceSignature{root2.Service, defaultEnv})
 
 	rates := map[Signature]float64{
 		sig1: 0.3,
@@ -60,27 +61,25 @@ func TestServiceKeyCatalogGetRateByService(t *testing.T) {
 	}
 	const totalRate = 0.2
 
-	var rateByService map[string]float64
-
-	rateByService = cat.getRateByService(rates, totalRate)
-	assert.Equal(map[string]float64{
-		"service:service1,env:none": 0.3,
-		"service:service2,env:none": 0.7,
-		"service:,env:":             0.2,
+	rateByService := cat.ratesByService(rates, totalRate)
+	assert.Equal(map[ServiceSignature]float64{
+		ServiceSignature{"service1", "none"}: 0.3,
+		ServiceSignature{"service2", "none"}: 0.7,
+		ServiceSignature{}:                   0.2,
 	}, rateByService)
 
 	delete(rates, sig1)
 
-	rateByService = cat.getRateByService(rates, totalRate)
-	assert.Equal(map[string]float64{
-		"service:service2,env:none": 0.7,
-		"service:,env:":             0.2,
+	rateByService = cat.ratesByService(rates, totalRate)
+	assert.Equal(map[ServiceSignature]float64{
+		ServiceSignature{"service2", "none"}: 0.7,
+		ServiceSignature{}:                   0.2,
 	}, rateByService)
 
 	delete(rates, sig2)
 
-	rateByService = cat.getRateByService(rates, totalRate)
-	assert.Equal(map[string]float64{
-		"service:,env:": 0.2,
+	rateByService = cat.ratesByService(rates, totalRate)
+	assert.Equal(map[ServiceSignature]float64{
+		ServiceSignature{}: 0.2,
 	}, rateByService)
 }

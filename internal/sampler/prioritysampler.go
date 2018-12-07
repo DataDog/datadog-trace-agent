@@ -33,10 +33,8 @@ type PriorityEngine struct {
 	Sampler *Sampler
 
 	rateByService *RateByService
-	catalog       serviceKeyCatalog
-	catalogMu     sync.Mutex
-
-	exit chan struct{}
+	catalog       *serviceKeyCatalog
+	exit          chan struct{}
 }
 
 // NewPriorityEngine returns an initialized Sampler
@@ -44,7 +42,7 @@ func NewPriorityEngine(extraRate float64, maxTPS float64, rateByService *RateByS
 	s := &PriorityEngine{
 		Sampler:       newSampler(extraRate, maxTPS),
 		rateByService: rateByService,
-		catalog:       newServiceKeyCatalog(),
+		catalog:       newServiceLookup(),
 		exit:          make(chan struct{}),
 	}
 
@@ -68,7 +66,7 @@ func (s *PriorityEngine) Run() {
 		for {
 			select {
 			case <-t.C:
-				s.rateByService.SetAll(s.getRateByService())
+				s.rateByService.SetAll(s.ratesByService())
 			case <-s.exit:
 				wg.Done()
 				return
@@ -109,10 +107,7 @@ func (s *PriorityEngine) Sample(trace agent.Trace, root *agent.Span, env string)
 		return sampled, 1
 	}
 
-	signature := computeServiceSignature(root, env)
-	s.catalogMu.Lock()
-	s.catalog.register(root, env, signature)
-	s.catalogMu.Unlock()
+	signature := s.catalog.register(ServiceSignature{root.Service, env})
 
 	// Update sampler state by counting this trace
 	s.Sampler.Backend.CountSignature(signature)
@@ -139,12 +134,10 @@ func (s *PriorityEngine) GetState() interface{} {
 	return s.Sampler.GetState()
 }
 
-// getRateByService returns all rates by service, this information is useful for
+// ratesByService returns all rates by service, this information is useful for
 // agents to pick the right service rate.
-func (s *PriorityEngine) getRateByService() map[string]float64 {
-	defer s.catalogMu.Unlock()
-	s.catalogMu.Lock()
-	return s.catalog.getRateByService(s.Sampler.GetAllSignatureSampleRates(), s.Sampler.GetDefaultSampleRate())
+func (s *PriorityEngine) ratesByService() map[ServiceSignature]float64 {
+	return s.catalog.ratesByService(s.Sampler.GetAllSignatureSampleRates(), s.Sampler.GetDefaultSampleRate())
 }
 
 // GetType return the type of the sampler engine
