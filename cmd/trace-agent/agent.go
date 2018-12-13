@@ -222,15 +222,19 @@ func (a *Agent) Process(t agent.Trace) {
 	}
 	a.Replacer.Replace(&t)
 
-	if a.CollectorTraceWriter != nil {
-		if a.conf.CollectorConfig.DualFlush {
-			// If the trace is going to be processed by the agent, copy it before sending
-			traceCopy := t.Clone()
-			a.collectorTraceChan <- &traceCopy
-		} else {
-			// Flush
-			a.collectorTraceChan <- &t
-			return
+	if a.CollectorTraceWriter != nil && len(t) > 0 {
+		traceID := t[0].TraceID
+		sampled := sampler.SampleByRate(traceID, a.conf.CollectorConfig.SamplingRate)
+		if sampled {
+			if a.conf.CollectorConfig.DualFlush {
+				// If the trace is going to be processed by the agent, copy it before sending
+				traceCopy := t.Clone()
+				a.collectorTraceChan <- &traceCopy
+			} else {
+				// Flush
+				a.collectorTraceChan <- &t
+				return
+			}
 		}
 	}
 

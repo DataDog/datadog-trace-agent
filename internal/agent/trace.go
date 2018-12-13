@@ -211,7 +211,7 @@ func (t Trace) ExtractTopLevelSubtraces(root *Span) []Subtrace {
 func (t Trace) Clone() Trace {
 	clonedTrace := make([]*Span, len(t))
 	for i := range t {
-		clonedSpan := t[i]
+		clonedSpan := *t[i]
 		clonedSpan.Meta = make(map[string]string, len(t[i].Meta))
 		for k, v := range t[i].Meta {
 			clonedSpan.Meta[k] = v
@@ -220,6 +220,7 @@ func (t Trace) Clone() Trace {
 		for k, v := range t[i].Metrics {
 			clonedSpan.Metrics[k] = v
 		}
+		clonedTrace[i] = &clonedSpan
 	}
 	return clonedTrace
 }
