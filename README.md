@@ -23,7 +23,7 @@ The APM agent (aka Trace Agent) isn't part of the OSX Datadog Agent yet, it need
 - Download the [latest OSX Trace Agent release](https://github.com/DataDog/datadog-trace-agent/releases/latest).
 - Run the Trace Agent using the Datadog Agent configuration.
 
-    `./trace-agent-darwin-amd64-X.Y.Z -config /opt/datadog-agent/etc/datadog.yaml`
+    `./trace-agent-X.Y.Z-darwin-amd64 -config /opt/datadog-agent/etc/datadog.yaml`
 
 - The Trace Agent should now be running in foreground, with an initial output similar to:
 

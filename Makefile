@@ -26,11 +26,12 @@ binaries:
 	# compiling release binaries for tag $(V)
 	git checkout $(V)
 	mkdir -p ./bin
-	TRACE_AGENT_VERSION=$(V) go generate ./info
-	GOOS=windows GOARCH=amd64 go build -o ./bin/trace-agent-windows-amd64-$(V).exe ./cmd/trace-agent
-	GOOS=linux GOARCH=amd64 go build -o ./bin/trace-agent-linux-amd64-$(V) ./cmd/trace-agent
-	GOOS=darwin GOARCH=amd64 go build -o ./bin/trace-agent-darwin-amd64-$(V) ./cmd/trace-agent
-	git checkout -
+	TRACE_AGENT_VERSION=$(V) go generate ./internal/info
+	go get -u github.com/karalabe/xgo
+	xgo -dest=bin -go=1.10 -out=trace-agent-$(V) -targets=windows-6.1/amd64,linux/amd64,darwin-10.11/amd64 ./cmd/trace-agent
+	mv ./bin/trace-agent-$(V)-windows-6.1-amd64.exe ./bin/trace-agent-$(V)-windows-amd64.exe
+	mv ./bin/trace-agent-$(V)-darwin-10.11-amd64 ./bin/trace-agent-$(V)-darwin-amd64 
+	git reset --hard head && git checkout -
 
 ci:
 	# task used by CI
