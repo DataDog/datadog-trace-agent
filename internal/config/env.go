@@ -22,6 +22,7 @@ func applyEnv() {
 		"DD_LOG_LEVEL":             "log_level",
 		"DD_CONNECTION_LIMIT":      "apm_config.connection_limit",
 		"DD_APM_ENABLED":           "apm_config.enabled",
+		"DD_APM_ENV":               "apm_config.env",
 		"DD_APM_NON_LOCAL_TRAFFIC": "apm_config.apm_non_local_traffic",
 		"DD_APM_DD_URL":            "apm_config.apm_dd_url",
 		"DD_RECEIVER_PORT":         "apm_config.receiver_port",
