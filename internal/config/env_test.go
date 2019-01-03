@@ -104,16 +104,20 @@ func TestLoadEnv(t *testing.T) {
 				assert.Equal("bindhost.com", cfg.StatsdHost)
 			})
 
-			env = "DD_RECEIVER_PORT"
-			t.Run(env, func(t *testing.T) {
-				assert := assert.New(t)
-				err := os.Setenv(env, "1234")
-				assert.NoError(err)
-				defer os.Unsetenv(env)
-				cfg, err := Load("./testdata/full." + ext)
-				assert.NoError(err)
-				assert.Equal(1234, cfg.ReceiverPort)
-			})
+			for _, envKey := range []string{
+				"DD_RECEIVER_PORT", // deprecated
+				"DD_APM_RECEIVER_PORT",
+			} {
+				t.Run(envKey, func(t *testing.T) {
+					assert := assert.New(t)
+					err := os.Setenv(envKey, "1234")
+					assert.NoError(err)
+					defer os.Unsetenv(envKey)
+					cfg, err := Load("./testdata/full." + ext)
+					assert.NoError(err)
+					assert.Equal(1234, cfg.ReceiverPort)
+				})
+			}
 
 			env = "DD_DOGSTATSD_PORT"
 			t.Run(env, func(t *testing.T) {
@@ -137,16 +141,20 @@ func TestLoadEnv(t *testing.T) {
 				assert.Equal("0.0.0.0", cfg.ReceiverHost)
 			})
 
-			env = "DD_IGNORE_RESOURCE"
-			t.Run(env, func(t *testing.T) {
-				assert := assert.New(t)
-				err := os.Setenv(env, "1,2,3")
-				assert.NoError(err)
-				defer os.Unsetenv(env)
-				cfg, err := Load("./testdata/full." + ext)
-				assert.NoError(err)
-				assert.Equal([]string{"1", "2", "3"}, cfg.Ignore["resource"])
-			})
+			for _, envKey := range []string{
+				"DD_IGNORE_RESOURCE", // deprecated
+				"DD_APM_IGNORE_RESOURCE",
+			} {
+				t.Run(envKey, func(t *testing.T) {
+					assert := assert.New(t)
+					err := os.Setenv(envKey, "1,2,3")
+					assert.NoError(err)
+					defer os.Unsetenv(envKey)
+					cfg, err := Load("./testdata/full." + ext)
+					assert.NoError(err)
+					assert.Equal([]string{"1", "2", "3"}, cfg.Ignore["resource"])
+				})
+			}
 
 			env = "DD_LOG_LEVEL"
 			t.Run(env, func(t *testing.T) {
@@ -173,38 +181,50 @@ func TestLoadEnv(t *testing.T) {
 				}, cfg.AnalyzedSpansByService)
 			})
 
-			env = "DD_CONNECTION_LIMIT"
-			t.Run(env, func(t *testing.T) {
-				assert := assert.New(t)
-				err := os.Setenv(env, "50")
-				assert.NoError(err)
-				defer os.Unsetenv(env)
-				cfg, err := Load("./testdata/full." + ext)
-				assert.NoError(err)
-				assert.Equal(50, cfg.ConnectionLimit)
-			})
+			for _, envKey := range []string{
+				"DD_CONNECTION_LIMIT", // deprecated
+				"DD_APM_CONNECTION_LIMIT",
+			} {
+				t.Run(envKey, func(t *testing.T) {
+					assert := assert.New(t)
+					err := os.Setenv(envKey, "50")
+					assert.NoError(err)
+					defer os.Unsetenv(envKey)
+					cfg, err := Load("./testdata/full." + ext)
+					assert.NoError(err)
+					assert.Equal(50, cfg.ConnectionLimit)
+				})
+			}
 
-			env = "DD_MAX_TPS"
-			t.Run(env, func(t *testing.T) {
-				assert := assert.New(t)
-				err := os.Setenv(env, "6")
-				assert.NoError(err)
-				defer os.Unsetenv(env)
-				cfg, err := Load("./testdata/full." + ext)
-				assert.NoError(err)
-				assert.Equal(6., cfg.MaxTPS)
-			})
+			for _, envKey := range []string{
+				"DD_MAX_TPS", // deprecated
+				"DD_APM_MAX_TPS",
+			} {
+				t.Run(envKey, func(t *testing.T) {
+					assert := assert.New(t)
+					err := os.Setenv(envKey, "6")
+					assert.NoError(err)
+					defer os.Unsetenv(envKey)
+					cfg, err := Load("./testdata/full." + ext)
+					assert.NoError(err)
+					assert.Equal(6., cfg.MaxTPS)
+				})
+			}
 
-			env = "DD_MAX_EPS"
-			t.Run(env, func(t *testing.T) {
-				assert := assert.New(t)
-				err := os.Setenv(env, "7")
-				assert.NoError(err)
-				defer os.Unsetenv(env)
-				cfg, err := Load("./testdata/full." + ext)
-				assert.NoError(err)
-				assert.Equal(7., cfg.MaxEPS)
-			})
+			for _, envKey := range []string{
+				"DD_MAX_EPS", // deprecated
+				"DD_APM_MAX_EPS",
+			} {
+				t.Run(envKey, func(t *testing.T) {
+					assert := assert.New(t)
+					err := os.Setenv(envKey, "7")
+					assert.NoError(err)
+					defer os.Unsetenv(envKey)
+					cfg, err := Load("./testdata/full." + ext)
+					assert.NoError(err)
+					assert.Equal(7., cfg.MaxEPS)
+				})
+			}
 		})
 	}
 }
