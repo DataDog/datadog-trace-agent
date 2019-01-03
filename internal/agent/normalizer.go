@@ -33,35 +33,35 @@ var (
 func (s *Span) Normalize() error {
 	// Service
 	if s.Service == "" {
-		return errors.New("span.normalize: empty `Service`")
+		return errors.New("empty `Service`")
 	}
 	if len(s.Service) > MaxServiceLen {
-		return fmt.Errorf("span.normalize: `Service` too long (max %d chars): %s", MaxServiceLen, s.Service)
+		return fmt.Errorf("`Service` too long (%d chars max): %s", MaxServiceLen, s.Service)
 	}
 	// service shall comply with Datadog tag normalization as it's eventually a tag
 	s.Service = NormalizeTag(s.Service)
 	if s.Service == "" {
-		return errors.New("span.normalize: `Service` could not be normalized")
+		return fmt.Errorf("invalid `Service`: %s", s.Service)
 	}
 
 	// Name
 	if s.Name == "" {
-		return errors.New("span.normalize: empty `Name`")
+		return errors.New("empty `Name`")
 	}
 	if len(s.Name) > MaxNameLen {
-		return fmt.Errorf("span.normalize: `Name` too long (max %d chars): %s", MaxNameLen, s.Name)
+		return fmt.Errorf("`Name` too long (%d chars max): %s", MaxNameLen, s.Name)
 	}
 	// name shall comply with Datadog metric name normalization
 	name, ok := normMetricNameParse(s.Name)
 	if !ok {
-		return fmt.Errorf("span.normalize: invalid `Name`: %s", s.Name)
+		return fmt.Errorf("invalid `Name`: %s", s.Name)
 	}
 	s.Name = name
 
 	// Resource
 	s.Resource = toUTF8(s.Resource)
 	if s.Resource == "" {
-		return errors.New("span.normalize: empty `Resource`")
+		return errors.New("empty `Resource`")
 	}
 
 	// ParentID, TraceID and SpanID set in the client could be the same
@@ -78,16 +78,16 @@ func (s *Span) Normalize() error {
 	// if s.Start is very little, less than year 2000 probably a unit issue so discard
 	// (or it is "le bug de l'an 2000")
 	if s.Start < Year2000NanosecTS {
-		return fmt.Errorf("span.normalize: invalid `Start` (must be nanosecond epoch): %d", s.Start)
+		return fmt.Errorf("invalid `Start` (must be nanosecond epoch): %d", s.Start)
 	}
 
 	// If the end date is too far away in the future, it's probably a mistake.
 	if s.Start+s.Duration > time.Now().Add(MaxEndDateOffset).UnixNano() {
-		return fmt.Errorf("span.normalize: more than %v in the future", MaxEndDateOffset)
+		return fmt.Errorf("invalid `Start`+`Duration`: too far in the future")
 	}
 
 	if s.Duration <= 0 {
-		return errors.New("span.normalize: durations need to be strictly positive")
+		return fmt.Errorf("invalid `Duration`: %d", s.Duration)
 	}
 
 	// ParentID set on the client side, no way of checking
@@ -95,7 +95,7 @@ func (s *Span) Normalize() error {
 	// Type
 	s.Type = toUTF8(s.Type)
 	if len(s.Type) > MaxTypeLen {
-		return fmt.Errorf("span.normalize: `Type` too long (max %d chars): %s", MaxTypeLen, s.Type)
+		return fmt.Errorf("`Type` too long (%d chars max): %s", MaxTypeLen, s.Type)
 	}
 
 	for k, v := range s.Meta {
@@ -143,13 +143,13 @@ func NormalizeTrace(t Trace) (Trace, error) {
 	traceID := t[0].TraceID
 	for _, span := range t {
 		if span.TraceID == 0 {
-			return t, errors.New("span.TraceID cannot be empty")
+			return t, errors.New("empty `TraceID`")
 		}
 		if span.SpanID == 0 {
-			return t, errors.New("span.SpanID cannot be empty")
+			return t, errors.New("empty `SpanID`")
 		}
 		if _, ok := spanIDs[span.SpanID]; ok {
-			return t, fmt.Errorf("duplicate SpanID %v (span %v)", span.SpanID, span)
+			return t, fmt.Errorf("duplicate `SpanID` %v (span %v)", span.SpanID, span)
 		}
 		if span.TraceID != traceID {
 			return t, fmt.Errorf("foreign span in trace (Name:TraceID) %s:%x != %s:%x", t[0].Name, t[0].TraceID, span.Name, span.TraceID)
