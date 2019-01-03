@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/DataDog/datadog-agent/pkg/config"
 	log "github.com/cihub/seelog"
 	"github.com/stretchr/testify/assert"
 )
@@ -14,6 +15,35 @@ func TestMain(m *testing.M) {
 }
 
 func TestLoadEnv(t *testing.T) {
+	t.Run("overrides", func(t *testing.T) {
+		// tests that newer envs. override deprecated ones
+		for _, tt := range []struct {
+			envOld, envNew, key string
+		}{
+			{"HTTPS_PROXY", "DD_PROXY_HTTPS", "proxy.https"},
+			{"DD_CONNECTION_LIMIT", "DD_APM_CONNECTION_LIMIT", "apm_config.connection_limit"},
+			{"DD_RECEIVER_PORT", "DD_APM_RECEIVER_PORT", "apm_config.receiver_port"},
+			{"DD_MAX_EPS", "DD_MAX_EPS", "apm_config.max_events_per_second"},
+			{"DD_MAX_TPS", "DD_APM_MAX_TPS", "apm_config.max_traces_per_second"},
+			{"DD_IGNORE_RESOURCE", "DD_APM_IGNORE_RESOURCES", "apm_config.ignore_resources"},
+		} {
+			assert := assert.New(t)
+			err := os.Setenv(tt.envOld, "1,2,3")
+			assert.NoError(err)
+			defer os.Unsetenv(tt.envOld)
+			err = os.Setenv(tt.envNew, "4,5,6")
+			assert.NoError(err)
+			defer os.Unsetenv(tt.envNew)
+			_, err = Load("./testdata/full.yaml")
+			assert.NoError(err)
+			if tt.envNew == "DD_APM_IGNORE_RESOURCES" {
+				assert.Equal([]string{"4", "5", "6"}, config.Datadog.GetStringSlice(tt.key))
+			} else {
+				assert.Equal("4,5,6", config.Datadog.Get(tt.key))
+			}
+		}
+	})
+
 	for _, ext := range []string{"yaml", "ini"} {
 		t.Run(ext, func(t *testing.T) {
 			env := "DD_API_KEY"
@@ -143,7 +173,7 @@ func TestLoadEnv(t *testing.T) {
 
 			for _, envKey := range []string{
 				"DD_IGNORE_RESOURCE", // deprecated
-				"DD_APM_IGNORE_RESOURCE",
+				"DD_APM_IGNORE_RESOURCES",
 			} {
 				t.Run(envKey, func(t *testing.T) {
 					assert := assert.New(t)

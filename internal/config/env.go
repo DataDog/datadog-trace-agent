@@ -13,38 +13,38 @@ import (
 func applyEnv() {
 	// Warning: do not use BindEnv to bind config variables. They will be overriden
 	// when using the legacy config loader.
-	for envKey, cfgKey := range map[string]string{
+	for _, override := range []struct{ env, key string }{
 		// Core agent:
-		"DD_SITE":           "site",
-		"DD_API_KEY":        "api_key",
-		"DD_HOSTNAME":       "hostname",
-		"DD_BIND_HOST":      "bind_host",
-		"DD_DOGSTATSD_PORT": "dogstatsd_port",
-		"DD_LOG_LEVEL":      "log_level",
-		"HTTPS_PROXY":       "proxy.https", // deprecated
-		"DD_PROXY_HTTPS":    "proxy.https",
+		{"DD_SITE", "site"},
+		{"DD_API_KEY", "api_key"},
+		{"DD_HOSTNAME", "hostname"},
+		{"DD_BIND_HOST", "bind_host"},
+		{"DD_DOGSTATSD_PORT", "dogstatsd_port"},
+		{"DD_LOG_LEVEL", "log_level"},
+		{"HTTPS_PROXY", "proxy.https"}, // deprecated
+		{"DD_PROXY_HTTPS", "proxy.https"},
 
 		// APM specific:
-		"DD_CONNECTION_LIMIT":      "apm_config.connection_limit", // deprecated
-		"DD_APM_CONNECTION_LIMIT":  "apm_config.connection_limit",
-		"DD_APM_ENABLED":           "apm_config.enabled",
-		"DD_APM_ENV":               "apm_config.env",
-		"DD_APM_NON_LOCAL_TRAFFIC": "apm_config.apm_non_local_traffic",
-		"DD_APM_DD_URL":            "apm_config.apm_dd_url",
-		"DD_RECEIVER_PORT":         "apm_config.receiver_port", // deprecated
-		"DD_APM_RECEIVER_PORT":     "apm_config.receiver_port",
-		"DD_MAX_EPS":               "apm_config.max_events_per_second", // deprecated
-		"DD_APM_MAX_EPS":           "apm_config.max_events_per_second",
-		"DD_MAX_TPS":               "apm_config.max_traces_per_second", // deprecated
-		"DD_APM_MAX_TPS":           "apm_config.max_traces_per_second",
+		{"DD_CONNECTION_LIMIT", "apm_config.connection_limit"}, // deprecated
+		{"DD_APM_CONNECTION_LIMIT", "apm_config.connection_limit"},
+		{"DD_APM_ENABLED", "apm_config.enabled"},
+		{"DD_APM_ENV", "apm_config.env"},
+		{"DD_APM_NON_LOCAL_TRAFFIC", "apm_config.apm_non_local_traffic"},
+		{"DD_APM_DD_URL", "apm_config.apm_dd_url"},
+		{"DD_RECEIVER_PORT", "apm_config.receiver_port"}, // deprecated
+		{"DD_APM_RECEIVER_PORT", "apm_config.receiver_port"},
+		{"DD_MAX_EPS", "apm_config.max_events_per_second"}, // deprecated
+		{"DD_APM_MAX_EPS", "apm_config.max_events_per_second"},
+		{"DD_MAX_TPS", "apm_config.max_traces_per_second"}, // deprecated
+		{"DD_APM_MAX_TPS", "apm_config.max_traces_per_second"},
 	} {
-		if v := os.Getenv(envKey); v != "" {
-			config.Datadog.Set(cfgKey, v)
+		if v := os.Getenv(override.env); v != "" {
+			config.Datadog.Set(override.key, v)
 		}
 	}
 	for _, envKey := range []string{
 		"DD_IGNORE_RESOURCE", // deprecated
-		"DD_APM_IGNORE_RESOURCE",
+		"DD_APM_IGNORE_RESOURCES",
 	} {
 		if v := os.Getenv(envKey); v != "" {
 			if r, err := splitString(v, ','); err != nil {
