@@ -73,6 +73,9 @@ apm_config:
 # 
 #   # The file path where the log will be written to.
 #   log_file: /var/log/datadog.log
+#
+#   # Limits the total number of warnings and errors to 10 for every 10 second interval.
+#   log_throttling: true
 # 
 #   # Defines a set of rules to replace or remove certain services, resources, tags containing
 #   # potentially sensitive information. Simply use the tag name, for services or resources
