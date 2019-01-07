@@ -2,7 +2,6 @@ package pb
 
 import (
 	"math"
-	"math/rand"
 )
 
 // TODO: move these to `sampler` package
@@ -38,11 +37,6 @@ const (
 	// PriorityUserKeep is the value set by a user to explicitly keep a trace.
 	PriorityUserKeep SamplingPriority = 2
 )
-
-// RandomID generates a random uint64 that we use for IDs
-func RandomID() uint64 {
-	return uint64(rand.Int63())
-}
 
 // End returns the end time of the span.
 func (s *Span) End() int64 {
