@@ -3,6 +3,7 @@ package testutil
 import (
 	"testing"
 
+	"github.com/DataDog/datadog-trace-agent/internal/agent"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -11,7 +12,7 @@ func TestRandomSpan(t *testing.T) {
 
 	for i := 0; i < 1000; i++ {
 		s := RandomSpan()
-		err := s.Normalize()
+		err := agent.Normalize(s)
 		assert.Nil(err)
 	}
 }
@@ -19,6 +20,6 @@ func TestRandomSpan(t *testing.T) {
 func TestTestSpan(t *testing.T) {
 	assert := assert.New(t)
 	ts := TestSpan()
-	err := ts.Normalize()
+	err := agent.Normalize(ts)
 	assert.Nil(err)
 }

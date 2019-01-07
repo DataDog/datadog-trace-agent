@@ -4,6 +4,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,8 +31,8 @@ func (values sublayerValues) Less(i, j int) bool {
 func TestComputeSublayers(t *testing.T) {
 	assert := assert.New(t)
 
-	span := func(id, parentId uint64, service, spanType string, start, duration int64) *Span {
-		return &Span{
+	span := func(id, parentId uint64, service, spanType string, start, duration int64) *pb.Span {
+		return &pb.Span{
 			TraceID:  1,
 			SpanID:   id,
 			ParentID: parentId,
@@ -67,7 +68,7 @@ func TestComputeSublayers(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		trace  Trace
+		trace  pb.Trace
 		values []SublayerValue
 	}{
 		// Single span
@@ -77,7 +78,7 @@ func TestComputeSublayers(t *testing.T) {
 		// <-1------------------------------------->
 		{
 			"single span",
-			Trace{
+			pb.Trace{
 				span(1, 0, "web-server", "web", 0, 100),
 			},
 			[]SublayerValue{
@@ -96,7 +97,7 @@ func TestComputeSublayers(t *testing.T) {
 		//       <-3->
 		{
 			"multiple spans",
-			Trace{
+			pb.Trace{
 				span(1, 0, "web-server", "web", 0, 100),
 				span(2, 1, "db-server", "db", 10, 20),
 				span(3, 2, "pgsql", "db", 15, 10),
@@ -124,7 +125,7 @@ func TestComputeSublayers(t *testing.T) {
 		//         <-4----->               <-7->
 		{
 			"multiple parallel spans no multiple service active",
-			Trace{
+			pb.Trace{
 				span(1, 0, "web-server", "web", 0, 100),
 				span(2, 1, "rpc1", "rpc", 10, 20),
 				span(3, 1, "rpc1", "rpc", 15, 20),
@@ -153,7 +154,7 @@ func TestComputeSublayers(t *testing.T) {
 		//                         <-3------------->
 		{
 			"parallel spans parent not waiting",
-			Trace{
+			pb.Trace{
 				span(1, 0, "web-server", "web", 0, 50),
 				span(2, 1, "rpc1", "rpc", 20, 50),
 				span(3, 2, "rpc2", "rpc", 60, 40),
@@ -178,7 +179,7 @@ func TestComputeSublayers(t *testing.T) {
 		//                         <-4->
 		{
 			"multiple parallel spans multiple service active parent not waiting",
-			Trace{
+			pb.Trace{
 				span(1, 0, "web-server", "web", 0, 50),
 				span(2, 1, "rpc1", "rpc", 20, 50),
 				span(3, 1, "rpc2", "rpc", 10, 90),
@@ -208,7 +209,7 @@ func TestComputeSublayers(t *testing.T) {
 		//                                             <-7------------->
 		{
 			"mix of everything",
-			Trace{
+			pb.Trace{
 				span(1, 0, "web-server", "web", 0, 130),
 				span(2, 1, "pg", "db", 10, 50),
 				span(3, 1, "render", "web", 80, 30),
@@ -245,8 +246,8 @@ func TestComputeSublayers(t *testing.T) {
 func TestBuildTraceTimestamps(t *testing.T) {
 	assert := assert.New(t)
 
-	span := func(id, parentId uint64, service, spanType string, start, duration int64) *Span {
-		return &Span{
+	span := func(id, parentId uint64, service, spanType string, start, duration int64) *pb.Span {
+		return &pb.Span{
 			TraceID:  1,
 			SpanID:   id,
 			ParentID: parentId,
@@ -259,7 +260,7 @@ func TestBuildTraceTimestamps(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		trace    Trace
+		trace    pb.Trace
 		expected []int64
 	}{
 		//
@@ -273,7 +274,7 @@ func TestBuildTraceTimestamps(t *testing.T) {
 		//                                             <-7------------->
 		{
 			"mix of everything",
-			Trace{
+			pb.Trace{
 				span(1, 0, "web-server", "web", 0, 130),
 				span(2, 1, "pg", "db", 10, 50),
 				span(3, 1, "render", "web", 80, 30),
@@ -296,8 +297,8 @@ func TestBuildTraceTimestamps(t *testing.T) {
 func TestBuildTraceActiveSpansMapping(t *testing.T) {
 	assert := assert.New(t)
 
-	span := func(id, parentId uint64, service, spanType string, start, duration int64) *Span {
-		return &Span{
+	span := func(id, parentId uint64, service, spanType string, start, duration int64) *pb.Span {
+		return &pb.Span{
 			TraceID:  1,
 			SpanID:   id,
 			ParentID: parentId,
@@ -310,7 +311,7 @@ func TestBuildTraceActiveSpansMapping(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		trace      Trace
+		trace      pb.Trace
 		timestamps []int64
 		expected   map[int64][]uint64
 	}{
@@ -325,7 +326,7 @@ func TestBuildTraceActiveSpansMapping(t *testing.T) {
 		//                                             <-7------------->
 		{
 			"mix of everything",
-			Trace{
+			pb.Trace{
 				span(1, 0, "web-server", "web", 0, 130),
 				span(2, 1, "pg", "db", 10, 50),
 				span(3, 1, "render", "web", 80, 30),
@@ -393,7 +394,7 @@ func TestSetSublayersOnSpan(t *testing.T) {
 		},
 	}
 
-	var span Span
+	var span pb.Span
 	SetSublayersOnSpan(&span, values)
 
 	assert.Equal(map[string]float64{
@@ -405,8 +406,8 @@ func TestSetSublayersOnSpan(t *testing.T) {
 }
 
 func BenchmarkComputeSublayers(b *testing.B) {
-	span := func(id, parentId uint64, service, spanType string, start, duration int64) *Span {
-		return &Span{
+	span := func(id, parentId uint64, service, spanType string, start, duration int64) *pb.Span {
+		return &pb.Span{
 			TraceID:  1,
 			SpanID:   id,
 			ParentID: parentId,
@@ -426,7 +427,7 @@ func BenchmarkComputeSublayers(b *testing.B) {
 	//       <-5------------------->
 	//                         <--6-------------------->
 	//                                             <-7------------->
-	trace := Trace{
+	trace := pb.Trace{
 		span(1, 0, "web-server", "web", 0, 130),
 		span(2, 1, "pg", "db", 10, 50),
 		span(3, 1, "render", "web", 80, 30),

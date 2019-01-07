@@ -3,6 +3,9 @@ package agent
 import (
 	"fmt"
 	"sort"
+
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
+	"github.com/DataDog/datadog-trace-agent/internal/traceutil"
 )
 
 // SublayerValue is just a span-metric placeholder for a given sublayer val
@@ -93,15 +96,15 @@ func (v SublayerValue) GoString() string {
 //             db: 55,
 //             rpc: 55,
 //         }
-func ComputeSublayers(trace Trace) []SublayerValue {
+func ComputeSublayers(trace pb.Trace) []SublayerValue {
 	timestamps := buildTraceTimestamps(trace)
 	activeSpans := buildTraceActiveSpansMapping(trace, timestamps)
 
 	durationsByService := computeDurationByAttr(
-		timestamps, activeSpans, func(s *Span) string { return s.Service },
+		timestamps, activeSpans, func(s *pb.Span) string { return s.Service },
 	)
 	durationsByType := computeDurationByAttr(
-		timestamps, activeSpans, func(s *Span) string { return s.Type },
+		timestamps, activeSpans, func(s *pb.Span) string { return s.Type },
 	)
 
 	// Generate sublayers values
@@ -143,7 +146,7 @@ func (a int64Slice) Less(i, j int) bool { return a[i] < a[j] }
 
 // buildTraceTimestamps returns the timestamps of a trace, i.e the set
 // of start/end times of each spans
-func buildTraceTimestamps(trace Trace) []int64 {
+func buildTraceTimestamps(trace pb.Trace) []int64 {
 	tsSet := make(map[int64]struct{}, 2*len(trace))
 
 	for _, span := range trace {
@@ -163,18 +166,18 @@ func buildTraceTimestamps(trace Trace) []int64 {
 // activeSpansMap is used by buildTraceActiveSpansMapping and is just
 // a map with a add function setting the key to the empty slice of no
 // entry exists
-type activeSpansMap map[int64][]*Span
+type activeSpansMap map[int64][]*pb.Span
 
-func (a activeSpansMap) Add(ts int64, span *Span) {
+func (a activeSpansMap) Add(ts int64, span *pb.Span) {
 	if _, ok := a[ts]; !ok {
-		a[ts] = make([]*Span, 0, 1)
+		a[ts] = make([]*pb.Span, 0, 1)
 	}
 	a[ts] = append(a[ts], span)
 }
 
 // buildTraceActiveSpansMapping returns a mapping from timestamps to
 // a set of active spans
-func buildTraceActiveSpansMapping(trace Trace, timestamps []int64) map[int64][]*Span {
+func buildTraceActiveSpansMapping(trace pb.Trace, timestamps []int64) map[int64][]*pb.Span {
 	activeSpans := make(activeSpansMap, len(timestamps))
 
 	tsToIdx := make(map[int64]int, len(timestamps))
@@ -182,7 +185,7 @@ func buildTraceActiveSpansMapping(trace Trace, timestamps []int64) map[int64][]*
 		tsToIdx[ts] = i
 	}
 
-	spanChildren := trace.ChildrenMap()
+	spanChildren := traceutil.ChildrenMap(trace)
 	for sIdx, span := range trace {
 		for tsIdx := tsToIdx[span.Start]; tsIdx < tsToIdx[span.End()]; tsIdx++ {
 			ts := timestamps[tsIdx]
@@ -208,7 +211,7 @@ func buildTraceActiveSpansMapping(trace Trace, timestamps []int64) map[int64][]*
 
 // attrSelector is used by computeDurationByAttr and is a func
 // returning an attribute for a given span
-type attrSelector func(*Span) string
+type attrSelector func(*pb.Span) string
 
 // computeDurationByAttr returns a mapping from an attribute to the
 // sum of all weighted duration of spans with that given
@@ -245,7 +248,7 @@ func computeDurationByAttr(timestamps []int64, activeSpansByTs activeSpansMap, s
 }
 
 // SetSublayersOnSpan takes some sublayers and pins them on the given span.Metrics
-func SetSublayersOnSpan(span *Span, values []SublayerValue) {
+func SetSublayersOnSpan(span *pb.Span, values []SublayerValue) {
 	if span.Metrics == nil {
 		span.Metrics = make(map[string]float64, len(values))
 	}

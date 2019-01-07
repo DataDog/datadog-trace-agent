@@ -3,10 +3,10 @@ package obfuscate
 import (
 	"strings"
 
-	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 )
 
-func (*Obfuscator) obfuscateMemcached(span *agent.Span) {
+func (*Obfuscator) obfuscateMemcached(span *pb.Span) {
 	const k = "memcached.command"
 	if span.Meta == nil || span.Meta[k] == "" {
 		return

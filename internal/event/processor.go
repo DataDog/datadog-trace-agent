@@ -2,6 +2,7 @@ package event
 
 import (
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/DataDog/datadog-trace-agent/internal/sampler"
 )
 
@@ -52,7 +53,7 @@ func (p *Processor) Process(t agent.ProcessedTrace) (events []*agent.Event, numE
 
 	priority, hasPriority := t.GetSamplingPriority()
 	if !hasPriority {
-		priority = agent.PriorityNone
+		priority = pb.PriorityNone
 	}
 
 	clientSampleRate := t.Root.GetClientSampleRate()
@@ -91,7 +92,7 @@ func (p *Processor) Process(t agent.ProcessedTrace) (events []*agent.Event, numE
 	return
 }
 
-func (p *Processor) extract(span *agent.WeightedSpan, priority agent.SamplingPriority) (*agent.Event, float64, bool) {
+func (p *Processor) extract(span *agent.WeightedSpan, priority pb.SamplingPriority) (*agent.Event, float64, bool) {
 	for _, extractor := range p.extractors {
 		if event, rate, ok := extractor.Extract(span, priority); ok {
 			return event, rate, ok
@@ -105,7 +106,7 @@ func (p *Processor) extractionSample(event *agent.Event, extractionRate float64)
 }
 
 func (p *Processor) maxEPSSample(event *agent.Event) (sampled bool, rate float64) {
-	if event.Priority == agent.PriorityUserKeep {
+	if event.Priority == pb.PriorityUserKeep {
 		return true, 1
 	}
 	return p.maxEPSSampler.Sample(event)

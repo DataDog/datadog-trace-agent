@@ -14,6 +14,7 @@ import (
 
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
 	"github.com/DataDog/datadog-trace-agent/internal/event"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	log "github.com/cihub/seelog"
 	"github.com/stretchr/testify/assert"
 
@@ -102,8 +103,8 @@ func TestFormatTrace(t *testing.T) {
 	resource := "SELECT name FROM people WHERE age = 42"
 	rep := strings.Repeat(" AND age = 42", 5000)
 	resource = resource + rep
-	testTrace := agent.Trace{
-		&agent.Span{
+	testTrace := pb.Trace{
+		&pb.Span{
 			Resource: resource,
 			Type:     "sql",
 		},
@@ -140,13 +141,13 @@ func TestProcess(t *testing.T) {
 		defer cancel()
 
 		now := time.Now()
-		span := &agent.Span{
+		span := &pb.Span{
 			Resource: "SELECT name FROM people WHERE age = 42 AND extra = 55",
 			Type:     "sql",
 			Start:    now.Add(-time.Second).UnixNano(),
 			Duration: (500 * time.Millisecond).Nanoseconds(),
 		}
-		agnt.Process(agent.Trace{span})
+		agnt.Process(pb.Trace{span})
 
 		assert := assert.New(t)
 		assert.Equal("SELECT name FROM people WHERE age = ? ...", span.Resource)
@@ -162,13 +163,13 @@ func TestProcess(t *testing.T) {
 		defer cancel()
 
 		now := time.Now()
-		spanValid := &agent.Span{
+		spanValid := &pb.Span{
 			Resource: "SELECT name FROM people WHERE age = 42 AND extra = 55",
 			Type:     "sql",
 			Start:    now.Add(-time.Second).UnixNano(),
 			Duration: (500 * time.Millisecond).Nanoseconds(),
 		}
-		spanInvalid := &agent.Span{
+		spanInvalid := &pb.Span{
 			Resource: "INSERT INTO db VALUES (1, 2, 3)",
 			Type:     "sql",
 			Start:    now.Add(-time.Second).UnixNano(),
@@ -178,11 +179,11 @@ func TestProcess(t *testing.T) {
 		stats := agnt.Receiver.Stats.GetTagStats(info.Tags{})
 		assert := assert.New(t)
 
-		agnt.Process(agent.Trace{spanValid})
+		agnt.Process(pb.Trace{spanValid})
 		assert.EqualValues(0, stats.TracesFiltered)
 		assert.EqualValues(0, stats.SpansFiltered)
 
-		agnt.Process(agent.Trace{spanInvalid, spanInvalid})
+		agnt.Process(pb.Trace{spanInvalid, spanInvalid})
 		assert.EqualValues(1, stats.TracesFiltered)
 		assert.EqualValues(2, stats.SpansFiltered)
 	})
@@ -195,34 +196,34 @@ func TestProcess(t *testing.T) {
 		defer cancel()
 
 		now := time.Now()
-		for _, key := range []agent.SamplingPriority{
-			agent.PriorityNone,
-			agent.PriorityUserDrop,
-			agent.PriorityUserDrop,
-			agent.PriorityAutoDrop,
-			agent.PriorityAutoDrop,
-			agent.PriorityAutoDrop,
-			agent.PriorityAutoKeep,
-			agent.PriorityAutoKeep,
-			agent.PriorityAutoKeep,
-			agent.PriorityAutoKeep,
-			agent.PriorityUserKeep,
-			agent.PriorityUserKeep,
-			agent.PriorityUserKeep,
-			agent.PriorityUserKeep,
-			agent.PriorityUserKeep,
+		for _, key := range []pb.SamplingPriority{
+			pb.PriorityNone,
+			pb.PriorityUserDrop,
+			pb.PriorityUserDrop,
+			pb.PriorityAutoDrop,
+			pb.PriorityAutoDrop,
+			pb.PriorityAutoDrop,
+			pb.PriorityAutoKeep,
+			pb.PriorityAutoKeep,
+			pb.PriorityAutoKeep,
+			pb.PriorityAutoKeep,
+			pb.PriorityUserKeep,
+			pb.PriorityUserKeep,
+			pb.PriorityUserKeep,
+			pb.PriorityUserKeep,
+			pb.PriorityUserKeep,
 		} {
-			span := &agent.Span{
+			span := &pb.Span{
 				Resource: "SELECT name FROM people WHERE age = 42 AND extra = 55",
 				Type:     "sql",
 				Start:    now.Add(-time.Second).UnixNano(),
 				Duration: (500 * time.Millisecond).Nanoseconds(),
 				Metrics:  map[string]float64{},
 			}
-			if key != agent.PriorityNone {
+			if key != pb.PriorityNone {
 				span.SetSamplingPriority(key)
 			}
-			agnt.Process(agent.Trace{span})
+			agnt.Process(pb.Trace{span})
 		}
 
 		stats := agnt.Receiver.Stats.GetTagStats(info.Tags{})
@@ -345,7 +346,7 @@ func TestSampling(t *testing.T) {
 				ErrorsScoreSampler: newMockSampler(tt.scoreErrorSampled, tt.scoreErrorRate),
 				PrioritySampler:    newMockSampler(tt.prioritySampled, tt.priorityRate),
 			}
-			root := &agent.Span{
+			root := &pb.Span{
 				Service:  "serv1",
 				Start:    time.Now().UnixNano(),
 				Duration: (100 * time.Millisecond).Nanoseconds(),
@@ -355,7 +356,7 @@ func TestSampling(t *testing.T) {
 			if tt.hasErrors {
 				root.Error = 1
 			}
-			pt := agent.ProcessedTrace{Trace: agent.Trace{root}, Root: root}
+			pt := agent.ProcessedTrace{Trace: pb.Trace{root}, Root: root}
 			if tt.hasPriority {
 				pt.Root.SetSamplingPriority(1)
 			}
@@ -392,21 +393,21 @@ func TestEventProcessorFromConf(t *testing.T) {
 
 	for _, testCase := range []eventProcessorTestCase{
 		// Name: <extractor>/<maxeps situation>/priority
-		{name: "none/below/none", intakeSPS: 100, serviceName: "serviceE", opName: "opA", extractionRate: -1, priority: agent.PriorityNone, expectedEPS: 0, deltaPct: 0, duration: 10 * time.Second},
-		{name: "metric/below/none", intakeSPS: 100, serviceName: "serviceD", opName: "opA", extractionRate: 0.5, priority: agent.PriorityNone, expectedEPS: 50, deltaPct: 0.1, duration: 10 * time.Second},
-		{name: "metric/above/none", intakeSPS: 200, serviceName: "serviceD", opName: "opA", extractionRate: 1, priority: agent.PriorityNone, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
-		{name: "fixed/below/none", intakeSPS: 100, serviceName: "serviceB", opName: "opB", extractionRate: -1, priority: agent.PriorityNone, expectedEPS: 50, deltaPct: 0.1, duration: 10 * time.Second},
-		{name: "fixed/above/none", intakeSPS: 200, serviceName: "serviceA", opName: "opC", extractionRate: -1, priority: agent.PriorityNone, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
-		{name: "fixed/above/autokeep", intakeSPS: 200, serviceName: "serviceA", opName: "opC", extractionRate: -1, priority: agent.PriorityAutoKeep, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
-		{name: "metric/above/autokeep", intakeSPS: 200, serviceName: "serviceD", opName: "opA", extractionRate: 1, priority: agent.PriorityAutoKeep, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
+		{name: "none/below/none", intakeSPS: 100, serviceName: "serviceE", opName: "opA", extractionRate: -1, priority: pb.PriorityNone, expectedEPS: 0, deltaPct: 0, duration: 10 * time.Second},
+		{name: "metric/below/none", intakeSPS: 100, serviceName: "serviceD", opName: "opA", extractionRate: 0.5, priority: pb.PriorityNone, expectedEPS: 50, deltaPct: 0.1, duration: 10 * time.Second},
+		{name: "metric/above/none", intakeSPS: 200, serviceName: "serviceD", opName: "opA", extractionRate: 1, priority: pb.PriorityNone, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
+		{name: "fixed/below/none", intakeSPS: 100, serviceName: "serviceB", opName: "opB", extractionRate: -1, priority: pb.PriorityNone, expectedEPS: 50, deltaPct: 0.1, duration: 10 * time.Second},
+		{name: "fixed/above/none", intakeSPS: 200, serviceName: "serviceA", opName: "opC", extractionRate: -1, priority: pb.PriorityNone, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
+		{name: "fixed/above/autokeep", intakeSPS: 200, serviceName: "serviceA", opName: "opC", extractionRate: -1, priority: pb.PriorityAutoKeep, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
+		{name: "metric/above/autokeep", intakeSPS: 200, serviceName: "serviceD", opName: "opA", extractionRate: 1, priority: pb.PriorityAutoKeep, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
 		// UserKeep traces allows overflow of EPS
-		{name: "metric/above/userkeep", intakeSPS: 200, serviceName: "serviceD", opName: "opA", extractionRate: 1, priority: agent.PriorityUserKeep, expectedEPS: 200, deltaPct: 0.1, duration: 10 * time.Second},
-		{name: "agent/above/userkeep", intakeSPS: 200, serviceName: "serviceA", opName: "opC", extractionRate: -1, priority: agent.PriorityUserKeep, expectedEPS: 200, deltaPct: 0.1, duration: 10 * time.Second},
+		{name: "metric/above/userkeep", intakeSPS: 200, serviceName: "serviceD", opName: "opA", extractionRate: 1, priority: pb.PriorityUserKeep, expectedEPS: 200, deltaPct: 0.1, duration: 10 * time.Second},
+		{name: "agent/above/userkeep", intakeSPS: 200, serviceName: "serviceA", opName: "opC", extractionRate: -1, priority: pb.PriorityUserKeep, expectedEPS: 200, deltaPct: 0.1, duration: 10 * time.Second},
 
 		// Overrides (Name: <extractor1>/override/<extractor2>)
-		{name: "metric/override/fixed", intakeSPS: 100, serviceName: "serviceA", opName: "opA", extractionRate: 1, priority: agent.PriorityNone, expectedEPS: 100, deltaPct: 0.1, duration: 10 * time.Second},
+		{name: "metric/override/fixed", intakeSPS: 100, serviceName: "serviceA", opName: "opA", extractionRate: 1, priority: pb.PriorityNone, expectedEPS: 100, deltaPct: 0.1, duration: 10 * time.Second},
 		// Legacy should never be considered if fixed rate is being used.
-		{name: "fixed/override/legacy", intakeSPS: 100, serviceName: "serviceA", opName: "opD", extractionRate: -1, priority: agent.PriorityNone, expectedEPS: 0, deltaPct: 0, duration: 10 * time.Second},
+		{name: "fixed/override/legacy", intakeSPS: 100, serviceName: "serviceA", opName: "opD", extractionRate: -1, priority: pb.PriorityNone, expectedEPS: 0, deltaPct: 0, duration: 10 * time.Second},
 	} {
 		testEventProcessorFromConf(t, &config.AgentConfig{
 			MaxEPS:                      testMaxEPS,
@@ -431,15 +432,15 @@ func TestEventProcessorFromConfLegacy(t *testing.T) {
 
 	for _, testCase := range []eventProcessorTestCase{
 		// Name: <extractor>/<maxeps situation>/priority
-		{name: "none/below/none", intakeSPS: 100, serviceName: "serviceE", opName: "opA", extractionRate: -1, priority: agent.PriorityNone, expectedEPS: 0, deltaPct: 0, duration: 10 * time.Second},
-		{name: "legacy/below/none", intakeSPS: 100, serviceName: "serviceC", opName: "opB", extractionRate: -1, priority: agent.PriorityNone, expectedEPS: 50, deltaPct: 0.1, duration: 10 * time.Second},
-		{name: "legacy/above/none", intakeSPS: 200, serviceName: "serviceD", opName: "opC", extractionRate: -1, priority: agent.PriorityNone, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
-		{name: "legacy/above/autokeep", intakeSPS: 200, serviceName: "serviceD", opName: "opC", extractionRate: -1, priority: agent.PriorityAutoKeep, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
+		{name: "none/below/none", intakeSPS: 100, serviceName: "serviceE", opName: "opA", extractionRate: -1, priority: pb.PriorityNone, expectedEPS: 0, deltaPct: 0, duration: 10 * time.Second},
+		{name: "legacy/below/none", intakeSPS: 100, serviceName: "serviceC", opName: "opB", extractionRate: -1, priority: pb.PriorityNone, expectedEPS: 50, deltaPct: 0.1, duration: 10 * time.Second},
+		{name: "legacy/above/none", intakeSPS: 200, serviceName: "serviceD", opName: "opC", extractionRate: -1, priority: pb.PriorityNone, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
+		{name: "legacy/above/autokeep", intakeSPS: 200, serviceName: "serviceD", opName: "opC", extractionRate: -1, priority: pb.PriorityAutoKeep, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
 		// UserKeep traces allows overflow of EPS
-		{name: "legacy/above/userkeep", intakeSPS: 200, serviceName: "serviceD", opName: "opC", extractionRate: -1, priority: agent.PriorityUserKeep, expectedEPS: 200, deltaPct: 0.1, duration: 10 * time.Second},
+		{name: "legacy/above/userkeep", intakeSPS: 200, serviceName: "serviceD", opName: "opC", extractionRate: -1, priority: pb.PriorityUserKeep, expectedEPS: 200, deltaPct: 0.1, duration: 10 * time.Second},
 
 		// Overrides (Name: <extractor1>/override/<extractor2>)
-		{name: "metrics/overrides/legacy", intakeSPS: 100, serviceName: "serviceC", opName: "opC", extractionRate: 1, priority: agent.PriorityNone, expectedEPS: 100, deltaPct: 0.1, duration: 10 * time.Second},
+		{name: "metrics/overrides/legacy", intakeSPS: 100, serviceName: "serviceC", opName: "opC", extractionRate: 1, priority: pb.PriorityNone, expectedEPS: 100, deltaPct: 0.1, duration: 10 * time.Second},
 	} {
 		testEventProcessorFromConf(t, &config.AgentConfig{
 			MaxEPS: testMaxEPS,
@@ -454,7 +455,7 @@ type eventProcessorTestCase struct {
 	serviceName    string
 	opName         string
 	extractionRate float64
-	priority       agent.SamplingPriority
+	priority       pb.SamplingPriority
 	expectedEPS    float64
 	deltaPct       float64
 	duration       time.Duration
@@ -478,7 +479,7 @@ func testEventProcessorFromConf(t *testing.T, conf *config.AgentConfig, testCase
 // second). These spans will all have the provided service and operation names and be set as extractable/sampled
 // based on the associated rate/%. This traffic generation will run for the specified `duration`.
 func generateTraffic(processor *event.Processor, serviceName string, operationName string, extractionRate float64,
-	duration time.Duration, intakeSPS float64, priority agent.SamplingPriority) float64 {
+	duration time.Duration, intakeSPS float64, priority pb.SamplingPriority) float64 {
 	tickerInterval := 100 * time.Millisecond
 	totalSampled := 0
 	timer := time.NewTimer(duration)
@@ -507,7 +508,7 @@ Loop:
 			WeightedTrace: agent.WeightedTrace(spans),
 			Root:          spans[0].Span,
 		}
-		if priority != agent.PriorityNone {
+		if priority != pb.PriorityNone {
 			trace.Root.SetSamplingPriority(priority)
 		}
 
@@ -579,10 +580,10 @@ func BenchmarkWatchdog(b *testing.B) {
 }
 
 // Mimicks behaviour of agent Process function
-func formatTrace(t agent.Trace) agent.Trace {
+func formatTrace(t pb.Trace) pb.Trace {
 	for _, span := range t {
 		obfuscate.NewObfuscator(nil).Obfuscate(span)
-		span.Truncate()
+		agent.Truncate(span)
 	}
 	return t
 }

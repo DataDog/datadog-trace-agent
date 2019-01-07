@@ -21,6 +21,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/internal/info"
 	"github.com/DataDog/datadog-trace-agent/internal/metrics"
 	"github.com/DataDog/datadog-trace-agent/internal/osutil"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/DataDog/datadog-trace-agent/internal/sampler"
 	"github.com/DataDog/datadog-trace-agent/internal/watchdog"
 )
@@ -58,9 +59,9 @@ const (
 type HTTPReceiver struct {
 	Stats      *info.ReceiverStats
 	PreSampler *sampler.PreSampler
-	Out        chan agent.Trace
+	Out        chan pb.Trace
 
-	services chan agent.ServicesMetadata
+	services chan pb.ServicesMetadata
 	conf     *config.AgentConfig
 	dynConf  *sampler.DynamicConfig
 	server   *http.Server
@@ -71,7 +72,7 @@ type HTTPReceiver struct {
 
 // NewHTTPReceiver returns a pointer to a new HTTPReceiver
 func NewHTTPReceiver(
-	conf *config.AgentConfig, dynConf *sampler.DynamicConfig, out chan agent.Trace, services chan agent.ServicesMetadata,
+	conf *config.AgentConfig, dynConf *sampler.DynamicConfig, out chan pb.Trace, services chan pb.ServicesMetadata,
 ) *HTTPReceiver {
 	// use buffered channels so that handlers are not waiting on downstream processing
 	return &HTTPReceiver{
@@ -229,18 +230,18 @@ func (r *HTTPReceiver) handleTraces(v Version, w http.ResponseWriter, req *http.
 	}
 
 	// normalize data
-	for i := range traces {
-		spans := len(traces[i])
+	for _, trace := range traces {
+		spans := len(trace)
 
 		atomic.AddInt64(&ts.TracesReceived, 1)
 		atomic.AddInt64(&ts.SpansReceived, int64(spans))
 
-		normTrace, err := agent.NormalizeTrace(traces[i])
+		err := agent.NormalizeTrace(trace)
 		if err != nil {
 			atomic.AddInt64(&ts.TracesDropped, 1)
 			atomic.AddInt64(&ts.SpansDropped, int64(spans))
 
-			errorMsg := fmt.Sprintf("dropping trace reason: %s (debug for more info), %v", err, normTrace)
+			errorMsg := fmt.Sprintf("dropping trace reason: %s (debug for more info), %v", err, trace)
 
 			// avoid truncation in DEBUG mode
 			if len(errorMsg) > 150 && !r.debug {
@@ -248,10 +249,8 @@ func (r *HTTPReceiver) handleTraces(v Version, w http.ResponseWriter, req *http.
 			}
 			log.Errorf(errorMsg)
 		} else {
-			atomic.AddInt64(&ts.SpansDropped, int64(spans-len(normTrace)))
-
 			select {
-			case r.Out <- normTrace:
+			case r.Out <- trace:
 				// if our downstream consumer is slow, we drop the trace on the floor
 				// this is a safety net against us using too much memory
 				// when clients flood us
@@ -267,7 +266,7 @@ func (r *HTTPReceiver) handleTraces(v Version, w http.ResponseWriter, req *http.
 
 // handleServices handle a request with a list of several services
 func (r *HTTPReceiver) handleServices(v Version, w http.ResponseWriter, req *http.Request) {
-	var servicesMeta agent.ServicesMetadata
+	var servicesMeta pb.ServicesMetadata
 
 	contentType := req.Header.Get("Content-Type")
 	if err := decodeReceiverPayload(req.Body, &servicesMeta, v, contentType); err != nil {
@@ -354,8 +353,8 @@ func (r *HTTPReceiver) Languages() string {
 	return strings.Join(str, "|")
 }
 
-func getTraces(v Version, w http.ResponseWriter, req *http.Request) (agent.Traces, bool) {
-	var traces agent.Traces
+func getTraces(v Version, w http.ResponseWriter, req *http.Request) (pb.Traces, bool) {
+	var traces pb.Traces
 	contentType := req.Header.Get("Content-Type")
 
 	switch v {
@@ -370,7 +369,7 @@ func getTraces(v Version, w http.ResponseWriter, req *http.Request) (agent.Trace
 		}
 
 		// in v01 we actually get spans that we have to transform in traces
-		var spans []agent.Span
+		var spans []pb.Span
 		if err := json.NewDecoder(req.Body).Decode(&spans); err != nil {
 			log.Errorf("cannot decode %s traces payload: %v", v, err)
 			HTTPDecodingError(err, []string{tagTraceHandler, fmt.Sprintf("v:%s", v)}, w)
@@ -412,9 +411,9 @@ func decodeReceiverPayload(r io.Reader, dest msgp.Decodable, v Version, contentT
 	}
 }
 
-func tracesFromSpans(spans []agent.Span) agent.Traces {
-	traces := agent.Traces{}
-	byID := make(map[uint64][]*agent.Span)
+func tracesFromSpans(spans []pb.Span) pb.Traces {
+	traces := pb.Traces{}
+	byID := make(map[uint64][]*pb.Span)
 	for _, s := range spans {
 		byID[s.TraceID] = append(byID[s.TraceID], &s)
 	}

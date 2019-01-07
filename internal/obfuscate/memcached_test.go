@@ -3,7 +3,7 @@ package obfuscate
 import (
 	"testing"
 
-	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,7 +33,7 @@ func TestObfuscateMemcached(t *testing.T) {
 			"decr mykey 5",
 		},
 	} {
-		span := agent.Span{
+		span := pb.Span{
 			Type: "memcached",
 			Meta: map[string]string{k: tt.in},
 		}

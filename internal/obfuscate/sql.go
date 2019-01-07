@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	log "github.com/cihub/seelog"
 )
 
@@ -202,7 +202,7 @@ func newSQLObfuscator() *sqlObfuscator {
 }
 
 // QuantizeSQL generates resource and sql.query meta for SQL spans
-func (o *Obfuscator) obfuscateSQL(span *agent.Span) {
+func (o *Obfuscator) obfuscateSQL(span *pb.Span) {
 	if span.Resource == "" {
 		return
 	}

@@ -6,9 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/DataDog/datadog-trace-agent/internal/agent"
 )
 
 type redisTestCase struct {
@@ -16,8 +15,8 @@ type redisTestCase struct {
 	expectedResource string
 }
 
-func redisSpan(query string) *agent.Span {
-	return &agent.Span{
+func redisSpan(query string) *pb.Span {
+	return &pb.Span{
 		Resource: query,
 		Type:     "redis",
 		Meta:     map[string]string{redisRawCommand: query},

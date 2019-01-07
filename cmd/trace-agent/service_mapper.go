@@ -4,28 +4,31 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/DataDog/datadog-trace-agent/internal/watchdog"
 	log "github.com/cihub/seelog"
 )
 
+// serviceApp represents the app to which certain integration belongs to
+const serviceApp = "app"
+
 // ServiceMapper provides a cache layer over model.ServicesMetadata pipeline
 // Used in conjunction with ServiceWriter: in-> ServiceMapper out-> ServiceWriter
 type ServiceMapper struct {
-	in    <-chan agent.ServicesMetadata
-	out   chan<- agent.ServicesMetadata
+	in    <-chan pb.ServicesMetadata
+	out   chan<- pb.ServicesMetadata
 	exit  chan bool
 	done  sync.WaitGroup
-	cache agent.ServicesMetadata
+	cache pb.ServicesMetadata
 }
 
 // NewServiceMapper returns an instance of ServiceMapper with the provided channels
-func NewServiceMapper(in <-chan agent.ServicesMetadata, out chan<- agent.ServicesMetadata) *ServiceMapper {
+func NewServiceMapper(in <-chan pb.ServicesMetadata, out chan<- pb.ServicesMetadata) *ServiceMapper {
 	return &ServiceMapper{
 		in:    in,
 		out:   out,
 		exit:  make(chan bool),
-		cache: make(agent.ServicesMetadata),
+		cache: make(pb.ServicesMetadata),
 	}
 }
 
@@ -63,8 +66,8 @@ func (s *ServiceMapper) Run() {
 	}
 }
 
-func (s *ServiceMapper) update(metadata agent.ServicesMetadata) {
-	var changes agent.ServicesMetadata
+func (s *ServiceMapper) update(metadata pb.ServicesMetadata) {
+	var changes pb.ServicesMetadata
 
 	for k, v := range metadata {
 		if !s.shouldAdd(k, metadata) {
@@ -74,7 +77,7 @@ func (s *ServiceMapper) update(metadata agent.ServicesMetadata) {
 		// We do this inside the for loop to avoid unecessary memory allocations.
 		// After few method executions, the cache will be warmed up and this section be skipped altogether.
 		if changes == nil {
-			changes = make(agent.ServicesMetadata)
+			changes = make(pb.ServicesMetadata)
 		}
 
 		changes[k] = v
@@ -88,7 +91,7 @@ func (s *ServiceMapper) update(metadata agent.ServicesMetadata) {
 	s.cache.Merge(changes)
 }
 
-func (s *ServiceMapper) shouldAdd(service string, metadata agent.ServicesMetadata) bool {
+func (s *ServiceMapper) shouldAdd(service string, metadata pb.ServicesMetadata) bool {
 	cacheEntry, ok := s.cache[service]
 
 	// No cache entry?
@@ -97,12 +100,12 @@ func (s *ServiceMapper) shouldAdd(service string, metadata agent.ServicesMetadat
 	}
 
 	// Cache entry came from service API?
-	if _, ok = cacheEntry[agent.ServiceApp]; ok {
+	if _, ok = cacheEntry[serviceApp]; ok {
 		return false
 	}
 
 	// New metadata value came from service API?
-	_, ok = metadata[service][agent.ServiceApp]
+	_, ok = metadata[service][serviceApp]
 
 	return ok
 }

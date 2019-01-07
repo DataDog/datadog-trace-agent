@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,7 +14,7 @@ func TestServiceMapper(t *testing.T) {
 	mapper.Start()
 	defer mapper.Stop()
 
-	input := agent.ServicesMetadata{"service-a": {"app_type": "type-a"}}
+	input := pb.ServicesMetadata{"service-a": {"app_type": "type-a"}}
 	in <- input
 	output := <-out
 
@@ -23,10 +23,10 @@ func TestServiceMapper(t *testing.T) {
 	assert.Equal(input, output)
 
 	// This entry will result in a cache-hit and therefore will be filtered out
-	in <- agent.ServicesMetadata{"service-a": {"app_type": "SOMETHING_DIFFERENT"}}
+	in <- pb.ServicesMetadata{"service-a": {"app_type": "SOMETHING_DIFFERENT"}}
 
 	// This represents a new service and thus will be cached and propagated to the outbound channel
-	newService := agent.ServicesMetadata{"service-b": {"app_type": "type-b"}}
+	newService := pb.ServicesMetadata{"service-b": {"app_type": "type-b"}}
 	in <- newService
 	output = <-out
 
@@ -40,7 +40,7 @@ func TestCachePolicy(t *testing.T) {
 	mapper.Start()
 	defer mapper.Stop()
 
-	input := agent.ServicesMetadata{"service-a": {"app_type": "type-a"}}
+	input := pb.ServicesMetadata{"service-a": {"app_type": "type-a"}}
 	in <- input
 	output := <-out
 
@@ -52,20 +52,20 @@ func TestCachePolicy(t *testing.T) {
 	// - New version DOES have "app"
 
 	// This first attempt won't be propagated to the writer
-	firstAttempt := agent.ServicesMetadata{"service-a": {"app_type": "FIRST_ATTEMPT"}}
+	firstAttempt := pb.ServicesMetadata{"service-a": {"app_type": "FIRST_ATTEMPT"}}
 	in <- firstAttempt
 
 	// But this second will
-	secondAttempt := agent.ServicesMetadata{"service-a": {"app_type": "SECOND_ATTEMPT", "app": "app-a"}}
+	secondAttempt := pb.ServicesMetadata{"service-a": {"app_type": "SECOND_ATTEMPT", "app": "app-a"}}
 	in <- secondAttempt
 
 	output = <-out
 	assert.Equal(secondAttempt, output)
 }
 
-func testMapper() (mapper *ServiceMapper, in, out chan agent.ServicesMetadata) {
-	in = make(chan agent.ServicesMetadata, 1)
-	out = make(chan agent.ServicesMetadata, 1)
+func testMapper() (mapper *ServiceMapper, in, out chan pb.ServicesMetadata) {
+	in = make(chan pb.ServicesMetadata, 1)
+	out = make(chan pb.ServicesMetadata, 1)
 	mapper = NewServiceMapper(in, out)
 
 	return mapper, in, out

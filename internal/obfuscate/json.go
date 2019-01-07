@@ -3,13 +3,13 @@ package obfuscate
 import (
 	"strings"
 
-	"github.com/DataDog/datadog-trace-agent/internal/agent"
 	"github.com/DataDog/datadog-trace-agent/internal/config"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 )
 
 // obfuscateJSON obfuscates the given span's tag using the given obfuscator. If the obfuscator is
 // nil it is considered disabled.
-func (o *Obfuscator) obfuscateJSON(span *agent.Span, tag string, obfuscator *jsonObfuscator) {
+func (o *Obfuscator) obfuscateJSON(span *pb.Span, tag string, obfuscator *jsonObfuscator) {
 	if obfuscator == nil || span.Meta == nil || span.Meta[tag] == "" {
 		// obfuscator is disabled or tag is not present
 		return

@@ -15,7 +15,7 @@
 		APITrace
 		TracePayload
 */
-package agent
+package pb
 
 import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"

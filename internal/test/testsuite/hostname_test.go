@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/DataDog/datadog-trace-agent/internal/test"
 	"github.com/DataDog/datadog-trace-agent/internal/test/testutil"
 )
@@ -30,12 +30,12 @@ func TestHostname(t *testing.T) {
 			}
 			defer r.KillAgent()
 
-			payload := agent.Traces{agent.Trace{testutil.RandomSpan()}}
-			payload[0][0].Metrics[agent.SamplingPriorityKey] = 2
+			payload := pb.Traces{pb.Trace{testutil.RandomSpan()}}
+			payload[0][0].Metrics[pb.SamplingPriorityKey] = 2
 			if err := r.Post(payload); err != nil {
 				t.Fatal(err)
 			}
-			waitForTrace(t, r.Out(), func(v agent.TracePayload) {
+			waitForTrace(t, r.Out(), func(v pb.TracePayload) {
 				if n := len(v.Traces); n != 1 {
 					t.Fatalf("expected %d traces, got %d", len(payload), n)
 				}
@@ -60,12 +60,12 @@ func TestHostname(t *testing.T) {
 		}
 		defer r.KillAgent()
 
-		payload := agent.Traces{agent.Trace{testutil.RandomSpan()}}
-		payload[0][0].Metrics[agent.SamplingPriorityKey] = 2
+		payload := pb.Traces{pb.Trace{testutil.RandomSpan()}}
+		payload[0][0].Metrics[pb.SamplingPriorityKey] = 2
 		if err := r.Post(payload); err != nil {
 			t.Fatal(err)
 		}
-		waitForTrace(t, r.Out(), func(v agent.TracePayload) {
+		waitForTrace(t, r.Out(), func(v pb.TracePayload) {
 			if n := len(v.Traces); n != 1 {
 				t.Fatalf("expected %d traces, got %d", len(payload), n)
 			}
@@ -76,19 +76,19 @@ func TestHostname(t *testing.T) {
 	})
 }
 
-// waitForTrace waits on the out channel until it times out or receives an agent.TracePayload.
+// waitForTrace waits on the out channel until it times out or receives an pb.TracePayload.
 // If the latter happens it will call fn.
-func waitForTrace(t *testing.T, out <-chan interface{}, fn func(agent.TracePayload)) {
+func waitForTrace(t *testing.T, out <-chan interface{}, fn func(pb.TracePayload)) {
 	waitForTraceTimeout(t, out, 3*time.Second, fn)
 }
 
 // waitForTraceTimeout behaves like waitForTrace but allows a customizable wait time.
-func waitForTraceTimeout(t *testing.T, out <-chan interface{}, wait time.Duration, fn func(agent.TracePayload)) {
+func waitForTraceTimeout(t *testing.T, out <-chan interface{}, wait time.Duration, fn func(pb.TracePayload)) {
 	timeout := time.After(wait)
 	for {
 		select {
 		case p := <-out:
-			if v, ok := p.(agent.TracePayload); ok {
+			if v, ok := p.(pb.TracePayload); ok {
 				fn(v)
 				return
 			}

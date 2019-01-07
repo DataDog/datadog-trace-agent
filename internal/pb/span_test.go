@@ -1,4 +1,4 @@
-package agent
+package pb
 
 import (
 	"testing"
@@ -31,12 +31,6 @@ func testSpan() *Span {
 func TestSpanString(t *testing.T) {
 	assert := assert.New(t)
 	assert.NotEqual("", testSpan().String())
-}
-
-func TestSpanFlushMarker(t *testing.T) {
-	assert := assert.New(t)
-	s := NewFlushMarker()
-	assert.True(s.IsFlushMarker())
 }
 
 func TestSpanWeight(t *testing.T) {

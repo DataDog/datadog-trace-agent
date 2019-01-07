@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
+	"github.com/DataDog/datadog-trace-agent/internal/traceutil"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,11 +26,11 @@ func getTsInBucket(alignedNow int64, bsize int64, offset int64) int64 {
 
 // testSpan avoids typo and inconsistency in test spans (typical pitfall: duration, start time,
 // and end time are aligned, and end time is the one that needs to be aligned
-func testSpan(spanID uint64, parentID uint64, duration, offset int64, service, resource string, err int32) *agent.Span {
+func testSpan(spanID uint64, parentID uint64, duration, offset int64, service, resource string, err int32) *pb.Span {
 	now := time.Now().UnixNano()
 	alignedNow := now - now%testBucketInterval
 
-	return &agent.Span{
+	return &pb.Span{
 		SpanID:   spanID,
 		ParentID: parentID,
 		Duration: duration,
@@ -50,7 +52,7 @@ func TestConcentratorOldestTs(t *testing.T) {
 	now := time.Now().UnixNano()
 
 	// Build that simply have spans spread over time windows.
-	trace := agent.Trace{
+	trace := pb.Trace{
 		testSpan(1, 0, 50, 5, "A1", "resource1", 0),
 		testSpan(1, 0, 40, 4, "A1", "resource1", 0),
 		testSpan(1, 0, 30, 3, "A1", "resource1", 0),
@@ -59,8 +61,8 @@ func TestConcentratorOldestTs(t *testing.T) {
 		testSpan(1, 0, 1, 0, "A1", "resource1", 0),
 	}
 
-	trace.ComputeTopLevel()
-	wt := agent.NewWeightedTrace(trace, trace.GetRoot())
+	traceutil.ComputeTopLevel(trace)
+	wt := agent.NewWeightedTrace(trace, traceutil.GetRoot(trace))
 
 	testTrace := agent.ProcessedTrace{
 		Env:           "none",
@@ -161,7 +163,7 @@ func TestConcentratorStatsTotals(t *testing.T) {
 	c.oldestTs = alignedNow - int64(c.bufferLen)*c.bsize
 
 	// Build that simply have spans spread over time windows.
-	trace := agent.Trace{
+	trace := pb.Trace{
 		testSpan(1, 0, 50, 5, "A1", "resource1", 0),
 		testSpan(1, 0, 40, 4, "A1", "resource1", 0),
 		testSpan(1, 0, 30, 3, "A1", "resource1", 0),
@@ -170,8 +172,8 @@ func TestConcentratorStatsTotals(t *testing.T) {
 		testSpan(1, 0, 1, 0, "A1", "resource1", 0),
 	}
 
-	trace.ComputeTopLevel()
-	wt := agent.NewWeightedTrace(trace, trace.GetRoot())
+	traceutil.ComputeTopLevel(trace)
+	wt := agent.NewWeightedTrace(trace, traceutil.GetRoot(trace))
 
 	testTrace := agent.ProcessedTrace{
 		Env:           "none",
@@ -220,7 +222,7 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	c.oldestTs = alignedNow - int64(c.bufferLen)*c.bsize
 
 	// Build a trace with stats which should cover 3 time buckets.
-	trace := agent.Trace{
+	trace := pb.Trace{
 		// more than 2 buckets old, should be added to the 2 bucket-old, first flush.
 		testSpan(1, 0, 111, 10, "A1", "resource1", 0),
 		testSpan(1, 0, 222, 3, "A1", "resource1", 0),
@@ -276,8 +278,8 @@ func TestConcentratorStatsCounts(t *testing.T) {
 	}
 	expectedCountValByKeyByTime[alignedNow+testBucketInterval] = map[string]int64{}
 
-	trace.ComputeTopLevel()
-	wt := agent.NewWeightedTrace(trace, trace.GetRoot())
+	traceutil.ComputeTopLevel(trace)
+	wt := agent.NewWeightedTrace(trace, traceutil.GetRoot(trace))
 
 	testTrace := agent.ProcessedTrace{
 		Env:           "none",
@@ -339,7 +341,7 @@ func TestConcentratorSublayersStatsCounts(t *testing.T) {
 	now := time.Now().UnixNano()
 	alignedNow := now - now%c.bsize
 
-	trace := agent.Trace{
+	trace := pb.Trace{
 		// first bucket
 		testSpan(1, 0, 2000, 0, "A1", "resource1", 0),
 		testSpan(2, 1, 1000, 0, "A2", "resource2", 0),
@@ -348,11 +350,11 @@ func TestConcentratorSublayersStatsCounts(t *testing.T) {
 		testSpan(5, 4, 300, 0, "A3", "resource5", 0),
 		testSpan(6, 2, 30, 0, "A3", "resource6", 0),
 	}
-	trace.ComputeTopLevel()
-	wt := agent.NewWeightedTrace(trace, trace.GetRoot())
+	traceutil.ComputeTopLevel(trace)
+	wt := agent.NewWeightedTrace(trace, traceutil.GetRoot(trace))
 
-	subtraces := trace.ExtractTopLevelSubtraces(trace.GetRoot())
-	sublayers := make(map[*agent.Span][]agent.SublayerValue)
+	subtraces := ExtractTopLevelSubtraces(trace, traceutil.GetRoot(trace))
+	sublayers := make(map[*pb.Span][]agent.SublayerValue)
 	for _, subtrace := range subtraces {
 		subtraceSublayers := agent.ComputeSublayers(subtrace.Trace)
 		sublayers[subtrace.Root] = subtraceSublayers

@@ -2,7 +2,7 @@
 // source: trace_payload.proto
 // DO NOT EDIT!
 
-package agent
+package pb
 
 import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"

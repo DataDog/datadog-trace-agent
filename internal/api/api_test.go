@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/internal/agent"
 	"github.com/DataDog/datadog-trace-agent/internal/config"
 	"github.com/DataDog/datadog-trace-agent/internal/info"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/DataDog/datadog-trace-agent/internal/sampler"
 	"github.com/DataDog/datadog-trace-agent/internal/test/testutil"
 	"github.com/stretchr/testify/assert"
@@ -36,8 +36,8 @@ var headerFields = map[string]string{
 func newTestReceiverFromConfig(conf *config.AgentConfig) *HTTPReceiver {
 	dynConf := sampler.NewDynamicConfig("none")
 
-	rawTraceChan := make(chan agent.Trace, 5000)
-	serviceChan := make(chan agent.ServicesMetadata, 50)
+	rawTraceChan := make(chan pb.Trace, 5000)
+	serviceChan := make(chan pb.ServicesMetadata, 50)
 	receiver := NewHTTPReceiver(conf, dynConf, rawTraceChan, serviceChan)
 
 	return receiver
@@ -111,10 +111,10 @@ func TestLegacyReceiver(t *testing.T) {
 		r           *HTTPReceiver
 		apiVersion  Version
 		contentType string
-		traces      agent.Trace
+		traces      pb.Trace
 	}{
-		{"v01 with empty content-type", newTestReceiverFromConfig(conf), v01, "", agent.Trace{testutil.GetTestSpan()}},
-		{"v01 with application/json", newTestReceiverFromConfig(conf), v01, "application/json", agent.Trace{testutil.GetTestSpan()}},
+		{"v01 with empty content-type", newTestReceiverFromConfig(conf), v01, "", pb.Trace{testutil.GetTestSpan()}},
+		{"v01 with application/json", newTestReceiverFromConfig(conf), v01, "application/json", pb.Trace{testutil.GetTestSpan()}},
 	}
 
 	for _, tc := range testCases {
@@ -167,7 +167,7 @@ func TestReceiverJSONDecoder(t *testing.T) {
 		r           *HTTPReceiver
 		apiVersion  Version
 		contentType string
-		traces      []agent.Trace
+		traces      []pb.Trace
 	}{
 		{"v02 with empty content-type", newTestReceiverFromConfig(conf), v02, "", testutil.GetTestTrace(1, 1, false)},
 		{"v03 with empty content-type", newTestReceiverFromConfig(conf), v03, "", testutil.GetTestTrace(1, 1, false)},
@@ -231,7 +231,7 @@ func TestReceiverMsgpackDecoder(t *testing.T) {
 		r           *HTTPReceiver
 		apiVersion  Version
 		contentType string
-		traces      agent.Traces
+		traces      pb.Traces
 	}{
 		{"v01 with application/msgpack", newTestReceiverFromConfig(conf), v01, "application/msgpack", testutil.GetTestTrace(1, 1, false)},
 		{"v02 with application/msgpack", newTestReceiverFromConfig(conf), v02, "application/msgpack", testutil.GetTestTrace(1, 1, false)},
@@ -349,7 +349,7 @@ func TestReceiverServiceJSONDecoder(t *testing.T) {
 			)
 
 			// send service to that endpoint using the JSON content-type
-			services := agent.ServicesMetadata{
+			services := pb.ServicesMetadata{
 				"backend": map[string]string{
 					"app":      "django",
 					"app_type": "web",
@@ -415,7 +415,7 @@ func TestReceiverServiceMsgpackDecoder(t *testing.T) {
 			)
 
 			// send service to that endpoint using the JSON content-type
-			services := agent.ServicesMetadata{
+			services := pb.ServicesMetadata{
 				"backend": map[string]string{
 					"app":      "django",
 					"app_type": "web",
@@ -690,7 +690,7 @@ func BenchmarkDecoderJSON(b *testing.B) {
 		reader := bytes.NewReader(payload)
 
 		b.StartTimer()
-		var spans agent.Traces
+		var spans pb.Traces
 		decoder := json.NewDecoder(reader)
 		_ = decoder.Decode(&spans)
 	}
@@ -712,7 +712,7 @@ func BenchmarkDecoderMsgpack(b *testing.B) {
 		reader := bytes.NewReader(buf.Bytes())
 
 		b.StartTimer()
-		var traces agent.Traces
+		var traces pb.Traces
 		_ = msgp.Decode(reader, &traces)
 	}
 }

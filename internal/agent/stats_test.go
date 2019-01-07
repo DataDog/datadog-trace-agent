@@ -8,22 +8,24 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/DataDog/datadog-trace-agent/internal/quantile"
+	"github.com/DataDog/datadog-trace-agent/internal/traceutil"
 	"github.com/stretchr/testify/assert"
 )
 
 const defaultEnv = "default"
 
 func testWeightedSpans() WeightedTrace {
-	spans := []Span{
-		Span{Service: "A", Name: "A.foo", Resource: "α", Duration: 1},
-		Span{Service: "A", Name: "A.foo", Resource: "β", Duration: 2, Error: 1},
-		Span{Service: "B", Name: "B.foo", Resource: "γ", Duration: 3},
-		Span{Service: "B", Name: "B.foo", Resource: "ε", Duration: 4, Error: 404},
-		Span{Service: "B", Name: "B.foo", Resource: "ζ", Duration: 5, Meta: map[string]string{"version": "1.3"}},
-		Span{Service: "B", Name: "sql.query", Resource: "ζ", Duration: 6, Meta: map[string]string{"version": "1.4"}},
-		Span{Service: "C", Name: "sql.query", Resource: "δ", Duration: 7},
-		Span{Service: "C", Name: "sql.query", Resource: "δ", Duration: 8},
+	spans := []pb.Span{
+		pb.Span{Service: "A", Name: "A.foo", Resource: "α", Duration: 1},
+		pb.Span{Service: "A", Name: "A.foo", Resource: "β", Duration: 2, Error: 1},
+		pb.Span{Service: "B", Name: "B.foo", Resource: "γ", Duration: 3},
+		pb.Span{Service: "B", Name: "B.foo", Resource: "ε", Duration: 4, Error: 404},
+		pb.Span{Service: "B", Name: "B.foo", Resource: "ζ", Duration: 5, Meta: map[string]string{"version": "1.3"}},
+		pb.Span{Service: "B", Name: "sql.query", Resource: "ζ", Duration: 6, Meta: map[string]string{"version": "1.4"}},
+		pb.Span{Service: "C", Name: "sql.query", Resource: "δ", Duration: 7},
+		pb.Span{Service: "C", Name: "sql.query", Resource: "δ", Duration: 8},
 	}
 	tws := make(WeightedTrace, len(spans))
 	for i := range spans {
@@ -36,31 +38,31 @@ func testWeightedSpans() WeightedTrace {
 	return tws
 }
 
-func testTrace() Trace {
+func testTrace() pb.Trace {
 	// Data below represents a trace with some sublayers, so that we make sure,
 	// those data are correctly calculated when aggregating in HandleSpan()
 	// A |---------------------------------------------------------------| duration: 100
 	// B   |----------------------|                                        duration: 20
 	// C     |-----| |---|                                                 duration: 5+3
-	trace := Trace{
-		&Span{TraceID: 42, SpanID: 42, ParentID: 0, Service: "A",
+	trace := pb.Trace{
+		&pb.Span{TraceID: 42, SpanID: 42, ParentID: 0, Service: "A",
 			Name: "A.foo", Type: "web", Resource: "α", Start: 0, Duration: 100,
-			Metrics: map[string]float64{KeySamplingRateGlobal: 0.5}},
-		&Span{TraceID: 42, SpanID: 100, ParentID: 42, Service: "B",
+			Metrics: map[string]float64{pb.KeySamplingRateGlobal: 0.5}},
+		&pb.Span{TraceID: 42, SpanID: 100, ParentID: 42, Service: "B",
 			Name: "B.bar", Type: "web", Resource: "α", Start: 1, Duration: 20},
-		&Span{TraceID: 42, SpanID: 2000, ParentID: 100, Service: "C",
+		&pb.Span{TraceID: 42, SpanID: 2000, ParentID: 100, Service: "C",
 			Name: "sql.query", Type: "sql", Resource: "SELECT value FROM table",
 			Start: 2, Duration: 5},
-		&Span{TraceID: 42, SpanID: 3000, ParentID: 100, Service: "C",
+		&pb.Span{TraceID: 42, SpanID: 3000, ParentID: 100, Service: "C",
 			Name: "sql.query", Type: "sql", Resource: "SELECT ololololo... value FROM table",
 			Start: 10, Duration: 3, Error: 1},
 	}
 
-	trace.ComputeTopLevel()
+	traceutil.ComputeTopLevel(trace)
 	return trace
 }
 
-func testTraceTopLevel() Trace {
+func testTraceTopLevel() pb.Trace {
 	// Data below represents a trace with some sublayers, so that we make sure,
 	// those data are correctly calculated when aggregating in HandleSpan()
 	// In this case, the sublayers B and C have been merged into B,
@@ -68,21 +70,21 @@ func testTraceTopLevel() Trace {
 	// A |---------------------------------------------------------------| duration: 100
 	// B   |----------------------|                                        duration: 20
 	// B     |-----| |---|                                                 duration: 5+3
-	trace := Trace{
-		&Span{TraceID: 42, SpanID: 42, ParentID: 0, Service: "A",
+	trace := pb.Trace{
+		&pb.Span{TraceID: 42, SpanID: 42, ParentID: 0, Service: "A",
 			Name: "A.foo", Type: "web", Resource: "α", Start: 0, Duration: 100,
-			Metrics: map[string]float64{KeySamplingRateGlobal: 1}},
-		&Span{TraceID: 42, SpanID: 100, ParentID: 42, Service: "B",
+			Metrics: map[string]float64{pb.KeySamplingRateGlobal: 1}},
+		&pb.Span{TraceID: 42, SpanID: 100, ParentID: 42, Service: "B",
 			Name: "B.bar", Type: "web", Resource: "α", Start: 1, Duration: 20},
-		&Span{TraceID: 42, SpanID: 2000, ParentID: 100, Service: "B",
+		&pb.Span{TraceID: 42, SpanID: 2000, ParentID: 100, Service: "B",
 			Name: "B.bar.1", Type: "web", Resource: "α",
 			Start: 2, Duration: 5},
-		&Span{TraceID: 42, SpanID: 3000, ParentID: 100, Service: "B",
+		&pb.Span{TraceID: 42, SpanID: 3000, ParentID: 100, Service: "B",
 			Name: "B.bar.2", Type: "web", Resource: "α",
 			Start: 10, Duration: 3, Error: 1},
 	}
 
-	trace.ComputeTopLevel()
+	traceutil.ComputeTopLevel(trace)
 	return trace
 }
 
@@ -268,7 +270,7 @@ func TestStatsBucketMany(t *testing.T) {
 	assert := assert.New(t)
 
 	templateSpan := &WeightedSpan{
-		Span:     &Span{Service: "A", Name: "A.foo", Resource: "α", Duration: 7},
+		Span:     &pb.Span{Service: "A", Name: "A.foo", Resource: "α", Duration: 7},
 		Weight:   1,
 		TopLevel: true,
 	}
@@ -305,7 +307,7 @@ func TestStatsBucketSublayers(t *testing.T) {
 
 	tr := testTrace()
 	sublayers := ComputeSublayers(tr)
-	root := tr.GetRoot()
+	root := traceutil.GetRoot(tr)
 	SetSublayersOnSpan(root, sublayers)
 
 	wt := NewWeightedTrace(tr, root)
@@ -403,7 +405,7 @@ func TestStatsBucketSublayersTopLevel(t *testing.T) {
 
 	tr := testTraceTopLevel()
 	sublayers := ComputeSublayers(tr)
-	root := tr.GetRoot()
+	root := traceutil.GetRoot(tr)
 	SetSublayersOnSpan(root, sublayers)
 
 	wt := NewWeightedTrace(tr, root)
@@ -536,7 +538,7 @@ func BenchmarkHandleSpanSublayers(b *testing.B) {
 
 	tr := testTrace()
 	sublayers := ComputeSublayers(tr)
-	root := tr.GetRoot()
+	root := traceutil.GetRoot(tr)
 	SetSublayersOnSpan(root, sublayers)
 
 	wt := NewWeightedTrace(tr, root)
