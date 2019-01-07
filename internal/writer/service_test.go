@@ -11,7 +11,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
 	"github.com/DataDog/datadog-trace-agent/internal/config"
 	"github.com/DataDog/datadog-trace-agent/internal/info"
-	"github.com/DataDog/datadog-trace-agent/internal/statsd"
+	"github.com/DataDog/datadog-trace-agent/internal/metrics"
 	"github.com/DataDog/datadog-trace-agent/internal/test/testutil"
 	writerconfig "github.com/DataDog/datadog-trace-agent/internal/writer/config"
 	"github.com/stretchr/testify/assert"
@@ -204,7 +204,7 @@ func testServiceWriter() (*ServiceWriter, chan agent.ServicesMetadata, *testEndp
 	serviceWriter := NewServiceWriter(conf, serviceChannel)
 	testEndpoint := &testEndpoint{}
 	serviceWriter.sender.setEndpoint(testEndpoint)
-	testStatsClient := statsd.Client.(*testutil.TestStatsClient)
+	testStatsClient := metrics.Client.(*testutil.TestStatsClient)
 	testStatsClient.Reset()
 
 	return serviceWriter, serviceChannel, testEndpoint, testStatsClient

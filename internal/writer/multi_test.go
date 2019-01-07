@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/internal/statsd"
+	"github.com/DataDog/datadog-trace-agent/internal/metrics"
 	"github.com/DataDog/datadog-trace-agent/internal/test/testutil"
 	"github.com/DataDog/datadog-trace-agent/internal/writer/config"
 	"github.com/stretchr/testify/assert"
@@ -15,10 +15,10 @@ import (
 
 func TestMain(m *testing.M) {
 	testStatsClient := &testutil.TestStatsClient{}
-	originalClient := statsd.Client
-	statsd.Client = testStatsClient
+	originalClient := metrics.Client
+	metrics.Client = testStatsClient
 	defer func() {
-		statsd.Client = originalClient
+		metrics.Client = originalClient
 	}()
 	os.Exit(m.Run())
 }

@@ -128,7 +128,6 @@ func TestRateByServiceConcurrency(t *testing.T) {
 }
 
 func benchRBSGetAll(sigs map[ServiceSignature]float64) func(*testing.B) {
-	all := make(map[string]float64)
 	return func(b *testing.B) {
 		rbs := &RateByService{defaultEnv: "test"}
 		rbs.SetAll(sigs)
@@ -137,7 +136,7 @@ func benchRBSGetAll(sigs map[ServiceSignature]float64) func(*testing.B) {
 		b.ReportAllocs()
 
 		for i := 0; i < b.N; i++ {
-			all = rbs.GetAll()
+			rbs.GetAll()
 		}
 	}
 }

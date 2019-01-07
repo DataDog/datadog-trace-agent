@@ -10,7 +10,7 @@ import (
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
 	"github.com/DataDog/datadog-trace-agent/internal/config"
 	"github.com/DataDog/datadog-trace-agent/internal/info"
-	"github.com/DataDog/datadog-trace-agent/internal/statsd"
+	"github.com/DataDog/datadog-trace-agent/internal/metrics"
 	"github.com/DataDog/datadog-trace-agent/internal/watchdog"
 	writerconfig "github.com/DataDog/datadog-trace-agent/internal/writer/config"
 	log "github.com/cihub/seelog"
@@ -102,7 +102,7 @@ func (w *TraceWriter) Run() {
 				log.Infof("flushed trace payload to the API, time:%s, size:%d bytes", event.stats.sendTime,
 					len(event.payload.bytes))
 				tags := []string{"url:" + event.stats.host}
-				statsd.Client.Gauge("datadog.trace_agent.trace_writer.flush_duration",
+				metrics.Gauge("datadog.trace_agent.trace_writer.flush_duration",
 					event.stats.sendTime.Seconds(), tags, 1)
 				atomic.AddInt64(&w.stats.Payloads, 1)
 			case eventTypeFailure:
@@ -282,14 +282,14 @@ func (w *TraceWriter) updateInfo() {
 	twInfo.Errors = atomic.SwapInt64(&w.stats.Errors, 0)
 	twInfo.SingleMaxSpans = atomic.SwapInt64(&w.stats.SingleMaxSpans, 0)
 
-	statsd.Client.Count("datadog.trace_agent.trace_writer.payloads", int64(twInfo.Payloads), nil, 1)
-	statsd.Client.Count("datadog.trace_agent.trace_writer.traces", int64(twInfo.Traces), nil, 1)
-	statsd.Client.Count("datadog.trace_agent.trace_writer.events", int64(twInfo.Events), nil, 1)
-	statsd.Client.Count("datadog.trace_agent.trace_writer.spans", int64(twInfo.Spans), nil, 1)
-	statsd.Client.Count("datadog.trace_agent.trace_writer.bytes", int64(twInfo.Bytes), nil, 1)
-	statsd.Client.Count("datadog.trace_agent.trace_writer.retries", int64(twInfo.Retries), nil, 1)
-	statsd.Client.Count("datadog.trace_agent.trace_writer.errors", int64(twInfo.Errors), nil, 1)
-	statsd.Client.Count("datadog.trace_agent.trace_writer.single_max_spans", int64(twInfo.SingleMaxSpans), nil, 1)
+	metrics.Count("datadog.trace_agent.trace_writer.payloads", int64(twInfo.Payloads), nil, 1)
+	metrics.Count("datadog.trace_agent.trace_writer.traces", int64(twInfo.Traces), nil, 1)
+	metrics.Count("datadog.trace_agent.trace_writer.events", int64(twInfo.Events), nil, 1)
+	metrics.Count("datadog.trace_agent.trace_writer.spans", int64(twInfo.Spans), nil, 1)
+	metrics.Count("datadog.trace_agent.trace_writer.bytes", int64(twInfo.Bytes), nil, 1)
+	metrics.Count("datadog.trace_agent.trace_writer.retries", int64(twInfo.Retries), nil, 1)
+	metrics.Count("datadog.trace_agent.trace_writer.errors", int64(twInfo.Errors), nil, 1)
+	metrics.Count("datadog.trace_agent.trace_writer.single_max_spans", int64(twInfo.SingleMaxSpans), nil, 1)
 
 	info.UpdateTraceWriterInfo(twInfo)
 }

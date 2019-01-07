@@ -6,8 +6,8 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/DataDog/datadog-trace-agent/internal/metrics"
 	"github.com/DataDog/datadog-trace-agent/internal/sampler"
-	"github.com/DataDog/datadog-trace-agent/internal/statsd"
 )
 
 const (
@@ -24,7 +24,7 @@ type traceResponse struct {
 // HTTPFormatError is used for payload format errors
 func HTTPFormatError(tags []string, w http.ResponseWriter) {
 	tags = append(tags, "error:format-error")
-	statsd.Client.Count(receiverErrorKey, 1, tags, 1)
+	metrics.Count(receiverErrorKey, 1, tags, 1)
 	http.Error(w, "format-error", http.StatusUnsupportedMediaType)
 }
 
@@ -41,7 +41,7 @@ func HTTPDecodingError(err error, tags []string, w http.ResponseWriter) {
 	}
 
 	tags = append(tags, fmt.Sprintf("error:%s", errtag))
-	statsd.Client.Count(receiverErrorKey, 1, tags, 1)
+	metrics.Count(receiverErrorKey, 1, tags, 1)
 
 	http.Error(w, msg, status)
 }
@@ -49,7 +49,7 @@ func HTTPDecodingError(err error, tags []string, w http.ResponseWriter) {
 // HTTPEndpointNotSupported is for payloads getting sent to a wrong endpoint
 func HTTPEndpointNotSupported(tags []string, w http.ResponseWriter) {
 	tags = append(tags, "error:unsupported-endpoint")
-	statsd.Client.Count(receiverErrorKey, 1, tags, 1)
+	metrics.Count(receiverErrorKey, 1, tags, 1)
 	http.Error(w, "unsupported-endpoint", http.StatusInternalServerError)
 }
 
@@ -68,7 +68,7 @@ func HTTPRateByService(w http.ResponseWriter, dynConf *sampler.DynamicConfig) {
 	encoder := json.NewEncoder(w)
 	if err := encoder.Encode(response); err != nil {
 		tags := []string{"error:response-error"}
-		statsd.Client.Count(receiverErrorKey, 1, tags, 1)
+		metrics.Count(receiverErrorKey, 1, tags, 1)
 		return
 	}
 }

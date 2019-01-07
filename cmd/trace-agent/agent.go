@@ -13,10 +13,10 @@ import (
 	"github.com/DataDog/datadog-trace-agent/internal/event"
 	"github.com/DataDog/datadog-trace-agent/internal/filters"
 	"github.com/DataDog/datadog-trace-agent/internal/info"
+	"github.com/DataDog/datadog-trace-agent/internal/metrics"
 	"github.com/DataDog/datadog-trace-agent/internal/obfuscate"
 	"github.com/DataDog/datadog-trace-agent/internal/osutil"
 	"github.com/DataDog/datadog-trace-agent/internal/sampler"
-	"github.com/DataDog/datadog-trace-agent/internal/statsd"
 	"github.com/DataDog/datadog-trace-agent/internal/watchdog"
 	"github.com/DataDog/datadog-trace-agent/internal/writer"
 )
@@ -323,7 +323,7 @@ func (a *Agent) watchdog() {
 	a.Receiver.PreSampler.SetError(err)
 
 	preSamplerStats := a.Receiver.PreSampler.Stats()
-	statsd.Client.Gauge("datadog.trace_agent.presampler_rate", preSamplerStats.Rate, nil, 1)
+	metrics.Gauge("datadog.trace_agent.presampler_rate", preSamplerStats.Rate, nil, 1)
 	info.UpdatePreSampler(*preSamplerStats)
 }
 
