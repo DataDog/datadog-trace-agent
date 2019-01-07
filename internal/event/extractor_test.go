@@ -4,13 +4,14 @@ import (
 	"testing"
 
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/stretchr/testify/assert"
 )
 
 type extractorTestCase struct {
 	name                   string
 	spans                  []*agent.WeightedSpan
-	priority               agent.SamplingPriority
+	priority               pb.SamplingPriority
 	expectedExtractionRate float64
 }
 

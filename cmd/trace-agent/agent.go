@@ -13,10 +13,12 @@ import (
 	"github.com/DataDog/datadog-trace-agent/internal/event"
 	"github.com/DataDog/datadog-trace-agent/internal/filters"
 	"github.com/DataDog/datadog-trace-agent/internal/info"
+	"github.com/DataDog/datadog-trace-agent/internal/metrics"
 	"github.com/DataDog/datadog-trace-agent/internal/obfuscate"
 	"github.com/DataDog/datadog-trace-agent/internal/osutil"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/DataDog/datadog-trace-agent/internal/sampler"
-	"github.com/DataDog/datadog-trace-agent/internal/statsd"
+	"github.com/DataDog/datadog-trace-agent/internal/traceutil"
 	"github.com/DataDog/datadog-trace-agent/internal/watchdog"
 	"github.com/DataDog/datadog-trace-agent/internal/writer"
 )
@@ -59,11 +61,11 @@ func NewAgent(ctx context.Context, conf *config.AgentConfig) *Agent {
 	dynConf := sampler.NewDynamicConfig(conf.DefaultEnv)
 
 	// inter-component channels
-	rawTraceChan := make(chan agent.Trace, 5000) // about 1000 traces/sec for 5 sec, TODO: move to *model.Trace
+	rawTraceChan := make(chan pb.Trace, 5000) // about 1000 traces/sec for 5 sec, TODO: move to *model.Trace
 	tracePkgChan := make(chan *writer.TracePackage)
 	statsChan := make(chan []agent.StatsBucket)
-	serviceChan := make(chan agent.ServicesMetadata, 50)
-	filteredServiceChan := make(chan agent.ServicesMetadata, 50)
+	serviceChan := make(chan pb.ServicesMetadata, 50)
+	filteredServiceChan := make(chan pb.ServicesMetadata, 50)
 
 	// create components
 	r := api.NewHTTPReceiver(conf, dynConf, rawTraceChan, serviceChan)
@@ -157,14 +159,14 @@ func (a *Agent) Run() {
 
 // Process is the default work unit that receives a trace, transforms it and
 // passes it downstream.
-func (a *Agent) Process(t agent.Trace) {
+func (a *Agent) Process(t pb.Trace) {
 	if len(t) == 0 {
 		log.Debugf("skipping received empty trace")
 		return
 	}
 
 	// Root span is used to carry some trace-level metadata, such as sampling rate and priority.
-	root := t.GetRoot()
+	root := traceutil.GetRoot(t)
 
 	// We get the address of the struct holding the stats associated to no tags.
 	// TODO: get the real tagStats related to this trace payload (per lang/version).
@@ -198,7 +200,7 @@ func (a *Agent) Process(t agent.Trace) {
 	// Extra sanitization steps of the trace.
 	for _, span := range t {
 		a.obfuscator.Obfuscate(span)
-		span.Truncate()
+		agent.Truncate(span)
 	}
 	a.Replacer.Replace(&t)
 
@@ -213,10 +215,10 @@ func (a *Agent) Process(t agent.Trace) {
 
 	// Figure out the top-level spans and sublayers now as it involves modifying the Metrics map
 	// which is not thread-safe while samplers and Concentrator might modify it too.
-	t.ComputeTopLevel()
+	traceutil.ComputeTopLevel(t)
 
-	subtraces := t.ExtractTopLevelSubtraces(root)
-	sublayers := make(map[*agent.Span][]agent.SublayerValue)
+	subtraces := ExtractTopLevelSubtraces(t, root)
+	sublayers := make(map[*pb.Span][]agent.SublayerValue)
 	for _, subtrace := range subtraces {
 		subtraceSublayers := agent.ComputeSublayers(subtrace.Trace)
 		sublayers[subtrace.Root] = subtraceSublayers
@@ -231,7 +233,7 @@ func (a *Agent) Process(t agent.Trace) {
 		Sublayers:     sublayers,
 	}
 	// Replace Agent-configured environment with `env` coming from span tag.
-	if tenv := t.GetEnv(); tenv != "" {
+	if tenv := traceutil.GetEnv(t); tenv != "" {
 		pt.Env = tenv
 	}
 
@@ -323,11 +325,11 @@ func (a *Agent) watchdog() {
 	a.Receiver.PreSampler.SetError(err)
 
 	preSamplerStats := a.Receiver.PreSampler.Stats()
-	statsd.Client.Gauge("datadog.trace_agent.presampler_rate", preSamplerStats.Rate, nil, 1)
+	metrics.Gauge("datadog.trace_agent.presampler_rate", preSamplerStats.Rate, nil, 1)
 	info.UpdatePreSampler(*preSamplerStats)
 }
 
-func traceContainsError(trace agent.Trace) bool {
+func traceContainsError(trace pb.Trace) bool {
 	for _, span := range trace {
 		if span.Error != 0 {
 			return true

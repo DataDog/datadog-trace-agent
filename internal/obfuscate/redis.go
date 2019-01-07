@@ -3,7 +3,7 @@ package obfuscate
 import (
 	"strings"
 
-	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 )
 
 // redisTruncationMark is used as suffix by tracing libraries to indicate that a
@@ -20,7 +20,7 @@ var redisCompoundCommandSet = map[string]bool{
 // TODO(gbbr): Refactor this method to use the tokenizer and
 // remove "compactWhitespaces". This method is buggy when commands
 // contain quoted strings with newlines.
-func (*Obfuscator) quantizeRedis(span *agent.Span) {
+func (*Obfuscator) quantizeRedis(span *pb.Span) {
 	query := compactWhitespaces(span.Resource)
 
 	var resource strings.Builder
@@ -83,7 +83,7 @@ const redisRawCommand = "redis.raw_command"
 
 // obfuscateRedis obfuscates arguments inside the given span's "redis.raw_command" tag, if it exists
 // and is non-empty.
-func (*Obfuscator) obfuscateRedis(span *agent.Span) {
+func (*Obfuscator) obfuscateRedis(span *pb.Span) {
 	if span.Meta == nil || span.Meta[redisRawCommand] == "" {
 		// nothing to do
 		return

@@ -1,11 +1,13 @@
 package agent
 
+import "github.com/DataDog/datadog-trace-agent/internal/pb"
+
 type ProcessedTrace struct {
-	Trace         Trace
+	Trace         pb.Trace
 	WeightedTrace WeightedTrace
-	Root          *Span
+	Root          *pb.Span
 	Env           string
-	Sublayers     map[*Span][]SublayerValue
+	Sublayers     map[*pb.Span][]SublayerValue
 	Sampled       bool
 }
 
@@ -16,6 +18,6 @@ func (pt *ProcessedTrace) Weight() float64 {
 	return pt.Root.Weight()
 }
 
-func (pt *ProcessedTrace) GetSamplingPriority() (SamplingPriority, bool) {
+func (pt *ProcessedTrace) GetSamplingPriority() (pb.SamplingPriority, bool) {
 	return pt.Root.GetSamplingPriority()
 }

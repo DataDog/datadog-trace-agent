@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/tinylib/msgp/msgp"
 )
 
@@ -83,7 +83,7 @@ func (s *Runner) KillAgent() {
 }
 
 // Out returns a channel which will provide payloads received by the fake backend.
-// They can be of type agent.TracePayload or agent.StatsPayload.
+// They can be of type pb.TracePayload or agent.StatsPayload.
 func (s *Runner) Out() <-chan interface{} {
 	if s.backend == nil {
 		closedCh := make(chan interface{})
@@ -95,7 +95,7 @@ func (s *Runner) Out() <-chan interface{} {
 
 // Post posts the given list of traces to the trace agent. Before posting, agent must
 // be started. You can start an agent using RunAgent.
-func (s *Runner) Post(traceList agent.Traces) error {
+func (s *Runner) Post(traceList pb.Traces) error {
 	if s.agent == nil {
 		return ErrNotStarted
 	}

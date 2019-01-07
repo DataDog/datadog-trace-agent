@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 )
 
 // RandomServices generates random services metadata
-func RandomServices(maxServices, maxTags int) agent.ServicesMetadata {
+func RandomServices(maxServices, maxTags int) pb.ServicesMetadata {
 	services := make(map[string]map[string]string)
 
 	k := 0

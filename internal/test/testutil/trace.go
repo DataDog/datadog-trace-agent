@@ -3,13 +3,13 @@ package testutil
 import (
 	"math/rand"
 
-	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 )
 
 // genNextLevel generates a new level for the trace tree structure,
 // having maxSpans as the max number of spans for this level
-func genNextLevel(prevLevel []*agent.Span, maxSpans int) []*agent.Span {
-	var spans []*agent.Span
+func genNextLevel(prevLevel []*pb.Span, maxSpans int) []*pb.Span {
+	var spans []*pb.Span
 	numSpans := rand.Intn(maxSpans) + 1
 
 	// the spans have to be "nested" in the previous level
@@ -39,7 +39,7 @@ func genNextLevel(prevLevel []*agent.Span, maxSpans int) []*agent.Span {
 		timeLeft := prev.Duration
 
 		// create the spans
-		curSpans := make([]*agent.Span, 0, childSpans)
+		curSpans := make([]*pb.Span, 0, childSpans)
 		for j := 0; j < childSpans && timeLeft > 0; j++ {
 			news := RandomSpan()
 			news.TraceID = prev.TraceID
@@ -65,8 +65,8 @@ func genNextLevel(prevLevel []*agent.Span, maxSpans int) []*agent.Span {
 
 // RandomTrace generates a random trace with a depth from 1 to
 // maxLevels of spans. Each level has at most maxSpans items.
-func RandomTrace(maxLevels, maxSpans int) agent.Trace {
-	t := agent.Trace{RandomSpan()}
+func RandomTrace(maxLevels, maxSpans int) pb.Trace {
+	t := pb.Trace{RandomSpan()}
 
 	prevLevel := t
 	maxDepth := 1 + rand.Intn(maxLevels)
@@ -83,8 +83,8 @@ func RandomTrace(maxLevels, maxSpans int) agent.Trace {
 
 // GetTestTrace returns a []Trace that is composed by ``traceN`` number
 // of traces, each one composed by ``size`` number of spans.
-func GetTestTrace(traceN, size int, realisticIDs bool) agent.Traces {
-	traces := agent.Traces{}
+func GetTestTrace(traceN, size int, realisticIDs bool) pb.Traces {
+	traces := pb.Traces{}
 
 	r := rand.New(rand.NewSource(42))
 
@@ -94,7 +94,7 @@ func GetTestTrace(traceN, size int, realisticIDs bool) agent.Traces {
 		// sampling algorithms work in a realistic way.
 		traceID := r.Uint64()
 
-		trace := agent.Trace{}
+		trace := pb.Trace{}
 		for j := 0; j < size; j++ {
 			span := GetTestSpan()
 			if realisticIDs {

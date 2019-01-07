@@ -5,50 +5,73 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/stretchr/testify/assert"
 )
 
+func testSpan() *pb.Span {
+	return &pb.Span{
+		Duration: 10000000,
+		Error:    0,
+		Resource: "GET /some/raclette",
+		Service:  "django",
+		Name:     "django.controller",
+		SpanID:   42,
+		Start:    1448466874000000000,
+		TraceID:  424242,
+		Meta: map[string]string{
+			"user": "leo",
+			"pool": "fondue",
+		},
+		Metrics: map[string]float64{
+			"cheese_weight": 100000.0,
+		},
+		ParentID: 1111,
+		Type:     "http",
+	}
+}
+
 func TestNormalizeOK(t *testing.T) {
 	s := testSpan()
-	assert.NoError(t, s.Normalize())
+	assert.NoError(t, Normalize(s))
 }
 
 func TestNormalizeServicePassThru(t *testing.T) {
 	s := testSpan()
 	before := s.Service
-	s.Normalize()
+	Normalize(s)
 	assert.Equal(t, before, s.Service)
 }
 
 func TestNormalizeEmptyService(t *testing.T) {
 	s := testSpan()
 	s.Service = ""
-	assert.Error(t, s.Normalize())
+	assert.Error(t, Normalize(s))
 }
 
 func TestNormalizeLongService(t *testing.T) {
 	s := testSpan()
 	s.Service = strings.Repeat("CAMEMBERT", 100)
-	assert.Error(t, s.Normalize())
+	assert.Error(t, Normalize(s))
 }
 
 func TestNormalizeNamePassThru(t *testing.T) {
 	s := testSpan()
 	before := s.Name
-	s.Normalize()
+	Normalize(s)
 	assert.Equal(t, before, s.Name)
 }
 
 func TestNormalizeEmptyName(t *testing.T) {
 	s := testSpan()
 	s.Name = ""
-	assert.Error(t, s.Normalize())
+	assert.Error(t, Normalize(s))
 }
 
 func TestNormalizeLongName(t *testing.T) {
 	s := testSpan()
 	s.Name = strings.Repeat("CAMEMBERT", 100)
-	assert.Error(t, s.Normalize())
+	assert.Error(t, Normalize(s))
 }
 
 func TestNormalizeName(t *testing.T) {
@@ -60,7 +83,7 @@ func TestNormalizeName(t *testing.T) {
 	s := testSpan()
 	for name, expName := range expNames {
 		s.Name = name
-		assert.NoError(t, s.Normalize())
+		assert.NoError(t, Normalize(s))
 		assert.Equal(t, expName, s.Name)
 	}
 }
@@ -75,142 +98,142 @@ func TestNormalizeNameFailure(t *testing.T) {
 	s := testSpan()
 	for _, v := range invalidNames {
 		s.Name = v
-		assert.Error(t, s.Normalize())
+		assert.Error(t, Normalize(s))
 	}
 }
 
 func TestNormalizeResourcePassThru(t *testing.T) {
 	s := testSpan()
 	before := s.Resource
-	s.Normalize()
+	Normalize(s)
 	assert.Equal(t, before, s.Resource)
 }
 
 func TestNormalizeEmptyResource(t *testing.T) {
 	s := testSpan()
 	s.Resource = ""
-	assert.Error(t, s.Normalize())
+	assert.Error(t, Normalize(s))
 }
 
 func TestNormalizeTraceIDPassThru(t *testing.T) {
 	s := testSpan()
 	before := s.TraceID
-	s.Normalize()
+	Normalize(s)
 	assert.Equal(t, before, s.TraceID)
 }
 
 func TestNormalizeNoTraceID(t *testing.T) {
 	s := testSpan()
 	s.TraceID = 0
-	s.Normalize()
+	Normalize(s)
 	assert.NotEqual(t, 0, s.TraceID)
 }
 
 func TestNormalizeSpanIDPassThru(t *testing.T) {
 	s := testSpan()
 	before := s.SpanID
-	s.Normalize()
+	Normalize(s)
 	assert.Equal(t, before, s.SpanID)
 }
 
 func TestNormalizeNoSpanID(t *testing.T) {
 	s := testSpan()
 	s.SpanID = 0
-	s.Normalize()
+	Normalize(s)
 	assert.NotEqual(t, 0, s.SpanID)
 }
 
 func TestNormalizeStartPassThru(t *testing.T) {
 	s := testSpan()
 	before := s.Start
-	s.Normalize()
+	Normalize(s)
 	assert.Equal(t, before, s.Start)
 }
 
 func TestNormalizeStartTooSmall(t *testing.T) {
 	s := testSpan()
 	s.Start = 42
-	assert.Error(t, s.Normalize())
+	assert.Error(t, Normalize(s))
 }
 
 func TestNormalizeStartTooLarge(t *testing.T) {
 	s := testSpan()
 	s.Start = time.Now().Add(15 * time.Minute).UnixNano()
-	assert.Error(t, s.Normalize())
+	assert.Error(t, Normalize(s))
 }
 
 func TestNormalizeDurationPassThru(t *testing.T) {
 	s := testSpan()
 	before := s.Duration
-	s.Normalize()
+	Normalize(s)
 	assert.Equal(t, before, s.Duration)
 }
 
 func TestNormalizeEmptyDuration(t *testing.T) {
 	s := testSpan()
 	s.Duration = 0
-	assert.Error(t, s.Normalize())
+	assert.Error(t, Normalize(s))
 }
 
 func TestNormalizeNegativeDuration(t *testing.T) {
 	s := testSpan()
 	s.Duration = -50
-	assert.Error(t, s.Normalize())
+	assert.Error(t, Normalize(s))
 }
 
 func TestNormalizeErrorPassThru(t *testing.T) {
 	s := testSpan()
 	before := s.Error
-	s.Normalize()
+	Normalize(s)
 	assert.Equal(t, before, s.Error)
 }
 
 func TestNormalizeMetricsPassThru(t *testing.T) {
 	s := testSpan()
 	before := s.Metrics
-	s.Normalize()
+	Normalize(s)
 	assert.Equal(t, before, s.Metrics)
 }
 
 func TestNormalizeMetaPassThru(t *testing.T) {
 	s := testSpan()
 	before := s.Meta
-	s.Normalize()
+	Normalize(s)
 	assert.Equal(t, before, s.Meta)
 }
 
 func TestNormalizeParentIDPassThru(t *testing.T) {
 	s := testSpan()
 	before := s.ParentID
-	s.Normalize()
+	Normalize(s)
 	assert.Equal(t, before, s.ParentID)
 }
 
 func TestNormalizeTypePassThru(t *testing.T) {
 	s := testSpan()
 	before := s.Type
-	s.Normalize()
+	Normalize(s)
 	assert.Equal(t, before, s.Type)
 }
 
 func TestNormalizeTypeTooLong(t *testing.T) {
 	s := testSpan()
 	s.Type = strings.Repeat("sql", 1000)
-	s.Normalize()
-	assert.Error(t, s.Normalize())
+	Normalize(s)
+	assert.Error(t, Normalize(s))
 }
 
 func TestNormalizeServiceTag(t *testing.T) {
 	s := testSpan()
 	s.Service = "retargeting(api-Staging "
-	s.Normalize()
+	Normalize(s)
 	assert.Equal(t, "retargeting_api-staging", s.Service)
 }
 
 func TestNormalizeEnv(t *testing.T) {
 	s := testSpan()
 	s.Meta["env"] = "DEVELOPMENT"
-	s.Normalize()
+	Normalize(s)
 	assert.Equal(t, "development", s.Meta["env"])
 }
 
@@ -221,16 +244,16 @@ func TestSpecialZipkinRootSpan(t *testing.T) {
 	s.SpanID = 42
 	beforeTraceID := s.TraceID
 	beforeSpanID := s.SpanID
-	s.Normalize()
+	Normalize(s)
 	assert.Equal(t, uint64(0), s.ParentID)
 	assert.Equal(t, beforeTraceID, s.TraceID)
 	assert.Equal(t, beforeSpanID, s.SpanID)
 }
 
 func TestNormalizeTraceEmpty(t *testing.T) {
-	trace := Trace{}
+	trace := pb.Trace{}
 
-	_, err := NormalizeTrace(trace)
+	err := NormalizeTrace(trace)
 	assert.Error(t, err)
 }
 
@@ -241,9 +264,9 @@ func TestNormalizeTraceTraceIdMismatch(t *testing.T) {
 	span2 := testSpan()
 	span2.TraceID = 2
 
-	trace := Trace{span1, span2}
+	trace := pb.Trace{span1, span2}
 
-	_, err := NormalizeTrace(trace)
+	err := NormalizeTrace(trace)
 	assert.Error(t, err)
 }
 
@@ -253,9 +276,9 @@ func TestNormalizeTraceInvalidSpan(t *testing.T) {
 	span2 := testSpan()
 	span2.Name = "" // invalid
 
-	trace := Trace{span1, span2}
+	trace := pb.Trace{span1, span2}
 
-	_, err := NormalizeTrace(trace)
+	err := NormalizeTrace(trace)
 	assert.Error(t, err)
 }
 
@@ -264,9 +287,9 @@ func TestNormalizeTraceDuplicateSpanID(t *testing.T) {
 	span2 := testSpan()
 	span2.SpanID = span1.SpanID
 
-	trace := Trace{span1, span2}
+	trace := pb.Trace{span1, span2}
 
-	_, err := NormalizeTrace(trace)
+	err := NormalizeTrace(trace)
 	assert.Error(t, err)
 }
 
@@ -276,9 +299,9 @@ func TestNormalizeTrace(t *testing.T) {
 	span2 := testSpan()
 	span2.SpanID++
 
-	trace := Trace{span1, span2}
+	trace := pb.Trace{span1, span2}
 
-	_, err := NormalizeTrace(trace)
+	err := NormalizeTrace(trace)
 	assert.NoError(t, err)
 }
 
@@ -300,7 +323,7 @@ func TestNormalizeInvalidUTF8(t *testing.T) {
 		span := testSpan()
 		span.Service = invalidUTF8
 
-		err := span.Normalize()
+		err := Normalize(span)
 
 		assert.Nil(err)
 		assert.Equal("test", span.Service)
@@ -312,7 +335,7 @@ func TestNormalizeInvalidUTF8(t *testing.T) {
 		span := testSpan()
 		span.Resource = invalidUTF8
 
-		err := span.Normalize()
+		err := Normalize(span)
 
 		assert.Nil(err)
 		assert.Equal("test��", span.Resource)
@@ -324,7 +347,7 @@ func TestNormalizeInvalidUTF8(t *testing.T) {
 		span := testSpan()
 		span.Name = invalidUTF8
 
-		err := span.Normalize()
+		err := Normalize(span)
 
 		assert.Nil(err)
 		assert.Equal("test", span.Name)
@@ -336,7 +359,7 @@ func TestNormalizeInvalidUTF8(t *testing.T) {
 		span := testSpan()
 		span.Type = invalidUTF8
 
-		err := span.Normalize()
+		err := Normalize(span)
 
 		assert.Nil(err)
 		assert.Equal("test��", span.Type)
@@ -351,7 +374,7 @@ func TestNormalizeInvalidUTF8(t *testing.T) {
 			"test2":     invalidUTF8,
 		}
 
-		err := span.Normalize()
+		err := Normalize(span)
 
 		assert.Nil(err)
 		assert.EqualValues(map[string]string{
@@ -365,6 +388,6 @@ func BenchmarkNormalization(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i += 1 {
-		testSpan().Normalize()
+		Normalize(testSpan())
 	}
 }

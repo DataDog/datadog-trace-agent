@@ -20,8 +20,8 @@ import (
 	"github.com/DataDog/datadog-trace-agent/internal/config"
 	"github.com/DataDog/datadog-trace-agent/internal/flags"
 	"github.com/DataDog/datadog-trace-agent/internal/info"
+	"github.com/DataDog/datadog-trace-agent/internal/metrics"
 	"github.com/DataDog/datadog-trace-agent/internal/osutil"
-	"github.com/DataDog/datadog-trace-agent/internal/statsd"
 	"github.com/DataDog/datadog-trace-agent/internal/watchdog"
 )
 
@@ -144,13 +144,13 @@ func runAgent(ctx context.Context) {
 	}
 
 	// Initialize dogstatsd client
-	err = statsd.Configure(cfg, []string{"version:" + info.Version})
+	err = metrics.Configure(cfg, []string{"version:" + info.Version})
 	if err != nil {
 		osutil.Exitf("cannot configure dogstatsd: %v", err)
 	}
 
 	// count the number of times the agent started
-	statsd.Client.Count("datadog.trace_agent.started", 1, nil, 1)
+	metrics.Count("datadog.trace_agent.started", 1, nil, 1)
 
 	// Seed rand
 	rand.Seed(time.Now().UTC().UnixNano())

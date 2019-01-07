@@ -2,21 +2,25 @@ package main
 
 import (
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 )
+
+// appType is one of the pieces of information embedded in ServiceMetadata
+const appType = "app_type"
 
 // TraceServiceExtractor extracts service metadata from top-level spans
 type TraceServiceExtractor struct {
-	outServices chan<- agent.ServicesMetadata
+	outServices chan<- pb.ServicesMetadata
 }
 
 // NewTraceServiceExtractor returns a new TraceServiceExtractor
-func NewTraceServiceExtractor(out chan<- agent.ServicesMetadata) *TraceServiceExtractor {
+func NewTraceServiceExtractor(out chan<- pb.ServicesMetadata) *TraceServiceExtractor {
 	return &TraceServiceExtractor{out}
 }
 
 // Process extracts service metadata from top-level spans and sends it downstream
 func (ts *TraceServiceExtractor) Process(t agent.WeightedTrace) {
-	meta := make(agent.ServicesMetadata)
+	meta := make(pb.ServicesMetadata)
 
 	for _, s := range t {
 		if !s.TopLevel {
@@ -28,7 +32,7 @@ func (ts *TraceServiceExtractor) Process(t agent.WeightedTrace) {
 		}
 
 		if v := s.Type; len(v) > 0 {
-			meta[s.Service] = map[string]string{agent.AppType: v}
+			meta[s.Service] = map[string]string{appType: v}
 		}
 	}
 

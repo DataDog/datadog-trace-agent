@@ -1,18 +1,23 @@
 package agent
 
+import (
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
+	"github.com/DataDog/datadog-trace-agent/internal/traceutil"
+)
+
 // WeightedSpan extends Span to contain weights required by the Concentrator.
 type WeightedSpan struct {
 	Weight   float64 // Span weight. Similar to the trace root.Weight().
 	TopLevel bool    // Is this span a service top-level or not. Similar to span.TopLevel().
 
-	*Span
+	*pb.Span
 }
 
 // WeightedTrace is a slice of WeightedSpan pointers.
 type WeightedTrace []*WeightedSpan
 
 // NewWeightedTrace returns a weighted trace, with coefficient required by the concentrator.
-func NewWeightedTrace(trace Trace, root *Span) WeightedTrace {
+func NewWeightedTrace(trace pb.Trace, root *pb.Span) WeightedTrace {
 	wt := make(WeightedTrace, len(trace))
 
 	weight := root.Weight()
@@ -21,9 +26,8 @@ func NewWeightedTrace(trace Trace, root *Span) WeightedTrace {
 		wt[i] = &WeightedSpan{
 			Span:     trace[i],
 			Weight:   weight,
-			TopLevel: trace[i].TopLevel(),
+			TopLevel: traceutil.HasTopLevel(trace[i]),
 		}
 	}
-
 	return wt
 }

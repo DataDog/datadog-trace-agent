@@ -1,6 +1,9 @@
 package agent
 
-import log "github.com/cihub/seelog"
+import (
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
+	log "github.com/cihub/seelog"
+)
 
 const (
 	// MaxResourceLen the maximum length the resource can have
@@ -15,7 +18,7 @@ const (
 
 // Truncate checks that the span resource, meta and metrics are within the max length
 // and modifies them if they are not
-func (s *Span) Truncate() {
+func Truncate(s *pb.Span) {
 	// Resource
 	if len(s.Resource) > MaxResourceLen {
 		s.Resource = s.Resource[:MaxResourceLen]

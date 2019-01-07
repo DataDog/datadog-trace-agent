@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/internal/agent"
 	"github.com/DataDog/datadog-trace-agent/internal/config"
 	"github.com/DataDog/datadog-trace-agent/internal/info"
-	"github.com/DataDog/datadog-trace-agent/internal/statsd"
+	"github.com/DataDog/datadog-trace-agent/internal/metrics"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/DataDog/datadog-trace-agent/internal/test/testutil"
 	writerconfig "github.com/DataDog/datadog-trace-agent/internal/writer/config"
 	"github.com/stretchr/testify/assert"
@@ -169,8 +169,8 @@ func TestServiceWriter_UpdateInfoHandling(t *testing.T) {
 	assert.Equal(expectedNumErrors, errorsSummary.Sum)
 }
 
-func mergeMetadataInOrder(metadatas ...agent.ServicesMetadata) agent.ServicesMetadata {
-	result := agent.ServicesMetadata{}
+func mergeMetadataInOrder(metadatas ...pb.ServicesMetadata) pb.ServicesMetadata {
+	result := pb.ServicesMetadata{}
 
 	for _, metadata := range metadatas {
 		for serviceName, serviceMetadata := range metadata {
@@ -181,14 +181,14 @@ func mergeMetadataInOrder(metadatas ...agent.ServicesMetadata) agent.ServicesMet
 	return result
 }
 
-func calculateMetadataPayloadSize(metadata agent.ServicesMetadata) int64 {
-	data, _ := agent.EncodeServicesPayload(metadata)
+func calculateMetadataPayloadSize(metadata pb.ServicesMetadata) int64 {
+	data, _ := pb.EncodeServicesPayload(metadata)
 	return int64(len(data))
 }
 
 func assertMetadata(assert *assert.Assertions, expectedHeaders map[string]string,
-	expectedMetadata agent.ServicesMetadata, p *payload) {
-	servicesMetadata := agent.ServicesMetadata{}
+	expectedMetadata pb.ServicesMetadata, p *payload) {
+	servicesMetadata := pb.ServicesMetadata{}
 
 	assert.NoError(json.Unmarshal(p.bytes, &servicesMetadata), "Stats payload should unmarshal correctly")
 
@@ -196,15 +196,15 @@ func assertMetadata(assert *assert.Assertions, expectedHeaders map[string]string
 	assert.Equal(expectedMetadata, servicesMetadata, "Service metadata should match expectation")
 }
 
-func testServiceWriter() (*ServiceWriter, chan agent.ServicesMetadata, *testEndpoint, *testutil.TestStatsClient) {
-	serviceChannel := make(chan agent.ServicesMetadata)
+func testServiceWriter() (*ServiceWriter, chan pb.ServicesMetadata, *testEndpoint, *testutil.TestStatsClient) {
+	serviceChannel := make(chan pb.ServicesMetadata)
 	conf := &config.AgentConfig{
 		ServiceWriterConfig: writerconfig.DefaultServiceWriterConfig(),
 	}
 	serviceWriter := NewServiceWriter(conf, serviceChannel)
 	testEndpoint := &testEndpoint{}
 	serviceWriter.sender.setEndpoint(testEndpoint)
-	testStatsClient := statsd.Client.(*testutil.TestStatsClient)
+	testStatsClient := metrics.Client.(*testutil.TestStatsClient)
 	testStatsClient.Reset()
 
 	return serviceWriter, serviceChannel, testEndpoint, testStatsClient

@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,8 +13,8 @@ type sqlTestCase struct {
 	expected string
 }
 
-func SQLSpan(query string) *agent.Span {
-	return &agent.Span{
+func SQLSpan(query string) *pb.Span {
+	return &pb.Span{
 		Resource: query,
 		Type:     "sql",
 		Meta: map[string]string{
@@ -25,7 +25,7 @@ func SQLSpan(query string) *agent.Span {
 
 func TestSQLResourceQuery(t *testing.T) {
 	assert := assert.New(t)
-	span := &agent.Span{
+	span := &pb.Span{
 		Resource: "SELECT * FROM users WHERE id = 42",
 		Type:     "sql",
 		Meta: map[string]string{
@@ -40,7 +40,7 @@ func TestSQLResourceQuery(t *testing.T) {
 
 func TestSQLResourceWithoutQuery(t *testing.T) {
 	assert := assert.New(t)
-	span := &agent.Span{
+	span := &pb.Span{
 		Resource: "SELECT * FROM users WHERE id = 42",
 		Type:     "sql",
 	}
@@ -53,22 +53,22 @@ func TestSQLResourceWithoutQuery(t *testing.T) {
 func TestSQLResourceWithError(t *testing.T) {
 	assert := assert.New(t)
 	testCases := []struct {
-		span agent.Span
+		span pb.Span
 	}{
 		{
-			agent.Span{
+			pb.Span{
 				Resource: "SELECT * FROM users WHERE id = '' AND '",
 				Type:     "sql",
 			},
 		},
 		{
-			agent.Span{
+			pb.Span{
 				Resource: "INSERT INTO pages (id, name) VALUES (%(id0)s, %(name0)s), (%(id1)s, %(name1",
 				Type:     "sql",
 			},
 		},
 		{
-			agent.Span{
+			pb.Span{
 				Resource: "INSERT INTO pages (id, name) VALUES (%(id0)s, %(name0)s), (%(id1)s, %(name1)",
 				Type:     "sql",
 			},
@@ -437,8 +437,8 @@ func BenchmarkTokenizer(b *testing.B) {
 	}
 }
 
-func CassSpan(query string) *agent.Span {
-	return &agent.Span{
+func CassSpan(query string) *pb.Span {
+	return &pb.Span{
 		Resource: query,
 		Type:     "cassandra",
 		Meta: map[string]string{

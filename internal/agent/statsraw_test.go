@@ -3,6 +3,7 @@ package agent
 import (
 	"testing"
 
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -10,7 +11,7 @@ func TestGrain(t *testing.T) {
 	srb := NewStatsRawBucket(0, 1e9)
 	assert := assert.New(t)
 
-	s := Span{Service: "thing", Name: "other", Resource: "yo"}
+	s := pb.Span{Service: "thing", Name: "other", Resource: "yo"}
 	aggr, tgs := assembleGrain(&srb.keyBuf, "default", s.Resource, s.Service, nil)
 
 	assert.Equal("env:default,resource:yo,service:thing", aggr)
@@ -21,7 +22,7 @@ func TestGrainWithExtraTags(t *testing.T) {
 	srb := NewStatsRawBucket(0, 1e9)
 	assert := assert.New(t)
 
-	s := Span{Service: "thing", Name: "other", Resource: "yo", Meta: map[string]string{"meta2": "two", "meta1": "ONE"}}
+	s := pb.Span{Service: "thing", Name: "other", Resource: "yo", Meta: map[string]string{"meta2": "two", "meta1": "ONE"}}
 	aggr, tgs := assembleGrain(&srb.keyBuf, "default", s.Resource, s.Service, s.Meta)
 
 	assert.Equal("env:default,resource:yo,service:thing,meta1:ONE,meta2:two", aggr)

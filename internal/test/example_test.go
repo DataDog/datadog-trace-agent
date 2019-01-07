@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/DataDog/datadog-trace-agent/internal/test/testutil"
 )
 
@@ -29,9 +30,9 @@ func Example() {
 	}
 
 	// Post a payload.
-	payload := agent.Traces{
-		agent.Trace{testutil.RandomSpan()},
-		agent.Trace{testutil.RandomSpan()},
+	payload := pb.Traces{
+		pb.Trace{testutil.RandomSpan()},
+		pb.Trace{testutil.RandomSpan()},
 	}
 	if err := runner.Post(payload); err != nil {
 		log.Fatal(err)
@@ -39,7 +40,7 @@ func Example() {
 
 	// Assert the results.
 	switch v := (<-runner.Out()).(type) {
-	case agent.TracePayload:
+	case pb.TracePayload:
 		fmt.Println("OK traces: ", len(v.Traces))
 	case agent.StatsPayload:
 		fmt.Println("OK stats: ", len(v.Stats))

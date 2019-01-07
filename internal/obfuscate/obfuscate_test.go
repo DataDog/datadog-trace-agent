@@ -6,8 +6,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/DataDog/datadog-trace-agent/internal/agent"
 	"github.com/DataDog/datadog-trace-agent/internal/config"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/cihub/seelog"
 	"github.com/stretchr/testify/assert"
 )
@@ -90,7 +90,7 @@ func TestCompactWhitespaces(t *testing.T) {
 func TestObfuscateDefaults(t *testing.T) {
 	t.Run("redis", func(t *testing.T) {
 		cmd := "SET k v\nGET k"
-		span := &agent.Span{
+		span := &pb.Span{
 			Type:     "redis",
 			Resource: cmd,
 			Meta:     map[string]string{"redis.raw_command": cmd},
@@ -102,7 +102,7 @@ func TestObfuscateDefaults(t *testing.T) {
 
 	t.Run("sql", func(t *testing.T) {
 		query := "UPDATE users(name) SET ('Jim')"
-		span := &agent.Span{
+		span := &pb.Span{
 			Type:     "sql",
 			Resource: query,
 			Meta:     map[string]string{"sql.query": query},
@@ -122,7 +122,7 @@ func TestObfuscateConfig(t *testing.T) {
 		cfg *config.ObfuscationConfig,
 	) func(*testing.T) {
 		return func(t *testing.T) {
-			span := &agent.Span{Type: typ, Meta: map[string]string{key: val}}
+			span := &pb.Span{Type: typ, Meta: map[string]string{key: val}}
 			NewObfuscator(cfg).Obfuscate(span)
 			assert.Equal(t, exp, span.Meta[key])
 		}

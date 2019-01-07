@@ -12,8 +12,10 @@ import (
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
 	"github.com/DataDog/datadog-trace-agent/internal/config"
 	"github.com/DataDog/datadog-trace-agent/internal/info"
-	"github.com/DataDog/datadog-trace-agent/internal/statsd"
+	"github.com/DataDog/datadog-trace-agent/internal/metrics"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/DataDog/datadog-trace-agent/internal/test/testutil"
+	"github.com/DataDog/datadog-trace-agent/internal/traceutil"
 	writerconfig "github.com/DataDog/datadog-trace-agent/internal/writer/config"
 	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
@@ -243,13 +245,13 @@ func TestTraceWriter(t *testing.T) {
 }
 
 func calculateTracePayloadSize(sampledTraces []*TracePackage) int64 {
-	apiTraces := make([]*agent.APITrace, len(sampledTraces))
+	apiTraces := make([]*pb.APITrace, len(sampledTraces))
 
 	for i, trace := range sampledTraces {
-		apiTraces[i] = trace.Trace.APITrace()
+		apiTraces[i] = traceutil.APITrace(trace.Trace)
 	}
 
-	tracePayload := agent.TracePayload{
+	tracePayload := pb.TracePayload{
 		HostName: testHostName,
 		Env:      testEnv,
 		Traces:   apiTraces,
@@ -277,7 +279,7 @@ func calculateTracePayloadSize(sampledTraces []*TracePackage) int64 {
 func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expectedHeaders map[string]string,
 	sampledTraces []*TracePackage, payloads []*payload) {
 
-	var expectedTraces []agent.Trace
+	var expectedTraces []pb.Trace
 	var expectedEvents []*agent.Event
 
 	for _, sampledTrace := range sampledTraces {
@@ -294,7 +296,7 @@ func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expecte
 	for _, payload := range payloads {
 		assert.Equal(expectedHeaders, payload.headers, "Payload headers should match expectation")
 
-		var tracePayload agent.TracePayload
+		var tracePayload pb.TracePayload
 		payloadBuffer := bytes.NewBuffer(payload.bytes)
 		gz, err := gzip.NewReader(payloadBuffer)
 		assert.NoError(err, "Gzip reader should work correctly")
@@ -312,7 +314,7 @@ func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expecte
 		for _, seenAPITrace := range tracePayload.Traces {
 			numSpans += len(seenAPITrace.Spans)
 
-			if !assert.True(proto.Equal(expectedTraces[expectedTraceIdx].APITrace(), seenAPITrace),
+			if !assert.True(proto.Equal(traceutil.APITrace(expectedTraces[expectedTraceIdx]), seenAPITrace),
 				"Unmarshalled trace should match expectation at index %d", expectedTraceIdx) {
 				return
 			}
@@ -349,7 +351,7 @@ func testTraceWriter() (*TraceWriter, chan *TracePackage, *testEndpoint, *testut
 	traceWriter := NewTraceWriter(conf, payloadChannel)
 	testEndpoint := &testEndpoint{}
 	traceWriter.sender.setEndpoint(testEndpoint)
-	testStatsClient := statsd.Client.(*testutil.TestStatsClient)
+	testStatsClient := metrics.Client.(*testutil.TestStatsClient)
 	testStatsClient.Reset()
 
 	return traceWriter, payloadChannel, testEndpoint, testStatsClient

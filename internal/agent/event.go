@@ -1,5 +1,7 @@
 package agent
 
+import "github.com/DataDog/datadog-trace-agent/internal/pb"
+
 const (
 	// KeySamplingRateEventExtraction is the key of the metric storing the event extraction rate on an APM event.
 	KeySamplingRateEventExtraction = "_dd1.sr.eausr"
@@ -9,8 +11,8 @@ const (
 
 // Event is an event extracted from received traces and sent to Datadog's Trace Search functionality.
 type Event struct {
-	Span     *Span
-	Priority SamplingPriority
+	Span     *pb.Span
+	Priority pb.SamplingPriority
 }
 
 // GetClientSampleRate gets the rate at which the trace from which we extracted this event was sampled at the tracer.

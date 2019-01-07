@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/gogo/protobuf/proto"
 )
 
@@ -102,7 +103,7 @@ func (s *fakeBackend) handleStats(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s *fakeBackend) handleTraces(w http.ResponseWriter, req *http.Request) {
-	var payload agent.TracePayload
+	var payload pb.TracePayload
 	if err := readProtoRequest(req, &payload); err != nil {
 		log.Println("server: error reading traces: ", err)
 	}

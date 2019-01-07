@@ -1,9 +1,11 @@
-package agent
+package pb
 
 import (
 	"math"
 	"math/rand"
 )
+
+// TODO: move these to `sampler` package
 
 const (
 	// SpanSampleRateMetricKey is the metric key holding the sample rate
@@ -40,16 +42,6 @@ const (
 // RandomID generates a random uint64 that we use for IDs
 func RandomID() uint64 {
 	return uint64(rand.Int63())
-}
-
-// IsFlushMarker tells if this is a marker span, which signals the system to flush
-func (s *Span) IsFlushMarker() bool {
-	return s.Type == flushMarkerType
-}
-
-// NewFlushMarker returns a new flush marker
-func NewFlushMarker() *Span {
-	return &Span{Type: flushMarkerType}
 }
 
 // End returns the end time of the span.
@@ -122,11 +114,6 @@ func (s *Span) SetSampleRate(rate float64) {
 // rate which is assumed to belong to an independent sampler. The combination is done by simple multiplications.
 func (s *Span) UpdateSampleRate(rate float64) {
 	s.SetMetric(KeySamplingRateGlobal, s.GetSampleRate()*rate)
-}
-
-// GetEventExtractionRate returns the set APM event extraction rate for this span.
-func (s *Span) GetEventExtractionRate() (float64, bool) {
-	return s.GetMetric(KeySamplingRateEventExtraction)
 }
 
 // GetClientSampleRate gets the rate at which the trace this span belongs to was sampled by the tracer.

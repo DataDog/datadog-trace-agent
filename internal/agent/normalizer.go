@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	log "github.com/cihub/seelog"
 )
 
@@ -30,7 +31,7 @@ var (
 )
 
 // Normalize makes sure a Span is properly initialized and encloses the minimum required info
-func (s *Span) Normalize() error {
+func Normalize(s *pb.Span) error {
 	// Service
 	if s.Service == "" {
 		return errors.New("empty `Service`")
@@ -133,34 +134,34 @@ func (s *Span) Normalize() error {
 // * return the normalized trace and an error:
 //   - nil if the trace can be accepted
 //   - an error string if the trace needs to be dropped
-func NormalizeTrace(t Trace) (Trace, error) {
+func NormalizeTrace(t pb.Trace) error {
 	if len(t) == 0 {
-		return t, errors.New("empty trace")
+		return errors.New("empty trace")
 	}
 
 	spanIDs := make(map[uint64]struct{})
-
 	traceID := t[0].TraceID
+
 	for _, span := range t {
 		if span.TraceID == 0 {
-			return t, errors.New("empty `TraceID`")
+			return errors.New("empty `TraceID`")
 		}
 		if span.SpanID == 0 {
-			return t, errors.New("empty `SpanID`")
+			return errors.New("empty `SpanID`")
 		}
 		if _, ok := spanIDs[span.SpanID]; ok {
-			return t, fmt.Errorf("duplicate `SpanID` %v (span %v)", span.SpanID, span)
+			return fmt.Errorf("duplicate `SpanID` %v (span %v)", span.SpanID, span)
 		}
 		if span.TraceID != traceID {
-			return t, fmt.Errorf("foreign span in trace (Name:TraceID) %s:%x != %s:%x", t[0].Name, t[0].TraceID, span.Name, span.TraceID)
+			return fmt.Errorf("foreign span in trace (Name:TraceID) %s:%x != %s:%x", t[0].Name, t[0].TraceID, span.Name, span.TraceID)
 		}
-		if err := span.Normalize(); err != nil {
-			return t, fmt.Errorf("invalid span (SpanID:%d): %v", span.SpanID, err)
+		if err := Normalize(span); err != nil {
+			return fmt.Errorf("invalid span (SpanID:%d): %v", span.SpanID, err)
 		}
 		spanIDs[span.SpanID] = struct{}{}
 	}
 
-	return t, nil
+	return nil
 }
 
 func isValidStatusCode(sc string) bool {

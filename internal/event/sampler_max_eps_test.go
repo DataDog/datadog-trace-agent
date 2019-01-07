@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/DataDog/datadog-trace-agent/internal/test/testutil"
 	"github.com/stretchr/testify/assert"
 )
@@ -48,7 +49,7 @@ func TestMaxEPSSampler(t *testing.T) {
 			nonUserKeep := 0
 
 			for _, event := range testCase.events {
-				if event.Priority != agent.PriorityUserKeep {
+				if event.Priority != pb.PriorityUserKeep {
 					nonUserKeep++
 				}
 			}

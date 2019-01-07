@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
+	"github.com/DataDog/datadog-trace-agent/internal/traceutil"
 )
 
 // YearNS is the number of nanoseconds in a year
@@ -246,8 +248,8 @@ func RandomSpanType() string {
 }
 
 // RandomSpan generates a wide-variety of spans, useful to test robustness & performance
-func RandomSpan() *agent.Span {
-	return &agent.Span{
+func RandomSpan() *pb.Span {
+	return &pb.Span{
 		Duration: RandomSpanDuration(),
 		Error:    RandomSpanError(),
 		Resource: RandomSpanResource(),
@@ -274,8 +276,8 @@ func RandomWeightedSpan() *agent.WeightedSpan {
 }
 
 // GetTestSpan returns a Span with different fields set
-func GetTestSpan() *agent.Span {
-	span := &agent.Span{
+func GetTestSpan() *pb.Span {
+	span := &pb.Span{
 		TraceID:  42,
 		SpanID:   52,
 		ParentID: 42,
@@ -288,14 +290,14 @@ func GetTestSpan() *agent.Span {
 		Meta:     map[string]string{"http.host": "192.168.0.1"},
 		Metrics:  map[string]float64{"http.monitor": 41.99},
 	}
-	trace := agent.Trace{span}
-	trace.ComputeTopLevel()
+	trace := pb.Trace{span}
+	traceutil.ComputeTopLevel(trace)
 	return trace[0]
 }
 
 // TestSpan returns a fix span with hardcoded info, useful for reproducible tests
-func TestSpan() *agent.Span {
-	return &agent.Span{
+func TestSpan() *pb.Span {
+	return &pb.Span{
 		Duration: 10000000,
 		Error:    0,
 		Resource: "GET /some/raclette",

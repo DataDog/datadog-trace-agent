@@ -8,6 +8,7 @@ import (
 
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
 	"github.com/DataDog/datadog-trace-agent/internal/test/testutil"
+	"github.com/DataDog/datadog-trace-agent/internal/traceutil"
 )
 
 const (
@@ -22,8 +23,8 @@ func BenchmarkHandleSpanRandom(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		trace := testutil.RandomTrace(10, 8)
-		root := trace.GetRoot()
-		trace.ComputeTopLevel()
+		root := traceutil.GetRoot(trace)
+		traceutil.ComputeTopLevel(trace)
 		wt := agent.NewWeightedTrace(trace, root)
 		for _, span := range wt {
 			sb.HandleSpan(span, defaultEnv, aggr, nil)

@@ -36,7 +36,7 @@ binaries:
 ci:
 	# task used by CI
 	go get -u golang.org/x/lint/golint
-	golint -set_exit_status=1 ./cmd/trace-agent ./internal/filters ./internal/api ./internal/test ./internal/info ./internal/quantile ./internal/obfuscate ./internal/sampler ./internal/statsd ./internal/watchdog ./internal/writer ./internal/flags ./internal/osutil
+	golint -set_exit_status=1 ./cmd/trace-agent ./internal/filters ./internal/api ./internal/test ./internal/info ./internal/quantile ./internal/obfuscate ./internal/sampler ./internal/metrics ./internal/watchdog ./internal/writer ./internal/flags ./internal/osutil
 	go install ./cmd/trace-agent
 	go test -v -race ./...
 
