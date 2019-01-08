@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
-	"github.com/DataDog/datadog-trace-agent/internal/pb"
+	"github.com/DataDog/datadog-trace-agent/internal/sampler"
 	"github.com/DataDog/datadog-trace-agent/internal/test/testutil"
 	"github.com/stretchr/testify/assert"
 )
@@ -28,20 +28,20 @@ func TestMaxEPSSampler(t *testing.T) {
 			counter := &MockRateCounter{
 				GetRateResult: testCase.pastEPS,
 			}
-			sampler := newMaxEPSSampler(testCase.maxEPS)
-			sampler.rateCounter = counter
-			sampler.Start()
+			testSampler := newMaxEPSSampler(testCase.maxEPS)
+			testSampler.rateCounter = counter
+			testSampler.Start()
 
 			sampled := 0
 			for _, event := range testCase.events {
-				sample, rate := sampler.Sample(event)
+				sample, rate := testSampler.Sample(event)
 				if sample {
 					sampled++
 				}
 				assert.EqualValues(testCase.expectedSampleRate, rate)
 			}
 
-			sampler.Stop()
+			testSampler.Stop()
 
 			assert.InDelta(testCase.expectedSampleRate, float64(sampled)/float64(len(testCase.events)), testCase.expectedSampleRate*testCase.deltaPct)
 
@@ -49,7 +49,7 @@ func TestMaxEPSSampler(t *testing.T) {
 			nonUserKeep := 0
 
 			for _, event := range testCase.events {
-				if event.Priority != pb.PriorityUserKeep {
+				if event.Priority != sampler.PriorityUserKeep {
 					nonUserKeep++
 				}
 			}

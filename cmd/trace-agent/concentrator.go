@@ -114,7 +114,8 @@ func (c *Concentrator) addNow(t agent.ProcessedTrace, now int64) {
 		if !s.TopLevel {
 			continue
 		}
-		btime := s.End() - s.End()%c.bsize
+		end := s.Start + s.Duration
+		btime := end - end%c.bsize
 
 		// // If too far in the past, count in the oldest-allowed time bucket instead.
 		if btime < c.oldestTs {

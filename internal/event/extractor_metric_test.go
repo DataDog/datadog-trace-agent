@@ -6,14 +6,15 @@ import (
 
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
 	"github.com/DataDog/datadog-trace-agent/internal/pb"
+	"github.com/DataDog/datadog-trace-agent/internal/sampler"
 )
 
 func createTestSpansWithEventRate(eventRate float64) []*agent.WeightedSpan {
 	spans := make([]*agent.WeightedSpan, 1000)
 	for i, _ := range spans {
-		spans[i] = &agent.WeightedSpan{Span: &pb.Span{TraceID: rand.Uint64(), Service: "test", Name: "test"}}
+		spans[i] = &agent.WeightedSpan{Span: &pb.Span{TraceID: rand.Uint64(), Service: "test", Name: "test", Metrics: map[string]float64{}}}
 		if eventRate >= 0 {
-			spans[i].SetMetric(agent.KeySamplingRateEventExtraction, eventRate)
+			spans[i].Metrics[sampler.KeySamplingRateEventExtraction] = eventRate
 		}
 	}
 	return spans

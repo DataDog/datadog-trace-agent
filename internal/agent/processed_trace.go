@@ -1,6 +1,9 @@
 package agent
 
-import "github.com/DataDog/datadog-trace-agent/internal/pb"
+import (
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
+	"github.com/DataDog/datadog-trace-agent/internal/sampler"
+)
 
 type ProcessedTrace struct {
 	Trace         pb.Trace
@@ -15,9 +18,9 @@ func (pt *ProcessedTrace) Weight() float64 {
 	if pt.Root == nil {
 		return 1.0
 	}
-	return pt.Root.Weight()
+	return sampler.Weight(pt.Root)
 }
 
-func (pt *ProcessedTrace) GetSamplingPriority() (pb.SamplingPriority, bool) {
-	return pt.Root.GetSamplingPriority()
+func (pt *ProcessedTrace) GetSamplingPriority() (sampler.SamplingPriority, bool) {
+	return sampler.GetSamplingPriority(pt.Root)
 }

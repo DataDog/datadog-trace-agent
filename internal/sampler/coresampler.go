@@ -1,16 +1,3 @@
-// Package sampler contains all the logic of the agent-side trace sampling
-//
-// Currently implementation is based on the scoring of the "signature" of each trace
-// Based on the score, we get a sample rate to apply to the given trace
-//
-// Current score implementation is super-simple, it is a counter with polynomial decay per signature.
-// We increment it for each incoming trace then we periodically divide the score by two every X seconds.
-// Right after the division, the score is an approximation of the number of received signatures over X seconds.
-// It is different from the scoring in the Agent.
-//
-// Since the sampling can happen at different levels (client, agent, server) or depending on different rules,
-// we have to track the sample rate applied at previous steps. This way, sampling twice at 50% can result in an
-// effective 25% sampling. The rate is stored as a metric in the trace root.
 package sampler
 
 import (
