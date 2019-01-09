@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/internal/agent"
 	"github.com/DataDog/datadog-trace-agent/internal/config"
 	"github.com/DataDog/datadog-trace-agent/internal/info"
 	"github.com/DataDog/datadog-trace-agent/internal/metrics"
@@ -280,7 +279,7 @@ func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expecte
 	sampledTraces []*TracePackage, payloads []*payload) {
 
 	var expectedTraces []pb.Trace
-	var expectedEvents []*agent.Event
+	var expectedEvents []*pb.Span
 
 	for _, sampledTrace := range sampledTraces {
 		expectedTraces = append(expectedTraces, sampledTrace.Trace)
@@ -325,7 +324,7 @@ func assertPayloads(assert *assert.Assertions, traceWriter *TraceWriter, expecte
 		for _, seenTransaction := range tracePayload.Transactions {
 			numSpans++
 
-			if !assert.True(proto.Equal(expectedEvents[expectedEventIdx].Span, seenTransaction),
+			if !assert.True(proto.Equal(expectedEvents[expectedEventIdx], seenTransaction),
 				"Unmarshalled transaction should match expectation at index %d", expectedTraceIdx) {
 				return
 			}
@@ -364,10 +363,10 @@ func randomTracePackage(numSpans, numEvents int) *TracePackage {
 
 	trace := testutil.GetTestTrace(1, numSpans, true)[0]
 
-	events := make([]*agent.Event, 0, numEvents)
+	events := make([]*pb.Span, 0, numEvents)
 
 	for _, span := range trace[:numEvents] {
-		events = append(events, &agent.Event{Span: span})
+		events = append(events, span)
 	}
 
 	return &TracePackage{

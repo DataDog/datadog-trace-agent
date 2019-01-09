@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/DataDog/datadog-trace-agent/internal/agent"
 	"github.com/DataDog/datadog-trace-agent/internal/config"
 	"github.com/DataDog/datadog-trace-agent/internal/info"
 	"github.com/DataDog/datadog-trace-agent/internal/metrics"
@@ -29,7 +28,7 @@ type TracePackage struct {
 	// Trace will contain a trace if it was sampled or be empty if it wasn't.
 	Trace pb.Trace
 	// Events contains all APMEvents extracted from a trace. If no events were extracted, it will be empty.
-	Events []*agent.Event
+	Events []*pb.Span
 }
 
 // Empty returns true if this TracePackage has no data.
@@ -188,10 +187,10 @@ func (w *TraceWriter) appendTrace(trace pb.Trace) {
 	w.spansInBuffer += numSpans
 }
 
-func (w *TraceWriter) appendEvents(events []*agent.Event) {
+func (w *TraceWriter) appendEvents(events []*pb.Span) {
 	for _, event := range events {
 		log.Tracef("Handling new APM event: %v", event)
-		w.events = append(w.events, event.Span)
+		w.events = append(w.events, event)
 	}
 
 	w.spansInBuffer += len(events)

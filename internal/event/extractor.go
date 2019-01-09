@@ -8,7 +8,7 @@ import (
 // Extractor extracts APM events from matching spans.
 type Extractor interface {
 	// Extract decides whether to extract an APM event from the provided span with the specified priority and returns
-	// the extracted event along with a suggested extraction sample rate and a true value. If no trace was extracted
-	// the bool value will be false and the other values should not be used.
-	Extract(span *agent.WeightedSpan, priority sampler.SamplingPriority) (event *agent.Event, rate float64, ok bool)
+	// a suggested extraction sample rate and a bool value. If no event was extracted the bool value will be false and
+	// the rate should not be used.
+	Extract(span *agent.WeightedSpan, priority sampler.SamplingPriority) (rate float64, ok bool)
 }

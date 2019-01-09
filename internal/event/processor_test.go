@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/DataDog/datadog-trace-agent/internal/sampler"
 	"github.com/stretchr/testify/assert"
 )
@@ -86,12 +87,12 @@ func TestProcessor(t *testing.T) {
 			assert.EqualValues(expectedSampleCalls, testSampler.SampleCalls)
 
 			for _, event := range events {
-				assert.EqualValues(test.expectedExtractedPct, event.GetExtractionSampleRate())
-				assert.EqualValues(test.expectedSampledPct, event.GetMaxEPSSampleRate())
-				assert.EqualValues(testClientSampleRate, event.GetClientTraceSampleRate())
-				assert.EqualValues(testPreSampleRate, event.GetPreSampleRate())
+				assert.EqualValues(test.expectedExtractedPct, sampler.GetEventExtractionRate(event))
+				assert.EqualValues(test.expectedSampledPct, sampler.GetMaxEPSRate(event))
+				assert.EqualValues(testClientSampleRate, sampler.GetClientRate(event))
+				assert.EqualValues(testPreSampleRate, sampler.GetPreSampleRate(event))
 
-				priority, ok := sampler.GetSamplingPriority(event.Span)
+				priority, ok := sampler.GetSamplingPriority(event)
 				if !ok {
 					priority = sampler.PriorityNone
 				}
@@ -105,15 +106,11 @@ type MockExtractor struct {
 	Rate float64
 }
 
-func (e *MockExtractor) Extract(s *agent.WeightedSpan, priority sampler.SamplingPriority) (*agent.Event, float64, bool) {
+func (e *MockExtractor) Extract(s *agent.WeightedSpan, priority sampler.SamplingPriority) (float64, bool) {
 	if e.Rate < 0 {
-		return nil, 0, false
+		return 0, false
 	}
-
-	return &agent.Event{
-		Span:     s.Span,
-		Priority: priority,
-	}, e.Rate, true
+	return e.Rate, true
 }
 
 type MockEventSampler struct {
@@ -132,7 +129,7 @@ func (s *MockEventSampler) Stop() {
 	s.StopCalls++
 }
 
-func (s *MockEventSampler) Sample(event *agent.Event) (bool, float64) {
+func (s *MockEventSampler) Sample(event *pb.Span) (bool, float64) {
 	s.SampleCalls++
 
 	return rand.Float64() < s.Rate, s.Rate
