@@ -1,6 +1,7 @@
 package writer
 
 import (
+	"encoding/json"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -119,7 +120,9 @@ func (w *ServiceWriter) Stop() {
 }
 
 func (w *ServiceWriter) handleServiceMetadata(metadata pb.ServicesMetadata) {
-	w.serviceBuffer.Merge(metadata)
+	for k, v := range metadata {
+		w.serviceBuffer[k] = v
+	}
 }
 
 func (w *ServiceWriter) flush() {
@@ -132,7 +135,7 @@ func (w *ServiceWriter) flush() {
 	log.Debugf("going to flush updated service metadata, %d services", numServices)
 	atomic.StoreInt64(&w.stats.Services, int64(numServices))
 
-	data, err := pb.EncodeServicesPayload(w.serviceBuffer)
+	data, err := json.Marshal(w.serviceBuffer)
 	if err != nil {
 		log.Errorf("error while encoding service payload: %v", err)
 		w.serviceBuffer = make(pb.ServicesMetadata)

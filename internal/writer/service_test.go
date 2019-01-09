@@ -182,7 +182,7 @@ func mergeMetadataInOrder(metadatas ...pb.ServicesMetadata) pb.ServicesMetadata 
 }
 
 func calculateMetadataPayloadSize(metadata pb.ServicesMetadata) int64 {
-	data, _ := pb.EncodeServicesPayload(metadata)
+	data, _ := json.Marshal(metadata)
 	return int64(len(data))
 }
 

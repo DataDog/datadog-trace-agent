@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-trace-agent/internal/pb"
+	"github.com/DataDog/datadog-trace-agent/internal/sampler"
 	"github.com/DataDog/datadog-trace-agent/internal/test"
 	"github.com/DataDog/datadog-trace-agent/internal/test/testutil"
 )
@@ -31,7 +32,7 @@ func TestHostname(t *testing.T) {
 			defer r.KillAgent()
 
 			payload := pb.Traces{pb.Trace{testutil.RandomSpan()}}
-			payload[0][0].Metrics[pb.SamplingPriorityKey] = 2
+			payload[0][0].Metrics[sampler.KeySamplingPriority] = 2
 			if err := r.Post(payload); err != nil {
 				t.Fatal(err)
 			}
@@ -61,7 +62,7 @@ func TestHostname(t *testing.T) {
 		defer r.KillAgent()
 
 		payload := pb.Traces{pb.Trace{testutil.RandomSpan()}}
-		payload[0][0].Metrics[pb.SamplingPriorityKey] = 2
+		payload[0][0].Metrics[sampler.KeySamplingPriority] = 2
 		if err := r.Post(payload); err != nil {
 			t.Fatal(err)
 		}

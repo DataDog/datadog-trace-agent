@@ -10,6 +10,7 @@ import (
 
 	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/DataDog/datadog-trace-agent/internal/quantile"
+	"github.com/DataDog/datadog-trace-agent/internal/sampler"
 	"github.com/DataDog/datadog-trace-agent/internal/traceutil"
 	"github.com/stretchr/testify/assert"
 )
@@ -47,7 +48,7 @@ func testTrace() pb.Trace {
 	trace := pb.Trace{
 		&pb.Span{TraceID: 42, SpanID: 42, ParentID: 0, Service: "A",
 			Name: "A.foo", Type: "web", Resource: "α", Start: 0, Duration: 100,
-			Metrics: map[string]float64{pb.KeySamplingRateGlobal: 0.5}},
+			Metrics: map[string]float64{sampler.KeySamplingRateGlobal: 0.5}},
 		&pb.Span{TraceID: 42, SpanID: 100, ParentID: 42, Service: "B",
 			Name: "B.bar", Type: "web", Resource: "α", Start: 1, Duration: 20},
 		&pb.Span{TraceID: 42, SpanID: 2000, ParentID: 100, Service: "C",
@@ -73,7 +74,7 @@ func testTraceTopLevel() pb.Trace {
 	trace := pb.Trace{
 		&pb.Span{TraceID: 42, SpanID: 42, ParentID: 0, Service: "A",
 			Name: "A.foo", Type: "web", Resource: "α", Start: 0, Duration: 100,
-			Metrics: map[string]float64{pb.KeySamplingRateGlobal: 1}},
+			Metrics: map[string]float64{sampler.KeySamplingRateGlobal: 1}},
 		&pb.Span{TraceID: 42, SpanID: 100, ParentID: 42, Service: "B",
 			Name: "B.bar", Type: "web", Resource: "α", Start: 1, Duration: 20},
 		&pb.Span{TraceID: 42, SpanID: 2000, ParentID: 100, Service: "B",

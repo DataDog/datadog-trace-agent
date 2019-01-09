@@ -88,7 +88,10 @@ func (s *ServiceMapper) update(metadata pb.ServicesMetadata) {
 	}
 
 	s.out <- changes
-	s.cache.Merge(changes)
+
+	for k, v := range changes {
+		s.cache[k] = v
+	}
 }
 
 func (s *ServiceMapper) shouldAdd(service string, metadata pb.ServicesMetadata) bool {

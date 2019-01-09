@@ -90,7 +90,7 @@ func (s *PriorityEngine) Sample(trace pb.Trace, root *pb.Span, env string) (samp
 		return false, 0
 	}
 
-	samplingPriority, _ := root.GetSamplingPriority()
+	samplingPriority, _ := GetSamplingPriority(root)
 
 	// Regardless of rates, sampling here is based on the metadata set
 	// by the client library. Which, is turn, is based on agent hints,

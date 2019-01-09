@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
-	"github.com/DataDog/datadog-trace-agent/internal/pb"
+	"github.com/DataDog/datadog-trace-agent/internal/sampler"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,30 +14,30 @@ func TestProcessor(t *testing.T) {
 		name                 string
 		extractorRates       []float64
 		samplerRate          float64
-		priority             pb.SamplingPriority
+		priority             sampler.SamplingPriority
 		expectedExtractedPct float64
 		expectedSampledPct   float64
 		deltaPct             float64
 	}{
 		// Name: <extraction rates>/<maxEPSSampler rate>/<priority>
-		{"none/1/none", nil, 1, pb.PriorityNone, 0, 0, 0},
+		{"none/1/none", nil, 1, sampler.PriorityNone, 0, 0, 0},
 
 		// Test Extractors
-		{"0/1/none", []float64{0}, 1, pb.PriorityNone, 0, 0, 0},
-		{"0.5/1/none", []float64{0.5}, 1, pb.PriorityNone, 0.5, 1, 0.1},
-		{"-1,0.8/1/none", []float64{-1, 0.8}, 1, pb.PriorityNone, 0.8, 1, 0.1},
-		{"-1,-1,-0.8/1/none", []float64{-1, -1, 0.8}, 1, pb.PriorityNone, 0.8, 1, 0.1},
+		{"0/1/none", []float64{0}, 1, sampler.PriorityNone, 0, 0, 0},
+		{"0.5/1/none", []float64{0.5}, 1, sampler.PriorityNone, 0.5, 1, 0.1},
+		{"-1,0.8/1/none", []float64{-1, 0.8}, 1, sampler.PriorityNone, 0.8, 1, 0.1},
+		{"-1,-1,-0.8/1/none", []float64{-1, -1, 0.8}, 1, sampler.PriorityNone, 0.8, 1, 0.1},
 
 		// Test MaxEPS sampler
-		{"1/0/none", []float64{1}, 0, pb.PriorityNone, 1, 0, 0},
-		{"1/0.5/none", []float64{1}, 0.5, pb.PriorityNone, 1, 0.5, 0.1},
-		{"1/1/none", []float64{1}, 1, pb.PriorityNone, 1, 1, 0},
+		{"1/0/none", []float64{1}, 0, sampler.PriorityNone, 1, 0, 0},
+		{"1/0.5/none", []float64{1}, 0.5, sampler.PriorityNone, 1, 0.5, 0.1},
+		{"1/1/none", []float64{1}, 1, sampler.PriorityNone, 1, 1, 0},
 
 		// Test Extractor and Sampler combinations
-		{"-1,0.8/0.8/none", []float64{-1, 0.8}, 0.8, pb.PriorityNone, 0.8, 0.8, 0.1},
-		{"-1,0.8/0.8/autokeep", []float64{-1, 0.8}, 0.8, pb.PriorityAutoKeep, 0.8, 0.8, 0.1},
+		{"-1,0.8/0.8/none", []float64{-1, 0.8}, 0.8, sampler.PriorityNone, 0.8, 0.8, 0.1},
+		{"-1,0.8/0.8/autokeep", []float64{-1, 0.8}, 0.8, sampler.PriorityAutoKeep, 0.8, 0.8, 0.1},
 		// Test userkeep bypass of max eps
-		{"-1,0.8/0.8/userkeep", []float64{-1, 0.8}, 0.8, pb.PriorityUserKeep, 0.8, 1, 0.1},
+		{"-1,0.8/0.8/userkeep", []float64{-1, 0.8}, 0.8, sampler.PriorityUserKeep, 0.8, 1, 0.1},
 	}
 
 	testClientSampleRate := 0.3
@@ -52,16 +52,16 @@ func TestProcessor(t *testing.T) {
 				extractors[i] = &MockExtractor{Rate: rate}
 			}
 
-			sampler := &MockEventSampler{Rate: test.samplerRate}
-			p := newProcessor(extractors, sampler)
+			testSampler := &MockEventSampler{Rate: test.samplerRate}
+			p := newProcessor(extractors, testSampler)
 
 			testSpans := createTestSpans("test", "test")
 			testTrace := agent.ProcessedTrace{WeightedTrace: testSpans}
 			testTrace.Root = testSpans[0].Span
-			testTrace.Root.SetPreSampleRate(testPreSampleRate)
-			testTrace.Root.SetClientTraceSampleRate(testClientSampleRate)
-			if test.priority != pb.PriorityNone {
-				testTrace.Root.SetSamplingPriority(test.priority)
+			sampler.SetPreSampleRate(testTrace.Root, testPreSampleRate)
+			sampler.SetClientRate(testTrace.Root, testClientSampleRate)
+			if test.priority != sampler.PriorityNone {
+				sampler.SetSamplingPriority(testTrace.Root, test.priority)
 			}
 
 			p.Start()
@@ -76,14 +76,14 @@ func TestProcessor(t *testing.T) {
 			expectedReturned := expectedExtracted * test.expectedSampledPct
 			assert.InDelta(expectedReturned, returned, expectedReturned*test.deltaPct)
 
-			assert.EqualValues(1, sampler.StartCalls)
-			assert.EqualValues(1, sampler.StopCalls)
+			assert.EqualValues(1, testSampler.StartCalls)
+			assert.EqualValues(1, testSampler.StopCalls)
 
 			expectedSampleCalls := extracted
-			if test.priority == pb.PriorityUserKeep {
+			if test.priority == sampler.PriorityUserKeep {
 				expectedSampleCalls = 0
 			}
-			assert.EqualValues(expectedSampleCalls, sampler.SampleCalls)
+			assert.EqualValues(expectedSampleCalls, testSampler.SampleCalls)
 
 			for _, event := range events {
 				assert.EqualValues(test.expectedExtractedPct, event.GetExtractionSampleRate())
@@ -91,9 +91,9 @@ func TestProcessor(t *testing.T) {
 				assert.EqualValues(testClientSampleRate, event.GetClientTraceSampleRate())
 				assert.EqualValues(testPreSampleRate, event.GetPreSampleRate())
 
-				priority, ok := event.Span.GetSamplingPriority()
+				priority, ok := sampler.GetSamplingPriority(event.Span)
 				if !ok {
-					priority = pb.PriorityNone
+					priority = sampler.PriorityNone
 				}
 				assert.EqualValues(test.priority, priority)
 			}
@@ -105,7 +105,7 @@ type MockExtractor struct {
 	Rate float64
 }
 
-func (e *MockExtractor) Extract(s *agent.WeightedSpan, priority pb.SamplingPriority) (*agent.Event, float64, bool) {
+func (e *MockExtractor) Extract(s *agent.WeightedSpan, priority sampler.SamplingPriority) (*agent.Event, float64, bool) {
 	if e.Rate < 0 {
 		return nil, 0, false
 	}

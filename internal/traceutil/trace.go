@@ -61,21 +61,22 @@ func GetRoot(t pb.Trace) *pb.Span {
 
 // APITrace returns an APITrace from the trace, as required by the Datadog API.
 func APITrace(t pb.Trace) *pb.APITrace {
-	start := t[0].Start
-	end := t[0].End()
-	for i := range t {
-		if t[i].Start < start {
-			start = t[i].Start
+	var earliest, latest int64
+	for _, s := range t {
+		start := s.Start
+		if start < earliest {
+			earliest = start
 		}
-		if t[i].End() < end {
-			end = t[i].End()
+		end := s.Start + s.Duration
+		if end > latest {
+			latest = end
 		}
 	}
 	return &pb.APITrace{
 		TraceID:   t[0].TraceID,
 		Spans:     t,
-		StartTime: start,
-		EndTime:   end,
+		StartTime: earliest,
+		EndTime:   latest,
 	}
 }
 

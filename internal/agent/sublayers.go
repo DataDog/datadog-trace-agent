@@ -150,8 +150,9 @@ func buildTraceTimestamps(trace pb.Trace) []int64 {
 	tsSet := make(map[int64]struct{}, 2*len(trace))
 
 	for _, span := range trace {
-		tsSet[span.Start] = struct{}{}
-		tsSet[span.End()] = struct{}{}
+		start, end := span.Start, span.Start+span.Duration
+		tsSet[start] = struct{}{}
+		tsSet[end] = struct{}{}
 	}
 
 	timestamps := make(int64Slice, 0, len(tsSet))
@@ -187,14 +188,16 @@ func buildTraceActiveSpansMapping(trace pb.Trace, timestamps []int64) map[int64]
 
 	spanChildren := traceutil.ChildrenMap(trace)
 	for sIdx, span := range trace {
-		for tsIdx := tsToIdx[span.Start]; tsIdx < tsToIdx[span.End()]; tsIdx++ {
+		start, end := span.Start, span.Start+span.Duration
+		for tsIdx := tsToIdx[start]; tsIdx < tsToIdx[end]; tsIdx++ {
 			ts := timestamps[tsIdx]
 
 			// Do we have one of our child also in the
 			// current time interval?
 			hasChild := false
 			for _, child := range spanChildren[span.SpanID] {
-				if child.Start <= ts && child.End() > ts {
+				start, end := child.Start, child.Start+child.Duration
+				if start <= ts && end > ts {
 					hasChild = true
 					break
 				}

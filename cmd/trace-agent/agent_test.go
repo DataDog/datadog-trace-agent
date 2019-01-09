@@ -196,22 +196,22 @@ func TestProcess(t *testing.T) {
 		defer cancel()
 
 		now := time.Now()
-		for _, key := range []pb.SamplingPriority{
-			pb.PriorityNone,
-			pb.PriorityUserDrop,
-			pb.PriorityUserDrop,
-			pb.PriorityAutoDrop,
-			pb.PriorityAutoDrop,
-			pb.PriorityAutoDrop,
-			pb.PriorityAutoKeep,
-			pb.PriorityAutoKeep,
-			pb.PriorityAutoKeep,
-			pb.PriorityAutoKeep,
-			pb.PriorityUserKeep,
-			pb.PriorityUserKeep,
-			pb.PriorityUserKeep,
-			pb.PriorityUserKeep,
-			pb.PriorityUserKeep,
+		for _, key := range []sampler.SamplingPriority{
+			sampler.PriorityNone,
+			sampler.PriorityUserDrop,
+			sampler.PriorityUserDrop,
+			sampler.PriorityAutoDrop,
+			sampler.PriorityAutoDrop,
+			sampler.PriorityAutoDrop,
+			sampler.PriorityAutoKeep,
+			sampler.PriorityAutoKeep,
+			sampler.PriorityAutoKeep,
+			sampler.PriorityAutoKeep,
+			sampler.PriorityUserKeep,
+			sampler.PriorityUserKeep,
+			sampler.PriorityUserKeep,
+			sampler.PriorityUserKeep,
+			sampler.PriorityUserKeep,
 		} {
 			span := &pb.Span{
 				Resource: "SELECT name FROM people WHERE age = 42 AND extra = 55",
@@ -220,8 +220,8 @@ func TestProcess(t *testing.T) {
 				Duration: (500 * time.Millisecond).Nanoseconds(),
 				Metrics:  map[string]float64{},
 			}
-			if key != pb.PriorityNone {
-				span.SetSamplingPriority(key)
+			if key != sampler.PriorityNone {
+				sampler.SetSamplingPriority(span, key)
 			}
 			agnt.Process(pb.Trace{span})
 		}
@@ -358,7 +358,7 @@ func TestSampling(t *testing.T) {
 			}
 			pt := agent.ProcessedTrace{Trace: pb.Trace{root}, Root: root}
 			if tt.hasPriority {
-				pt.Root.SetSamplingPriority(1)
+				sampler.SetSamplingPriority(pt.Root, 1)
 			}
 
 			sampled, rate := a.sample(pt)
@@ -393,21 +393,21 @@ func TestEventProcessorFromConf(t *testing.T) {
 
 	for _, testCase := range []eventProcessorTestCase{
 		// Name: <extractor>/<maxeps situation>/priority
-		{name: "none/below/none", intakeSPS: 100, serviceName: "serviceE", opName: "opA", extractionRate: -1, priority: pb.PriorityNone, expectedEPS: 0, deltaPct: 0, duration: 10 * time.Second},
-		{name: "metric/below/none", intakeSPS: 100, serviceName: "serviceD", opName: "opA", extractionRate: 0.5, priority: pb.PriorityNone, expectedEPS: 50, deltaPct: 0.1, duration: 10 * time.Second},
-		{name: "metric/above/none", intakeSPS: 200, serviceName: "serviceD", opName: "opA", extractionRate: 1, priority: pb.PriorityNone, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
-		{name: "fixed/below/none", intakeSPS: 100, serviceName: "serviceB", opName: "opB", extractionRate: -1, priority: pb.PriorityNone, expectedEPS: 50, deltaPct: 0.1, duration: 10 * time.Second},
-		{name: "fixed/above/none", intakeSPS: 200, serviceName: "serviceA", opName: "opC", extractionRate: -1, priority: pb.PriorityNone, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
-		{name: "fixed/above/autokeep", intakeSPS: 200, serviceName: "serviceA", opName: "opC", extractionRate: -1, priority: pb.PriorityAutoKeep, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
-		{name: "metric/above/autokeep", intakeSPS: 200, serviceName: "serviceD", opName: "opA", extractionRate: 1, priority: pb.PriorityAutoKeep, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
+		{name: "none/below/none", intakeSPS: 100, serviceName: "serviceE", opName: "opA", extractionRate: -1, priority: sampler.PriorityNone, expectedEPS: 0, deltaPct: 0, duration: 10 * time.Second},
+		{name: "metric/below/none", intakeSPS: 100, serviceName: "serviceD", opName: "opA", extractionRate: 0.5, priority: sampler.PriorityNone, expectedEPS: 50, deltaPct: 0.1, duration: 10 * time.Second},
+		{name: "metric/above/none", intakeSPS: 200, serviceName: "serviceD", opName: "opA", extractionRate: 1, priority: sampler.PriorityNone, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
+		{name: "fixed/below/none", intakeSPS: 100, serviceName: "serviceB", opName: "opB", extractionRate: -1, priority: sampler.PriorityNone, expectedEPS: 50, deltaPct: 0.1, duration: 10 * time.Second},
+		{name: "fixed/above/none", intakeSPS: 200, serviceName: "serviceA", opName: "opC", extractionRate: -1, priority: sampler.PriorityNone, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
+		{name: "fixed/above/autokeep", intakeSPS: 200, serviceName: "serviceA", opName: "opC", extractionRate: -1, priority: sampler.PriorityAutoKeep, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
+		{name: "metric/above/autokeep", intakeSPS: 200, serviceName: "serviceD", opName: "opA", extractionRate: 1, priority: sampler.PriorityAutoKeep, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
 		// UserKeep traces allows overflow of EPS
-		{name: "metric/above/userkeep", intakeSPS: 200, serviceName: "serviceD", opName: "opA", extractionRate: 1, priority: pb.PriorityUserKeep, expectedEPS: 200, deltaPct: 0.1, duration: 10 * time.Second},
-		{name: "agent/above/userkeep", intakeSPS: 200, serviceName: "serviceA", opName: "opC", extractionRate: -1, priority: pb.PriorityUserKeep, expectedEPS: 200, deltaPct: 0.1, duration: 10 * time.Second},
+		{name: "metric/above/userkeep", intakeSPS: 200, serviceName: "serviceD", opName: "opA", extractionRate: 1, priority: sampler.PriorityUserKeep, expectedEPS: 200, deltaPct: 0.1, duration: 10 * time.Second},
+		{name: "agent/above/userkeep", intakeSPS: 200, serviceName: "serviceA", opName: "opC", extractionRate: -1, priority: sampler.PriorityUserKeep, expectedEPS: 200, deltaPct: 0.1, duration: 10 * time.Second},
 
 		// Overrides (Name: <extractor1>/override/<extractor2>)
-		{name: "metric/override/fixed", intakeSPS: 100, serviceName: "serviceA", opName: "opA", extractionRate: 1, priority: pb.PriorityNone, expectedEPS: 100, deltaPct: 0.1, duration: 10 * time.Second},
+		{name: "metric/override/fixed", intakeSPS: 100, serviceName: "serviceA", opName: "opA", extractionRate: 1, priority: sampler.PriorityNone, expectedEPS: 100, deltaPct: 0.1, duration: 10 * time.Second},
 		// Legacy should never be considered if fixed rate is being used.
-		{name: "fixed/override/legacy", intakeSPS: 100, serviceName: "serviceA", opName: "opD", extractionRate: -1, priority: pb.PriorityNone, expectedEPS: 0, deltaPct: 0, duration: 10 * time.Second},
+		{name: "fixed/override/legacy", intakeSPS: 100, serviceName: "serviceA", opName: "opD", extractionRate: -1, priority: sampler.PriorityNone, expectedEPS: 0, deltaPct: 0, duration: 10 * time.Second},
 	} {
 		testEventProcessorFromConf(t, &config.AgentConfig{
 			MaxEPS:                      testMaxEPS,
@@ -432,15 +432,15 @@ func TestEventProcessorFromConfLegacy(t *testing.T) {
 
 	for _, testCase := range []eventProcessorTestCase{
 		// Name: <extractor>/<maxeps situation>/priority
-		{name: "none/below/none", intakeSPS: 100, serviceName: "serviceE", opName: "opA", extractionRate: -1, priority: pb.PriorityNone, expectedEPS: 0, deltaPct: 0, duration: 10 * time.Second},
-		{name: "legacy/below/none", intakeSPS: 100, serviceName: "serviceC", opName: "opB", extractionRate: -1, priority: pb.PriorityNone, expectedEPS: 50, deltaPct: 0.1, duration: 10 * time.Second},
-		{name: "legacy/above/none", intakeSPS: 200, serviceName: "serviceD", opName: "opC", extractionRate: -1, priority: pb.PriorityNone, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
-		{name: "legacy/above/autokeep", intakeSPS: 200, serviceName: "serviceD", opName: "opC", extractionRate: -1, priority: pb.PriorityAutoKeep, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
+		{name: "none/below/none", intakeSPS: 100, serviceName: "serviceE", opName: "opA", extractionRate: -1, priority: sampler.PriorityNone, expectedEPS: 0, deltaPct: 0, duration: 10 * time.Second},
+		{name: "legacy/below/none", intakeSPS: 100, serviceName: "serviceC", opName: "opB", extractionRate: -1, priority: sampler.PriorityNone, expectedEPS: 50, deltaPct: 0.1, duration: 10 * time.Second},
+		{name: "legacy/above/none", intakeSPS: 200, serviceName: "serviceD", opName: "opC", extractionRate: -1, priority: sampler.PriorityNone, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
+		{name: "legacy/above/autokeep", intakeSPS: 200, serviceName: "serviceD", opName: "opC", extractionRate: -1, priority: sampler.PriorityAutoKeep, expectedEPS: 100, deltaPct: 0.5, duration: 60 * time.Second},
 		// UserKeep traces allows overflow of EPS
-		{name: "legacy/above/userkeep", intakeSPS: 200, serviceName: "serviceD", opName: "opC", extractionRate: -1, priority: pb.PriorityUserKeep, expectedEPS: 200, deltaPct: 0.1, duration: 10 * time.Second},
+		{name: "legacy/above/userkeep", intakeSPS: 200, serviceName: "serviceD", opName: "opC", extractionRate: -1, priority: sampler.PriorityUserKeep, expectedEPS: 200, deltaPct: 0.1, duration: 10 * time.Second},
 
 		// Overrides (Name: <extractor1>/override/<extractor2>)
-		{name: "metrics/overrides/legacy", intakeSPS: 100, serviceName: "serviceC", opName: "opC", extractionRate: 1, priority: pb.PriorityNone, expectedEPS: 100, deltaPct: 0.1, duration: 10 * time.Second},
+		{name: "metrics/overrides/legacy", intakeSPS: 100, serviceName: "serviceC", opName: "opC", extractionRate: 1, priority: sampler.PriorityNone, expectedEPS: 100, deltaPct: 0.1, duration: 10 * time.Second},
 	} {
 		testEventProcessorFromConf(t, &config.AgentConfig{
 			MaxEPS: testMaxEPS,
@@ -455,7 +455,7 @@ type eventProcessorTestCase struct {
 	serviceName    string
 	opName         string
 	extractionRate float64
-	priority       pb.SamplingPriority
+	priority       sampler.SamplingPriority
 	expectedEPS    float64
 	deltaPct       float64
 	duration       time.Duration
@@ -479,7 +479,7 @@ func testEventProcessorFromConf(t *testing.T, conf *config.AgentConfig, testCase
 // second). These spans will all have the provided service and operation names and be set as extractable/sampled
 // based on the associated rate/%. This traffic generation will run for the specified `duration`.
 func generateTraffic(processor *event.Processor, serviceName string, operationName string, extractionRate float64,
-	duration time.Duration, intakeSPS float64, priority pb.SamplingPriority) float64 {
+	duration time.Duration, intakeSPS float64, priority sampler.SamplingPriority) float64 {
 	tickerInterval := 100 * time.Millisecond
 	totalSampled := 0
 	timer := time.NewTimer(duration)
@@ -496,7 +496,7 @@ Loop:
 			span.Service = serviceName
 			span.Name = operationName
 			if extractionRate >= 0 {
-				span.SetMetric(agent.KeySamplingRateEventExtraction, extractionRate)
+				span.Metrics[sampler.KeySamplingRateEventExtraction] = extractionRate
 			}
 			spans[i] = &agent.WeightedSpan{
 				Span: span,
@@ -508,8 +508,8 @@ Loop:
 			WeightedTrace: agent.WeightedTrace(spans),
 			Root:          spans[0].Span,
 		}
-		if priority != pb.PriorityNone {
-			trace.Root.SetSamplingPriority(priority)
+		if priority != sampler.PriorityNone {
+			sampler.SetSamplingPriority(trace.Root, priority)
 		}
 
 		events, _ := processor.Process(trace)

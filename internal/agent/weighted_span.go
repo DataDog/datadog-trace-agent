@@ -2,6 +2,7 @@ package agent
 
 import (
 	"github.com/DataDog/datadog-trace-agent/internal/pb"
+	"github.com/DataDog/datadog-trace-agent/internal/sampler"
 	"github.com/DataDog/datadog-trace-agent/internal/traceutil"
 )
 
@@ -20,7 +21,7 @@ type WeightedTrace []*WeightedSpan
 func NewWeightedTrace(trace pb.Trace, root *pb.Span) WeightedTrace {
 	wt := make(WeightedTrace, len(trace))
 
-	weight := root.Weight()
+	weight := sampler.Weight(root)
 
 	for i := range trace {
 		wt[i] = &WeightedSpan{

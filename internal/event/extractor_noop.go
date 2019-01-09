@@ -2,7 +2,7 @@ package event
 
 import (
 	"github.com/DataDog/datadog-trace-agent/internal/agent"
-	"github.com/DataDog/datadog-trace-agent/internal/pb"
+	"github.com/DataDog/datadog-trace-agent/internal/sampler"
 )
 
 // noopExtractor is a no-op APM event extractor used when APM event extraction is disabled.
@@ -13,6 +13,6 @@ func NewNoopExtractor() Extractor {
 	return &noopExtractor{}
 }
 
-func (e *noopExtractor) Extract(_ *agent.WeightedSpan, _ pb.SamplingPriority) (*agent.Event, float64, bool) {
+func (e *noopExtractor) Extract(_ *agent.WeightedSpan, _ sampler.SamplingPriority) (*agent.Event, float64, bool) {
 	return nil, 0, false
 }

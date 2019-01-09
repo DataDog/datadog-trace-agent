@@ -33,5 +33,12 @@ func setTopLevel(s *pb.Span, topLevel bool) {
 	}
 	// Setting the metrics value, so that code downstream in the pipeline
 	// can identify this as top-level without recomputing everything.
-	s.SetMetric(topLevelKey, 1)
+	setMetric(s, topLevelKey, 1)
+}
+
+func setMetric(s *pb.Span, key string, val float64) {
+	if s.Metrics == nil {
+		s.Metrics = make(map[string]float64)
+	}
+	s.Metrics[key] = val
 }

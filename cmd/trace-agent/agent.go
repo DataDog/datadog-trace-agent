@@ -173,7 +173,7 @@ func (a *Agent) Process(t pb.Trace) {
 	ts := a.Receiver.Stats.GetTagStats(info.Tags{})
 
 	// Extract priority early, as later goroutines might manipulate the Metrics map in parallel which isn't safe.
-	priority, hasPriority := root.GetSamplingPriority()
+	priority, hasPriority := sampler.GetSamplingPriority(root)
 
 	// Depending on the sampling priority, count that trace differently.
 	stat := &ts.TracesPriorityNone
@@ -205,13 +205,13 @@ func (a *Agent) Process(t pb.Trace) {
 	a.Replacer.Replace(&t)
 
 	// Extract the client sampling rate.
-	clientSampleRate := root.GetSampleRate()
-	root.SetClientTraceSampleRate(clientSampleRate)
+	clientSampleRate := sampler.GetGlobalRate(root)
+	sampler.SetClientRate(root, clientSampleRate)
 	// Combine it with the pre-sampling rate.
 	preSamplerRate := a.Receiver.PreSampler.Rate()
-	root.SetPreSampleRate(preSamplerRate)
+	sampler.SetPreSampleRate(root, preSamplerRate)
 	// Update root's global sample rate to include the presampler rate as well
-	root.UpdateSampleRate(preSamplerRate)
+	sampler.AddGlobalRate(root, preSamplerRate)
 
 	// Figure out the top-level spans and sublayers now as it involves modifying the Metrics map
 	// which is not thread-safe while samplers and Concentrator might modify it too.
@@ -262,7 +262,7 @@ func (a *Agent) Process(t pb.Trace) {
 
 		if sampled {
 			pt.Sampled = sampled
-			pt.Root.UpdateSampleRate(rate)
+			sampler.AddGlobalRate(pt.Root, rate)
 			tracePkg.Trace = pt.Trace
 		}
 

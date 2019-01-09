@@ -35,7 +35,7 @@ func getTestTraceWithService(t *testing.T, service string, s *PriorityEngine) (p
 		&pb.Span{TraceID: tID, SpanID: 2, ParentID: 1, Start: 100, Duration: 200000, Service: service, Type: "sql"},
 	}
 	r := rand.Float64()
-	priority := pb.PriorityAutoDrop
+	priority := PriorityAutoDrop
 	rates := s.ratesByService()
 	key := ServiceSignature{trace[0].Service, defaultEnv}
 	var rate float64
@@ -45,9 +45,9 @@ func getTestTraceWithService(t *testing.T, service string, s *PriorityEngine) (p
 		rate = 1
 	}
 	if r <= rate {
-		priority = pb.PriorityAutoKeep
+		priority = PriorityAutoKeep
 	}
-	trace[0].SetSamplingPriority(priority)
+	SetSamplingPriority(trace[0], priority)
 	return trace, trace[0]
 }
 
@@ -66,7 +66,7 @@ func TestPrioritySample(t *testing.T) {
 	s = getTestPriorityEngine()
 	trace, root = getTestTraceWithService(t, "my-service", s)
 
-	root.SetSamplingPriority(-1)
+	SetSamplingPriority(root, -1)
 	sampled, rate := s.Sample(trace, root, env)
 	assert.False(sampled, "trace with negative priority is dropped")
 	assert.Equal(0.0, rate, "dropping all traces")
@@ -76,7 +76,7 @@ func TestPrioritySample(t *testing.T) {
 	s = getTestPriorityEngine()
 	trace, root = getTestTraceWithService(t, "my-service", s)
 
-	root.SetSamplingPriority(0)
+	SetSamplingPriority(root, 0)
 	sampled, _ = s.Sample(trace, root, env)
 	assert.False(sampled, "trace with priority 0 is dropped")
 	assert.True(0.0 < s.Sampler.Backend.GetTotalScore(), "sampling a priority 0 trace should increase total score")
@@ -85,7 +85,7 @@ func TestPrioritySample(t *testing.T) {
 	s = getTestPriorityEngine()
 	trace, root = getTestTraceWithService(t, "my-service", s)
 
-	root.SetSamplingPriority(1)
+	SetSamplingPriority(root, 1)
 	sampled, _ = s.Sample(trace, root, env)
 	assert.True(sampled, "trace with priority 1 is kept")
 	assert.True(0.0 < s.Sampler.Backend.GetTotalScore(), "sampling a priority 0 trace should increase total score")
@@ -94,7 +94,7 @@ func TestPrioritySample(t *testing.T) {
 	s = getTestPriorityEngine()
 	trace, root = getTestTraceWithService(t, "my-service", s)
 
-	root.SetSamplingPriority(2)
+	SetSamplingPriority(root, 2)
 	sampled, rate = s.Sample(trace, root, env)
 	assert.True(sampled, "trace with priority 2 is kept")
 	assert.Equal(1.0, rate, "sampling all traces")
@@ -104,14 +104,14 @@ func TestPrioritySample(t *testing.T) {
 	s = getTestPriorityEngine()
 	trace, root = getTestTraceWithService(t, "my-service", s)
 
-	root.SetSamplingPriority(pb.PriorityUserKeep)
+	SetSamplingPriority(root, PriorityUserKeep)
 	sampled, rate = s.Sample(trace, root, env)
 	assert.True(sampled, "trace with high priority is kept")
 	assert.Equal(1.0, rate, "sampling all traces")
 	assert.Equal(0.0, s.Sampler.Backend.GetTotalScore(), "sampling a high priority trace should *NOT* increase total score")
 	assert.Equal(0.0, s.Sampler.Backend.GetSampledScore(), "sampling a high priority trace should *NOT* increase sampled score")
 
-	delete(root.Metrics, pb.SamplingPriorityKey)
+	delete(root.Metrics, KeySamplingPriority)
 	sampled, _ = s.Sample(trace, root, env)
 	assert.False(sampled, "this should not happen but a trace without priority sampling set should be dropped")
 }
@@ -125,7 +125,7 @@ func TestPrioritySampleTracerWeight(t *testing.T) {
 	clientRate := 0.33
 	for i := 0; i < 10; i++ {
 		trace, root := getTestTraceWithService(t, "my-service", s)
-		root.SetSamplingPriority(pb.SamplingPriority(i % 2))
+		SetSamplingPriority(root, SamplingPriority(i%2))
 		root.Metrics[SamplingPriorityRateKey] = clientRate
 		_, rate := s.Sample(trace, root, env)
 		assert.Equal(clientRate, rate)
