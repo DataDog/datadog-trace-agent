@@ -21,21 +21,18 @@ func NewMetricBasedExtractor() Extractor {
 //
 // NOTE: If priority is UserKeep (manually sampled) any extraction rate bigger than 0 is upscaled to 1 to ensure no
 // extraction sampling is done on this event.
-func (e *metricBasedExtractor) Extract(s *agent.WeightedSpan, priority sampler.SamplingPriority) (*agent.Event, float64, bool) {
+func (e *metricBasedExtractor) Extract(s *agent.WeightedSpan, priority sampler.SamplingPriority) (float64, bool) {
 	if len(s.Metrics) == 0 {
 		// metric not set
-		return nil, 0, false
+		return 0, false
 	}
 	extractionRate, ok := s.Metrics[sampler.KeySamplingRateEventExtraction]
 	if !ok {
-		return nil, 0, false
+		return 0, false
 	}
 	if extractionRate > 0 && priority >= sampler.PriorityUserKeep {
 		// If the trace has been manually sampled, we keep all matching spans
 		extractionRate = 1
 	}
-	return &agent.Event{
-		Priority: priority,
-		Span:     s.Span,
-	}, extractionRate, true
+	return extractionRate, true
 }

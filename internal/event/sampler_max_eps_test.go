@@ -3,8 +3,7 @@ package event
 import (
 	"testing"
 
-	"github.com/DataDog/datadog-trace-agent/internal/agent"
-	"github.com/DataDog/datadog-trace-agent/internal/sampler"
+	"github.com/DataDog/datadog-trace-agent/internal/pb"
 	"github.com/DataDog/datadog-trace-agent/internal/test/testutil"
 	"github.com/stretchr/testify/assert"
 )
@@ -12,7 +11,7 @@ import (
 func TestMaxEPSSampler(t *testing.T) {
 	for _, testCase := range []struct {
 		name               string
-		events             []*agent.Event
+		events             []*pb.Span
 		maxEPS             float64
 		pastEPS            float64
 		expectedSampleRate float64
@@ -44,30 +43,15 @@ func TestMaxEPSSampler(t *testing.T) {
 			testSampler.Stop()
 
 			assert.InDelta(testCase.expectedSampleRate, float64(sampled)/float64(len(testCase.events)), testCase.expectedSampleRate*testCase.deltaPct)
-
-			// Ensure PriorityUserKeep events do not affect counters
-			nonUserKeep := 0
-
-			for _, event := range testCase.events {
-				if event.Priority != sampler.PriorityUserKeep {
-					nonUserKeep++
-				}
-			}
-
-			assert.EqualValues(nonUserKeep, counter.GetRateCalls)
-			assert.EqualValues(nonUserKeep, counter.CountCalls)
 		})
 	}
 }
 
-func generateTestEvents(numEvents int) []*agent.Event {
-	testEvents := make([]*agent.Event, numEvents)
+func generateTestEvents(numEvents int) []*pb.Span {
+	testEvents := make([]*pb.Span, numEvents)
 	for i, _ := range testEvents {
-		testEvents[i] = &agent.Event{
-			Span: testutil.RandomSpan(),
-		}
+		testEvents[i] = testutil.RandomSpan()
 	}
-
 	return testEvents
 }
 

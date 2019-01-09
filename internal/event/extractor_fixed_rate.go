@@ -23,21 +23,18 @@ func NewFixedRateExtractor(rateByServiceAndName map[string]map[string]float64) E
 // on the rateByServiceAndName map passed in the constructor. The extracted event is returned along with the associated
 // extraction rate and a true value. If no extraction happened, false is returned as the third value and the others
 // are invalid.
-func (e *fixedRateExtractor) Extract(s *agent.WeightedSpan, priority sampler.SamplingPriority) (*agent.Event, float64, bool) {
+func (e *fixedRateExtractor) Extract(s *agent.WeightedSpan, priority sampler.SamplingPriority) (float64, bool) {
 	operations, ok := e.rateByServiceAndName[s.Service]
 	if !ok {
-		return nil, 0, false
+		return 0, false
 	}
 	extractionRate, ok := operations[s.Name]
 	if !ok {
-		return nil, 0, false
+		return 0, false
 	}
 	if extractionRate > 0 && priority >= sampler.PriorityUserKeep {
 		// If the span has been manually sampled, we always want to keep these events
 		extractionRate = 1
 	}
-	return &agent.Event{
-		Span:     s.Span,
-		Priority: priority,
-	}, extractionRate, true
+	return extractionRate, true
 }

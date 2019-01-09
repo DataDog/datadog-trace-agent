@@ -23,16 +23,13 @@ func NewLegacyExtractor(rateByService map[string]float64) Extractor {
 // span's service. In this case the extracted event is returned along with the found extraction rate and a true value.
 // If this rate doesn't exist or the provided span is not a top level one, then no extraction is done and false is
 // returned as the third value, with the others being invalid.
-func (e *legacyExtractor) Extract(s *agent.WeightedSpan, priority sampler.SamplingPriority) (*agent.Event, float64, bool) {
+func (e *legacyExtractor) Extract(s *agent.WeightedSpan, priority sampler.SamplingPriority) (float64, bool) {
 	if !s.TopLevel {
-		return nil, 0, false
+		return 0, false
 	}
 	extractionRate, ok := e.rateByService[s.Service]
 	if !ok {
-		return nil, 0, false
+		return 0, false
 	}
-	return &agent.Event{
-		Span:     s.Span,
-		Priority: priority,
-	}, extractionRate, true
+	return extractionRate, true
 }

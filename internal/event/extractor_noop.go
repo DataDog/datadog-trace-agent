@@ -13,6 +13,6 @@ func NewNoopExtractor() Extractor {
 	return &noopExtractor{}
 }
 
-func (e *noopExtractor) Extract(_ *agent.WeightedSpan, _ sampler.SamplingPriority) (*agent.Event, float64, bool) {
-	return nil, 0, false
+func (e *noopExtractor) Extract(_ *agent.WeightedSpan, _ sampler.SamplingPriority) (float64, bool) {
+	return 0, false
 }
