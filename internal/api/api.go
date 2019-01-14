@@ -238,7 +238,7 @@ func (r *HTTPReceiver) handleTraces(v Version, w http.ResponseWriter, req *http.
 
 		err := agent.NormalizeTrace(trace)
 		if err != nil {
-			atomic.AddInt64(&ts.TracesDropped, 1)
+			atomic.AddInt64(&ts.TracesDroppedError, 1)
 			atomic.AddInt64(&ts.SpansDropped, int64(spans))
 
 			errorMsg := fmt.Sprintf("dropping trace reason: %s (debug for more info), %v", err, trace)
@@ -255,7 +255,7 @@ func (r *HTTPReceiver) handleTraces(v Version, w http.ResponseWriter, req *http.
 				// this is a safety net against us using too much memory
 				// when clients flood us
 			default:
-				atomic.AddInt64(&ts.TracesDropped, 1)
+				atomic.AddInt64(&ts.TracesDroppedSlow, 1)
 				atomic.AddInt64(&ts.SpansDropped, int64(spans))
 
 				log.Errorf("dropping trace reason: rate-limited")

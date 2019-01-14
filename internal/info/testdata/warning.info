@@ -17,7 +17,7 @@ Trace Agent (v 0.99.0)
     Traces received: 70 (10679 bytes)
     Spans received: 984
     Services received: 0 (0 bytes)
-    WARNING: Traces dropped: 23
+    WARNING: Traces dropped (due to errors): 23
     WARNING: Spans dropped: 184
 
   WARNING: Pre-sampling traces: 42.1 %

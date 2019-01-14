@@ -117,7 +117,8 @@ func newTagStats(tags Tags) *TagStats {
 func (ts *TagStats) publish() {
 	// Atomically load the stats from ts
 	tracesReceived := atomic.LoadInt64(&ts.TracesReceived)
-	tracesDropped := atomic.LoadInt64(&ts.TracesDropped)
+	tracesDroppedSlow := atomic.LoadInt64(&ts.TracesDroppedSlow)
+	tracesDroppedError := atomic.LoadInt64(&ts.TracesDroppedError)
 	tracesFiltered := atomic.LoadInt64(&ts.TracesFiltered)
 	tracesPriorityNone := atomic.LoadInt64(&ts.TracesPriorityNone)
 	tracesPriorityNeg := atomic.LoadInt64(&ts.TracesPriorityNeg)
@@ -138,7 +139,8 @@ func (ts *TagStats) publish() {
 
 	metrics.Count("datadog.trace_agent.receiver.trace", tracesReceived, tags, 1)
 	metrics.Count("datadog.trace_agent.receiver.traces_received", tracesReceived, tags, 1)
-	metrics.Count("datadog.trace_agent.receiver.traces_dropped", tracesDropped, tags, 1)
+	metrics.Count("datadog.trace_agent.receiver.traces_dropped", tracesDroppedSlow, append(tags, "reason:slow"), 1)
+	metrics.Count("datadog.trace_agent.receiver.traces_dropped", tracesDroppedError, append(tags, "reason:error"), 1)
 	metrics.Count("datadog.trace_agent.receiver.traces_filtered", tracesFiltered, tags, 1)
 	metrics.Count("datadog.trace_agent.receiver.traces_priority", tracesPriorityNone, append(tags, "priority:none"), 1)
 	metrics.Count("datadog.trace_agent.receiver.traces_priority", tracesPriorityNeg, append(tags, "priority:neg"), 1)
@@ -160,8 +162,10 @@ func (ts *TagStats) publish() {
 type Stats struct {
 	// TracesReceived is the total number of traces received, including the dropped ones.
 	TracesReceived int64
-	// TracesDropped is the number of traces dropped.
-	TracesDropped int64
+	// TracesDroppedSlow is the number of traces dropped because the agent couldn't process them fast enough.
+	TracesDroppedSlow int64
+	// TracesDroppedError is the number of traces dropped because of normalization errors.
+	TracesDroppedError int64
 	// TracesFiltered is the number of traces filtered.
 	TracesFiltered int64
 	// TracesPriorityNone is the number of traces with no sampling priority.
@@ -194,7 +198,8 @@ type Stats struct {
 
 func (s *Stats) update(recent *Stats) {
 	atomic.AddInt64(&s.TracesReceived, atomic.LoadInt64(&recent.TracesReceived))
-	atomic.AddInt64(&s.TracesDropped, atomic.LoadInt64(&recent.TracesDropped))
+	atomic.AddInt64(&s.TracesDroppedSlow, atomic.LoadInt64(&recent.TracesDroppedSlow))
+	atomic.AddInt64(&s.TracesDroppedError, atomic.LoadInt64(&recent.TracesDroppedError))
 	atomic.AddInt64(&s.TracesFiltered, atomic.LoadInt64(&recent.TracesFiltered))
 	atomic.AddInt64(&s.TracesPriorityNone, atomic.LoadInt64(&recent.TracesPriorityNone))
 	atomic.AddInt64(&s.TracesPriorityNeg, atomic.LoadInt64(&recent.TracesPriorityNeg))
@@ -213,7 +218,8 @@ func (s *Stats) update(recent *Stats) {
 
 func (s *Stats) reset() {
 	atomic.StoreInt64(&s.TracesReceived, 0)
-	atomic.StoreInt64(&s.TracesDropped, 0)
+	atomic.StoreInt64(&s.TracesDroppedError, 0)
+	atomic.StoreInt64(&s.TracesDroppedSlow, 0)
 	atomic.StoreInt64(&s.TracesFiltered, 0)
 	atomic.StoreInt64(&s.TracesPriorityNone, 0)
 	atomic.StoreInt64(&s.TracesPriorityNeg, 0)
@@ -240,7 +246,8 @@ func (s *Stats) isEmpty() bool {
 func (s *Stats) String() string {
 	// Atomically load the stats
 	tracesReceived := atomic.LoadInt64(&s.TracesReceived)
-	tracesDropped := atomic.LoadInt64(&s.TracesDropped)
+	tracesDroppedError := atomic.LoadInt64(&s.TracesDroppedError)
+	tracesDroppedSlow := atomic.LoadInt64(&s.TracesDroppedSlow)
 	tracesFiltered := atomic.LoadInt64(&s.TracesFiltered)
 	// Omitting priority information, use expvar or metrics for debugging purpose
 	tracesBytes := atomic.LoadInt64(&s.TracesBytes)
@@ -249,10 +256,10 @@ func (s *Stats) String() string {
 	eventsExtracted := atomic.LoadInt64(&s.EventsExtracted)
 	eventsSampled := atomic.LoadInt64(&s.EventsSampled)
 
-	return fmt.Sprintf("traces received: %d, traces dropped: %d, traces filtered: %d, "+
+	return fmt.Sprintf("traces received: %d, traces dropped: {error: %d, slow: %d}, traces filtered: %d, "+
 		"traces amount: %d bytes, services received: %d, services amount: %d bytes, "+
 		"events extracted: %d, events sampled: %d",
-		tracesReceived, tracesDropped, tracesFiltered,
+		tracesReceived, tracesDroppedError, tracesDroppedSlow, tracesFiltered,
 		tracesBytes, servicesReceived, servicesBytes,
 		eventsExtracted, eventsSampled)
 }

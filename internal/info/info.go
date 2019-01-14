@@ -67,8 +67,11 @@ const (
     Traces received: {{ $ts.Stats.TracesReceived }} ({{ $ts.Stats.TracesBytes }} bytes)
     Spans received: {{ $ts.Stats.SpansReceived }}
     Services received: {{ $ts.Stats.ServicesReceived }} ({{ $ts.Stats.ServicesBytes }} bytes)
-    {{if gt $ts.Stats.TracesDropped 0}}
-    WARNING: Traces dropped: {{ $ts.Stats.TracesDropped }}
+    {{if gt $ts.Stats.TracesDroppedError 0}}
+    WARNING: Traces dropped (due to errors): {{ $ts.Stats.TracesDroppedError }}
+    {{end}}
+    {{if gt $ts.Stats.TracesDroppedSlow 0}}
+    WARNING: Traces dropped (due to performance): {{ $ts.Stats.TracesDroppedSlow }}
     {{end}}
     {{if gt $ts.Stats.SpansDropped 0}}
     WARNING: Spans dropped: {{ $ts.Stats.SpansDropped }}
